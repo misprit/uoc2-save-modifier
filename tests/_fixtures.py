@@ -64,7 +64,7 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
 
     units = [
         {"id": 1, "type": "us_inf_42", "name_brief": "id_us_inf_42_brief",
-         "name_full": None, "hq_id": 5, "xp": 10, "act_st": 4, "sup_st": 0,
+         "name_full": "第 1 步兵连", "hq_id": 5, "xp": 10, "act_st": 4, "sup_st": 0,
          "losses": 0, "ap": 1, "mp": 3, "entr": 0, "supply": 3,
          "retreated": False, "hidden_defense": False,
          "specs": [{"active": True, "captured": False, "idx": 0,

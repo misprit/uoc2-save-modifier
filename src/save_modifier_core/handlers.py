@@ -136,6 +136,20 @@ def _unit_field(w, e: Edit) -> Outcome:
     if field == "xp":
         oc.warnings.append(
             "登陆单位被补兵后 XP 会被重算掉一部分（§3.5.6）")
+    if field in ("name_brief", "name_full") and isinstance(value, str):
+        if value.startswith("id_") or value.startswith("idp_"):
+            oc.warnings.append(
+                f"{value!r} 看起来是本地化 id，游戏会去本地化表里查它；"
+                "想显示固定文字请直接写明文（§5.5）")
+    # 战力软上限提示 —— 上限来自类型的 max_st，不硬拦（§5.3、§10 第 8 条）
+    if field in ("act_st", "sup_st") and w.catalog is not None:
+        limit = w.catalog.max_st(unit.get("type"))
+        if limit is not None:
+            total = int(unit.get("act_st") or 0) + int(unit.get("sup_st") or 0)
+            if total > limit:
+                oc.warnings.append(
+                    f"该单位战力合计 {total} 超过上限 {limit}"
+                    f"（类型 {unit.get('type')} 的 max_st）—— 游戏可能读不出这个值")
     return oc
 
 

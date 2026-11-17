@@ -31,6 +31,8 @@ __all__ = ["CommitResult", "commit", "make_backup", "backup_path_for"]
 @dataclass
 class CommitResult:
     ok: bool = False
+    #: 计划里没有任何需要写入的改动（不是错误，只是没事可做）
+    nothing_to_do: bool = False
     path: Path | None = None
     backup: Path | None = None
     #: 实际变了的条目
@@ -40,6 +42,8 @@ class CommitResult:
     report: PackReport | None = None
 
     def summary(self) -> str:
+        if self.nothing_to_do:
+            return "没有需要写入的改动"
         if not self.ok:
             return "❌ " + "；".join(self.errors[:3])
         return f"已写入 {self.path.name}（改动 {len(self.changed)} 个文件）"
@@ -89,7 +93,7 @@ def commit(plan: Plan) -> CommitResult:
         res.errors.append("计划里有错误，拒绝写入")
         return res
     if not plan.changes:
-        res.errors.append("没有需要写入的改动")
+        res.nothing_to_do = True
         return res
 
     save_path = Path(plan.path)
