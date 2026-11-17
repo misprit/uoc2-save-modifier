@@ -377,6 +377,11 @@ def _store_set(w, e: Edit) -> Outcome:
                   f" 的 {field}：{old} → {value}")
     if field == "price" and value == 0:
         oc.warnings.append("price=0 表示**免费商品**，不是下架")
+    nat = entry.get("nationality")
+    if isinstance(nat, str) and nat.lower() in ("allies", "axis"):
+        oc.warnings.append(
+            f"nationality={nat!r} 看着像阵营 —— 它要填**国籍 id**"
+            "（uk / us / german / …），不是 allies / axis（§10 第 15 条）")
     return oc
 
 

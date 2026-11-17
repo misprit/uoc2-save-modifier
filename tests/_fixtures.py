@@ -62,6 +62,15 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
     if main_overrides:
         main.update(main_overrides)
 
+    # 上次会议检查点：那时**发了牌**，所以 card_store 非空（§6.3「恢复牌局」的来源）
+    conference_main = dict(main)
+    conference_main["card_store"] = [
+        {"card_type": "air_attack_allies", "is_free": True, "position": 1,
+         "unit_id": None, "used": False},
+        {"card_type": "air_supply_allies", "is_free": False, "position": 2,
+         "unit_id": None, "used": False},
+    ]
+
     units = [
         {"id": 1, "type": "us_inf_42", "name_brief": "id_us_inf_42_brief",
          "name_full": "第 1 步兵连", "hq_id": 5, "xp": 10, "act_st": 4, "sup_st": 0,
@@ -114,7 +123,7 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
         "hqs.yml": dump(hqs),
         "cards.yml": dump(cards),
         "store.yml": dump(store),
-        "last_conference/main.yml": dump(main),
+        "last_conference/main.yml": dump(conference_main),
         "last_conference/units.yml": dump(units),
         "last_conference/hqs.yml": dump(hqs),
         "last_conference/cards.yml": dump(cards),
