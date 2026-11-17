@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>UOC2 存档修改器 · GUI 视觉稿</title>
+<style>
+:root{
+  --window:#f4f6f8; --surface:#ffffff; --surface-alt:#eef2f6; --border:#d4dbe3;
+  --text:#1f2933; --muted:#5c6b78; --accent:#245b8f; --accent-dark:#17456f;
+  --accent-light:#dceaf7; --selection:#cfe3f5;
+  --ok:#1e6b3a; --ok-light:#e4f2ea; --warn:#8a5a00; --warn-light:#fdf3e0;
+  --danger:#a4262c; --danger-light:#fbe9ea; --stage:#1b2430;
+  --ui: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#e9edf1;color:var(--text);font:14px/1.6 var(--ui)}
+.wrap{max-width:1500px;margin:0 auto;padding:28px 24px 80px}
+h1{font-size:26px;margin:0 0 6px;color:var(--accent-dark)}
+h2{font-size:19px;margin:38px 0 4px;color:var(--accent-dark);
+   border-left:4px solid var(--accent);padding-left:10px}
+h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
+.lead{color:var(--muted);margin:0 0 4px}
+.note{background:var(--accent-light);border:1px solid #b9d3ea;border-radius:6px;
+      padding:10px 14px;margin:14px 0;font-size:13px}
+.note.warn{background:var(--warn-light);border-color:#e6cf9a;color:var(--warn)}
+.note b{color:var(--accent-dark)}
+
+/* ---------- 应用窗口模拟 ---------- */
+.app{background:var(--window);border:1px solid var(--border);border-radius:8px;
+     box-shadow:0 18px 44px rgba(20,40,60,.16);overflow:hidden;margin:18px 0 10px}
+.titlebar{background:linear-gradient(180deg,#fdfefe,#eef2f6);border-bottom:1px solid var(--border);
+          padding:9px 14px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.titlebar .dots{display:flex;gap:5px;margin-right:6px}
+.titlebar .dots i{width:10px;height:10px;border-radius:50%;display:block}
+.titlebar .dots i:nth-child(1){background:#e06c60}.titlebar .dots i:nth-child(2){background:#e3b341}
+.titlebar .dots i:nth-child(3){background:#57ab5a}
+.titlebar .t{color:var(--text);font-weight:600}
+
+/* Header */
+.hdr{background:var(--surface);border-bottom:1px solid var(--border);
+     padding:10px 16px;display:flex;align-items:center;gap:14px}
+.hdr .brand{display:flex;align-items:center;gap:9px;font-weight:700;color:var(--accent-dark);font-size:15px}
+.hdr .brand .logo{width:26px;height:26px;border-radius:6px;background:var(--accent);
+  color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
+.hdr .save{background:var(--surface-alt);border:1px solid var(--border);border-radius:6px;
+  padding:5px 11px;font-size:13px;display:flex;align-items:center;gap:9px}
+.badge{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--accent-light);
+  color:var(--accent-dark);font-weight:600;border:1px solid #b9d3ea}
+.badge.battle{background:var(--danger-light);color:var(--danger);border-color:#eec3c5}
+.hdr .sp{flex:1}
+.hdr .hint{font-size:12px;color:var(--muted)}
+
+/* 按钮 */
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);
+  border-radius:6px;padding:6px 13px;font:inherit;font-size:13px;cursor:pointer}
+.btn:hover{background:var(--surface-alt)}
+.btn.pri{background:var(--accent);border-color:var(--accent-dark);color:#fff;font-weight:600}
+.btn.pri:hover{background:var(--accent-dark)}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{background:var(--surface-alt)}
+.btn[disabled]{background:var(--surface-alt);border-color:var(--border);color:var(--muted);cursor:not-allowed}
+.btn .badge-n{background:var(--danger);color:#fff;border-radius:20px;font-size:11px;
+  padding:1px 7px;margin-left:7px;font-weight:700}
+
+/* 主体 */
+.body{display:flex;min-height:520px}
+.rail{width:186px;background:var(--surface);border-right:1px solid var(--border);padding:12px 8px;flex:none}
+.rail .grp{font-size:11px;color:var(--muted);padding:12px 10px 6px;letter-spacing:.08em}
+.nav{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;
+  color:var(--text);font-size:13.5px;margin-bottom:2px;cursor:pointer}
+.nav:hover{background:var(--surface-alt)}
+.nav.on{background:var(--accent);color:#fff;font-weight:600}
+.nav .ic{width:20px;text-align:center;font-size:15px}
+.nav .ct{margin-left:auto;font-size:11px;background:var(--danger);color:#fff;border-radius:20px;padding:0 7px;font-weight:700}
+.nav.dis{color:var(--muted);cursor:default}
+.nav.dis:hover{background:transparent}
+.nav.dis .why{margin-left:auto;font-size:10.5px;color:var(--muted)}
+.rail .sep{border-top:1px solid var(--border);margin:10px 6px}
+.rail .undo{font-size:12px;color:var(--muted);padding:6px 10px}
+.rail .undo b{color:var(--text)}
+
+/* 工作区 */
+.work{flex:1;padding:14px 16px;position:relative;overflow:hidden}
+.toolbar{display:flex;align-items:center;gap:10px;background:var(--surface-alt);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:12px}
+.inp{background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 9px;
+  font:inherit;font-size:13px;color:var(--text)}
+.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(36,91,143,.13)}
+.toolbar .sp{flex:1}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text)}
+.sel{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 9px;font-size:13px}
+
+.cols{display:grid;grid-template-columns:minmax(430px,1.05fr) minmax(430px,1fr);gap:14px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.panel>h3{font-size:13px;margin:0;padding:9px 12px;background:var(--surface-alt);
+  border-bottom:1px solid var(--border);color:var(--accent-dark)}
+
+/* 单位行 */
+.rows{max-height:330px;overflow:hidden}
+.urow{display:flex;align-items:center;gap:11px;padding:9px 12px;border-bottom:1px solid #f0f3f6}
+.urow:hover{background:var(--accent-light)}
+.urow.sel{background:var(--selection)}
+.ava{width:52px;height:52px;border-radius:6px;background:var(--stage);flex:none;
+  display:grid;place-items:center;overflow:hidden}
+.ava img{max-width:100%;max-height:100%;object-fit:contain}
+.umin{flex:1;min-width:0}
+.uname{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px}
+.uname .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block}
+.uname .full{color:var(--ok);font-size:11px}
+.umeta{font-size:11.5px;color:var(--muted);margin-top:1px}
+.pips{display:flex;gap:2px;margin-top:4px}
+.pip{width:13px;height:9px;border-radius:2px;background:var(--surface-alt);border:1px solid var(--border)}
+.pip.on{background:var(--accent);border-color:var(--accent-dark)}
+.pip.max{background:var(--ok);border-color:var(--ok)}
+.uv{font-family:var(--mono);font-size:13px;text-align:right;min-width:58px}
+.uv small{display:block;font-size:10.5px;color:var(--muted);font-family:var(--ui)}
+
+/* 详情 */
+.detail{padding:14px}
+.dhead{display:flex;gap:14px;align-items:flex-start}
+.dhead .ava{width:88px;height:88px}
+.dtitle{font-size:17px;font-weight:700;color:var(--accent-dark);display:flex;align-items:center;gap:8px}
+.dtitle .edit{font-size:12px;color:var(--muted);font-weight:400;border:1px dashed var(--border);
+  border-radius:5px;padding:1px 7px}
+.dsub{font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.stat{background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:9px 11px}
+.stat .lb{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between}
+.stat .lb .hintw{color:var(--accent);font-size:10.5px}
+.stat .v{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--accent-dark);margin-top:2px}
+.stat .v small{font-size:12px;color:var(--muted);font-weight:400}
+.stat .stepic{display:flex;align-items:center;gap:6px;margin-top:6px}
+.stat .stepic img{height:26px;image-rendering:auto}
+.stat .stepic span{font-size:11.5px;color:var(--muted)}
+.specs{display:flex;gap:7px;margin-top:12px;align-items:center;flex-wrap:wrap}
+.spec{width:44px;height:44px;border-radius:6px;background:var(--stage);display:grid;place-items:center;overflow:hidden}
+.spec img{max-width:100%;max-height:100%;object-fit:contain}
+.spec.add{background:var(--surface-alt);border:1px dashed var(--border);color:var(--muted);
+  font-size:20px;display:grid;place-items:center;cursor:pointer}
+.spec .x{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;
+  background:var(--danger);color:#fff;font-size:10px;display:grid;place-items:center}
+.specwrap{position:relative}
+
+/* 抽屉 */
+.drawer{position:absolute;right:14px;bottom:14px;width:430px;background:var(--surface);
+  border:1px solid var(--border);border-radius:9px;box-shadow:0 14px 36px rgba(20,40,60,.22);overflow:hidden}
+.drawer .dh{background:var(--surface-alt);border-bottom:1px solid var(--border);padding:9px 12px;
+  font-size:13px;font-weight:700;color:var(--accent-dark);display:flex;align-items:center;gap:8px}
+.drawer .dh .files{margin-left:auto;font-weight:400;font-size:11px;color:var(--muted);font-family:var(--mono)}
+.ditem{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f4f7;font-size:12.5px}
+.ditem .what{flex:1}
+.ditem .what b{font-weight:600}
+.ditem .what .chg{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.ditem .old{font-family:var(--mono);color:var(--muted);text-decoration:line-through}
+.ditem .new{font-family:var(--mono);color:var(--accent-dark);font-weight:700}
+.drawer .df{display:flex;gap:8px;padding:10px 12px;background:var(--surface-alt)}
+
+/* 状态栏 */
+.status{background:var(--surface);border-top:1px solid var(--border);padding:6px 16px;
+  font-size:12px;color:var(--muted);display:flex;align-items:center;gap:14px}
+.status .ok{color:var(--ok)}.status .no{color:var(--danger)}
+
+/* ---------- 色卡 ---------- */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;margin:12px 0}
+.sw{border:1px solid var(--border);border-radius:7px;overflow:hidden;background:var(--surface)}
+.sw .c{height:54px}
+.sw .m{padding:6px 9px;font-size:11.5px}
+.sw .m b{display:block;font-family:var(--mono);font-size:11px}
+.sw .m span{color:var(--muted)}
+
+/* ---------- 组件 ---------- */
+.comps{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.comp{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
+.comp h4{margin:0 0 10px;font-size:12.5px;color:var(--accent-dark)}
+.comp .row{display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+
+/* 图鉴 */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:11px;padding:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px;text-align:center}
+.card:hover{border-color:var(--accent);box-shadow:0 6px 16px rgba(20,40,60,.13)}
+.card .ci{width:76px;height:76px;margin:0 auto;background:var(--stage);border-radius:6px;
+  display:grid;place-items:center;overflow:hidden}
+.card .ci img{max-width:100%;max-height:100%;object-fit:contain}
+.card .cn{font-size:12px;font-weight:600;margin-top:6px}
+.card .cs{font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.card .used{font-size:10px;color:var(--accent);margin-top:2px}
+
+/* 战区资产 */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px;padding:12px}
+.titem{display:flex;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:9px}
+.titem img{width:60px;height:60px;flex:none}
+.titem .tn{font-size:12.5px;font-weight:600}
+.titem .tv{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.states{display:flex;gap:7px;margin-top:6px}
+.states img{width:34px;height:34px;border:1px solid var(--border);border-radius:5px;background:var(--surface-alt)}
+
+/* tooltip */
+.tip{position:relative;display:inline-block}
+.tipbox{position:absolute;left:50%;transform:translateX(-50%);bottom:130%;background:#1b2430;color:#fff;
+  padding:7px 10px;border-radius:6px;font-size:11.5px;white-space:nowrap;z-index:9;
+  box-shadow:0 8px 22px rgba(0,0,0,.3)}
+.tipbox:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#1b2430}
+
+/* 对话框 */
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:9px;width:520px;
+  box-shadow:0 20px 50px rgba(20,40,60,.3);overflow:hidden}
+.modal .mh{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;color:var(--accent-dark);
+  display:flex;align-items:center;gap:8px}
+.modal .mb{padding:14px 16px;font-size:13px}
+.modal .mf{padding:11px 16px;background:var(--surface-alt);border-top:1px solid var(--border);
+  display:flex;gap:8px;justify-content:flex-end}
+.elist{font-family:var(--mono);font-size:12px;background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:6px;padding:9px 11px;margin-top:9px}
+.elist div{padding:2px 0}
+
+table.spec-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+table.spec-tbl th{text-align:left;background:var(--accent-dark);color:#fff;padding:7px 10px;font-weight:600}
+table.spec-tbl td{padding:7px 10px;border-bottom:1px solid #eef1f4}
+table.spec-tbl tr:hover td{background:var(--accent-light)}
+table.spec-tbl td.num{font-family:var(--mono);text-align:right}
+table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border-radius:4px;display:grid;place-items:center;overflow:hidden}
+table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>UOC2 存档修改器 · GUI 视觉稿</h1>
+<p class="lead">配套文档：<code>docs/GUI设计规范.md</code>。本稿用<strong>游戏原贴图</strong>渲染，用来确认"好看"这件事落地后的样子。</p>
+
+<div class="note">
+<b>贴图说明</b>：本稿直接引用本机游戏安装目录里的原始 PNG（<code>file://</code>）。因此需要装了
+<code>Unity of Command 2</code> 才能看到图；换台机器打开会自动退化为占位方块（正式程序也会这样兜底，不影响功能）。
+</div>
+
+<h2>1 · 色板与字体</h2>
+<p class="lead">前 10 个 token 沿用静态查看器已验证的 PALETTE，后 6 个是本次为"可改 / 不可改 / 已改"新增的。</p>
+<div class="swatches" id="sw"></div>
+
+<div class="comps">
+  <div class="comp"><h4>字体</h4>
+    <div style="font-size:16px;font-weight:700;color:var(--accent-dark)">页面标题 Segoe UI Bold 16</div>
+    <div style="font-size:11px;font-weight:700;color:var(--accent-dark);margin-top:6px">区块标题 Bold 11</div>
+    <div style="font-size:13px;margin-top:6px">正文 Segoe UI 10–13</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">次要文字 Muted 9–12</div>
+    <div style="font-family:var(--mono);font-size:19px;font-weight:700;color:var(--accent-dark);margin-top:6px">7 / 7</div>
+    <div style="font-size:11px;color:var(--muted)">数值用等宽 Consolas —— 滚轮变值时不跳</div>
+  </div>
+  <div class="comp"><h4>按钮</h4>
+    <div class="row"><button class="btn pri">应用更改 <span class="badge-n">2</span></button></div>
+    <div class="row"><button class="btn">↶ 撤销</button><button class="btn">批量调整</button><button class="btn ghost">丢弃</button></div>
+    <div class="row"><button class="btn danger">下架</button><button class="btn" disabled>战区资产</button></div>
+  </div>
+  <div class="comp"><h4>数值控件（滚轮可调）</h4>
+    <div class="row">
+      <span class="sel">战力 5 / 7</span>
+      <span class="inp" style="font-family:var(--mono);width:74px;text-align:right">1 240</span>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted)">悬停 → 边框转 accent + 数值染 accent（120ms）；<br>
+    滚轮 ±1 · Ctrl+滚轮 ±10 · Shift+滚轮 到边界</div>
+  </div>
+  <div class="comp"><h4>战力段格条（离散格）</h4>
+    <div class="pips" style="margin-bottom:7px">
+      <span class="pip on"></span><span class="pip on"></span><span class="pip on"></span>
+      <span class="pip on"></span><span class="pip on"></span><span class="pip"></span><span class="pip"></span>
+    </div>
+    <div class="pips">
+      <span class="pip max"></span><span class="pip max"></span><span class="pip max"></span>
+      <span class="pip max"></span><span class="pip max"></span><span class="pip max"></span><span class="pip max"></span>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:8px">一格 = 1 点战力；空格子 = 还能升几格。<br>满战力用 <span style="color:var(--ok)">ok 色</span> + ★</div>
+  </div>
+  <div class="comp"><h4>提示（tooltip）</h4>
+    <div class="tip"><button class="btn">悬停我</button>
+      <div class="tipbox">战力 5 / 7 · 还差 2 步升满<br><span style="opacity:.75">滚轮可调</span></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:10px">深底 #1b2430 · 白字 · 400ms 延迟 · 跟随鼠标</div>
+  </div>
+  <div class="comp"><h4>滚动条 / 表格</h4>
+    <div style="height:12px;background:var(--surface-alt);border-radius:6px;position:relative">
+      <div style="position:absolute;top:1px;bottom:1px;left:8px;width:44px;background:#b8c2cc;border-radius:5px"></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:8px">clam 皮肤重绘：滑块 10px 圆角、槽 window 色、无边框</div>
+  </div>
+</div>
+
+<h2>2 · 主窗口 · 单位页</h2>
+<p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 7 个功能页，右下是常驻的待应用抽屉。</p>
+
+<div class="app">
+  <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>
+    <span class="t">统一指挥 2 存档修改器</span> <span>— 战役 · 西部线.usg</span></div>
+
+  <div class="hdr">
+    <div class="brand"><span class="logo">U2</span>存档修改器</div>
+    <div class="save">战役 · 西部线.usg <span class="badge battle">战斗中</span></div>
+    <span class="hint">改动会先备份原存档</span>
+    <span class="sp"></span>
+    <button class="btn">↶ 撤销</button>
+    <button class="btn pri">应用更改 <span class="badge-n">2</span></button>
+  </div>
+
+  <div class="body">
+    <div class="rail">
+      <div class="grp">功能</div>
+      <div class="nav"><span class="ic">▤</span>概览</div>
+      <div class="nav on"><span class="ic">▥</span>单位<span class="ct">3</span></div>
+      <div class="nav"><span class="ic">▦</span>特种兵</div>
+      <div class="nav"><span class="ic">▧</span>总部</div>
+      <div class="nav"><span class="ic">▨</span>卡牌</div>
+      <div class="nav"><span class="ic">▩</span>商店</div>
+      <div class="nav dis"><span class="ic">▪</span>战区资产<span class="why">不在战斗中</span></div>
+      <div class="sep"></div>
+      <div class="undo">撤销栈 <b>2</b> 条</div>
+      <div class="undo">最近：单位 3 战力 5 → 7</div>
+    </div>
+
+    <div class="work">
+      <div class="toolbar">
+        <input class="inp" placeholder="搜索单位 / ID…" style="width:210px">
+        <span class="sel">按总部 ▾</span>
+        <label class="chk"><input type="checkbox"> 只看满战力</label>
+        <label class="chk"><input type="checkbox"> 只看有改动的</label>
+        <span class="sp"></span>
+        <span style="font-size:12px;color:var(--muted)">已选 3 个</span>
+        <button class="btn">批量调整</button>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <h3>名册 · 12 个单位</h3>
+          <div class="rows" id="units"></div>
+        </div>
+
+        <div class="panel">
+          <h3>单位详情</h3>
+          <div class="detail">
+            <div class="dhead">
+              <div class="ava"><img id="d-ava" alt=""></div>
+              <div>
+                <div class="dtitle">第 1 装甲师 <span class="edit">✎ 改名</span></div>
+                <div class="dsub">us_arm_42 · 装甲 / 机械化 · 美军</div>
+                <div class="pips" style="margin-top:8px">
+                  <span class="pip on"></span><span class="pip on"></span><span class="pip on"></span>
+                  <span class="pip on"></span><span class="pip on"></span><span class="pip"></span><span class="pip"></span>
+                </div>
+                <div class="umeta">战力 <b style="font-family:var(--mono);color:var(--accent-dark)">5 / 7</b> · 活跃 4 · 压制 1 · 经验 120</div>
+              </div>
+            </div>
+
+            <div class="stats">
+              <div class="stat">
+                <div class="lb"><span>战力</span><span class="hintw">滚轮可调</span></div>
+                <div class="v">5 <small>/ 7</small></div>
+                <div class="stepic"><img id="stepimg" alt=""><span>还差 2 步升满</span></div>
+              </div>
+              <div class="stat">
+                <div class="lb"><span>经验 XP</span><span class="hintw">Ctrl+滚轮 ±10</span></div>
+                <div class="v">120</div>
+                <div class="stepic"><span>满级 400 · 升一级 +1 战力</span></div>
+              </div>
+              <div class="stat">
+                <div class="lb"><span>活跃兵力</span><span class="hintw">战斗外会被重算</span></div>
+                <div class="v">4</div>
+              </div>
+              <div class="stat">
+                <div class="lb"><span>压制兵力</span><span class="hintw">战斗外会被重算</span></div>
+                <div class="v">1</div>
+              </div>
+            </div>
+
+            <h3 style="padding:0;background:none;border:none;margin-top:14px">特种兵挂载 <span style="font-weight:400;color:var(--muted);font-size:11.5px">最多 min(3, max_spec)</span></h3>
+            <div class="specs" id="specs"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer">
+        <div class="dh">待应用（2）<span class="files">将改动 units.yml</span></div>
+        <div class="ditem">
+          <div class="what"><b>第 1 装甲师</b> · 战力<br>
+            <span class="chg"><span class="old">5</span> → <span class="new">7</span></span></div>
+          <button class="btn ghost">撤销</button>
+        </div>
+        <div class="ditem">
+          <div class="what"><b>侦察骑兵</b> · 改名<br>
+            <span class="chg"><span class="old">侦察骑兵</span> → <span class="new">第 2 装甲侦察队</span></span></div>
+          <button class="btn ghost">撤销</button>
+        </div>
+        <div class="df">
+          <button class="btn">丢弃全部</button>
+          <span class="sp" style="flex:1"></span>
+          <button class="btn pri">应用更改</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status">
+    <span>能力位：<span class="ok">单位✓</span> <span class="ok">特种兵✓</span> <span class="ok">总部✓</span>
+      <span class="ok">卡牌✓</span> <span class="ok">商店✓</span> <span class="no">战区资产✗（不在战斗中）</span></span>
+    <span style="flex:1"></span>
+    <span>就绪 · 未改动磁盘</span>
+  </div>
+</div>
+
+<h2>3 · 特种兵图鉴</h2>
+<p class="lead">378 种真实贴图，网格卡片。主图用 <code>hq_action_icon.png</code>（160×160，唯一够大的一张）。</p>
+<div class="app">
+  <div class="body" style="min-height:0">
+    <div class="rail" style="width:150px">
+      <div class="grp">功能</div>
+      <div class="nav"><span class="ic">▤</span>概览</div>
+      <div class="nav"><span class="ic">▥</span>单位</div>
+      <div class="nav on"><span class="ic">▦</span>特种兵</div>
+      <div class="nav"><span class="ic">▧</span>总部</div>
+      <div class="nav"><span class="ic">▨</span>卡牌</div>
+      <div class="nav"><span class="ic">▩</span>商店</div>
+    </div>
+    <div class="work">
+      <div class="toolbar">
+        <input class="inp" placeholder="搜索特种兵…" style="width:200px">
+        <span class="sel">按国籍 ▾</span><span class="sel">按攻击 ▾</span>
+        <label class="chk"><input type="checkbox"> 只看本存档已有的</label>
+        <span class="sp"></span>
+        <span style="font-size:12px;color:var(--muted)">当前单位：第 1 装甲师</span>
+      </div>
+      <div class="panel"><h3>全部特种兵 · 378 种</h3><div class="grid" id="specgrid"></div></div>
+    </div>
+  </div>
+</div>
+
+<h2>4 · 商店页</h2>
+<div class="app">
+  <div class="body" style="min-height:0">
+    <div class="rail" style="width:150px">
+      <div class="grp">功能</div>
+      <div class="nav on"><span class="ic">▩</span>商店</div>
+    </div>
+    <div class="work">
+      <div class="toolbar"><span class="sel">战线：西部 ▾</span><span class="sel">会议：第 3 次 ▾</span>
+        <span class="sp"></span><span style="font-size:12px;color:var(--muted)">价格 / 库存：滚轮可调</span></div>
+      <div class="panel">
+        <h3>商品 · 5 条</h3>
+        <table class="spec-tbl">
+          <tr><th style="width:46px"></th><th>商品</th><th>国籍</th><th style="text-align:right">价格</th>
+              <th style="text-align:right">库存</th><th style="text-align:right">操作</th></tr>
+          <tr><td><div class="thumb"><img id="s1" alt=""></div></td><td>第 1 装甲师</td><td>美</td>
+              <td class="num">120</td><td class="num">2</td>
+              <td class="num"><button class="btn danger">下架</button></td></tr>
+          <tr><td><div class="thumb"><img id="s2" alt=""></div></td><td>特种兵 · 拖曳炮</td><td>德</td>
+              <td class="num">60</td><td class="num">1</td>
+              <td class="num"><button class="btn danger">下架</button></td></tr>
+          <tr><td><div class="thumb"><img id="s3" alt=""></div></td><td>摩托化步兵</td><td>英</td>
+              <td class="num">95</td><td class="num">3</td>
+              <td class="num"><button class="btn danger">下架</button></td></tr>
+        </table>
+        <div style="padding:10px 13px;font-size:12px;color:var(--muted)">
+          「下架」= 删条目（<code>Edit.store_remove</code>），<b>不是</b>把库存设成 0 —— 游戏里没有售罄标记，设 0 会被核心库硬拦。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>5 · 战区资产页（四态图标直接复用游戏贴图）</h2>
+<p class="lead">11 个资产，各 4 态：<code>_neutral</code> / <code>_hover</code> / <code>_down</code> / <code>_disabled</code>。游戏已经画好了，我们只管换文件名。</p>
+<div class="app">
+  <div class="body" style="min-height:0">
+    <div class="rail" style="width:150px">
+      <div class="grp">功能</div>
+      <div class="nav on"><span class="ic">▪</span>战区资产</div>
+    </div>
+    <div class="work">
+      <div class="panel"><h3>战区资产 · 战斗中</h3><div class="tgrid" id="theater"></div></div>
+    </div>
+  </div>
+</div>
+
+<h2>6 · 写盘确认框</h2>
+<p class="lead">任何写盘前都要先出现"要改什么"。软警告不拦、硬拦禁用按钮。</p>
+<div style="display:flex;gap:18px;flex-wrap:wrap">
+  <div class="modal">
+    <div class="mh">⚠ 应用 2 处改动？</div>
+    <div class="mb">
+      将改动存档 <b>campaigns/west.usg</b> 里的：
+      <div class="elist">
+        <div>units.yml</div>
+        <div>units.yml</div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)">
+        写回前会自动备份：<code>west_BACKUP.usg</code>（同名已存在则递增为 <code>west_BACKUP_2.usg</code>）<br>
+        改动后仍可一键撤销。
+      </div>
+    </div>
+    <div class="mf"><button class="btn">取消</button><button class="btn pri">应用更改</button></div>
+  </div>
+
+  <div class="modal" style="border-color:#eec3c5">
+    <div class="mh" style="color:var(--danger)">✕ 无法应用：2 处错误</div>
+    <div class="mb">
+      <div style="color:var(--danger);font-size:12.5px;line-height:1.9">
+        · 单位 12 的战力 8 超过该类型的上限 7<br>
+        · 特种兵 铁拳 的数量 4 超过上限 3
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)">硬拦：<code>plan.errors</code> 非空时按钮禁用，原存档不会被写入。</div>
+    </div>
+    <div class="mf"><button class="btn">返回修改</button><button class="btn" disabled>应用更改</button></div>
+  </div>
+
+  <div class="modal" style="border-color:#e6cf9a">
+    <div class="mh" style="color:var(--warn)">⚠ 有 1 条软警告</div>
+    <div class="mb">
+      <div style="color:var(--warn);font-size:12.5px;line-height:1.9">
+        · 单位 5 的战力 7 超过类型上限 6，仍会写入
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)">软警告：照写，只是提醒。</div>
+    </div>
+    <div class="mf"><button class="btn">取消</button><button class="btn pri">仍然应用</button></div>
+  </div>
+</div>
+
+<h2>7 · 其它页 · 概览（存档体检）</h2>
+<div class="app">
+  <div class="body" style="min-height:0">
+    <div class="rail" style="width:150px">
+      <div class="grp">功能</div>
+      <div class="nav on"><span class="ic">▤</span>概览</div>
+    </div>
+    <div class="work">
+      <div class="cols">
+        <div class="panel"><h3>存档体检</h3>
+          <div style="padding:12px 14px;font-size:13px;line-height:2.1">
+            <div>✅ 单位　　<span style="color:var(--muted)">可改 · 12 个单位</span></div>
+            <div>✅ 特种兵　<span style="color:var(--muted)">可改 · 上限 3</span></div>
+            <div>✅ 总部　　<span style="color:var(--muted)">可改 · 2 个总部</span></div>
+            <div>✅ 卡牌　　<span style="color:var(--muted)">库存 12 张，可改</span></div>
+            <div>✅ 商店　　<span style="color:var(--muted)">2 条战线，可改</span></div>
+            <div>❌ 战区资产 <span style="color:var(--muted)">当前不在战斗中，战斗外改会被场景重算覆盖</span></div>
+          </div>
+        </div>
+        <div class="panel"><h3>战役进度</h3>
+          <div class="stats" style="padding:12px">
+            <div class="stat"><div class="lb"><span>声望</span><span class="hintw">Ctrl+滚轮 ±10</span></div><div class="v">1 240</div></div>
+            <div class="stat"><div class="lb"><span>分数</span><span class="hintw">Ctrl+滚轮 ±10</span></div><div class="v">87</div></div>
+          </div>
+          <h3 style="padding:9px 12px;background:var(--surface-alt);border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:0">备份与撤销栈</h3>
+          <div style="padding:10px 14px;font-size:12.5px;line-height:2">
+            <div>备份　<code>west_BACKUP.usg</code>　10月4日 21:33　<span style="color:var(--accent)">打开目录</span></div>
+            <div>　　　<code>west_BACKUP_2.usg</code>　10月4日 21:30　<span style="color:var(--accent)">打开目录</span></div>
+            <div>撤销　① 10月4日 21:33　单位 3 战力 5 → 7</div>
+            <div>　　　② 10月4日 21:30　商店 3 件商品价格 −50%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>8 · 启动页（选存档）</h2>
+<div class="app" style="max-width:760px">
+  <div class="body" style="min-height:0;justify-content:center;padding:34px">
+    <div style="width:100%;max-width:600px">
+      <div style="text-align:center;margin-bottom:22px">
+        <div style="display:inline-grid;place-items:center;width:52px;height:52px;border-radius:12px;
+          background:var(--accent);color:#fff;font-weight:700;font-size:20px">U2</div>
+        <div style="font-size:20px;font-weight:700;color:var(--accent-dark);margin-top:10px">统一指挥 2 存档修改器</div>
+      </div>
+      <div class="panel">
+        <div class="toolbar" style="margin:0;border:none;border-bottom:1px solid var(--border);border-radius:0">
+          <input class="inp" placeholder="搜索存档…" style="flex:1;border:none;background:transparent">
+          <button class="btn">刷新</button>
+        </div>
+        <div style="padding:6px 0">
+          <div class="urow"><span class="ava" style="width:34px;height:34px"></span>
+            <div class="umin"><div class="uname">战役 · 西部线.usg</div>
+              <div class="umeta">战斗中 · 10月4日 21:33 · 12.0 MB</div></div></div>
+          <div class="urow"><span class="ava" style="width:34px;height:34px"></span>
+            <div class="umin"><div class="uname">战役 · 东部线.usg</div>
+              <div class="umeta">会议中 · 10月3日 19:02 · 11.4 MB</div></div></div>
+          <div class="urow"><span class="ava" style="width:34px;height:34px"></span>
+            <div class="umin"><div class="uname">独立场景 · 诺曼底.usg</div>
+              <div class="umeta">战斗中 · 10月1日 08:11 · 3.2 MB</div></div></div>
+          <div style="padding:8px 14px;font-size:11.5px;color:var(--muted);background:var(--surface-alt)">
+            ── 历史存档（游戏自己的「Old Saves」）────────────</div>
+          <div class="urow" style="opacity:.6"><span class="ava" style="width:34px;height:34px"></span>
+            <div class="umin"><div class="uname">战役 · 旧档.usg</div>
+              <div class="umeta">9月28日 · 12.0 MB</div></div></div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:18px">
+        <button class="btn pri" style="padding:9px 26px;font-size:14px">打开这个存档</button>
+      </div>
+      <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--warn)">
+        ⚠ 改存档前请先退出游戏（文件被占用时写回会失败）
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="lead" style="margin-top:40px;text-align:center;color:var(--muted)">
+  本稿只是<b>视觉参考</b>；行为规范以 <code>docs/GUI设计规范.md</code> 为准。
+</p>
+
+</div>
+
+<script>
+/* ---------------- 数据（全部取自游戏真实文件） ---------------- */
+const SUR = "file:///D:/SteamLibrary/steamapps/common/Unity%20of%20Command%202/_packages/base/assets/surfaces/";
+
+const PALETTE = [
+  ["window","#f4f6f8","窗口底"],["surface","#ffffff","卡片底"],["surface_alt","#eef2f6","工具条"],
+  ["border","#d4dbe3","分隔线"],["text","#1f2933","正文"],["muted","#5c6b78","次要文字"],
+  ["accent","#245b8f","主色"],["accent_dark","#17456f","深主色"],["accent_light","#dceaf7","浅主色"],
+  ["selection","#cfe3f5","选中行"],["ok","#1e6b3a","已满 / 成功"],["ok_light","#e4f2ea","浅底"],
+  ["warn","#8a5a00","软警告"],["warn_light","#fdf3e0","浅底"],["danger","#a4262c","破坏性操作"],
+  ["danger_light","#fbe9ea","浅底"],["stage_dark","#1b2430","头像衬底"]
+];
+
+const UNITS = [
+  {t:"us_arm_42",     name:"第 1 装甲师",      hq:"北部", st:5, max:7, xp:120, spec:["bel_at_40","cz_s_eng_dlc9"]},
+  {t:"us_inf_42",     name:"第 2 摩托化步兵",  hq:"北部", st:7, max:7, xp:340, full:true},
+  {t:"ger_inf_40",    name:"苏军近卫步兵",     hq:"南部", st:3, max:7, xp:40,  spec:["bel_arty_towed_40"]},
+  {t:"bel_cav_40",    name:"侦察骑兵",         hq:"北部", st:7, max:7, xp:210, spec:["cz_s_recon_dlc9"]},
+  {t:"sws_mtn_40",    name:"山地突击队",       hq:"东部", st:4, max:7, xp:80},
+  {t:"uk_arm_div_late_dlc6", name:"英军装甲师", hq:"东部", st:6, max:7, xp:260}
+];
+
+const SPECIALISTS = [
+  ["bel_at_40","反坦克手",3,2,1],["cz_s_eng_dlc9","工兵",1,4,0],
+  ["bel_arty_towed_40","拖曳炮",0,6,4],["cz_s_recon_dlc9","侦察兵",3,4,0],
+  ["bul_s_armx_dlc9","装甲兵",5,5,3],["ff_arty_towed_dlc6","自行火炮",2,3,5],
+  ["cz_s_at_dlc9","突击兵",4,3,0],["bul_s_recon_dlc9","侦察兵",3,4,0],
+  ["cz_s_towed_arty_dlc9","牵引炮兵",0,4,3],["cz_s_armx_dlc9","装甲突击兵",5,5,3],
+  ["bul_s_towed_at_dlc9_opt","反坦克炮",1,4,2],["cz_s_towed_at_dlc9","反坦克炮",1,4,2]
+];
+
+const THEATER = [
+  ["air_attack","空袭"],["air_supply","空中补给"],["flying_artillery","飞行炮兵"],
+  ["long_range_recon","远程侦察"],["naval_bombardment","舰炮轰击"],
+  ["precision_bombing","精确轰炸"],["saturation_strike","饱和攻击"]
+];
+
+/* ---------------- 渲染 ---------------- */
+const sw = document.getElementById("sw");
+PALETTE.forEach(([n,v,d])=>{
+  const el=document.createElement("div"); el.className="sw";
+  el.innerHTML=`<div class="c" style="background:${v}"></div><div class="m"><b>${n}</b><span>${d} · ${v}</span></div>`;
+  sw.appendChild(el);
+});
+
+function img(el, src, alt){ el.src = src; el.alt = alt||""; el.onerror=function(){this.style.display="none";}; }
+
+const rows = document.getElementById("units");
+UNITS.forEach((u,i)=>{
+  const row=document.createElement("div"); row.className="urow"+(i===0?" sel":"");
+  let pips="";
+  for(let k=0;k<u.max;k++){
+    pips += `<span class="pip ${k<u.st ? (u.full?"max":"on") : ""}"></span>`;
+  }
+  row.innerHTML=`
+    <div class="ava"><img alt=""></div>
+    <div class="umin">
+      <div class="uname">${u.name}${u.dot?'<span class="dot"></span>':''}${u.full?'<span class="full">★ 满战力</span>':''}</div>
+      <div class="umeta">总部 ${u.hq} · XP ${u.xp}</div>
+      <div class="pips">${pips}</div>
+    </div>
+    <div class="uv">${u.st} / ${u.max}<small>战力</small></div>`;
+  img(row.querySelector("img"), SUR+"unit/"+u.t+"/sheet_L.png", u.name);
+  rows.appendChild(row);
+});
+
+/* 详情页：第 1 装甲师 = us_arm_42 ⇒ armor/2 ⇒ step_armor_2.png */
+img(document.getElementById("d-ava"), SUR+"unit/us_arm_42/sheet_L.png", "us_arm_42");
+img(document.getElementById("stepimg"), SUR+"steps/step_armor_2.png", "step");
+
+const sp = document.getElementById("specs");
+["bel_at_40","cz_s_eng_dlc9"].forEach(s=>{
+  const w=document.createElement("div"); w.className="specwrap";
+  w.innerHTML=`<div class="spec"><img alt=""></div><div class="spec">✕</div>`;
+  const imgs=w.querySelectorAll("img");
+  img(imgs[0], SUR+"specialist/"+s+"/hq_action_icon.png", s);
+  w.querySelectorAll(".spec")[1].style.cssText="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--danger);color:#fff;font-size:10px;display:grid;place-items:center";
+  sp.appendChild(w);
+});
+const add=document.createElement("div"); add.className="spec add"; add.textContent="＋";
+sp.appendChild(add);
+
+/* 图鉴 */
+const sg=document.getElementById("specgrid");
+SPECIALISTS.forEach(([t,n,a,d,f])=>{
+  const c=document.createElement("div"); c.className="card";
+  c.innerHTML=`<div class="ci"><img alt=""></div><div class="cn">${n}</div>
+    <div class="cs">攻${a} 防${d} 装${f}</div><div class="used">已被 2 个单位使用</div>`;
+  img(c.querySelector("img"), SUR+"specialist/"+t+"/hq_action_icon.png", n);
+  sg.appendChild(c);
+});
+
+/* 商店缩略 */
+img(document.getElementById("s1"), SUR+"unit/us_arm_42/sheet_L.png");
+img(document.getElementById("s2"), SUR+"specialist/bel_arty_towed_40/hq_action_icon.png");
+img(document.getElementById("s3"), SUR+"unit/uk_arm_div_late_dlc6/sheet_L.png");
+
+/* 战区资产 */
+const tg=document.getElementById("theater");
+THEATER.forEach(([a,n])=>{
+  const t=document.createElement("div"); t.className="titem";
+  t.innerHTML=`<img alt=""><div><div class="tn">${n}</div>
+    <div class="tv">可用 3 次 · 每回合 1</div>
+    <div class="states">
+      <img title="neutral"><img title="hover"><img title="down"><img title="disabled">
+    </div></div>`;
+  const all=t.querySelectorAll("img");
+  img(all[0], SUR+"theater/"+a+"_neutral.png");
+  ["hover","down","disabled"].forEach((s,i)=>img(all[i+1], SUR+"theater/"+a+"_"+s+".png"));
+  tg.appendChild(t);
+});
+</script>
+</body>
+</html>
