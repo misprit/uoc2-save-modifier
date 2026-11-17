@@ -41,6 +41,15 @@
 | §12 | 证据与复现（脚本表） | 想自己验证时 |
 | §13 | 给实现者的最后提醒 | 收尾读一遍 |
 
+**配套文档**（同一仓库，随 Git 提交）：
+
+| 文档 | 内容 |
+|---|---|
+| **`docs/GUI设计规范.md`** | ⭐ **GUI 侧的事实源** —— 三条铁律、信息架构、视觉规范、贴图资产映射、交互规范、7 个功能页、GUI↔核心库调用时序、技术实现、实施路线 |
+| `docs/GUI视觉稿.html` | GUI 视觉稿（浏览器打开；直接引用游戏真贴图） |
+| `docs/核心库调用说明.md` | 8 个函数的精确签名 + 11 种 Edit + 能力位矩阵（写 GUI 必读） |
+| `docs/开发上下文.md` | 工程进度、决策记录、踩过的坑 |
+
 ---
 
 ## 0. 任务
@@ -55,10 +64,11 @@
 |---|---|---|
 | **核心库形态** | **纯 Python 包**（`save_modifier_core`），**GUI 直接 `import`** 使用 | 不做 JSON/HTTP/子进程 CLI —— 少一层协议、少一层出错点，GUI 与核心库在同一进程里 |
 | **对外接口** | **8 个函数**（`§0.2`） | 接口越少越不容易被误用，也越不容易漂移 |
-| **GUI 归属** | 由实现者在**另一个已有 GUI 的项目**里调用本核心库；**最终产物是"与静态查看器合成的一个文件"** | 静态查看器已有成熟的 Tk 界面与数据结构，重新造 GUI 不划算 |
-| **开发顺序** | **先做无界面核心库**（可独立跑测试），**后续再合并接入 GUI** | 核心库能独立跑回归测试（往返无损），不用每次都点 GUI |
-| **界面** | 必须是**傻瓜式 GUI**：不要求用户懂 YAML，不提供"跳过校验"入口 | §13 |
+| **GUI 归属** | ✅ **就在本仓库里做**（`src/save_modifier_gui/`）—— 原计划"并入静态查看器"，2026-11-17 改判：两个项目的**数据哲学与安全边界契约**不同，合并要跨仓库改契约；**先各自独立稳定，再做"外壳合并"** | GUI 的**设计**另见 `docs/GUI设计规范.md`（含 `docs/GUI视觉稿.html`）—— 那是 GUI 侧的事实源 |
+| **开发顺序** | **先做无界面核心库**（可独立跑测试），**再在本仓库做 GUI** | 核心库能独立跑回归测试（往返无损），不用每次都点 GUI |
+| **界面** | 必须是**傻瓜式 GUI**：不要求用户懂 YAML，不提供"跳过校验"入口 | §13；具体设计见 `docs/GUI设计规范.md` |
 | **Python 运行时** | **随包分发**（`python/` 目录，含 CPython 3.14 运行时，**一并进 Git**） | 用户不装 Python 也能用；25 MB 一次性成本，之后不再改动 |
+| **GUI 运行时** | 随包 runtime 是 **embeddable 版 CPython 3.14.3，不带 tkinter** ⇒ 做原生窗口须**补 tcl/tk**（+8.7 MB，见 `docs/GUI设计规范.md` §10.1 与证据脚本 `e141`~`e145`、`e144`） | 已端到端验证：补齐后 `Tk() OK patchlevel 8.6.15` |
 | **成品形态** | **解压即用的 zip**（解压后双击 `run.bat` 即可） | 同上 |
 
 > **阶段 4（并入静态查看器）的前置条件**：那个项目自己的「安全边界」契约目前明文禁止"修改存档"，
@@ -3035,7 +3045,7 @@ mod 新增的类型还没被扫到时，玩家仍然可以手输 id 完成修改
 
 ## 12. 证据与复现
 
-本机实测脚本**随仓库分发**：`docs\证据脚本\`（144 个取证脚本 + 两个终检脚本 + README）。
+本机实测脚本**随仓库分发**：`docs\证据脚本\`（162 个取证脚本 + 两个终检脚本 + README + 1 份取证报告）。
 原件仍在 `D:\MiniMax\_analysis\`；仓库里那份是**逐字节拷贝**，路径仍是本机绝对路径
 （它们是"取证现场"，故意没改）。
 
@@ -3184,6 +3194,27 @@ mod 新增的类型还没被扫到时，玩家仍然可以手输 id 完成修改
 | `e126_unicode.py` | 真实存档里中文的存储形态普查：**含原始非 ASCII 字节的 0 个、含 `\uXXXX` 转义的 40 个** |
 | `e127_esc.py` | 转义字符串的确切写法：`name_brief: "1\u7B2C\u82CF\u8054\u8B66\u536B\u961F"`（双引号 + 大写十六进制） |
 | `e120_ser.py` / `e123_base.py` / `e124_base2.py` | `tools/serialization.pyc` 的 `save_yaml` → `yaml_dumps` 调用链，以及 `_Dumper` 基类确认 |
+| `e135_assetmap.py` / `e135_assetmap.md` | **GUI 贴图资产全盘点**：629 个单位类型目录 / 379 个特种兵目录（378 真有图 + `generic` 空目录）/ 11 张 step / 44 张战区资产（11×4 态）/ status 55 / icon 211 —— 尺寸全部由 PNG IHDR 直读，**不靠文件名猜** |
+| `e136_fphelper.py` | `hq_ctrl.pyc::HQCtrl._fp_helper` 全量反汇编 ⇒ **战力阶梯（step）语义**：`'steps/step{}'` 的拼法、`id_n_steps_*` 的三选一分支、步数 `n` 的来源（§《GUI设计规范》§5.4） |
+| `e137_scan_pyc.py` | 全量 `.pyc` 字符串扫描 ⇒ 定位 `n_steps` / `force_pool` / `img_ident` 的定义方（`state/entities/force_pool.pyc`、`state/entities/unit.pyc`） |
+| `e138_nsteps.py` | `n_steps` 出现在哪些类/方法里 |
+| `e139_stepalgo.py` | **战力阶梯算法**：`UnitState.use_from_deploy` → `num_steps = max_st − tot_st`；`get_num_nationality_steps` / `get_unit_equipment_steps` 逐条反汇编 |
+| `e140_equipcombo.py` | 627 个单位类型的 `(equipment, equipment_q)` 组合分布 ⇒ 日常只会用到 `step.png` / `step_armor_1.png` / `step_armor_2.png` 三张阶梯图 |
+| `e141_tkprobe.py` / `e142_tkreal.py` | tkinter / PhotoImage / PNG 能力探测；**"能 import" ≠ "能开窗"** 的实测（`Tk()` + `ttk.Style` + `PhotoImage`） |
+| `e143_tcllib.py` | Tcl 脚本库位置（`info library` / `auto_path`） |
+| `e144_tktest.py` | **给随包 runtime 补 tcl/tk 的端到端验证**：补齐 7 项后 `Tk() OK patchlevel: 8.6.15`、`clam` 主题可用、`PhotoImage` 可用 |
+| `e145_peimports.py` | PE 导入表解析（纯标准库）⇒ 定位缺失依赖：**`tcl86t.dll` 依赖 `zlib1.dll`**，缺了必然 `DLL load failed` |
+| `e146_edge.py` | 两个真实坑：`specialist/generic` 是**空目录**；`unit/ger_pz_dlc7/` 里是 **`sheet_l.png`（小写 L）** ⇒ 图标查找必须大小写不敏感 |
+| `e147_sheetlr.py` / `e148_sheetbranch.py` | **`sheet_L` / `sheet_R` 语义**：战斗面板进攻方用 `sheet_L`、防守方用 `sheet_R`；单位详情面板**永远用 `sheet_L`** |
+| `e149_picktypes.py` | 真实单位类型的 `movement` / `equipment` / `max_st` / `max_spec`（视觉稿与测试用） |
+| `e150_speccheck.py` | 特种兵目录逐个复查（**只有 `generic` 空**，其余 378 个 7 图齐全） |
+| `e151_checkrefs.py` | 视觉稿引用的每一个贴图路径逐个核对（**缺失 0**） |
+
+> `e135` ~ `e151` 这一组是 **《GUI设计规范》§5「游戏贴图资产映射」与 §10「技术实现」的证据链**：
+> 它们把"GUI 能用哪些游戏贴图、step 图标到底怎么选、贴图怎么缩放、GUI 跑在什么运行时上"
+> 从**猜测**变成了**字节码 + 实测**。
+> ⚠️ 其中 `e144` 是**唯一一条结论会影响成品打包**的证据链：随包 CPython 3.14.3（embeddable 版）
+> **不带 tkinter**，不补 `tcl/tk` 就做不了原生窗口。
 
 > `e88` ~ `e105` 这一组是 **§6.1b「不做里程碑功能」那个决定的证据链** ——
 > 它们回答的是"全局里程碑状态到底存在哪里"，而不是"怎么改它"。
@@ -3337,6 +3368,14 @@ um = importlib.import_module("uoc2.state.entities.data_validation.unit")
 | **新增单位类型 / 新增特种兵类型（`create-type` / `create-spec`）不做** | **产品决策** | 要写游戏包或 L5 名册 → 跨存档共享、**回退不掉**（§7.5） |
 | **核心库 = 纯 Python 包、8 个函数、GUI 直接 `import`** | **产品决策** | 少一层协议、少一层出错点；核心库能**无界面**跑回归测试（§0.1、§0.2、§7.7） |
 | **Python 运行时随包分发并一并进 Git** | **产品决策** | 用户不装 Python 也能用；25 MB 是一次性成本，之后不再改动（§0.1、§10 第 51 条） |
+| **GUI 在本仓库独立开发**（不并入静态查看器） | **产品决策**（2026-11-17 改判） | 两个项目的**安全边界契约**不同（静态项目 D-033 明文禁止改存档），合并要跨仓库改契约；先各自稳定再"外壳合并" |
+| **GUI 技术栈 = Tk 8.6 + ttk** | **产品决策**（基于实测） | 与静态查看器同栈 ⇒ 配色/主题代码可复用，未来"外壳合并"成本最低；原生窗口对玩家最傻瓜 |
+| **随包 runtime 必须补 tcl/tk（+8.7 MB）** | ✅ **实证结论**（`e141`~`e145`） | embeddable 版 CPython 3.14.3 **不带 tkinter**；补齐后 `Tk() OK patchlevel 8.6.15`（§0.1、GUI 设计规范 §10.1） |
+| **GUI 贴图运行时从游戏目录读，不打包** | **产品决策**（基于实测） | `assets/surfaces` 全部约 **180 MB**；改存档的人一定装了游戏 |
+| **"战力阶梯"（step）= 离满战力还差几步** | ✅ **实证结论**（`e136` / `e139` 字节码） | `use_from_deploy`：`num_steps = max_st − tot_st`；图标按 `equipment` / `equipment_q` 选 `steps/step*`（GUI 设计规范 §5.4） |
+| **单位头像用 `sheet_L`**（`sheet_R` 只在"进攻方 vs 防守方"对阵时用） | ✅ **实证结论**（`e147` / `e148` 字节码） | 战斗面板：攻方 `sheet_L` / 守方 `sheet_R`；单位详情面板永远 `sheet_L`（GUI 设计规范 §5.3） |
+| **战区资产图标有 4 态变体**（neutral/hover/down/disabled） | ✅ **实证结论**（`e135` 全盘点） | 11 个资产 × 4 = 44 张，120×120 ⇒ GUI 可直接复用游戏现成的四态（GUI 设计规范 §5.5） |
+| **特种兵图鉴主图用 `hq_action_icon.png`（160×160）** | **产品决策**（基于实测尺寸） | `sheet_large.png` 只有 52×68，名字骗人（GUI 设计规范 §5.2、§12.3） |
 
 > **给实现者的一条方法论**：
 > 本项目在这份文档上犯过两次同类错误 —— ①用"最后一个快照"抽样做存在性普查，
