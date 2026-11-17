@@ -17,7 +17,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from save_modifier import packing
+from save_modifier_core import packing
 from save_modifier.savefile import extract_archive
 
 # 游戏自己的写盘约定（实测 70 个存档一致）：全条目同一时间戳

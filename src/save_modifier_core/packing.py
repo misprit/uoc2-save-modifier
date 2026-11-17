@@ -15,7 +15,7 @@
 1. **条目清单与顺序** —— 完全沿用原存档；
 2. **元数据** —— `date_time` / `external_attr` / `create_system` / `compress_type`
    全部沿用原存档；
-3. **内容** —— 优先取工作目录里的文件；工作目录缺某个条目时从原存档原样取回。
+3. **内容** —— 优先取调用方给的内容（overlay）；没给的条目从原存档原样取回。
 
 游戏自己的写盘约定（实测 70 个存档一致）
 ----------------------------------------
@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import hashlib
 import zipfile
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
@@ -40,6 +41,7 @@ __all__ = [
     "PackReport",
     "list_entries",
     "repack",
+    "repack_overlay",
     "verify",
 ]
 
@@ -56,9 +58,9 @@ class PackReport:
     total: int = 0
     #: 内容与原存档不同的条目名（应当只有被显式修改过的那几个）
     changed: list[str] = field(default_factory=list)
-    #: 工作目录里有、但原存档没有的条目 —— **正常情况下必须为空**
+    #: 新出现的条目 —— **正常情况下必须为空**（§7.2 W1：绝不新建文件）
     added: list[str] = field(default_factory=list)
-    #: 原存档里有、但没能从工作目录取到的条目（已从原存档原样回填）
+    #: 工作目录里有、但没能从工作目录取到的条目（已从原存档原样回填）
     missing: list[str] = field(default_factory=list)
     #: 条目顺序与原存档不一致（只有重建才可能出现）
     reordered: bool = False
@@ -92,17 +94,23 @@ def _work_path(work_dir: Path, entry_name: str) -> Path:
     return work_dir / Path(PurePosixPath(entry_name))
 
 
-def repack(original: Path, work_dir: Path, output: Path, *,
-           extra_entries: list[str] | None = None) -> PackReport:
-    """按原存档的条目清单与顺序重建 ZIP。
+def repack_overlay(original: Path,
+                   overlay: Mapping[str, bytes],
+                   output: Path,
+                   *,
+                   extra_entries: Mapping[str, bytes] | None = None) -> PackReport:
+    """按原存档的条目清单与顺序重建 ZIP，只把 `overlay` 里的条目换成新内容。
+
+    这是核心库写回的主入口：**overlay 只装真正被改过的条目**，
+    其余条目一律从原存档原样取回 —— 内存占用与改动量成正比，
+    与存档总大小无关。
 
     参数
     ----
     original : 原存档路径（提供条目清单、顺序与元数据）
-    work_dir : 解包后的工作目录（提供被修改过的内容）
-    output   : 输出路径（先写临时文件再原子替换由调用方负责）
-    extra_entries : 允许额外写入的条目名（相对 work_dir 的 posix 路径）。
-                    默认空 —— §7.2 W1 规定"绝不新建文件"。
+    overlay  : {条目名: 新内容}，条目名是 ZIP 内的 posix 路径
+    output   : 输出路径（先写临时文件再原子替换）
+    extra_entries : 允许**新增**的条目。默认空 —— §7.2 W1 规定"绝不新建文件"。
 
     返回 PackReport：哪些条目内容变了、哪些是多余的、顺序是否一致。
     """
@@ -119,25 +127,31 @@ def repack(original: Path, work_dir: Path, output: Path, *,
         src_infos = src.infolist()
         src_names = {i.filename for i in src_infos}
 
-        # 工作目录里多出来的文件 —— 正常必须为空
-        on_disk = set()
-        for f in work_dir.rglob("*"):
-            if f.is_file():
-                on_disk.add(f.relative_to(work_dir).as_posix())
-        allowed = set(extra_entries or ())
-        report.added = sorted(on_disk - src_names - allowed)
+        report.added = sorted(set(overlay) - src_names)
+        extra = dict(extra_entries or {})
+        report.added.extend(sorted(set(extra) - src_names))
 
         for info in src_infos:
             orig_data = src.read(info.filename)
             original_hashes[info.filename] = _sha256(orig_data)
-            fpath = _work_path(work_dir, info.filename)
-            if fpath.is_file():
-                data = fpath.read_bytes()
+            if info.filename in overlay:
+                data = overlay[info.filename]
             else:
-                # 工作目录里没有 —— 从原存档原样取回，绝不静默丢失
                 data = orig_data
-                report.missing.append(info.filename)
             payloads.append((info, data))
+
+        # 新增条目（正常为空）—— 追加在最后，保持原条目顺序不变
+        new_names = []
+        for name, data in extra.items():
+            if name in src_names:
+                continue
+            zi = zipfile.ZipInfo(name, date_time=src_infos[0].date_time
+                                 if src_infos else (1980, 1, 1, 0, 0, 0))
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            zi.external_attr = 0o600 << 16
+            zi.create_system = 0
+            payloads.append((zi, data))
+            new_names.append(name)
 
     tmp = output.with_name(output.name + ".tmp")
     tmp.parent.mkdir(parents=True, exist_ok=True)
@@ -159,9 +173,30 @@ def repack(original: Path, work_dir: Path, output: Path, *,
 
     # 用实际结果覆盖"改动列表"与"顺序一致性"
     new_entries = list_entries(output)
-    old_order = list(original_hashes.keys())
+    old_order = list(original_hashes.keys()) + new_names
     report.changed = [n for n, h in new_entries if original_hashes.get(n) != h]
     report.reordered = [n for n, _ in new_entries] != old_order
+    return report
+
+
+def repack(original: Path, work_dir: Path, output: Path, *,
+           extra_entries: Mapping[str, bytes] | None = None) -> PackReport:
+    """把工作目录的内容打包成 .usg（兼容旧 REPL 工具的入口）。
+
+    与 `repack_overlay` 的区别：这里的内容来自**整个工作目录**，
+    工作目录里有而原存档没有的文件会被记为 `added`（**不会写进存档**）；
+    原存档里有而工作目录缺的文件会被记为 `missing`（已从原存档原样回填）。
+    """
+    overlay: dict[str, bytes] = {}
+    for f in work_dir.rglob("*"):
+        if f.is_file():
+            overlay[f.relative_to(work_dir).as_posix()] = f.read_bytes()
+
+    report = repack_overlay(original, overlay, output, extra_entries=extra_entries)
+
+    # 工作目录应当包含原存档的全部条目 —— 少了的要报告出来（已自动回填）
+    with zipfile.ZipFile(original, "r") as src:
+        report.missing = sorted(set(src.namelist()) - set(overlay))
     return report
 
 

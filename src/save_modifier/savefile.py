@@ -146,7 +146,7 @@ class SaveSession:
         用保真打包器（packing.repack）：条目顺序与元数据沿用原存档，
         只有工作目录里被改过的文件内容会变（§11.4 / §11.5）。
         """
-        from . import packing
+        from save_modifier_core import packing
 
         report = packing.repack(self.save.path, self.work_dir, self.save.path)
         if report.added:
