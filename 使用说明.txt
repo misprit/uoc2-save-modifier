@@ -7,8 +7,10 @@
     · 核心库  src\save_modifier_core\   —— 真正干活的部分，无界面，可被任何 GUI 直接 import
     · 自测入口 src\save_modifier\        —— 核心库的命令行外壳，供开发/排查用
 
-玩家真正使用的界面是 GUI（另一个项目），它直接调用核心库的 8 个函数；
+玩家真正使用的界面是 **GUI**（正在本仓库内开发，设计稿见 docs\GUI设计规范.md
+与 docs\GUI视觉稿.html），它直接调用核心库的 8 个函数；
 本目录里的命令行入口只是开发时敲命令用的通道。
+（运行时里已经带上了 Tcl/Tk 8.6，原生窗口开箱即用。）
 
 
 一、怎么启动
@@ -54,11 +56,12 @@
 
 
 五、目录说明
-    python\   自带的 CPython 3.14.3 解释器与 PyYAML 6.0.3（约 25 MB）
+    python\   自带的 CPython 3.14.3 解释器与 PyYAML 6.0.3（约 31 MB，含 Tcl/Tk 8.6）
+    lib\      Tcl/Tk 8.6 脚本库（GUI 层的运行时依赖）
     src\      程序本体
               save_modifier_core\   ★ 核心库（GUI 只要复制这个包）
               save_modifier\        自测入口
-    docs\     参考文档（核心库调用说明 / 命令参考 / 开发上下文）
+    docs\     参考文档（核心库调用说明 / 命令参考 / 开发上下文 / GUI 设计规范 / GUI 视觉稿）
     tests\    自动化测试（167 项）
     run.bat           启动自测入口
     run_tests.bat    跑全部自动化测试
