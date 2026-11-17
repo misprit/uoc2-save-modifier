@@ -7,6 +7,8 @@ setlocal
 cd /d "%~dp0"
 set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
+set "TCL_LIBRARY=%~dp0lib\tcl8.6"
+set "TK_LIBRARY=%~dp0lib\tk8.6"
 if not exist "python\python.exe" (
     echo [ERROR] python\python.exe is missing - the package is incomplete.
     pause

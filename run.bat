@@ -7,6 +7,11 @@ setlocal
 cd /d "%~dp0"
 set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
+rem Tcl/Tk script libraries (needed by the GUI layer; harmless for the CLI).
+rem Tcl auto-discovers them under <package root>\lib, but set them explicitly
+rem so the GUI also works if the package is relocated.
+set "TCL_LIBRARY=%~dp0lib\tcl8.6"
+set "TK_LIBRARY=%~dp0lib\tk8.6"
 if not exist "python\python.exe" (
     echo [ERROR] python\python.exe is missing - the package is incomplete.
     echo Please re-extract the whole zip.

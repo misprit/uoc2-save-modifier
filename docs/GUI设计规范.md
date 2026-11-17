@@ -726,19 +726,34 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 
 补齐清单（**全部来自本机已有文件，不联网**）：
 
-| 文件 | 来源 | 体积 | 作用 |
-|---|---|---|---|
-| `_tkinter.pyd` | 游戏 `lib\`（CPython 官方 3.14 构建） | 69 KB | C 扩展 |
-| `tcl86t.dll` | 游戏 `lib\` | 1.84 MB | Tcl 8.6 运行时 |
-| `tk86t.dll` | 游戏 `lib\` | 1.59 MB | Tk 8.6 运行时 |
-| `zlib1.dll` | 游戏 `lib\` | 146 KB | **`tcl86t.dll` 的依赖，缺了 DLL 加载必失败** |
-| `tkinter/`（含 `ttk.py`） | 系统 Python 3.14.7 的 `Lib\tkinter` 源码包 | ~250 KB | 纯 Python 层 |
-| `tcl8.6/` | 游戏 `share\tcl8.6` | ~4 MB | Tcl 脚本库（`init.tcl` 等） |
-| `tk8.6/` | 游戏 `share\tk8.6` | ~2 MB | Tk 脚本库（`tk.tcl` 等） |
+| 文件 | 落位 | 来源 | 体积 | 作用 |
+|---|---|---|---|---|
+| `_tkinter.pyd` | `python/` | 游戏 `lib\`（CPython 官方 3.14 构建） | 69 KB | C 扩展 |
+| `tcl86t.dll` | `python/` | 游戏 `lib\` | 1.84 MB | Tcl 8.6 运行时 |
+| `tk86t.dll` | `python/` | 游戏 `lib\` | 1.59 MB | Tk 8.6 运行时 |
+| `zlib1.dll` | `python/` | 游戏 `lib\` | 146 KB | **`tcl86t.dll` 的依赖，缺了 DLL 加载必失败** |
+| `tkinter/`（含 `ttk.py`） | `python/Lib/site-packages/` | 系统 Python 3.14.7 的 `Lib\tkinter` 源码包 | ~250 KB | 纯 Python 层 |
+| `tcl8.6/` | **`lib/`（包根）** | 游戏 `share\tcl8.6` | 3.0 MB | Tcl 脚本库（`init.tcl` 等） |
+| `tk8.6/` | **`lib/`（包根）** | 游戏 `share\tk8.6` | 1.6 MB | Tk 脚本库（`tk.tcl` 等） |
 
 合计 **+8.7 MB**（22.5 MB → 31.2 MB）。
 
-**【实证】** 端到端验证通过（`docs/证据脚本/e144_tktest.py`）：
+**【实证】** 脚本库**必须放在 `<包根>/lib/`**，不能放在 `python/` 下面 ——
+Tcl 的自动发现路径是 `<prefix>/lib/tcl8.6`、`<prefix>/library`、`<prefix>/tcl8.6.15/library`，
+而 embeddable runtime 的 `<prefix>` 是**包根**（`python/` 的上一级），不是 `python/` 本身。
+实测三种布局：
+
+| 布局 | 不设环境变量 | 结论 |
+|---|---|---|
+| `python/Lib/tcl8.6` | ❌ `Can't find a usable init.tcl` | prefix 不是 `python/` |
+| `python/tcl8.6` + `TCL_LIBRARY` | ✅ | 靠环境变量才work |
+| **`<包根>/lib/tcl8.6` + `<包根>/lib/tk8.6`** | ✅ **不需要任何环境变量** | **采用这个** |
+
+**【决策】** 采用第三种布局 —— **零环境变量依赖**。
+另外 `run.bat` / `run_tests.bat` 里**也**显式设 `TCL_LIBRARY` / `TK_LIBRARY`（指向 `%~dp0lib\tcl8.6`），
+作为"整包被挪位置"时的兜底；GUI 入口在 `import tkinter` 之前也会自己设一次。
+
+**【实证】** 端到端验证通过（`docs/证据脚本/e144_tktest.py` + 仓库内实测）：
 
 ```
 python: 3.14.3
@@ -748,16 +763,17 @@ python: 3.14.3
   themes: ('winnative', 'clam', 'alt', 'default', 'classic', 'vista', 'xpnative')
   clam OK
   PhotoImage OK
+  lib E:/.../uoc2-save-modifier/lib/tcl8.6      ← 自动发现，无环境变量
 ```
 
 **注意事项**：
 
 * 游戏的 `lib\tkinter` 是**冻结版**（只有 `__init__.pyc`，**没有 `ttk.py`**）⇒ 必须用系统 3.14.7 的**源码包**；
-* `TCL_LIBRARY` / `TK_LIBRARY` 环境变量要在启动器里设（指向 `python\tcl8.6` / `python\tk8.6`），
-  否则 Tcl 会去系统盘找 8.6 脚本库；
 * `_tkinter.pyd` 依赖 `python314.dll` ⇒ 必须与随包 runtime 的 Python 次版本一致（3.14.x 补丁版 ABI 兼容，已验证）；
 * `_tkinter.pyd` / `tcl86t.dll` / `tk86t.dll` 都是 CPython / Tcl / Tk 的官方组件，
   **可再分发**（PSF / BSD 风格许可）。
+* ⚠️ **Tcl 对非 ASCII 路径不友好**（报错信息里中文路径会被按本地代码页显示成乱码）——
+  但这只是**报错信息**的显示问题，脚本库本身能被正确定位与加载（已验证 `info library` 输出正常）。
 
 ### 10.2 PNG 缩放管线（纯标准库）
 

@@ -68,7 +68,7 @@
 | **开发顺序** | **先做无界面核心库**（可独立跑测试），**再在本仓库做 GUI** | 核心库能独立跑回归测试（往返无损），不用每次都点 GUI |
 | **界面** | 必须是**傻瓜式 GUI**：不要求用户懂 YAML，不提供"跳过校验"入口 | §13；具体设计见 `docs/GUI设计规范.md` |
 | **Python 运行时** | **随包分发**（`python/` 目录，含 CPython 3.14 运行时，**一并进 Git**） | 用户不装 Python 也能用；25 MB 一次性成本，之后不再改动 |
-| **GUI 运行时** | 随包 runtime 是 **embeddable 版 CPython 3.14.3，不带 tkinter** ⇒ 做原生窗口须**补 tcl/tk**（+8.7 MB，见 `docs/GUI设计规范.md` §10.1 与证据脚本 `e141`~`e145`、`e144`） | 已端到端验证：补齐后 `Tk() OK patchlevel 8.6.15` |
+| **GUI 运行时** | 随包 runtime 是 **embeddable 版 CPython 3.14.3，不带 tkinter** ⇒ 做原生窗口须**补 tcl/tk**（+8.7 MB）：`python/{_tkinter.pyd,tcl86t.dll,tk86t.dll,zlib1.dll}` + `python/Lib/site-packages/tkinter/` + **`<包根>/lib/{tcl8.6,tk8.6}`**（Tcl 的 `<prefix>` 是包根，脚本库放这里才能被自动发现）。已端到端验证：补齐后 `Tk() OK patchlevel 8.6.15` | 见 `docs/GUI设计规范.md` §10.1 与证据脚本 `e141`~`e145`、`e144` |
 | **成品形态** | **解压即用的 zip**（解压后双击 `run.bat` 即可） | 同上 |
 
 > **阶段 4（并入静态查看器）的前置条件**：那个项目自己的「安全边界」契约目前明文禁止"修改存档"，
