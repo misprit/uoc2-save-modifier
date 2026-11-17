@@ -18,7 +18,10 @@ import zipfile
 from pathlib import Path
 
 from save_modifier_core import packing
-from save_modifier.savefile import extract_archive
+
+#: 旧工具里的 `savefile.extract_archive` 已随旧 REPL 一起砍掉；
+#: 解包能力搬进了核心库（`packing.extract`），旧工具不再需要自己解包。
+extract_archive = packing.extract
 
 # 游戏自己的写盘约定（实测 70 个存档一致）：全条目同一时间戳
 GAME_STAMP = (2026, 1, 2, 3, 4, 6)

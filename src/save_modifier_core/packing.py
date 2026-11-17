@@ -39,6 +39,7 @@ from pathlib import Path, PurePosixPath
 
 __all__ = [
     "PackReport",
+    "extract",
     "list_entries",
     "repack",
     "repack_overlay",
@@ -198,6 +199,38 @@ def repack(original: Path, work_dir: Path, output: Path, *,
     with zipfile.ZipFile(original, "r") as src:
         report.missing = sorted(set(src.namelist()) - set(overlay))
     return report
+
+
+def extract(original: Path, work_dir: Path) -> list[str]:
+    """把存档解包到 `work_dir` —— `repack` 的反面（**只读**，不改存档）。
+
+    解包前**清空** `work_dir`：上次运行残留的文件既不属于本存档，
+    又会被 `repack` 原样打包回去，混入不属于本存档的内容。
+    `work_dir` 只存放 .usg 的展开副本，清空不会丢掉唯一数据。
+
+    返回解出来的条目名（顺序与 ZIP 内一致）。
+    """
+    import shutil
+
+    if work_dir.exists():
+        shutil.rmtree(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    names: list[str] = []
+    with zipfile.ZipFile(original, "r") as zf:
+        for info in zf.infolist():
+            name = info.filename
+            # 目录条目不需要；路径穿越（../）直接跳过
+            if name.endswith("/") or name.startswith("/"):
+                continue
+            parts = PurePosixPath(name).parts
+            if any(p == ".." for p in parts):
+                continue
+            target = work_dir / Path(*parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(zf.read(name))
+            names.append(name)
+    return names
 
 
 def verify(original: Path, output: Path) -> PackReport:

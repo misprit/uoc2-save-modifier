@@ -1,978 +1,571 @@
-"""REPL 命令层：解析命令、维护会话上下文（存档、选中单位、类型绑定），
-并把命令分发给对应的 cmd_* 实现。
+"""自测入口 —— 对核心库 `save_modifier_core` 的命令行外壳。
 
-命令总览（help 输出）：
-  存档管理:  open/reload(qs/ql) save exit help
-  声望/资产: ptg <数量>  |  st <资产名> <to_use,total,turn>
-  卡牌:      cardList | cardAdd/cardBuy <卡牌类型> [位置]
-             cardDel/cardUnused <位置|卡牌类型>（仅战役存档）
-  单位:      find <关键字> | select <id> | xp <id> <值> | str <id> <活跃> [压制]
-             type <id> <类型> | spec <id> <特种> | unspec <id> <特种> [idx]
-             set <id> <字段> <值>
-  绑定/实体: bind <id> <类型> | bindInfo | create-type <原型> [新名]
-             create-spec <原型> [新名]
-  本地化:    troopName <id> <文本> | brief <id> <文本> | full <实体> <文本>
-  杂项:      refs [refs|uoc2|temp|orig](打开参考/数据/临时mod/原版包目录) | which
+**它不是产品界面。** 玩家用的是 GUI（另一个项目里的静态查看器），
+这里只是给开发者/排查问题时用的终端入口：直接调用核心库的 8 个函数，
+把中间结果（视图、diff、校验、撤销栈）打印出来。
+
+旧版 REPL 里的这些能力**已经砍掉**（规范 §7.5、§0.3）：
+
+| 砍掉的东西 | 为什么 |
+|---|---|
+| `create-type` / `create-spec`（新建单位/特种类型） | 要写游戏包，跨存档共享，**游戏内回退不掉** |
+| `bind` / `bindInfo` / `reu`（类型绑定） | 同上 —— 绑定写的是 temp mod，不是存档 |
+| `rename`（重命名 temp mod 实体） | 改名**直接写明文**（`name_brief` / `name_full`） |
+| `troopName` / `brief` / `full`（本地化写入） | 同上 —— 不写 temp mod，不写本地化包 |
+| `qs` / `ql`（快速存读档） | 产品决策：**不做**频繁存读档（§0.3、§7.5） |
+| `type <id> <类型>`（改编制） | 硬约束：**不改单位编制**（§0.4） |
+
+保留的只有"读"和"改存档本身"的部分 —— 而这些现在全部由核心库实现，
+本模块只做**参数解析与打印**。
 """
 
 from __future__ import annotations
 
 import os
-import re
+import sys
 from pathlib import Path
-from typing import Optional
 
-from . import cards, entity_service, game_state, localize
-from .entity_service import BindingStore
-from .savefile import SaveSession, load_yaml, quick_load, quick_save
-from .session import SessionContext
+# 允许直接 `python src/save_modifier/repl.py` 运行
+if __package__ in (None, ""):  # pragma: no cover
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-HELP_TEXT = """指令（<参数>为必填，[参数]可选）：
+from save_modifier_core import (Catalog, CorePaths, Edit, list_saves,  # noqa: E402
+                                open_save, validate)
+
+__all__ = ["run_repl", "Repl"]
+
+HELP_TEXT = """自测入口（核心库的命令行外壳）：
 
 --- 存档 ---
-open [存档名]            重新选择/打开存档（不带参则列出可选）
-save | s                 把修改保存回 .usg
-qs [后缀]                备份当前存档为 <存档名><后缀>.usg（默认 _quick）
-ql [后缀]                从备份恢复
-re                       重新从 .usg 加载（丢弃未保存修改）
-exit                     退出
+saves                        列出本机存档
+open <序号|save_id>          打开存档
+view                         当前存档概览（阶段 / 能力位 / 各表条目数）
+caps                         只看能力位
+units [关键字]               列出单位（可按 id / 名称 / type 过滤）
+hqs                          列出总部
+cards                        列出卡牌（根表 + 手里）
+store                        列出商店
+types [unit|spec|card|hq]    列出类型目录（候选值）
 
---- 声望 / 战区资产 ---
-ptg <数量>               设定声望；ptg +N / ptg -N 在当前值上增减
-st <代码> <a,total,turn> 战区资产：air/airArt/airRec/pb/supply/ss/nb
-                         例：st air 2,0,2（每回合2次，不限总次数）
+--- 编辑（先 plan，确认后再 commit）---
+xp <单位id> <值>             经验值 0..400
+st <单位id> <活跃> [压制]    战力 act_st / sup_st
+name <单位id> <明文>         改显示名（**直接写明文**）
+spec <单位id> <特种类型>      加特种
+unspec <单位id> <类型> [idx]  卸特种
+pool <总部id> <条目序号> <数量>  总部兵库存量
+ptg <值>                     声望
+score <值>                   分数
+card add <卡牌类型> [槽位]     加卡
+card del <槽位>               删卡
+store set <战线> <序号> <price|quantity> <值>   改商店条目
+store del <战线> <序号>        下架商店条目（删条目）
+hand                         恢复上次会议的牌局
+asset <资产名> <可用次数> [总次数] [每回合]     战区资产（仅战斗中）
 
---- 卡牌（仅战役存档）---
-cardList                 列出当前卡槽（1–5 为宽松范围，实际槽位数随难度）
-cardAdd <卡牌类型> [位置] 添加卡；省略位置取第一个空槽；同位置会覆盖旧卡
-cardBuy <卡牌类型> [位置] 购买卡：添加同时扣除卡牌费用，不允许覆盖
-cardDel <位置|卡牌类型>   删除一张卡
-cardUnused <位置|卡牌类型> 把卡设为未使用过（used: false，保留 unit_id）
-                         添加时 unit_id 恒为 null；
-                         添加的卡阵营与战役阵营不符时需二次确认
-
---- 单位 ---
-find <关键字>            按名称/本地化id/type 查单位，列出候选 id
-select <id>              选中单位作为后续命令的默认对象（可省略 id）
-xp [id] <值>             经验值（0-400）
-str [id] <活跃> [压制]    战力：活跃战力 act_st，压制 sup_st（合计>7 时提示）
-type [id] <类型>         单位类型
-spec [id] <特种名>       给单位挂特种（同名可重复挂）
-unspec [id] <特种名> [idx] 移除特种；同名多条时只卸一条（默认第一条）
-set <id> <字段> <值>     改任意字段（如 set 27 losses 0）
-
---- 实体/绑定 ---
-create-type <原型> [新名] [--model-from <包|路径>]
-                          以原版单位为原型克隆新单位类型到 temp mod
-                          --model-from 指定模型 meta 来源：base/dlc1/... 或路径
-                          （包目录或直接的 *_meta.yml；路径可用引号包裹空格）
-create-spec <原型> [新名]   以原版特种为原型克隆新特种
-bind <id> <类型>            绑定：单位 → 类型（写入绑定文件并应用）
-bindInfo                    列出当前绑定
-rename <旧名> <新名>        重命名 temp mod 实体（同步文件与绑定）
-reu                         重新应用全部绑定（应对战役段脚本覆写）
-
---- 本地化 ---
-troopName <id> <文本>       给单个单位改显示名（加 _custom 后缀）
-brief <实体名|单位id> <文本> 改实体的简称（数字 id 需先 bind；实体名可直接改）
-full <实体名> <文本>        改特种实体全称（如 full xxx_custom 新全称）
+--- 写回 ---
+plan                         显示上一次编辑的 diff 与校验结果
+commit                       提交（备份 → 校验 → 原子替换，并压撤销栈）
+undo                         撤销上一次提交（撤销前校验基准）
+stack                        看撤销栈
 
 --- 其他 ---
-refs [目标]                 打开参考目录：refs(默认)/uoc2/temp(临时 mod)/orig(原版包)
-which                       显示当前存档与工作目录
-help | h                    本帮助
+selftest                     核心库自检（能力位 / 类型表 / 往返无损）
+refs                         生成名册参考表（单位/总部 → 临时目录，并打印路径）
+paths                        显示探测到的路径
+exit                         退出
 """
 
-_ARG_RE = re.compile(r'"[^"]*"|\'[^\']*\'|\S+')
-
-
-def split_command(line: str) -> list[str]:
-    """按空白分词，并支持用引号包裹含空格的参数（如 Windows 绝对路径）。
-
-    不处理反斜杠转义，避免破坏 Windows 路径。
-    """
-    tokens = []
-    for m in _ARG_RE.findall(line):
-        if len(m) >= 2 and m[0] == m[-1] and m[0] in "\"'":
-            tokens.append(m[1:-1])
-        else:
-            tokens.append(m)
-    return tokens
-
-
-# help 中列出的短别名：dispatch 以 "cmd_<名>" 查方法，类属性别名不会被命中，
-# 故在此统一映射（同时覆盖旧命令名）。
-COMMAND_ALIASES = {
-    "s": "save",
-    "h": "help",
-    "quickSave": "qs",
-    "quickLoad": "ql",
-    "editUnit": "create-type",
-    "editSpec": "create-spec",
-    "bindType": "bind",
-    "setUnit": "set",
+#: 战区资产的简写 → 存档里的真实资产名
+ASSET_ALIASES = {
+    "air": "air_attack",
+    "airArt": "flying_artillery",
+    "airRec": "long_range_recon",
+    "pb": "precision_bombing",
+    "supply": "air_supply",
+    "ss": "saturation_strike",
+    "nb": "naval_bombardment",
 }
 
 
-class CommandError(Exception):
-    pass
+class ReplError(Exception):
+    """命令用法错误。"""
 
 
 class Repl:
-    """命令分发器。持有当前存档会话（可切换）。"""
+    """极简命令行外壳。"""
 
-    def __init__(self, config, select_first: bool = True):
-        self.config = config
-        self._ctx: Optional[SessionContext] = None
+    def __init__(self):
+        self.paths = CorePaths.discover()
+        self.catalog = Catalog(self.paths)
+        self._save = None
+        self._last_plan = None
+        self._last_edits: list[Edit] = []
         self._translations = None
 
-    @property
-    def ctx(self) -> SessionContext:
-        """当前存档会话；未打开时抛 CommandError。
+    # ---------------------------------------------------------------- 工具
 
-        以 property 访问取代各处 None 判空：handler 只要用到 ctx，
-        未打开存档就会得到明确报错并被 dispatch 捕获。
-        """
-        if self._ctx is None:
-            raise CommandError("当前未打开存档，先使用 open 选择存档。")
-        return self._ctx
-
-    @ctx.setter
-    def ctx(self, value: SessionContext) -> None:
-        self._ctx = value
-
-    # ---- 翻译（懒加载） ----
     @property
     def translations(self):
+        """游戏原版的本地化表（只读）—— 用来把 id 翻成中文名。"""
         if self._translations is None:
             from .translations import TranslationStore
             self._translations = TranslationStore(
-                self.config.orig_packages, self.config.locale)
+                self.paths.game_packages_dir, "chi")
         return self._translations
 
-    # ---- 存档选择 ----
-    def list_primary_saves(self) -> list:
-        from .savefile import primary_saves, scan_all_saves
-        return primary_saves(scan_all_saves(
-            self.config.campaigns_dir, self.config.games_dir))
+    def _cn(self, text: str | None) -> str:
+        """把本地化 id 翻成中文；翻不到就原样返回。"""
+        if not text:
+            return ""
+        return self.translations.get(text) or text
 
-    def _find_by_name(self, name: str):
-        """在战役/场景目录中按名称找主存档；找到返回 SaveFile，否则 None。"""
-        from .savefile import SaveFile, detect_save_kind
-        for d in (self.config.campaigns_dir, self.config.games_dir):
-            p = d / f"{name}.usg"
-            if p.exists():
-                return SaveFile(p, kind=detect_save_kind(p))
-        return None
+    @property
+    def save(self):
+        if self._save is None:
+            raise ReplError("当前未打开存档，先用 saves / open 选一个。")
+        return self._save
 
-    def open_save(self, name: Optional[str] = None) -> bool:
-        """打开存档。name 为 None 时列出可选让用户输入。
+    def close(self) -> None:
+        if self._save is not None:
+            self._save.close()
+            self._save = None
 
-        同时支持战役（save/campaigns）与独立场景（save/games）两类存档：
-        列表合并展示并标注类型；按名称打开时先精确匹配，再退回
-        “列出可选”的交互流程。
-        """
-        from .savefile import SaveFile
-        saves = self.list_primary_saves()
-        # 无任何存档时不进入交互（避免把“选错目录”伪装成可选）
-        if not saves:
-            print(f"在 {self.config.campaigns_dir} 与 {self.config.games_dir} "
-                  "未找到主存档 (.usg)。")
-            print("请确认游戏数据目录配置正确。")
-            return False
+    # ---------------------------------------------------------------- 命令
 
-        def _describe(index: int, s: SaveFile) -> str:
-            tag = "场景" if s.kind == "standalone" else "战役"
-            return f"  {index}. {s.name}  ({tag}存档)"
-
-        chosen = None
-        if name:
-            chosen = next((s for s in saves if s.name == name), None)
-            if chosen is None:
-                # 允许带编号/后缀的手动档（备份）作为目标
-                chosen = self._find_by_name(name)
-            if chosen is None:
-                print(f"未找到存档 {name}")
-                return False
-        else:
-            print("可用的存档：")
-            for i, s in enumerate(saves, 1):
-                print(_describe(i, s))
-            print("  (或输入完整文件名) ")
-            inp = input("选择序号或名称 > ").strip()
-            if inp.isdigit() and 1 <= int(inp) <= len(saves):
-                chosen = saves[int(inp) - 1]
-            elif inp:
-                chosen = next((s for s in saves if s.name == inp), None)
-                if chosen is None:
-                    chosen = self._find_by_name(inp)
-            if chosen is None:
-                print("未选择有效存档。")
-                return False
-
-        # 装配会话
-        session = SaveSession(self.config, chosen)
-        self.ctx = SessionContext(
-            session=session,
-            config=self.config,
-            translations=self.translations,
-            bindings=BindingStore(self.config.save_dir_for(session.name)),
-        )
-        # 记住上次（写到 modifier_root/last_save.txt）
-        try:
-            last = self.config.modifier_root / "last_save.txt"
-            last.parent.mkdir(parents=True, exist_ok=True)
-            last.write_text(session.name, encoding="utf-8")
-        except OSError:
-            pass
-        print(f"当前存档: {session.name}")
-        return True
-
-    def auto_open_last(self) -> bool:
-        """若存在 last_save.txt 且对应存档在，自动打开。"""
-        last = self.config.modifier_root / "last_save.txt"
-        if last.exists():
-            name = last.read_text(encoding="utf-8").strip()
-            if name:
-                return self.open_save(name)
-        return False
-
-    # ---- 命令分发 ----
-    def dispatch(self, line: str) -> bool:
-        """处理一行输入。返回 False 表示应退出。"""
-        parts = split_command(line)
-        if not parts:
-            return True
-        cmd, args = parts[0], parts[1:]
-        cmd = COMMAND_ALIASES.get(cmd, cmd)
-        try:
-            # 未打开存档时只放行无需会话的命令
-            if self._ctx is None and cmd not in (
-                "open", "help", "h", "exit", "quit", "save"
-            ):
-                raise CommandError("当前未打开存档，先使用 open 选择存档。")
-            # 命令名中的连字符映射为下划线以匹配方法名
-            method_name = "cmd_" + cmd.replace("-", "_")
-            handler = getattr(self, method_name, None)
-            if handler is None:
-                print(f"未知指令: {cmd}（输入 help 查看指令）")
-                return True
-            return bool(handler(args))
-        except (CommandError, cards.CardError) as e:
-            print(f"错误: {e}")
-            return True
-        except Exception as e:  # noqa: BLE001 命令层兜底，避免一次报错退出
-            import traceback
-            traceback.print_exc()
-            print(f"执行出错: {e}")
-            return True
-
-    # ---- 各命令实现 ----
     def cmd_help(self, args) -> bool:
         print(HELP_TEXT)
         return True
 
-    h = cmd_help
+    def cmd_exit(self, args) -> bool:
+        self.close()
+        return False
+
+    def cmd_saves(self, args) -> bool:
+        saves = [s for s in list_saves(self.paths) if s.is_primary]
+        if not saves:
+            print(f"在 {self.paths.save_root} 下没有找到 .usg")
+            return True
+        print(f"存档根目录: {self.paths.save_root}\n")
+        for i, s in enumerate(saves, 1):
+            tag = "场景" if s.is_standalone else "战役"
+            print(f"  {i:2d}. {s.display_name}  [{tag}]  {s.save_id}")
+        return True
 
     def cmd_open(self, args) -> bool:
-        name = args[0] if args else None
-        self.open_save(name)
+        if not args:
+            raise ReplError("用法: open <序号|save_id>")
+        saves = [s for s in list_saves(self.paths) if s.is_primary]
+        if not saves:
+            raise ReplError("本机没有存档")
+        target = None
+        if args[0].isdigit():
+            i = int(args[0])
+            if not (1 <= i <= len(saves)):
+                raise ReplError(f"序号超出范围（1..{len(saves)}）")
+            target = saves[i - 1]
+        else:
+            target = next((s for s in saves if s.save_id == args[0]
+                           or s.path.name == args[0]
+                           or s.path.stem == args[0]), None)
+            if target is None:
+                raise ReplError(f"未找到存档 {args[0]}")
+        self.close()
+        self._save = open_save(target.save_id, self.paths)
+        print(f"已打开: {target.display_name}  ({target.path})")
         return True
 
-    def cmd_save(self, args) -> bool:
-        self.ctx.session.commit()
+    def cmd_view(self, args) -> bool:
+        v = self.save.view(self.catalog)
+        print(f"阶段: {v.stage}")
+        print(f"声望: {v.prestige}   分数: {v.score}")
+        if v.battle_turn:
+            print(f"当前战斗回合: {v.battle_turn}")
+        print(f"能力位: {_caps_text(v.capabilities)}")
+        print(f"单位 {len(v.units)}  总部 {len(v.hqs)}  "
+              f"卡牌 {len(v.cards)}  手里 {len(v.hand)}  商店 {len(v.store)}")
+        for w in v.warnings:
+            print(f"⚠️ {w}")
         return True
 
-    s = cmd_save
-
-    def cmd_exit(self, args) -> bool:
-        return False
-
-    def cmd_quit(self, args) -> bool:
-        return False
-
-    def cmd_re(self, args) -> bool:
-        self.ctx.session.reload()
-        # 重建 units 与重应用绑定
-        self.ctx.units.load()
-        self.ctx.reapply_bindings(verbose=False)
-        print("已重新加载。")
+    def cmd_caps(self, args) -> bool:
+        print(_caps_text(self.save.capabilities()))
         return True
 
-    def cmd_reu(self, args) -> bool:
-        n = self.ctx.reapply_bindings(verbose=True)
-        print(f"已应用 {n} 处绑定。")
+    def cmd_units(self, args) -> bool:
+        v = self.save.view(self.catalog)
+        key = args[0].lower() if args else ""
+        for u in v.units:
+            cn = self._cn(u.name_brief)
+            label = f"{cn} {u.display_name}" if cn else u.display_name
+            hay = f"{u.id} {u.type or ''} {label}".lower()
+            if key and key not in hay:
+                continue
+            st = f"act={u.act_st} sup={u.sup_st}"
+            if u.max_st is not None:
+                st += f"/{u.max_st}"
+            spec = ",".join(s.get("type", "?") for s in u.specs)
+            print(f"  {u.id:4d}  {label[:28]:28s}  {u.type or '-':16s}  "
+                  f"xp={u.xp}  {st}  spec=[{spec}]")
         return True
 
-    def cmd_qs(self, args) -> bool:
-        suffix = args[0] if args else "_quick"
-        if not suffix.startswith("_"):
-            suffix = "_" + suffix
-        target = quick_save(self.ctx.session, suffix)
-        print(f"已备份: {target.name}" if target else "备份失败。")
+    def cmd_hqs(self, args) -> bool:
+        v = self.save.view(self.catalog)
+        for h in v.hqs:
+            cn = self._cn(h.name_brief)
+            label = f"{cn} {h.display_name}" if cn else h.display_name
+            pool = ", ".join(
+                f"{p.get('equipment') or p.get('spec')}×{p.get('quantity')}"
+                for p in h.force_pool)
+            print(f"  {h.id:4d}  {label[:28]:28s}  cp={h.cp}/{h.max_cp}  "
+                  f"兵库[{pool}]")
         return True
 
-    quickSave = cmd_qs
-
-    def cmd_ql(self, args) -> bool:
-        suffix = args[0] if args else "_quick"
-        if not suffix.startswith("_"):
-            suffix = "_" + suffix
-        quick_load(self.ctx.session, suffix)
-        self.ctx.units.load()
-        self.ctx.reapply_bindings(verbose=False)
+    def cmd_cards(self, args) -> bool:
+        v = self.save.view(self.catalog)
+        for c in v.cards:
+            print(f"  根表  槽{c.position}  {c.card_type}  "
+                  f"{'免费' if c.is_free else '付费'}"
+                  f"{'  已用' if c.used else ''}")
+        for c in v.hand:
+            print(f"  手里  槽{c.position}  {c.card_type}  "
+                  f"{'免费' if c.is_free else '付费'}"
+                  f"{'  已用' if c.used else ''}")
+        if not v.cards and not v.hand:
+            print("（没有卡牌）")
         return True
 
-    quickLoad = cmd_ql
-
-    # --- 声望/资产 ---
-    def cmd_ptg(self, args) -> bool:
-        """ptg <数量> 绝对赋值；ptg +N / ptg -N 在当前值上增减。"""
-        raw = args[0] if args else ""
-        if raw.startswith(("+", "-")) and raw[1:].isdigit():
-            current = game_state.get_prestige(self.ctx.session) or 0
-            game_state.set_prestige(self.ctx.session, current + int(raw))
+    def cmd_store(self, args) -> bool:
+        v = self.save.view(self.catalog)
+        if not v.store:
+            print("（没有商店）")
             return True
-        if raw.isdigit():
-            game_state.set_prestige(self.ctx.session, int(raw))
-            return True
-        print("用法: ptg <数量>（前缀 + / - 表示增减）")
+        for i, e in enumerate(v.store):
+            print(f"  {e.front:10s} {e.what:22s} 价 {e.price:4d}  库存 {e.quantity:4d}"
+                  f"  {e.nationality or ''}")
         return True
 
-    prestige = cmd_ptg
+    def cmd_types(self, args) -> bool:
+        what = (args[0].lower() if args else "unit")
+        table = {
+            "unit": self.catalog.unit_type_names,
+            "spec": self.catalog.spec_type_names,
+            "card": self.catalog.card_type_names,
+            "hq": self.catalog.hq_type_names,
+        }.get(what)
+        if table is None:
+            raise ReplError("用法: types [unit|spec|card|hq]")
+        names = table()
+        print(f"{len(names)} 个：")
+        for n in names:
+            print(f"  {n}")
+        return True
+
+    # ---- 编辑 ----
+
+    def cmd_xp(self, args) -> bool:
+        uid, value = _int_args(args, 2, "xp <单位id> <值>")
+        return self._plan([Edit.unit_field(uid, "xp", value)])
 
     def cmd_st(self, args) -> bool:
         if len(args) < 2:
-            print("用法: st <代码> <to_use,total,turn>  例: st air 2,0,2")
-            return True
-        alias = args[0]
-        try:
-            vals = [int(x) for x in args[1].split(",")]
-        except ValueError:
-            print("参数需为逗号分隔的三个整数。")
-            return True
-        if len(vals) != 3:
-            print("需要 3 个数值: to_use,total,turn")
-            return True
-        game_state.set_theater_asset(self.ctx.session, alias, *vals)
-        return True
+            raise ReplError("用法: st <单位id> <活跃> [压制]")
+        uid = _as_int(args[0], "单位 id")
+        act = _as_int(args[1], "活跃战力")
+        edits = [Edit.unit_field(uid, "act_st", act)]
+        if len(args) > 2:
+            edits.append(Edit.unit_field(uid, "sup_st", _as_int(args[2], "压制战力")))
+        return self._plan(edits)
 
-    setTheaterAssets = cmd_st
-
-    # --- 卡牌（仅战役存档） ---
-
-    def _card_list(self) -> "cards.CardList":
-        return cards.CardList(self.ctx.session)
-
-    def _card_catalog(self) -> dict:
-        return cards.load_card_catalog(self.config)
-
-    def _card_title(self, card_type: str, catalog: dict) -> str:
-        """卡牌的中文标题 + 类型名；无翻译时退回类型名。"""
-        entry = catalog.get(card_type) or {}
-        title = (entry.get("data") or {}).get("title")
-        name = self.translations.get(title) if title else ""
-        return f"{name}（{card_type}）" if name else str(card_type)
-
-    def _confirm(self, prompt: str) -> bool:
-        """REPL 内的二次确认；非交互输入（EOF）视为取消。"""
-        try:
-            ans = input(f"{prompt} [y/N] > ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            return False
-        return ans in ("y", "yes", "是")
-
-    def _faction_ok(self, card_type: str, catalog: dict) -> bool:
-        """软校验：卡牌阵营与战役扮演阵营不符时要求二次确认。
-
-        战役阵营来自 document/main.yml 的 player_faction；读不到、或包中
-        没有该卡牌定义时只提示，不拦截。
-        """
-        entry = catalog.get(card_type)
-        if entry is None:
-            print(f"提示：包中未找到卡牌定义 {card_type}，跳过阵营校验。")
-            return True
-        data = entry.get("data") or {}
-        raw_faction = data.get("faction")
-        if not raw_faction:
-            print(f"提示：卡牌 {card_type} 缺少 faction 字段（异常数据），"
-                  "跳过阵营校验。")
-            return True
-        card_faction = cards.card_faction(data)
-        campaign = cards.campaign_faction(self.ctx.session.work_dir)
-        if campaign is None:
-            print("提示：未读到战役阵营（document/main.yml 的 player_faction），"
-                  "跳过阵营校验。")
-            return True
-        if card_faction == campaign:
-            return True
-        return self._confirm(
-            f"警告：卡牌 {card_type} 属于{cards.faction_label(card_faction)}"
-            f"（{card_faction}），本战役扮演的是{cards.faction_label(campaign)}"
-            f"（{campaign}）。确定仍要添加？")
-
-    def _resolve_card(self, raw: str, card_list: "cards.CardList"):
-        """按位置（纯数字）或卡牌类型定位一张现有卡；找不到时打印并返回 None。"""
-        if raw.isdigit():
-            card = card_list.find_position(int(raw))
-            if card is None:
-                print(f"槽位 {raw} 没有卡牌。")
-            return card
-        card = card_list.find_by_type(raw)
-        if card is None:
-            print(f"当前没有卡牌 {raw}。")
-        return card
-
-    def cmd_cardList(self, args) -> bool:
-        card_list = self._card_list()
-        catalog = self._card_catalog()
-        if not card_list.cards:
-            print("当前没有卡牌。")
-        else:
-            print(f"当前卡牌（{len(card_list.cards)} 张）：")
-            for c in card_list.cards:
-                traits = []
-                if c.get("used"):
-                    traits.append("已使用")
-                if c.get("is_free"):
-                    traits.append("免费")
-                if c.get("unit_id") is not None:
-                    traits.append(f"unit_id={c.get('unit_id')}")
-                suffix = f"（{'，'.join(traits)}）" if traits else ""
-                print(f"  槽位 {c.get('position')}: "
-                      f"{self._card_title(c.get('card_type'), catalog)}{suffix}")
-        free = [p for p in range(1, cards.CARD_SLOTS_MAX + 1)
-                if card_list.find_position(p) is None]
-        print(f"空槽位（宽松范围 1–{cards.CARD_SLOTS_MAX}，实际槽位数随难度）："
-              f"{'、'.join(map(str, free)) if free else '无'}")
-        return True
-
-    def _add_card(self, args, buy: bool) -> bool:
-        """cardAdd / cardBuy 的共同实现：buy=True 时扣费且禁止覆盖。"""
-        usage = ("cardBuy <卡牌类型> [位置]" if buy
-                 else "cardAdd <卡牌类型> [位置]")
-        if not args:
-            print(f"用法: {usage}")
-            return True
-        card_type = args[0]
-        card_list = self._card_list()
-        catalog = self._card_catalog()
-        if len(args) > 1:
-            pos = cards.parse_position(args[1])
-        else:
-            pos = card_list.empty_position()
-            if pos is None:
-                print(f"没有空卡槽（宽松范围 1–{cards.CARD_SLOTS_MAX}）；"
-                      "请指定要覆盖的位置，或先删除一张卡。")
-                return True
-
-        existing = card_list.find_position(pos)
-        if buy:
-            if existing is not None:
-                print(f"槽位 {pos} 已有卡牌 {existing.get('card_type')}，"
-                      "购买不允许覆盖；先删除或改用 cardAdd。")
-                return True
-            entry = catalog.get(card_type)
-            if entry is None:
-                raise cards.CardError(
-                    f"无法确定 {card_type} 的购买费用：包中未找到该卡牌定义。")
-            cost = (entry.get("data") or {}).get("cost")
-            if not isinstance(cost, int):
-                raise cards.CardError(f"卡牌 {card_type} 没有可用的费用字段。")
-
-        if not self._faction_ok(card_type, catalog):
-            print("已取消，未写入存档。")
-            return True
-
-        if buy:
-            current = game_state.get_prestige(self.ctx.session) or 0
-            if current < cost:
-                print(f"声望不足：卡牌费用 {cost}，当前声望 {current}。")
-                return True
-
-        if existing is not None:
-            print(f"覆盖槽位 {pos} 上的卡牌 {existing.get('card_type')}。")
-        card_list.put(cards.build_card(card_type, pos))
-        print(f"{'已购买' if buy else '已添加'}卡牌 "
-              f"{self._card_title(card_type, catalog)} 到槽位 {pos}。")
-        if buy:
-            game_state.set_prestige(self.ctx.session, current - cost)
-            print(f"已扣除 {cost} 声望，当前声望 {current - cost}。")
-        return True
-
-    def cmd_cardAdd(self, args) -> bool:
-        return self._add_card(args, buy=False)
-
-    def cmd_cardBuy(self, args) -> bool:
-        return self._add_card(args, buy=True)
-
-    def cmd_cardDel(self, args) -> bool:
-        if not args:
-            print("用法: cardDel <位置|卡牌类型>")
-            return True
-        card_list = self._card_list()
-        card = self._resolve_card(args[0], card_list)
-        if card is None:
-            return True
-        pos = int(card.get("position") or 0)
-        removed = card_list.remove(pos)
-        if removed is None:
-            print(f"槽位 {pos} 未找到可删除的卡牌，未修改存档。")
-            return True
-        print(f"已删除槽位 {pos} 的卡牌 "
-              f"{self._card_title(removed.get('card_type'), self._card_catalog())}。")
-        return True
-
-    def cmd_cardUnused(self, args) -> bool:
-        if not args:
-            print("用法: cardUnused <位置|卡牌类型>")
-            return True
-        card_list = self._card_list()
-        card = self._resolve_card(args[0], card_list)
-        if card is None:
-            return True
-        if card.get("used") is False:
-            print(f"槽位 {card.get('position')} 的卡牌本来就是未使用状态。")
-            return True
-        card["used"] = False
-        card_list.persist()
-        print(f"槽位 {card.get('position')} 的卡牌已设为未使用过（used: false）。")
-        return True
-
-    # --- 单位 ---
-    def cmd_find(self, args) -> bool:
-        if not args:
-            print("用法: find <关键字>（中文名/本地化id/type）")
-            return True
-        results = self.ctx.units.find_by_name(args[0], self.translations)
-        if not results:
-            print(f"未找到匹配 '{args[0]}' 的单位。")
-            return True
-        print(f"匹配 {len(results)} 个单位：")
-        for u in results[:40]:
-            brief = u.get("name_brief", "")
-            name = self.translations.get(brief) or brief
-            print(f"  id={u.get('id'):<5} type={u.get('type'):<18} {name}")
-        if len(results) > 40:
-            print(f"... 共 {len(results)} 条，仅显示前 40。")
-        return True
-
-    def cmd_select(self, args) -> bool:
-        if not args or not args[0].isdigit():
-            print("当前无选中单位。用法: select <id>")
-            return True
-        uid = int(args[0])
-        u = self.ctx.units.get(uid)
-        if u is None:
-            print(f"单位 {uid} 不在 units.yml。")
-            return True
-        self.ctx.selected_unit = uid
-        brief = u.get("name_brief", "")
-        name = self.translations.get(brief) or brief
-        print(f"已选中单位 {uid}: {name} (type={u.get('type')}, "
-              f"act_st={u.get('act_st')}, xp={u.get('xp')})")
-        return True
-
-    def cmd_xp(self, args) -> bool:
-        uid, rest = self._resolve_field_id(args, nvalue=1)
-        if uid is None or not rest or not rest[0].isdigit():
-            print("用法: xp <id> <值>  或 (选中后) xp <值>")
-            return True
-        self.ctx.units.set_xp(uid, int(rest[0]))
-        return True
-
-    def cmd_str(self, args) -> bool:
-        uid, rest = self._resolve_field_id(args, nvalue=2)
-        if uid is None or not rest:
-            print("用法: str <id> <活跃> [压制]  或 (选中后) str <活跃> [压制]")
-            return True
-        try:
-            act = int(rest[0])
-            sup = int(rest[1]) if len(rest) > 1 else None
-        except ValueError:
-            print("战力需为整数。")
-            return True
-        self.ctx.units.set_strength(uid, act, sup)
-        return True
-
-    strength = cmd_str
-
-    def cmd_type(self, args) -> bool:
-        uid, rest = self._resolve_field_id(args, nvalue=1)
-        if uid is None or not rest:
-            print("用法: type <id> <类型>  或 (选中后) type <类型>")
-            return True
-        self.ctx.units.set_type(uid, rest[0])
-        return True
+    def cmd_name(self, args) -> bool:
+        if len(args) < 2:
+            raise ReplError("用法: name <单位id> <明文>")
+        uid = _as_int(args[0], "单位 id")
+        text = " ".join(args[1:])
+        return self._plan([Edit.unit_field(uid, "name_brief", text)])
 
     def cmd_spec(self, args) -> bool:
-        uid, rest = self._resolve_field_id(args, nvalue=1)
-        if uid is None or not rest:
-            print("用法: spec <id> <特种名>  或 (选中后) spec <特种名>")
-            return True
-        self.ctx.units.add_spec(uid, rest[0])
-        return True
-
-    specToUnit = cmd_spec
+        if len(args) < 2:
+            raise ReplError("用法: spec <单位id> <特种类型>")
+        uid = _as_int(args[0], "单位 id")
+        return self._plan([Edit.unit_spec_add(uid, args[1])])
 
     def cmd_unspec(self, args) -> bool:
-        """unspec 支持可选的 idx，用于同名特种只卸一条。
+        if len(args) < 2:
+            raise ReplError("用法: unspec <单位id> <类型> [idx]")
+        uid = _as_int(args[0], "单位 id")
+        idx = _as_int(args[2], "idx") if len(args) > 2 else None
+        return self._plan([Edit.unit_spec_remove(uid, args[1], idx)])
 
-        三种写法：unspec <id> <特种名> [idx] / (选中后) unspec <特种名> [idx]。
-        不写 idx 时移除该类型的第一条。
-        """
-        uid, rest = self._resolve_field_id(args, nvalue=1)
-        if uid is None and self.ctx.selected_unit is not None \
-                and len(args) == 2 and args[1].isdigit():
-            # 选中单位 + “特种名 idx” 形式，_resolve_field_id 会误判，这里补上
-            uid, rest = self.ctx.selected_unit, args
-        if uid is None or not rest:
-            print("用法: unspec <id> <特种名> [idx]  或 (选中后) unspec <特种名> [idx]")
-            return True
-        idx = None
-        if len(rest) >= 2 and rest[1].isdigit():
-            idx = int(rest[1])
-        self.ctx.units.remove_spec(uid, rest[0], idx)
-        return True
-
-    def _resolve_field_id(self, args: list[str], nvalue: int):
-        """高频字段命令的 id 解析。
-
-        两种形式：
-          1) 无选中单位：必须写 <id> <值...>，args[0] 是 id；
-          2) 有选中单位且参数个数恰好是值的个数（或更少，如 str 可省略压制）：
-             第一个参数解释为值，作用于选中单位。
-        返回 (uid, 剩余参数=值部分)。uid 为 None 表示参数不足以解析。
-        """
-        sel = self.ctx.selected_unit
-        # 有选中单位且首参不是“明显多值”（即 args 长度 <= nvalue）=> 值是首参
-        if sel is not None and args and len(args) <= nvalue:
-            # 若首参是数字且后面还有值（如 str 6 0：nvalue=2, args=[6,0]）也走这里
-            return sel, args
-        # 否则首参应为 id
-        if args and args[0].isdigit():
-            return int(args[0]), args[1:]
-        return None, []
-
-    def cmd_set(self, args) -> bool:
+    def cmd_pool(self, args) -> bool:
         if len(args) < 3:
-            print("用法: set <id> <字段> <值>  例: set 27 losses 0")
-            return True
-        try:
-            uid = int(args[0])
-        except ValueError:
-            print("id 需为数字。")
-            return True
-        raw = args[2]
-        value: object
-        try:
-            value = int(raw)
-        except ValueError:
-            value = raw
-        self.ctx.units.set_field(uid, args[1], value)
-        return True
+            raise ReplError("用法: pool <总部id> <条目序号> <数量>")
+        hq = _as_int(args[0], "总部 id")
+        idx = _as_int(args[1], "条目序号")
+        qty = _as_int(args[2], "数量")
+        return self._plan([Edit.hq_force_pool(hq, idx, qty)])
 
-    setUnit = cmd_set
+    def cmd_ptg(self, args) -> bool:
+        value, = _int_args(args, 1, "ptg <值>")
+        return self._plan([Edit.progress("prestige", value)])
 
-    # --- 实体/绑定 ---
-    def cmd_create_type(self, args) -> bool:
-        positional: list[str] = []
-        model_from: Optional[str] = None
-        i = 0
-        while i < len(args):
-            a = args[i]
-            if a in ("--model-from", "-m"):
-                if i + 1 >= len(args):
-                    print("--model-from 需要一个值（包名或路径）。")
-                    return True
-                model_from = args[i + 1]
-                i += 2
-            elif a.startswith("--model-from="):
-                model_from = a.split("=", 1)[1]
-                i += 1
-            else:
-                positional.append(a)
-                i += 1
-        if not positional:
-            print("用法: create-type <原型类型> [新类型名] "
-                  "[--model-from <base|dlc1|...|路径>]")
-            return True
-        prototype = positional[0]
-        new_name = positional[1] if len(positional) > 1 else None
-        campaign = self._campaign_id()
-        entity_service.create_type_from_prototype(
-            self.config, self.ctx.session, campaign, prototype,
-            new_name=new_name, kind="unit", model_from=model_from, verbose=True)
-        return True
+    def cmd_score(self, args) -> bool:
+        value, = _int_args(args, 1, "score <值>")
+        return self._plan([Edit.progress("score", value)])
 
-    editUnit = cmd_create_type
-
-    def cmd_create_spec(self, args) -> bool:
-        if any(a in ("--model-from", "-m") or a.startswith("--model-from=")
-               for a in args):
-            print("提示：create-spec 不支持 --model-from（特种实体没有模型 meta），"
-                  "该参数将被忽略。")
-            cleaned: list[str] = []
-            skip_next = False
-            for a in args:
-                if skip_next:
-                    skip_next = False
-                    continue
-                if a in ("--model-from", "-m"):
-                    skip_next = True
-                    continue
-                if a.startswith("--model-from="):
-                    continue
-                cleaned.append(a)
-            args = cleaned
+    def cmd_card(self, args) -> bool:
         if not args:
-            print("用法: create-spec <原型特种> [新名]")
-            return True
-        campaign = self._campaign_id()
-        entity_service.create_type_from_prototype(
-            self.config, self.ctx.session, campaign, args[0],
-            new_name=args[1] if len(args) > 1 else None,
-            kind="specialist", verbose=True)
-        return True
+            raise ReplError("用法: card add <卡牌类型> [槽位] | card del <槽位>")
+        act = args[0].lower()
+        if act == "add":
+            if len(args) < 2:
+                raise ReplError("用法: card add <卡牌类型> [槽位]")
+            pos = _as_int(args[2], "槽位") if len(args) > 2 else None
+            return self._plan([Edit.card_add(args[1], position=pos)])
+        if act == "del":
+            if len(args) < 2:
+                raise ReplError("用法: card del <槽位>")
+            return self._plan([Edit.card_remove(_as_int(args[1], "槽位"))])
+        raise ReplError(f"未知 card 子命令 {args[0]}（add / del）")
 
-    editSpec = cmd_create_spec
+    def cmd_store_set(self, args) -> bool:
+        if len(args) < 4:
+            raise ReplError("用法: store set <战线> <序号> <price|quantity> <值>")
+        front = args[0]
+        idx = _as_int(args[1], "条目序号")
+        field = args[2]
+        if field not in ("price", "quantity"):
+            raise ReplError("字段只能是 price 或 quantity")
+        value = _as_int(args[3], "值")
+        return self._plan([Edit.store_set(front, idx, field, value)])
 
-    def cmd_bind(self, args) -> bool:
-        if len(args) < 2 or not args[0].isdigit():
-            print("用法: bind <单位id> <类型>  例: bind 27 inf_02_custom")
-            return True
-        entity_service.bind_unit_to_type(
-            self.ctx.session, self.ctx.units, self.ctx.bindings,
-            int(args[0]), args[1])
-        return True
-
-    bindType = cmd_bind
-
-    def cmd_bindInfo(self, args) -> bool:
-        items = list(self.ctx.bindings.items())
-        if not items:
-            print("当前无绑定。")
-            return True
-        print("单位类型绑定：")
-        for uid, tname in items:
-            u = self.ctx.units.get(uid)
-            if u:
-                brief = u.get("name_brief", "")
-                name = self.translations.get(brief) or brief
-                print(f"  id={uid:<5} {name} -> {tname}")
-            else:
-                print(f"  id={uid:<5} (不在当前 units.yml) -> {tname}")
-        return True
-
-    # --- 本地化 ---
-    def cmd_troopName(self, args) -> bool:
-        if len(args) < 2 or not args[0].isdigit():
-            print("用法: troopName <id> <文本>")
-            return True
-        uid = int(args[0])
-        u = self.ctx.units.get(uid)
-        if u is None:
-            print(f"单位 {uid} 不在 units.yml。")
-            return True
-        text = " ".join(args[1:])
-        localize.localize_unit_name_brief(self.ctx.session, u, uid, text)
-        self.ctx.units.persist()
-        return True
-
-    def cmd_brief(self, args) -> bool:
-        # brief <实体名|单位id> <文本>：改实体的简称
+    def cmd_store_del(self, args) -> bool:
         if len(args) < 2:
-            print("用法: brief <实体名|单位id> <文本>")
-            return True
-        if args[0].isdigit():
-            # 数字 id：改绑定单位对应的实体简称
-            uid = int(args[0])
-            tname = self.ctx.bindings.get(uid)
-            if tname is None:
-                print(f"单位 {uid} 没有绑定类型，先使用 bind。")
-                return True
-            ent = self._load_bound_entity(tname)
-            if ent is None:
-                return True
-        else:
-            # 实体名：直接改该实体（spec/unit 通用）
-            ent = self._load_entity(args[0])
-            if ent is None:
-                return True
-        localize.localize_entity_text(self.ctx.session, ent, " ".join(args[1:]),
-                                      field="brief")
-        return True
+            raise ReplError("用法: store del <战线> <条目序号>")
+        front = args[0]
+        idx = _as_int(args[1], "条目序号")
+        return self._plan([Edit.store_remove(front, idx)])
 
-    def cmd_full(self, args) -> bool:
-        # full <实体名> <文本>（特种）或 full <id> <文本>
+    def cmd_hand(self, args) -> bool:
+        return self._plan([Edit.hand_restore()])
+
+    def cmd_asset(self, args) -> bool:
         if len(args) < 2:
-            print("用法: full <实体名|单位id> <文本>")
+            raise ReplError(
+                "用法: asset <资产名> <可用次数> [总次数] [每回合]")
+        name = ASSET_ALIASES.get(args[0], args[0])
+        to_use = _as_int(args[1], "可用次数")
+        total = _as_int(args[2], "总次数") if len(args) > 2 else None
+        turn = _as_int(args[3], "每回合次数") if len(args) > 3 else 0
+        return self._plan([Edit.theater_asset(
+            name, to_use=to_use, uses_total=total, uses_turn=turn)])
+
+    # ---- 写回 ----
+
+    def cmd_plan(self, args) -> bool:
+        if self._last_plan is None:
+            print("（还没有待提交的编辑）")
             return True
-        if args[0].isdigit():
-            uid = int(args[0])
-            tname = self.ctx.bindings.get(uid)
-            if tname is None:
-                print(f"单位 {uid} 没有绑定类型。")
-                return True
-            ent = self._load_bound_entity(tname)
-            if ent is None:
-                return True
-        else:
-            ent = self._load_entity(args[0])
-            if ent is None:
-                return True
-        localize.localize_entity_text(self.ctx.session, ent, " ".join(args[1:]),
-                                      field="full")
+        plan = self._last_plan
+        print(plan.summary())
+        for note in plan.notes:
+            print(f"  · {note}")
+        for change in plan.changes:
+            print(f"\n--- {change.entry}（{change.layer}）---")
+            print(change.diff)
+        v = validate(plan)
+        print(f"\n校验: {v.summary()}")
+        for e in v.errors:
+            print(f"  ❌ {e}")
+        for w in v.warnings:
+            print(f"  ⚠️ {w}")
         return True
 
-    def cmd_rename(self, args) -> bool:
-        """rename <旧名> <新名>：重命名 temp mod 中的实体。
-
-        同步改名 type/meta/surfaces 文件、更新 name id，并把绑定文件中
-        引用旧名的记录改为新名。
-        """
-        if len(args) < 2:
-            print("用法: rename <旧实体名> <新实体名>")
-            return True
-        old, new = args[0], args[1]
-        ent = self._load_entity(old)
-        if ent is None:
-            return True
-        ok = ent.rename_entity(new, verbose=True)
-        if not ok:
-            return True
-        # 同步绑定文件
-        updated = False
-        for uid, tname in list(self.ctx.bindings.items()):
-            if tname == old:
-                self.ctx.bindings.set(uid, new)
-                print(f"绑定已更新: 单位 {uid} -> {new}")
-                updated = True
-        if not updated:
-            print("无绑定引用旧名。")
+    def cmd_commit(self, args) -> bool:
+        if self._last_plan is None:
+            raise ReplError("没有待提交的编辑。")
+        if not self._last_plan.ok:
+            raise ReplError("计划里有错误，先修掉再提交（看 plan）。")
+        res = self.save.commit(self._last_plan)
+        print(res.summary())
+        for e in res.errors:
+            print(f"  ❌ {e}")
+        for w in res.warnings:
+            print(f"  ⚠️ {w}")
+        if res.ok:
+            self._last_plan = None
+            self._last_edits = []
+            print(f"备份: {res.backup.name if res.backup else '—'}")
+            print("撤销: undo")
         return True
 
-    def _campaign_id(self) -> str:
-        main = load_yaml(self.ctx.session.work_dir / "main.yml")
-        return main.get("campaign_id", "base")
+    def cmd_undo(self, args) -> bool:
+        res = self.save.undo()
+        print(res.summary())
+        for e in res.errors:
+            print(f"  ❌ {e}")
+        for w in res.warnings:
+            print(f"  ⚠️ {w}")
+        return True
 
-    def _load_bound_entity(self, tname: str):
-        """从 temp mod 加载绑定类型对应的实体（unit 优先，退回 specialist）。"""
-        from .entities import load_entity
-        mod = self.config.temp_mod_dir_for(self.ctx.session.name)
-        for kind in ("unit", "specialist"):
-            try:
-                return load_entity(mod, tname, kind, verbose=False)
-            except FileNotFoundError:
-                continue
-        print(f"在 temp mod 中未找到实体 {tname}（先使用 create-type/create-spec）。")
-        return None
+    def cmd_stack(self, args) -> bool:
+        from save_modifier_core.undo import load_stack, stack_path_for
+        path = stack_path_for(self.save.path)
+        records, errs = load_stack(self.save.path)
+        for e in errs:
+            print(f"⚠️ {e}")
+        if not records:
+            print("撤销栈是空的")
+            return True
+        print(f"撤销栈: {path}（{len(records)} 条）")
+        for i, r in enumerate(records, 1):
+            mark = "← 栈顶" if i == len(records) else ""
+            print(f"  {i}. {r.time}  {r.summary}  [{', '.join(r.entry_names)}] {mark}")
+        return True
 
-    def _load_entity(self, name: str):
-        from .entities import load_entity
-        mod = self.config.temp_mod_dir_for(self.ctx.session.name)
-        for kind in ("unit", "specialist"):
-            try:
-                return load_entity(mod, name, kind, verbose=False)
-            except FileNotFoundError:
-                continue
-        print(f"在 temp mod 中未找到实体 {name}。")
-        return None
-
-    # --- 杂项 ---
-    # refs 子目标：(显示名, 路径来源)
-    REFS_TARGETS = {
-        "refs": ("参考列表目录", "refs"),
-        "uoc2": (".uoc2 目录", "uoc2"),
-        "temp": ("临时 mod 目录", "temp"),
-        "orig": ("原版包目录", "orig"),
-    }
-    REFS_ALIASES = {
-        "ref": "refs",
-        "reference": "refs",
-        "appdata": "uoc2",
-        ".uoc2": "uoc2",
-        "mod": "temp",
-        "packages": "orig",
-        "original": "orig",
-    }
+    # ---- 其他 ----
 
     def cmd_refs(self, args) -> bool:
-        """打开参考目录：refs [refs|uoc2|temp|orig]。"""
-        key = args[0].lower() if args else "refs"
-        key = self.REFS_ALIASES.get(key, key)
-        if key not in self.REFS_TARGETS:
-            print("用法: refs [refs|uoc2|temp|orig]")
-            print("  refs         参考列表目录（单位/总部/卡牌 txt）")
-            print("  refs uoc2    .uoc2 数据目录")
-            print("  refs temp    本存档的临时 mod 目录（_packages/<存档>_temp）")
-            print("  refs orig    脚本使用的原版包搜索路径")
-            return True
+        """生成名册参考表（单位 / 总部）—— 写到临时目录并打印路径。"""
+        import tempfile
 
-        label, kind = self.REFS_TARGETS[key]
-        name = self.ctx.session.name
-        if kind == "refs":
-            path = self.config.save_dir_for(name) / "references"
-        elif kind == "uoc2":
-            path = self.config.uoc2_appdata
-        elif kind == "temp":
-            path = self.config.temp_mod_dir_for(name)
-        else:
-            path = self.config.orig_packages
+        from save_modifier_core import yamlio
 
-        if path is None:
-            print(f"{label}未配置（config.yml 的 uoc2_orig_packages_path 为空且未探测到）。")
-            return True
-        path = Path(path)
-        if kind == "refs" and path.is_dir():
-            # 早期生成的参考目录可能缺少卡牌列表，打开前补齐
-            cards.generate_card_reference_if_missing(
-                self.config, path / cards.CARD_REF_DIRNAME,
-                self.translations)
-        if not path.exists():
-            if kind == "refs":
-                print("参考列表尚未生成。")
-            else:
-                print(f"{label}不存在: {path}")
-            return True
-        os.startfile(path)  # 仅 Windows 提供该函数
-        print(f"已打开{label}: {path}")
+        from . import references
+
+        doc_units = self.save.read_yaml("document/units.yml", [])
+        doc_hqs = self.save.read_yaml("document/hqs.yml", [])
+        if not isinstance(doc_units, list):
+            doc_units = []
+        if not isinstance(doc_hqs, list):
+            doc_hqs = []
+
+        tmp = Path(tempfile.mkdtemp(prefix="uoc2_refs_"))
+        units_src = tmp / "units.yml"
+        hqs_src = tmp / "hqs.yml"
+        units_src.write_bytes(yamlio.dump(doc_units))
+        hqs_src.write_bytes(yamlio.dump(doc_hqs))
+
+        trans = self.translations
+        references.generate_unit_reference(units_src, tmp / "units.txt", trans)
+        references.generate_hq_reference(hqs_src, tmp / "hqs.txt", trans)
+        print(f"参考表目录: {tmp}")
         return True
 
-    def cmd_which(self, args) -> bool:
-        ctx = self.ctx
-        print(f"存档: {ctx.session.name}")
-        print(f"状态目录: {self.config.state_dir}")
-        print(f"工作目录: {ctx.session.work_dir}")
-        print(f"临时 mod: {self.config.temp_mod_dir_for(ctx.session.name)}")
-        print(f"绑定文件: {ctx.bindings.path}")
+    def cmd_selftest(self, args) -> bool:
+        from save_modifier_core import catalog as cat_mod
+        print("核心库自检")
+        print(f"  游戏目录: {self.paths.game_dir or '（未探测到）'}")
+        print(f"  存档根目录: {self.paths.save_root}")
+        units = self.catalog.unit_type_names()
+        specs = self.catalog.spec_type_names()
+        cards = self.catalog.card_type_names()
+        hqs = self.catalog.hq_type_names()
+        print(f"  类型表: 单位 {len(units)}  特种 {len(specs)}  "
+              f"卡牌 {len(cards)}  总部 {len(hqs)}")
+        if not units:
+            print("  ⚠️ 没读到单位类型表 —— 战力上限校验会退化为软警告")
+        saves = [s for s in list_saves(self.paths) if s.is_primary]
+        print(f"  存档数: {len(saves)}")
+        for s in saves[:3]:
+            try:
+                with open_save(s.save_id, self.paths) as sv:
+                    caps = sv.capabilities()
+                    print(f"    {s.display_name}: {_caps_text(caps)}")
+            except Exception as exc:                      # noqa: BLE001
+                print(f"    {s.display_name}: 打不开（{exc}）")
+        _ = cat_mod
+        return True
+
+    def cmd_paths(self, args) -> bool:
+        print(f"游戏目录: {self.paths.game_dir or '（未探测到）'}")
+        print(f"存档根目录: {self.paths.save_root}")
+        print(f"  战役: {self.paths.campaigns_dir}")
+        print(f"  场景: {self.paths.games_dir}")
+        print(f"  历史: {self.paths.old_saves_dir}")
+        print(f"用户包目录: {self.paths.user_packages_dir}")
+        for p in self.paths.packages():
+            print(f"  包: {p}")
+        return True
+
+    # ---------------------------------------------------------------- 内部
+
+    def _plan(self, edits: list[Edit]) -> bool:
+        """规划一批编辑并立刻显示 diff（**不碰磁盘**）。"""
+        plan = self.save.plan_edit(edits, catalog=self.catalog)
+        self._last_plan = plan
+        self._last_edits = list(edits)
+        if not plan.ok:
+            print("❌ 计划有错误：")
+            for e in plan.errors:
+                print(f"  {e}")
+            return True
+        print(plan.summary())
+        for note in plan.notes:
+            print(f"  · {note}")
+        for w in plan.warnings:
+            print(f"  ⚠️ {w}")
+        v = validate(plan)
+        print(f"校验: {v.summary()}")
+        print("（看 diff 用 plan；写入用 commit）")
         return True
 
 
-def run_repl(config, repl: Optional[Repl] = None, skip_open: bool = False) -> None:
-    """启动 REPL 主循环。
+def _caps_text(caps) -> str:
+    """能力位的一行摘要。"""
+    on = [name for name, value in vars(caps).items() if value]
+    return " ".join(on) if on else "（全无）"
 
-    repl: 可复用的 Repl 实例；为 None 时新建。
-    skip_open: 若已预先 open 过存档，设为 True 跳过自动打开。
-    """
-    if repl is None:
-        repl = Repl(config)
-        skip_open = False
-    if not skip_open:
-        # 尝试自动打开上次存档；失败则列出
-        if not repl.auto_open_last():
-            print("未找到上次使用的存档，请选择：")
-            repl.open_save(None)
-    print("输入 help 查看指令。")
+
+def _as_int(text: str, what: str) -> int:
+    try:
+        return int(text)
+    except (TypeError, ValueError):
+        raise ReplError(f"{what} 必须是整数（收到 {text!r}）") from None
+
+
+def _int_args(args, n: int, usage: str) -> tuple:
+    if len(args) < n:
+        raise ReplError(f"用法: {usage}")
+    return tuple(_as_int(a, "参数") for a in args[:n])
+
+
+def run_repl(argv: list[str] | None = None) -> int:
+    """进入自测入口。"""
+    repl = Repl()
+    print("UOC2 存档修改器 —— 自测入口（核心库命令行外壳）")
+    print("输入 help 看命令；exit 退出。\n")
     while True:
         try:
-            line = input("\n> ").strip()
+            line = input("> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\n退出。")
+            print()
             break
         if not line:
             continue
-        if not repl.dispatch(line):
-            print("再见。")
-            break
+        parts = line.split()
+        cmd, args = parts[0], parts[1:]
+        method = getattr(repl, "cmd_" + cmd.replace("-", "_"), None)
+        if method is None:
+            print(f"未知指令: {cmd}（help 看列表）")
+            continue
+        try:
+            if not method(args):
+                break
+        except ReplError as exc:
+            print(f"错误: {exc}")
+        except Exception as exc:                          # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+            print(f"执行出错: {exc}")
+    repl.close()
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    return run_repl(argv)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    os.chdir(Path(__file__).resolve().parent.parent.parent)
+    raise SystemExit(run_repl())
