@@ -1,5 +1,7 @@
 @echo off
-rem UOC2 save modifier launcher (Windows, no installation required)
+rem UOC2 save modifier -- self-test entry (Windows, no installation required)
+rem Keep this file ASCII + CRLF only: cmd.exe mis-parses UTF-8 comments
+rem after "chcp 65001" shifts its read pointer. Chinese docs live in docs\.
 chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
@@ -14,6 +16,5 @@ if not exist "python\python.exe" (
 "python\python.exe" -m save_modifier.main %*
 set "rc=%errorlevel%"
 rem Keep the window open only when launched by double-click (no arguments).
-rem When called by a hotkey tool, e.g. "run.bat qs", return immediately.
 if "%~1"=="" pause
 exit /b %rc%

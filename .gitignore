@@ -8,6 +8,9 @@
 # ---- 运行时状态目录（解包工作区 / 参考列表 / last_save.txt 等）----
 data/
 
+# ---- 成品 zip（构建产物，不入库）----
+dist/
+
 # ---- 本机配置（由 config 引导生成，含本机路径）----
 config/config.yml
 config.yml
