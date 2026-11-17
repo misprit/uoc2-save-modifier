@@ -1,0 +1,28 @@
+# UOC2 存档修改器配置文件（示例）
+# 实际使用的 config.yml 由初始模板 config.default.yml 复制而来，
+# 首次运行会进入配置引导。本文件仅作参考，可按需复制为 config.yml。
+
+# 游戏数据目录（%LOCALAPPDATA%/.uoc2）。通常无需修改。
+uoc2_appdata: "%LOCALAPPDATA%/.uoc2"
+
+# 状态目录：解包工作区与参考列表的存放处。
+#   ""        默认，启动脚本旁的 data/
+#   "appdata" 游戏数据目录 <uoc2_appdata>/modifier（旧版行为）
+#   其他路径  自定义绝对路径（支持环境变量）
+state_dir: ""
+
+# 游戏安装目录中的原版 _packages 目录。单位/总部与卡牌的中文名、卡牌费用
+# （cardBuy）、自定义类型原型都从这里读取。留空时按默认位置
+# D:\SteamLibrary\steamapps\common\Unity of Command 2\_packages 探测；
+# 探测不到则这些功能退化，但改数值不受影响。
+uoc2_orig_packages_path: ""
+
+# 额外搜索路径：创建新类型时，除原版包外还会按此列表顺序查找原型（默认为空）。
+# 结构需与原版 _packages 下的包一致（含 base/ 时按 base 查找）。
+mod_search_paths: []
+
+# 语言：翻译解析使用的本地化子目录（chi/eng/...），默认 chi。
+locale: "chi"
+
+# 是否已完成配置引导；显式 false 时下次启动会重新进入引导。
+setup_done: true
