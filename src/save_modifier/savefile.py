@@ -97,7 +97,14 @@ def extract_archive(archive_path: Path, target_dir: Path) -> None:
 
 
 def pack_directory(source_dir: Path, archive_path: Path) -> None:
-    """把 source_dir 下所有内容打包为 .usg（ZIP），用于保存。"""
+    """把 source_dir 下所有内容打包为 .usg（ZIP），用于保存。
+
+    ⚠️ **已弃用，请改用 `packing.repack`。**
+    这个函数用 `rglob` 遍历目录再逐个 `zf.write()`，实测会**打乱条目顺序**
+    并把时间戳全部改成打包时刻（文档 §11.4）。`packing.repack` 按原存档的
+    条目清单与顺序重建，并沿用原存档的元数据。
+    保留仅为兼容旧调用。
+    """
     archive_path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(
         archive_path, "w", compression=zipfile.ZIP_DEFLATED
@@ -134,9 +141,24 @@ class SaveSession:
         self.open()
 
     def commit(self) -> bool:
-        """把工作目录打包覆盖回 .usg。"""
-        pack_directory(self.work_dir, self.save.path)
-        print(f"已保存到: {self.save.path.name}")
+        """把工作目录打包覆盖回 .usg。
+
+        用保真打包器（packing.repack）：条目顺序与元数据沿用原存档，
+        只有工作目录里被改过的文件内容会变（§11.4 / §11.5）。
+        """
+        from . import packing
+
+        report = packing.repack(self.save.path, self.work_dir, self.save.path)
+        if report.added:
+            print(f"⚠️ 工作目录里有 {len(report.added)} 个原存档没有的文件，"
+                  f"已忽略（不写进存档）：{', '.join(report.added[:5])}")
+        if report.missing:
+            print(f"ℹ️ 有 {len(report.missing)} 个条目在工作目录里缺失，"
+                  f"已从原存档原样取回。")
+        if report.changed:
+            print(f"已保存到: {self.save.path.name}（改动 {len(report.changed)} 个文件）")
+        else:
+            print(f"已保存到: {self.save.path.name}（内容无变化）")
         return True
 
 
