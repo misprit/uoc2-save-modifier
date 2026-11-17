@@ -25,7 +25,9 @@ L2 检查点 / L3 战斗实时层 / L4 回合历史 / L5 战役文档 一律只�
 
 from __future__ import annotations
 
+from . import catalog
 from .capabilities import Capabilities
+from .catalog import Catalog, UnitType
 from .container import (CardView, HqView, Save, StoreEntryView, UnitView,
                         View)
 from .discovery import SaveInfo, list_saves, resolve_save_id
@@ -34,13 +36,16 @@ from .paths import CorePaths
 __all__ = [
     "Capabilities",
     "CardView",
+    "Catalog",
     "CorePaths",
     "HqView",
     "Save",
     "SaveInfo",
     "StoreEntryView",
+    "UnitType",
     "UnitView",
     "View",
+    "catalog",
     "list_saves",
     "open_save",
     "resolve_save_id",

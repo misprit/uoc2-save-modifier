@@ -19,9 +19,13 @@ KNOWN_FIELDS = [
     "retreated", "hidden_defense", "specs", "supplied_by", "uv",
 ]
 
-# 战力上限中最大的一个（轴心 7；盟军 6，美军战斗指挥部 4）。units.yml 不含
-# 阵营与编制信息，无法逐单位判定上限，故只按此值提示，不做硬性校验。
-AXIS_STEP_CAP = 7
+# ⚠️ **不再有硬编码的战力上限。**
+# 以前这里写死 `AXIS_STEP_CAP = 7`（"轴心 7 / 盟军 6"），那是粗糙近似：
+# 真实上限在**类型定义**里（`entity_types/unit_types/<type>.yml` 的 `max_st`），
+# 实测 627 个类型的 max_st 分布是 {3:4, 4:9, 5:83, 6:108, 7:245, 无:178}。
+# 现在从类型目录取（`Catalog`）；类型查不到时**不提示上限，也不拦截**
+# —— 类型表只做候选，绝不做白名单（规范 §9.1.3、§5.3、§10 第 8 条）。
+SPEC_HARD_LIMIT = 3          # 存档 schema 的硬上限（§5.2：长度 0..3）
 
 
 def _int_or_none(v: Any) -> Optional[int]:
@@ -39,9 +43,10 @@ class UnitList:
     打包回 .usg。
     """
 
-    def __init__(self, session, path: Optional[Path] = None):
+    def __init__(self, session, path: Optional[Path] = None, catalog=None):
         self.session = session
         self.path = path or session.work_dir / "units.yml"
+        self.catalog = catalog
         self.units: list[dict[str, Any]] = []
         self.load()
 
@@ -99,9 +104,9 @@ class UnitList:
                      suppressed: Optional[int] = None) -> bool:
         """战力设置：可设活跃战力 (act_st) 与压制战力 (sup_st)。
 
-        游戏单位战力由 act_st（活跃）+ sup_st（被压制）构成，上限依阵营与
-        编制而定（轴心 7、盟军 6、美军战斗指挥部 4）。存档里没有阵营信息，
-        因此只在合计超过 AXIS_STEP_CAP 时提示，不拦截写入。
+        战力上限来自**类型定义**的 `max_st`（`entity_types/unit_types/`），
+        不是硬编码的"轴心 7 / 盟军 6"。类型查不到时**只提示不拦截** ——
+        类型表只做候选，绝不做白名单（规范 §5.3、§9.1.3）。
         """
         unit = self._find(unit_id)
         if unit is None:
@@ -115,10 +120,29 @@ class UnitList:
         total = int(unit.get("act_st", 0)) + int(unit.get("sup_st", 0))
         print(f"单位 {unit_id} 战力: act_st={unit.get('act_st')} "
               f"sup_st={unit.get('sup_st')} 合计={total}")
-        if total > AXIS_STEP_CAP:
-            print(f"提示：合计 {total} 超过 {AXIS_STEP_CAP}（轴心上限，盟军为 6），"
-                  "游戏读取时可能出错。")
+        limit = self._max_st(unit)
+        if limit is not None and total > limit:
+            print(f"提示：合计 {total} 超过该单位的战力上限 {limit}"
+                  f"（来自类型 {unit.get('type')} 的 max_st）。")
         return True
+
+    def _max_st(self, unit: dict[str, Any]) -> Optional[int]:
+        """该单位的战力上限；类型未知返回 None（不提示、不拦截）。"""
+        if self.catalog is None:
+            return None
+        type_name = unit.get("type")
+        if not type_name:
+            return None
+        return self.catalog.max_st(type_name)
+
+    def _spec_cap(self, unit: dict[str, Any]) -> int:
+        """该单位能挂几个特种兵 = `min(3, max_spec or 3)`（规范 §5.3）。"""
+        if self.catalog is None:
+            return SPEC_HARD_LIMIT
+        type_name = unit.get("type")
+        if not type_name:
+            return SPEC_HARD_LIMIT
+        return self.catalog.spec_cap(type_name)
 
     def set_type(self, unit_id: int, type_name: str) -> bool:
         return self.set_field(unit_id, "type", type_name)
@@ -127,16 +151,17 @@ class UnitList:
         """给单位挂载一个特种（specs 追加）。
 
         同名特种允许重复挂载（例如两个工兵），每条各占一个槽位与 idx。
-        游戏规则盟军最多 3 个、轴心依战役而定（通常更少）；本方法按 3 校验
-        并提示，若需突破可手改 YAML。
+        上限是该单位**类型**的 `min(3, max_spec or 3)`（规范 §5.3），
+        不是写死的 3；类型查不到时按存档 schema 的硬上限 3 处理。
         """
         unit = self._find(unit_id)
         if unit is None:
             print(f"未找到单位 id {unit_id}")
             return False
         specs = unit.setdefault("specs", [])
-        if len(specs) >= 3:
-            print("特种已满（3），无法自动添加；可手改 YAML 突破。")
+        cap = self._spec_cap(unit)
+        if len(specs) >= cap:
+            print(f"特种已满（{cap}），无法自动添加。")
             return False
         used_idx = {s.get("idx") for s in specs}
         free_idx = next(i for i in (0, 1, 2) if i not in used_idx)

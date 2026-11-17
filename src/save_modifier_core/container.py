@@ -22,12 +22,15 @@ import re
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from . import yamlio
 from .capabilities import Capabilities
 from .discovery import SaveInfo
 from .paths import CorePaths
+
+if TYPE_CHECKING:                      # pragma: no cover
+    from .catalog import Catalog
 
 __all__ = ["Save", "View", "UnitView", "HqView", "CardView", "StoreEntryView"]
 
@@ -371,16 +374,27 @@ class Save:
 
     # ---- 视图 ----
 
-    def view(self) -> View:
-        """给 GUI 用的只读投影。"""
+    def view(self, catalog: "Catalog | None" = None) -> View:
+        """给 GUI 用的只读投影。
+
+        参数
+        ----
+        catalog : 类型目录。给了就把每个单位的 `max_st` / `max_spec` 填上
+                  （战力上限在类型定义里，不在存档里 —— 规范 §5.3）。
+                  不给就留空，GUI 只能显示存档里的值。
+        """
         caps = self.capabilities()
         main = self.root_main()
         roster = self.roster_ids() if caps.has_root_units else set()
 
-        units = [
-            UnitView(
-                id=u.get("id"),
-                type=u.get("type"),
+        units = []
+        for u in self.root_units():
+            if not isinstance(u.get("id"), int):
+                continue
+            t = u.get("type")
+            units.append(UnitView(
+                id=u["id"],
+                type=t,
                 name_brief=u.get("name_brief"),
                 name_full=u.get("name_full"),
                 hq_id=u.get("hq_id"),
@@ -394,11 +408,10 @@ class Save:
                 ap=u.get("ap"),
                 losses=u.get("losses"),
                 retreated=u.get("retreated"),
-                in_roster=u.get("id") in roster if roster else True,
-            )
-            for u in self.root_units()
-            if isinstance(u.get("id"), int)
-        ]
+                in_roster=u["id"] in roster if roster else True,
+                max_st=catalog.max_st(t) if (catalog and t) else None,
+                max_spec=(catalog.spec_cap(t) if (catalog and t) else None),
+            ))
 
         hqs = [
             HqView(

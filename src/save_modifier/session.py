@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from . import cards, references
 from .config import Config
@@ -29,9 +30,14 @@ class SessionContext:
     # 当前 REPL “选中单位”（select 上下文）
     selected_unit: int | None = None
     scenario_name: str | None = None
+    #: 游戏包类型目录（提供 max_st / max_spec 等真实上限）
+    catalog: Any = None
 
     def __post_init__(self) -> None:
-        self.units = UnitList(self.session)
+        if self.catalog is None:
+            from save_modifier_core.catalog import Catalog
+            self.catalog = Catalog()
+        self.units = UnitList(self.session, catalog=self.catalog)
         self._resolve_scenario()
         self._gen_references_once()
         # 进入会话即应用绑定（应对战役段脚本覆写 type）

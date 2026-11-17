@@ -149,10 +149,10 @@ class CorePaths:
             return None
         return self.game_dir / "_packages"
 
-    def package_dirs(self) -> list[Path]:
-        """按游戏自己的优先级返回包目录列表（**用户包在前**）。
+    def package_roots(self) -> list[Path]:
+        """包**容器**目录（**用户包在前**）。
 
-        与 `uoc2.paths.all_package_dirs()` 的实测顺序一致：
+        与游戏自己的 `uoc2.paths.all_package_dirs()` 实测顺序一致：
         `['%LOCALAPPDATA%\\.uoc2\\_packages', '<game>\\_packages']`。
         """
         out: list[Path] = []
@@ -163,6 +163,25 @@ class CorePaths:
         if gp is not None and gp.is_dir():
             out.append(gp)
         return out
+
+    def packages(self) -> list[Path]:
+        """全部**包**目录（用户包在前）。
+
+        ⚠️ `_packages/` 是**容器**，真正的包是它下面的子目录：
+        游戏侧是 `base` / `dlc1` … `dlc10`，用户侧是 mod 目录（如 `fall_blau_2`）。
+        每个包自己的数据在 `<包>/data/…`。
+        """
+        out: list[Path] = []
+        for root in self.package_roots():
+            try:
+                subs = sorted(p for p in root.iterdir() if p.is_dir())
+            except OSError:
+                continue
+            out.extend(subs)
+        return out
+
+    # 兼容旧名
+    package_dirs = package_roots
 
     # ---- 构造 ----
 
