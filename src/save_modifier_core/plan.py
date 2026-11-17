@@ -69,6 +69,8 @@ class Plan:
     warnings: list[str] = field(default_factory=list)
     #: 内部：entry -> 新的 YAML 文本（commit 用）
     _payload: dict[str, str] = field(default_factory=dict, repr=False)
+    #: 内部：entry -> **改前的原始字节**（撤销栈用；提交时还要拿它校验存档没被改动过）
+    _before_raw: dict[str, bytes] = field(default_factory=dict, repr=False)
 
     @property
     def ok(self) -> bool:
@@ -100,6 +102,7 @@ class Work:
         self.caps = save.capabilities()
         self._tables: dict[str, Any] = {}
         self._texts: dict[str, str] = {}
+        self._raws: dict[str, bytes] = {}
         self.touched: set[str] = set()
         self.outcomes: list[Outcome] = []
 
@@ -121,6 +124,7 @@ class Work:
                 value = default
         self._tables[entry] = value
         self._texts[entry] = raw.decode("utf-8", errors="replace") if raw else ""
+        self._raws[entry] = raw or b""
         return value
 
     def text(self, entry: str) -> str:
@@ -198,11 +202,13 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
             notes=[oc.summary for oc in w.outcomes if oc.summary],
         ))
         plan._payload[entry] = after
+        plan._before_raw[entry] = w._raws.get(entry, b"")
 
     # 有错误就不该有任何"改动"可提交
     if plan.errors:
         plan.changes.clear()
         plan._payload.clear()
+        plan._before_raw.clear()
     return plan
 
 

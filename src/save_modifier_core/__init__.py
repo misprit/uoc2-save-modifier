@@ -16,6 +16,10 @@ with open_save("campaigns/west.usg") as save:
     print(view.stage, view.prestige, len(view.units))
 ```
 
+**备份与撤销**（规范 §6.4）：`save.commit(plan)` 写回前自动生成 `<存档名>_BACKUP.usg`，
+并把本次改动压进**落盘**的撤销栈；`save.undo()` 撤销上一次提交
+（撤销前会校验基准，基准过期就拒绝，不硬改）。
+
 **分层**（规范 §7）—— 本包只写 L1（根目录的 5 个 YAML），
 L2 检查点 / L3 战斗实时层 / L4 回合历史 / L5 战役文档 一律只读；
 唯一的 L3 例外是"当前进行中战斗"的战区资产 `theater_assets`。
@@ -35,6 +39,7 @@ from .discovery import SaveInfo, list_saves, resolve_save_id
 from .edits import Edit
 from .paths import CorePaths
 from .plan import FileChange, Plan, ValidationResult, plan_edit, validate
+from .undo import UndoRecord, UndoResult, stack_path_for
 
 __all__ = [
     "Capabilities",
@@ -49,6 +54,8 @@ __all__ = [
     "Save",
     "SaveInfo",
     "StoreEntryView",
+    "UndoRecord",
+    "UndoResult",
     "UnitType",
     "UnitView",
     "ValidationResult",
@@ -60,6 +67,7 @@ __all__ = [
     "open_save",
     "plan_edit",
     "resolve_save_id",
+    "stack_path_for",
     "validate",
 ]
 

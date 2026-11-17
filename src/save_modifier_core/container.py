@@ -33,6 +33,7 @@ if TYPE_CHECKING:                      # pragma: no cover
     from .catalog import Catalog
     from .commit import CommitResult
     from .plan import Plan
+    from .undo import UndoResult
 
 __all__ = ["Save", "View", "UnitView", "HqView", "CardView", "StoreEntryView"]
 
@@ -502,11 +503,53 @@ class Save:
         return plan_edit(self, edits, catalog)
 
     def commit(self, plan: "Plan") -> "CommitResult":
-        """把计划写回存档（备份 → 临时文件 → 校验 → 原子替换）。"""
+        """把计划写回存档（备份 → 临时文件 → 校验 → 原子替换）。
+
+        提交成功后会把本次改动**压进撤销栈**（§6.4.2）。
+        """
         from .commit import commit
         # 必须先关掉 ZIP 句柄 —— Windows 上替换被打开的文件会失败
         self.close()
-        return commit(plan)
+        res = commit(plan)
+        if res.ok:
+            self._invalidate()
+        return res
+
+    def undo(self) -> "UndoResult":
+        """撤销上一次提交（修改器自己的撤销栈，§6.4.2）。
+
+        撤销前会**校验基准**：如果存档在你改完之后又被动过（多半是在游戏里手动改的），
+        就会**拒绝执行并说明原因**，不硬改。
+        """
+        from .undo import undo_save
+        self.close()
+        res = undo_save(self.info.path)
+        if res.ok:
+            self._invalidate()
+        return res
+
+    def undo_available(self) -> bool:
+        """撤销栈里有没有东西可撤（GUI 用来决定按钮是否可点）。"""
+        from .undo import peek
+        return peek(self.info.path) is not None
+
+    def undo_peek(self) -> str | None:
+        """看栈顶是什么（GUI 显示"可撤销：xxx"）；栈空返回 None。"""
+        from .undo import peek
+        rec = peek(self.info.path)
+        if rec is None:
+            return None
+        if rec.summary:
+            return rec.summary
+        return f"改了 {len(rec.entries)} 个文件：{'、'.join(rec.entry_names)}"
+
+    def _invalidate(self) -> None:
+        """写回之后，缓存的 YAML 解析结果与条目清单都过期了。"""
+        self._yaml_cache.clear()
+        self._names = None
+        self._overlay.clear()
+        self._battle_turn = None
+        self._battle_turn_done = False
 
     @property
     def path(self) -> Path:
