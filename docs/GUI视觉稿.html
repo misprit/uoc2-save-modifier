@@ -224,6 +224,20 @@ table.spec-tbl tr:hover td{background:var(--accent-light)}
 table.spec-tbl td.num{font-family:var(--mono);text-align:right}
 table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border-radius:4px;display:grid;place-items:center;overflow:hidden}
 table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
+
+/* ---------- 窄窗口兜底（真程序是 1440×900，这里只是让本稿在窄窗口也不至于挤坏） ---------- */
+@media (max-width:1240px){
+  .cols{grid-template-columns:1fr}
+  .toolbar{flex-wrap:wrap;row-gap:6px}
+  .toolbar .inp,.toolbar .sel{white-space:nowrap}
+  .drawer{position:static;width:auto;margin-top:12px}
+}
+@media (max-width:900px){
+  .body{flex-direction:column}
+  .rail{width:100%!important;border-right:none;border-bottom:1px solid var(--border)}
+  .rail .grp{display:none}
+  .drawer .dh{flex-wrap:wrap}
+}
 </style>
 </head>
 <body>
