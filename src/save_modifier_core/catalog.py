@@ -193,6 +193,10 @@ class Catalog:
     def has_unit_type(self, name: str) -> bool:
         return name in self._index("unit_types")
 
+    def card_type(self, name: str) -> dict | None:
+        """卡牌类型定义（`cost` / `has_unit` / `theater_asset` …）。"""
+        return self._load("cards", name)
+
     def has_spec_type(self, name: str) -> bool:
         return name in self._index("specialists")
 

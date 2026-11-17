@@ -28,27 +28,39 @@ from __future__ import annotations
 from . import catalog
 from .capabilities import Capabilities
 from .catalog import Catalog, UnitType
+from .commit import CommitResult, commit, make_backup
 from .container import (CardView, HqView, Save, StoreEntryView, UnitView,
                         View)
 from .discovery import SaveInfo, list_saves, resolve_save_id
+from .edits import Edit
 from .paths import CorePaths
+from .plan import FileChange, Plan, ValidationResult, plan_edit, validate
 
 __all__ = [
     "Capabilities",
     "CardView",
     "Catalog",
+    "CommitResult",
     "CorePaths",
+    "Edit",
+    "FileChange",
     "HqView",
+    "Plan",
     "Save",
     "SaveInfo",
     "StoreEntryView",
     "UnitType",
     "UnitView",
+    "ValidationResult",
     "View",
     "catalog",
+    "commit",
     "list_saves",
+    "make_backup",
     "open_save",
+    "plan_edit",
     "resolve_save_id",
+    "validate",
 ]
 
 __version__ = "0.1.0"

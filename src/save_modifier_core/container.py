@@ -31,6 +31,8 @@ from .paths import CorePaths
 
 if TYPE_CHECKING:                      # pragma: no cover
     from .catalog import Catalog
+    from .commit import CommitResult
+    from .plan import Plan
 
 __all__ = ["Save", "View", "UnitView", "HqView", "CardView", "StoreEntryView"]
 
@@ -493,6 +495,18 @@ class Save:
         )
 
     # ---- 写回（S5 之后接上）----
+
+    def plan_edit(self, edits, catalog: "Catalog | None" = None) -> "Plan":
+        """规划一批编辑。**不碰磁盘。**"""
+        from .plan import plan_edit
+        return plan_edit(self, edits, catalog)
+
+    def commit(self, plan: "Plan") -> "CommitResult":
+        """把计划写回存档（备份 → 临时文件 → 校验 → 原子替换）。"""
+        from .commit import commit
+        # 必须先关掉 ZIP 句柄 —— Windows 上替换被打开的文件会失败
+        self.close()
+        return commit(plan)
 
     @property
     def path(self) -> Path:
