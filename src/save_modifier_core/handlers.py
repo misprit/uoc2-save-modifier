@@ -780,16 +780,47 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
     # 条目字段补齐：游戏自己写的是 {delay, nationality, quantity, spec?|equipment?}
     new = dict(entry)
     new.setdefault("delay", 0)
-    new.setdefault("nationality", "")
+    if not new.get("nationality"):
+        # ⚠️ 原来这里 setdefault 成空串 —— 游戏读不出来（U22 修）。
+        # 实测（U22）：真实存档里 商店 1043 条 + 兵库 1747 条 spec 条目，
+        # 国籍 **100% 等于该特种兵类型自身的 nationality**，0 条例外
+        # ⇒ 给了 spec 就自动把国籍填成类型国籍。
+        nat = _spec_nationality(w, new.get("spec"))
+        if nat:
+            new["nationality"] = nat
+        else:
+            new.setdefault("nationality", "")
     pool.insert(index, new)
     hq["force_pool"] = pool
     w.touch("hqs.yml")
     oc.summary = (f"总部 {hq_id} 兵库加一条"
                   f"（{new.get('spec') or new.get('equipment')} × {new.get('quantity')}）")
-    oc.warnings.append(
-        "兵库条目的**国籍**要填国籍 id（uk / us / german …），不是阵营"
-        "（allies / axis）—— 填错游戏读不出来")
+    spec_nat = _spec_nationality(w, new.get("spec"))
+    if spec_nat and new.get("nationality") != spec_nat:
+        oc.warnings.append(
+            f"国籍填的是 {new.get('nationality')!r}，但这个特种兵自己的国籍是 "
+            f"{spec_nat!r} —— 游戏自己的数据全部跟着特种兵类型走，"
+            "建议让国籍跟着类型自动填")
+    elif not new.get("nationality"):
+        oc.warnings.append(
+            "兵库条目的**国籍**要填国籍 id（uk / us / german …），不是阵营"
+            "（allies / axis）—— 填错游戏读不出来")
     return oc
+
+
+def _spec_nationality(w, spec) -> str | None:
+    """特种兵类型自己的国籍（查不到返回 `None`）。
+
+    数据源：游戏包 `entity_types/specialists/<type>.yml` 的 `nationality` 字段
+    （实测 375/375 都有）。拿不到游戏包就返回 `None` —— **不猜**。
+    """
+    if not spec or w.catalog is None:
+        return None
+    try:
+        st = w.catalog.spec_type(spec)
+    except Exception:
+        return None
+    return getattr(st, "nationality", None) if st is not None else None
 
 
 def _hq_force_pool_remove(w, e: Edit) -> Outcome:

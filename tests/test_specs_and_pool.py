@@ -159,5 +159,58 @@ class TestForcePool(SpecPoolTestBase):
         self.assertEqual(res.changed, ["hqs.yml"])
 
 
+class TestForcePoolAddNationality(SpecPoolTestBase):
+    """U22：兵库加一条时，**国籍跟着特种兵类型走**。
+
+    取证：真实存档里 **商店 1043 条 + 兵库 1747 条 spec 条目，
+    国籍 100% 等于该特种兵类型自身的 `nationality`，0 条例外**
+    ⇒ 给了 `spec` 就自动填国籍；填错了要警告。
+    """
+
+    def setUp(self):
+        super().setUp()
+        if not self.catalog.has_spec_type("ger_arty_40"):
+            self.skipTest("本机没有游戏包")
+        self.spec_nat = self.catalog.spec_type("ger_arty_40").nationality
+
+    def _pool(self):
+        with zipfile.ZipFile(self.save_path) as zf:
+            hqs = yaml.safe_load(zf.read("hqs.yml"))
+        return hqs[0]["force_pool"]
+
+    def test_nationality_is_filled_from_spec_type(self):
+        """不传 nationality ⇒ 自动填成该特种兵自己的国籍（原来填的是空串）。"""
+        plan, res = self.commit([Edit.hq_force_pool_add(
+            5, {"quantity": 2, "spec": "ger_arty_40"})])
+        self.assertTrue(res.ok, res.errors)
+        pool = self._pool()
+        self.assertEqual(pool[-1]["spec"], "ger_arty_40")
+        self.assertEqual(pool[-1]["nationality"], self.spec_nat)
+        self.assertTrue(self.spec_nat, "游戏包里这个特种兵应当有国籍")
+
+    def test_mismatched_nationality_warns(self):
+        """显式填了别的国籍 ⇒ 警告（不硬拦，但要说清游戏自己的规矩）。"""
+        plan, res = self.commit([Edit.hq_force_pool_add(
+            5, {"quantity": 2, "spec": "ger_arty_40", "nationality": "us"})])
+        self.assertTrue(res.ok, res.errors)
+        self.assertTrue(any("国籍" in w for w in plan.warnings), plan.warnings)
+        self.assertEqual(self._pool()[-1]["nationality"], "us")
+
+    def test_equipment_entry_keeps_its_nationality(self):
+        """装备条目的国籍是独立组合（实测 20+ 种）⇒ 原样保留，不被覆盖。"""
+        plan, res = self.commit([Edit.hq_force_pool_add(
+            5, {"quantity": 5, "equipment": "armor", "nationality": "soviet"})])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self._pool()[-1]["nationality"], "soviet")
+
+    def test_equipment_entry_without_nationality_warns(self):
+        """装备条目没给国籍 ⇒ 仍是空串，但必须警告（游戏读不出来）。"""
+        plan, res = self.commit([Edit.hq_force_pool_add(
+            5, {"quantity": 5, "equipment": "armor"})])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self._pool()[-1]["nationality"], "")
+        self.assertTrue(any("国籍" in w for w in plan.warnings), plan.warnings)
+
+
 if __name__ == "__main__":
     unittest.main()

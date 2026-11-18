@@ -244,6 +244,29 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .pcell:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(36,91,143,.2)}
 .pcell.blocked{opacity:.32;filter:grayscale(.92);cursor:not-allowed}
 .pcell.blocked:hover{border-color:var(--stage-edge);box-shadow:none}
+/* ---------- U22：特种兵选择器（商店上架 / 总部兵库共用） ----------
+   复用单位详情页的两套现成组件，一行样式都没重写：
+     · 图标网格 = 备选池的 .pcell（只图标，悬停出名字 + 数值 + 国籍）
+     · 详情卡   = 已挂槽位的 .slot（图标 ‖ 名称+特性 ‖ 右侧纵向数值）
+   ⇒ 两处上架入口和单位页看起来就是**同一个东西**。 */
+.spick{border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);overflow:hidden}
+.spick .sphd{display:flex;align-items:center;gap:9px;padding:8px 11px;
+  background:var(--surface);border-bottom:1px solid var(--border)}
+.spick .spt{font-size:12.5px;font-weight:700;color:var(--accent-dark);white-space:nowrap}
+.spick .spc{font-size:11px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.spick .spgrid{display:flex;flex-wrap:wrap;gap:6px;padding:10px 11px;max-height:156px;overflow:auto}
+.spick .spgrid .pcell.on{border-color:var(--accent);background:var(--accent-light);
+  box-shadow:0 0 0 2px rgba(36,91,143,.35)}
+.spick .spfoot{padding:9px 11px;background:var(--surface);border-top:1px solid var(--border)}
+/* 详情卡用 .slot 的样式，但去掉「点击 = 卸下」的悬停变红语义 */
+.spick .slot.spcard{cursor:default}
+.spick .slot.spcard:hover{border-color:var(--border);background:var(--surface-alt)}
+.spick .slot.spcard:hover .slotname{color:inherit}
+/* 国籍自动跟随特种兵 —— 只读，不给选 */
+.spnat{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.spnat b{font-family:var(--mono);color:var(--accent-dark);font-weight:700;font-size:13px}
+.spnat .auto{font-size:10px;padding:0 5px;border-radius:3px;background:var(--accent-light);
+  border:1px solid #b9d3ea;color:var(--accent-dark)}
 /* 悬停提示（深色浮层） */
 .tip{position:absolute;z-index:99;background:#1b2430;color:#fff;border-radius:6px;padding:7px 10px;
   font-size:11.5px;line-height:1.55;white-space:nowrap;pointer-events:none;opacity:0;
@@ -1107,6 +1130,54 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
+<div class="app" style="margin-top:14px">
+  <div class="hdr" style="border-bottom:1px solid var(--border)">
+    <div class="brand"><span class="logo">U2</span>添加兵库条目</div>
+  </div>
+  <div class="modal" style="width:auto;margin:14px;box-shadow:none;border:1px solid var(--border)">
+    <div class="mh">给「A集团军群」加一条 <span class="ro">存进 hqs.yml</span></div>
+    <div class="mb">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px">
+        <span style="width:64px;color:var(--muted)">条目类型</span>
+        <span class="sel">特种兵</span><span class="sel">兵种</span>
+        <span style="font-size:11.5px;color:var(--muted)">375 种特种兵 / 2 种兵种 × 34 种国籍</span></div>
+
+      <!-- U22：同一个「特种兵选择器」组件（与商店上架完全一致） -->
+      <div class="spick" id="spickPool">
+        <div class="sphd">
+          <span class="spt">选一个特种兵</span>
+          <input class="inp" placeholder="搜索特种兵…" style="flex:1">
+          <label class="chk"><input type="checkbox" checked> 只列本战役有的</label>
+          <span class="spc"></span>
+        </div>
+        <div class="spgrid"></div>
+        <div class="spfoot">
+          <div class="slot spcard"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px">
+            <span style="color:var(--muted)">国籍</span>
+            <span class="spnat"><b>—</b><span class="auto">跟着特种兵自动 · 不用手选</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:11px;font-size:13px">
+        <span style="width:64px;color:var(--muted)">数量</span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--accent-dark);font-size:17px">3</span>
+        <span style="font-size:11.5px;color:var(--muted)">滚轮可调 · 非负整数</span></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:13px">
+        <span style="width:64px;color:var(--muted)">延迟</span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--accent-dark);font-size:17px">0</span>
+        <span style="font-size:11.5px;color:var(--muted)">滚轮可调 · 0 = 立即可用</span></div>
+      <div class="note" style="border:1px solid var(--border);border-radius:7px;margin-top:12px;border-top:1px solid var(--border)">
+        ⓘ 条目 = <code>{delay, nationality, quantity, spec|equipment}</code>。<br>
+        ⓘ <b>特种兵的国籍跟着特种兵自动</b> —— 实测真实存档里兵库 1747 条<b>全是</b>跟着类型走的。<br>
+        ⓘ 装备条目的国籍是<b>独立组合</b>（实测 20+ 种），那个要手选。
+      </div>
+    </div>
+    <div class="mf"><button class="btn">取消</button><button class="btn pri">添加</button></div>
+  </div>
+</div>
+
 <h2>5 · 卡牌页（手牌 + 卡牌商店 · 50/50）</h2>
 <p class="lead"><b>卡牌商店 = <code>main.yml.card_store</code></b>，和手牌 <code>cards.yml</code> <b>同一套字段</b>
 <code>{card_type, is_free, position, unit_id, used}</code>。只在<b>会议阶段</b>存在。
@@ -1255,24 +1326,41 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   <div class="modal" style="width:auto;margin:14px;box-shadow:none;border:1px solid var(--border)">
     <div class="mh">上架新商品 <span class="ro">存进 store.yml</span></div>
     <div class="mb">
-      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="width:64px;color:var(--muted)">商品类型</span>
-          <span class="sel">特种兵 ▾</span><span class="sel">拖曳炮 · 42 ▾</span>
-          <span style="font-size:11.5px;color:var(--muted)">（375 种特种兵 / 2 种兵种 × 34 种国籍）</span></div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="width:64px;color:var(--muted)">国籍</span><span class="sel">德 ▾</span></div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="width:64px;color:var(--muted)">价格</span>
-          <span style="font-family:var(--mono);font-weight:700;color:var(--accent-dark);font-size:17px">40</span>
-          <span style="font-size:11.5px;color:var(--muted)">Ctrl+滚轮 ±5 · 任意非负整数，不必是会议默认值</span></div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="width:64px;color:var(--muted)">库存</span>
-          <span style="font-family:var(--mono);font-weight:700;color:var(--accent-dark);font-size:17px">2</span>
-          <span style="font-size:11.5px;color:var(--muted)">Ctrl+滚轮 ±1 · 正整数</span></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px">
+        <span style="width:64px;color:var(--muted)">商品类型</span>
+        <span class="sel">特种兵</span><span class="sel">兵种</span>
+        <span style="font-size:11.5px;color:var(--muted)">375 种特种兵 / 2 种兵种 × 34 种国籍</span></div>
+
+      <!-- U22：特种兵选择器 = 单位页「备选池图标格」+「已挂槽位卡」 -->
+      <div class="spick" id="spickStore">
+        <div class="sphd">
+          <span class="spt">选一个特种兵</span>
+          <input class="inp" placeholder="搜索特种兵…" style="flex:1">
+          <label class="chk"><input type="checkbox" checked> 只列本战役可上架的</label>
+          <span class="spc"></span>
+        </div>
+        <div class="spgrid"></div>
+        <div class="spfoot">
+          <div class="slot spcard"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px">
+            <span style="color:var(--muted)">国籍</span>
+            <span class="spnat"><b>—</b><span class="auto">跟着特种兵自动 · 不用手选</span></span>
+          </div>
+        </div>
       </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:11px;font-size:13px">
+        <span style="width:64px;color:var(--muted)">价格</span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--accent-dark);font-size:17px">40</span>
+        <span style="font-size:11.5px;color:var(--muted)">Ctrl+滚轮 ±5 · 任意非负整数，不必是会议默认值</span></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:13px">
+        <span style="width:64px;color:var(--muted)">库存</span>
+        <span style="font-family:var(--mono);font-weight:700;color:var(--accent-dark);font-size:17px">2</span>
+        <span style="font-size:11.5px;color:var(--muted)">Ctrl+滚轮 ±1 · 正整数</span></div>
       <div class="note" style="border:1px solid var(--border);border-radius:7px;margin-top:12px;border-top:1px solid var(--border)">
         ⓘ 商品必须是游戏里定义过的（<b>特种兵 / 兵种 × 国籍</b>）—— schema 会校验。<br>
+        ⓘ <b>特种兵的国籍跟着特种兵自动</b>，不用手选 —— 实测真实存档里商店 1043 条 +
+        兵库 1747 条<b>全是</b>跟着类型走的，<b>0 条例外</b>。<br>
         ⓘ 库存<b>不能为 0</b> —— 游戏没有"售罄"标记，要下架请删条目。<br>
         ⓘ <code>spec</code> 与 <code>equipment</code> <b>二选一</b>，不能同时给。
       </div>
@@ -2183,14 +2271,11 @@ function blockReason(s){
   return "";
 }
 
-/* U16：已挂槽位 = 图标 ‖ 名称(上)+特性(下) ‖ 右侧纵向数值；点击 = 卸下
-   数值标签用游戏自己的（id_sheet_spec_attack/defense/armor/artillery） */
-const slots=document.getElementById("slots");
-MOUNTED.forEach(t=>{
-  const s=SPECIALISTS.find(x=>x[0]===t); if(!s) return;
-  const d=document.createElement("div"); d.className="slot";
+/* ---------- U22：特种兵卡的**唯一**渲染函数 ----------
+   单位页的「已挂槽位」与商店/兵库的「选择器详情卡」共用它 ⇒ 永远长得一样。 */
+function specSlotHTML(s){
   const fl=s[8] ? s[8].split(",").filter(Boolean) : [];
-  d.innerHTML=`<div class="sq"><img alt=""></div>`
+  return `<div class="sq"><img alt=""></div>`
     +`<div class="slotinfo"><div class="slotname">${s[1]}</div>`
     +`<div class="slotflags">`
     +(fl.length ? fl.map(f=>`<span class="ftag">${FLAG_CN[f]||f}</span>`).join("")
@@ -2202,6 +2287,15 @@ MOUNTED.forEach(t=>{
     +`<span class="st"><i>装甲</i><b>${s[4]}</b></span>`
     +`<span class="st"><i>炮术</i><b>${s[5]}</b></span>`
     +`</div>`;
+}
+
+/* U16：已挂槽位 = 图标 ‖ 名称(上)+特性(下) ‖ 右侧纵向数值；点击 = 卸下
+   数值标签用游戏自己的（id_sheet_spec_attack/defense/armor/artillery） */
+const slots=document.getElementById("slots");
+MOUNTED.forEach(t=>{
+  const s=SPECIALISTS.find(x=>x[0]===t); if(!s) return;
+  const d=document.createElement("div"); d.className="slot";
+  d.innerHTML=specSlotHTML(s);
   img(d.querySelector("img"), SUR+"specialist/"+t+"/hq_action_icon.png", s[1]);
   d.title="点击卸下这个特种兵";
   slots.appendChild(d);
@@ -2691,6 +2785,40 @@ if(pg){
     pg.appendChild(el);
   });
 }
+
+/* ---------- U22：特种兵选择器（商店上架 / 总部兵库共用） ----------
+   图标网格 = 单位页备选池的 .pcell；详情卡 = 单位页已挂槽位的 .slot（同一套样式）。
+   候选集：商店 = 本战役商店里出现过的（= 核心库 store_item_universe 的 spec 集合，
+           选了必定过校验）；兵库 = 本战役默认池（与单位页备选池同口径）。 */
+function mountSpicker(rootId, list, countText){
+  const root=document.getElementById(rootId);
+  if(!root || !list.length) return;
+  const grid=root.querySelector(".spgrid"), card=root.querySelector(".spcard"),
+        cnt=root.querySelector(".spc"), nat=root.querySelector(".spnat b");
+  let sel=list[0];
+  function paint(){
+    grid.innerHTML="";
+    list.forEach(function(s){
+      const c=document.createElement("div");
+      c.className="pcell"+(s===sel?" on":"");
+      c.innerHTML=`<img alt="">`;
+      img(c.querySelector("img"), SUR+"specialist/"+s[0]+"/hq_action_icon.png", s[1]);
+      c.dataset.tip=`<span class="tn">${s[1]}</span>`
+        +`<span class="tr">攻击 ${s[2]} · 防御 ${s[3]} · 装甲 ${s[4]} · 炮术 ${s[5]}</span><br>`
+        +`<span class="tr">国籍 ${NAT_CN[s[6]]||s[6]}</span>`;
+      c.addEventListener("click", function(){ sel=s; paint(); });
+      grid.appendChild(c);
+    });
+    card.innerHTML=specSlotHTML(sel);
+    img(card.querySelector("img"), SUR+"specialist/"+sel[0]+"/hq_action_icon.png", sel[1]);
+    if(nat) nat.textContent=NAT_CN[sel[6]]||sel[6];
+    if(cnt) cnt.textContent=countText;
+  }
+  paint();
+}
+const SP_CAMPAIGN=SPECIALISTS.filter(s=>s[9]==="1");
+mountSpicker("spickStore", SP_CAMPAIGN, "本战役可上架 "+SP_CAMPAIGN.length+" 种");
+mountSpicker("spickPool",  SP_CAMPAIGN, "本战役 "+SP_CAMPAIGN.length+" 种");
 
 /* 战区资产 —— U20：三个字段都是 X/X 形式的可调数字（借用总部 CP 卡的做法）
    联动与核心库完全一致：
