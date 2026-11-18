@@ -3,7 +3,7 @@
 数据源
 ------
 ```
-<包>/data/entity_types/unit_types/<类型名>.yml     627 个  → max_st / max_spec
+<包>/data/entity_types/unit_types/<类型名>.yml     627 个  → max_st / max_spec / equipment / equipment_q
 <包>/data/entity_types/specialists/<类型名>.yml     375 个
 <包>/data/entity_types/cards/<类型名>.yml            39 个
 <包>/data/entity_types/hq_types/<类型名>.yml        213 个
@@ -68,12 +68,36 @@ class UnitType:
     max_st: int | None = None
     #: 特种兵上限；None 表示该类型没有这个字段
     max_spec: int | None = None
+    #: 装备类别（`null` = 无装备）；决定"战力阶梯"用哪张图
+    equipment: str | None = None
+    #: 装备档位（0 = 无装备；实测 base 包只有 1 / 2 两种）
+    equipment_q: int | None = None
     name_brief: str | None = None
 
     @property
     def spec_cap(self) -> int:
         """能挂几个特种兵 = `min(3, max_spec or 3)`（规范 §5.3）。"""
         return min(3, self.max_spec if self.max_spec is not None else 3)
+
+    def step_icon(self) -> str:
+        """这个单位类型的"战力阶梯"图标文件名（不含目录、不含扩展名）。
+
+        规则来自游戏自己的 `hq_ctrl.pyc::HQCtrl._fp_helper`（字节码实证）：
+
+        ```python
+        'steps/step{}'.format('_' + equipment + '_' + equipment_q if equipment else '')
+        ```
+
+        ⇒ 无装备 → `step`；有装备 → `step_<装备>_<档位>`。
+
+        ⚠️ 游戏里是**先判 `equipment` 真假**，再看 `equipment_q`；
+        `equipment` 为 null 时 `equipment_q` 恒为 0，不会拼出 `step__0`。
+
+        兜底：拼不出来的组合一律回落到 `step`（GUI 侧不该因此崩）。
+        """
+        if self.equipment:
+            return f"step_{self.equipment}_{self.equipment_q}"
+        return "step"
 
 
 def _as_int(v) -> int | None:
@@ -157,6 +181,8 @@ class Catalog:
             armor=_as_int(d.get("armor")),
             max_st=_as_int(d.get("max_st")),
             max_spec=_as_int(d.get("max_spec")),
+            equipment=d.get("equipment"),
+            equipment_q=_as_int(d.get("equipment_q")),
             name_brief=d.get("name_brief"),
         )
 
@@ -169,6 +195,14 @@ class Catalog:
         """特种兵上限 = `min(3, max_spec or 3)`；类型未知按 3 处理。"""
         t = self.unit_type(type_name)
         return t.spec_cap if t else 3
+
+    def step_icon(self, type_name: str) -> str:
+        """单位的"战力阶梯"图标文件名（不含目录、不含扩展名）。
+
+        类型未知回落到 `step`（GUI 侧不该因此崩）。
+        """
+        t = self.unit_type(type_name)
+        return t.step_icon() if t else "step"
 
     def unit_type_names(self) -> list[str]:
         """全部单位类型名（只列目录，不解析 YAML）。"""

@@ -72,6 +72,47 @@ class TestCatalogCounts(unittest.TestCase):
         self.assertEqual(self.cat.max_st("ger_inf_39"), 7)
         self.assertEqual(self.cat.spec_cap("ger_inf_39"), 2)
 
+    def test_equipment_exposed(self):
+        """`equipment` / `equipment_q` 是类型定义里的字段，必须能读到。
+
+        字节码实证（`hq_ctrl.pyc::_fp_helper`）：阶梯图标名 =
+        `'steps/step{}'.format('_' + equipment + '_' + equipment_q if equipment else '')`
+        ⇒ GUI 要靠这两个字段选图。
+        """
+        ut = self.cat.unit_type("us_arm_42")
+        self.assertIsNotNone(ut)
+        self.assertEqual(ut.equipment, "armor")
+        self.assertEqual(ut.equipment_q, 2)
+
+        plain = self.cat.unit_type("us_inf_42")
+        self.assertIsNotNone(plain)
+        self.assertIsNone(plain.equipment)
+        self.assertEqual(plain.equipment_q, 0)
+
+    def test_equipment_distribution(self):
+        """base 包 627 个单位类型的 `(equipment, equipment_q)` 组合实测分布。"""
+        dist = collections.Counter()
+        for name in self.cat.unit_type_names():
+            ut = self.cat.unit_type(name)
+            dist[(ut.equipment, ut.equipment_q) if ut else ("missing", "missing")] += 1
+        self.assertEqual(dist, collections.Counter(
+            {(None, 0): 398, ("armor", 2): 135, ("armor", 1): 94}))
+
+    def test_step_icon_rule(self):
+        """阶梯图标名：先判 `equipment` 真假，再拼 `equipment_q`。
+
+        * 无装备 → `step`
+        * armor + 1 → `step_armor_1`
+        * armor + 2 → `step_armor_2`
+        """
+        self.assertEqual(self.cat.step_icon("us_inf_42"), "step")
+        self.assertEqual(self.cat.step_icon("us_arm_42"), "step_armor_2")
+        self.assertEqual(self.cat.step_icon("ger_pz_dlc7"), "step_armor_2")
+
+        # 未知类型回落到 step，不抛异常
+        self.assertEqual(self.cat.step_icon("definitely_not_a_type"), "step")
+        self.assertEqual(self.cat.unit_type("definitely_not_a_type"), None)
+
     def test_fronts_are_per_campaign(self):
         """fronts 每个战役包各有一份 —— west 有两条，stalingrad 也有自己的两条。"""
         self.assertEqual(self.cat.fronts("west"), ["france", "italy"])

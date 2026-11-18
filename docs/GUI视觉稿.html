@@ -9,7 +9,8 @@
   --text:#1f2933; --muted:#5c6b78; --accent:#245b8f; --accent-dark:#17456f;
   --accent-light:#dceaf7; --selection:#cfe3f5;
   --ok:#1e6b3a; --ok-light:#e4f2ea; --warn:#8a5a00; --warn-light:#fdf3e0;
-  --danger:#a4262c; --danger-light:#fbe9ea; --stage:#1b2430;
+  --danger:#a4262c; --danger-light:#fbe9ea;
+  --stage:#e4eaf1; --stage-sup:#b9c6d6; --stage-edge:#ccd6e2;
   --ui: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
   --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
 }
@@ -82,7 +83,7 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .rail .undo b{color:var(--text)}
 
 /* 工作区 */
-.work{flex:1;padding:14px 16px;position:relative;overflow:hidden}
+.work{flex:1;padding:14px 16px;position:relative;overflow:hidden;display:flex;flex-direction:column}
 .toolbar{display:flex;align-items:center;gap:10px;background:var(--surface-alt);
   border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:12px}
 .inp{background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 9px;
@@ -102,18 +103,18 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .urow{display:flex;align-items:center;gap:11px;padding:9px 12px;border-bottom:1px solid #f0f3f6}
 .urow:hover{background:var(--accent-light)}
 .urow.sel{background:var(--selection)}
-.ava{width:52px;height:52px;border-radius:6px;background:var(--stage);flex:none;
-  display:grid;place-items:center;overflow:hidden}
+.ava{width:52px;height:52px;border-radius:6px;background:var(--stage);
+  border:1px solid var(--stage-edge);flex:none;display:grid;place-items:center;overflow:hidden}
 .ava img{max-width:100%;max-height:100%;object-fit:contain}
 .umin{flex:1;min-width:0}
 .uname{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px}
 .uname .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block}
-.uname .full{color:var(--ok);font-size:11px}
+.uname .full{color:var(--muted);font-size:11px}
 .umeta{font-size:11.5px;color:var(--muted);margin-top:1px}
 .pips{display:flex;gap:2px;margin-top:4px}
 .pip{width:13px;height:9px;border-radius:2px;background:var(--surface-alt);border:1px solid var(--border)}
 .pip.on{background:var(--accent);border-color:var(--accent-dark)}
-.pip.max{background:var(--ok);border-color:var(--ok)}
+.pip.sup{background:var(--stage-sup);border-color:#a9b7c7}
 .uv{font-family:var(--mono);font-size:13px;text-align:right;min-width:58px}
 .uv small{display:block;font-size:10.5px;color:var(--muted);font-family:var(--ui)}
 
@@ -134,8 +135,23 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .stat .stepic{display:flex;align-items:center;gap:6px;margin-top:6px}
 .stat .stepic img{height:26px;image-rendering:auto}
 .stat .stepic span{font-size:11.5px;color:var(--muted)}
+
+/* 两层血量条 */
+.blood{display:flex;align-items:center;gap:10px;margin-top:8px}
+.blood .bar{display:flex;gap:3px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);
+  background:var(--surface)}
+.blood .bar .pip{width:16px;height:13px}
+.blood .num{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--accent-dark);
+  border:1px dashed var(--border);border-radius:6px;padding:2px 9px;background:var(--surface)}
+.blood .tag{font-size:10.5px;color:var(--muted);line-height:1.35}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:6px;align-items:center;
+  flex-wrap:wrap}
+.legend span{white-space:nowrap}
+.legend i{display:inline-block;width:11px;height:8px;border-radius:2px;margin-right:5px;
+  vertical-align:middle}
 .specs{display:flex;gap:7px;margin-top:12px;align-items:center;flex-wrap:wrap}
-.spec{width:44px;height:44px;border-radius:6px;background:var(--stage);display:grid;place-items:center;overflow:hidden}
+.spec{width:44px;height:44px;border-radius:6px;background:var(--stage);
+  border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden}
 .spec img{max-width:100%;max-height:100%;object-fit:contain}
 .spec.add{background:var(--surface-alt);border:1px dashed var(--border);color:var(--muted);
   font-size:20px;display:grid;place-items:center;cursor:pointer}
@@ -144,18 +160,22 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .specwrap{position:relative}
 
 /* 抽屉 */
-.drawer{position:absolute;right:14px;bottom:14px;width:430px;background:var(--surface);
-  border:1px solid var(--border);border-radius:9px;box-shadow:0 14px 36px rgba(20,40,60,.22);overflow:hidden}
-.drawer .dh{background:var(--surface-alt);border-bottom:1px solid var(--border);padding:9px 12px;
+/* 待应用清单 = **底部面板**，不是浮层 —— 展开时把工作区压矮，永不遮挡内容 */
+.drawer{position:relative;right:auto;bottom:auto;width:auto;margin-top:12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:9px;
+  box-shadow:0 -6px 20px rgba(20,40,60,.08);overflow:hidden;flex:none}
+.drawer .dh{background:var(--surface-alt);border-bottom:1px solid var(--border);padding:8px 12px;
   font-size:13px;font-weight:700;color:var(--accent-dark);display:flex;align-items:center;gap:8px}
 .drawer .dh .files{margin-left:auto;font-weight:400;font-size:11px;color:var(--muted);font-family:var(--mono)}
-.ditem{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f4f7;font-size:12.5px}
-.ditem .what{flex:1}
+.dlist{display:flex;gap:10px;padding:10px 12px;flex-wrap:wrap}
+.ditem{display:flex;align-items:center;gap:10px;padding:8px 11px;border:1px solid var(--border);
+  border-radius:7px;background:var(--surface-alt);font-size:12.5px;flex:1 1 300px}
+.ditem .what{flex:1;min-width:0}
 .ditem .what b{font-weight:600}
 .ditem .what .chg{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
 .ditem .old{font-family:var(--mono);color:var(--muted);text-decoration:line-through}
 .ditem .new{font-family:var(--mono);color:var(--accent-dark);font-weight:700}
-.drawer .df{display:flex;gap:8px;padding:10px 12px;background:var(--surface-alt)}
+.drawer .df{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface)}
 
 /* 状态栏 */
 .status{background:var(--surface);border-top:1px solid var(--border);padding:6px 16px;
@@ -180,8 +200,8 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:11px;padding:12px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px;text-align:center}
 .card:hover{border-color:var(--accent);box-shadow:0 6px 16px rgba(20,40,60,.13)}
-.card .ci{width:76px;height:76px;margin:0 auto;background:var(--stage);border-radius:6px;
-  display:grid;place-items:center;overflow:hidden}
+.card .ci{width:76px;height:76px;margin:0 auto;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:6px;display:grid;place-items:center;overflow:hidden}
 .card .ci img{max-width:100%;max-height:100%;object-fit:contain}
 .card .cn{font-size:12px;font-weight:600;margin-top:6px}
 .card .cs{font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-top:2px}
@@ -222,7 +242,8 @@ table.spec-tbl th{text-align:left;background:var(--accent-dark);color:#fff;paddi
 table.spec-tbl td{padding:7px 10px;border-bottom:1px solid #eef1f4}
 table.spec-tbl tr:hover td{background:var(--accent-light)}
 table.spec-tbl td.num{font-family:var(--mono);text-align:right}
-table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border-radius:4px;display:grid;place-items:center;overflow:hidden}
+table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:4px;display:grid;place-items:center;overflow:hidden}
 table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 
 /* ---------- 窄窗口兜底（真程序是 1440×900，这里只是让本稿在窄窗口也不至于挤坏） ---------- */
@@ -271,26 +292,35 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
   <div class="comp"><h4>数值控件（滚轮可调）</h4>
     <div class="row">
-      <span class="sel">战力 5 / 7</span>
+      <span class="sel">兵力 5 / 7</span>
       <span class="inp" style="font-family:var(--mono);width:74px;text-align:right">1 240</span>
     </div>
     <div style="font-size:11.5px;color:var(--muted)">悬停 → 边框转 accent + 数值染 accent（120ms）；<br>
     滚轮 ±1 · Ctrl+滚轮 ±10 · Shift+滚轮 到边界</div>
   </div>
-  <div class="comp"><h4>战力段格条（离散格）</h4>
-    <div class="pips" style="margin-bottom:7px">
-      <span class="pip on"></span><span class="pip on"></span><span class="pip on"></span>
-      <span class="pip on"></span><span class="pip on"></span><span class="pip"></span><span class="pip"></span>
+  <div class="comp"><h4>两层血量条（滚轮分区）</h4>
+    <div class="blood" style="margin-top:2px">
+      <div class="bar">
+        <span class="pip on"></span><span class="pip on"></span><span class="pip on"></span>
+        <span class="pip on"></span><span class="pip sup"></span>
+        <span class="pip"></span><span class="pip"></span>
+      </div>
+      <div class="num">5 / 7</div>
     </div>
-    <div class="pips">
-      <span class="pip max"></span><span class="pip max"></span><span class="pip max"></span>
-      <span class="pip max"></span><span class="pip max"></span><span class="pip max"></span><span class="pip max"></span>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>未被压制 4</span>
+      <span><i style="background:var(--stage-sup)"></i>被压制 1</span>
+      <span><i style="background:var(--surface-alt);border:1px solid var(--border)"></i>还差 2</span>
     </div>
-    <div style="font-size:11.5px;color:var(--muted);margin-top:8px">一格 = 1 点战力；空格子 = 还能升几格。<br>满战力用 <span style="color:var(--ok)">ok 色</span> + ★</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.6">
+      <b style="color:var(--accent)">血条上滚轮</b> = 调被压制的量（淡色段增减）<br>
+      <b style="color:var(--accent)">数字区滚轮</b> = 调当前血量（实心+淡色总量）<br>
+      一格 = 1 点血；被压制的还在，但不能行动
+    </div>
   </div>
   <div class="comp"><h4>提示（tooltip）</h4>
     <div class="tip"><button class="btn">悬停我</button>
-      <div class="tipbox">战力 5 / 7 · 还差 2 步升满<br><span style="opacity:.75">滚轮可调</span></div>
+      <div class="tipbox">当前血量 5 / 7 · 被压制 1<br><span style="opacity:.75">数字区滚轮调血量 · 血条上滚轮调压制</span></div>
     </div>
     <div style="font-size:11.5px;color:var(--muted);margin-top:10px">深底 #1b2430 · 白字 · 400ms 延迟 · 跟随鼠标</div>
   </div>
@@ -303,7 +333,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 </div>
 
 <h2>2 · 主窗口 · 单位页</h2>
-<p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 7 个功能页，右下是常驻的待应用抽屉。</p>
+<p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 7 个功能页，底部是常驻的待应用面板（展开时压矮工作区，永不遮挡详情区）。</p>
 
 <div class="app">
   <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>
@@ -330,14 +360,14 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
       <div class="nav dis"><span class="ic">▪</span>战区资产<span class="why">不在战斗中</span></div>
       <div class="sep"></div>
       <div class="undo">撤销栈 <b>2</b> 条</div>
-      <div class="undo">最近：单位 3 战力 5 → 7</div>
+      <div class="undo">最近：单位 3 兵力 5 → 7</div>
     </div>
 
-    <div class="work">
+    <div class="work has-drawer">
       <div class="toolbar">
         <input class="inp" placeholder="搜索单位 / ID…" style="width:210px">
         <span class="sel">按总部 ▾</span>
-        <label class="chk"><input type="checkbox"> 只看满战力</label>
+        <label class="chk"><input type="checkbox"> 只看被压制的</label>
         <label class="chk"><input type="checkbox"> 只看有改动的</label>
         <span class="sp"></span>
         <span style="font-size:12px;color:var(--muted)">已选 3 个</span>
@@ -360,30 +390,41 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                 <div class="dsub">us_arm_42 · 装甲 / 机械化 · 美军</div>
                 <div class="pips" style="margin-top:8px">
                   <span class="pip on"></span><span class="pip on"></span><span class="pip on"></span>
-                  <span class="pip on"></span><span class="pip on"></span><span class="pip"></span><span class="pip"></span>
+                  <span class="pip on"></span><span class="pip sup"></span>
+                  <span class="pip"></span><span class="pip"></span>
                 </div>
-                <div class="umeta">战力 <b style="font-family:var(--mono);color:var(--accent-dark)">5 / 7</b> · 活跃 4 · 压制 1 · 经验 120</div>
+                <div class="umeta">兵力 <b style="font-family:var(--mono);color:var(--accent-dark)">5 / 7</b> · 未被压制 4 · 被压制 1 · 经验 120</div>
               </div>
             </div>
 
-            <div class="stats">
-              <div class="stat">
-                <div class="lb"><span>战力</span><span class="hintw">滚轮可调</span></div>
-                <div class="v">5 <small>/ 7</small></div>
-                <div class="stepic"><img id="stepimg" alt=""><span>还差 2 步升满</span></div>
+            <div class="stats" style="grid-template-columns:1fr 1fr">
+              <div class="stat" style="grid-column:1 / -1">
+                <div class="lb"><span>兵力</span>
+                  <span class="hintw">战斗外改会被重算 · 战斗中立即生效</span></div>
+                <div class="blood">
+                  <div class="bar" title="在这里滚轮 = 调被压制的量">
+                    <span class="pip on"></span><span class="pip on"></span>
+                    <span class="pip on"></span><span class="pip on"></span>
+                    <span class="pip sup"></span>
+                    <span class="pip"></span><span class="pip"></span>
+                  </div>
+                  <div class="num" title="在这里滚轮 = 调当前血量">5 / 7</div>
+                </div>
+                <div class="legend">
+                  <span><i style="background:var(--accent)"></i>未被压制 4</span>
+                  <span><i style="background:var(--stage-sup)"></i>被压制 1</span>
+                  <span><i style="background:var(--surface-alt);border:1px solid var(--border)"></i>还差 2</span>
+                  <span style="margin-left:auto;color:var(--accent)">血条滚轮调压制 · 数字滚轮调血量</span>
+                </div>
               </div>
               <div class="stat">
                 <div class="lb"><span>经验 XP</span><span class="hintw">Ctrl+滚轮 ±10</span></div>
                 <div class="v">120</div>
-                <div class="stepic"><span>满级 400 · 升一级 +1 战力</span></div>
+                <div class="stepic"><span>满级 400</span></div>
               </div>
               <div class="stat">
-                <div class="lb"><span>活跃兵力</span><span class="hintw">战斗外会被重算</span></div>
-                <div class="v">4</div>
-              </div>
-              <div class="stat">
-                <div class="lb"><span>压制兵力</span><span class="hintw">战斗外会被重算</span></div>
-                <div class="v">1</div>
+                <div class="lb"><span>战力阶梯</span><span class="hintw">升满还差 2 步</span></div>
+                <div class="stepic"><img id="stepimg" alt=""><span>升满战力还差 2 步</span></div>
               </div>
             </div>
 
@@ -395,15 +436,18 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 
       <div class="drawer">
         <div class="dh">待应用（2）<span class="files">将改动 units.yml</span></div>
-        <div class="ditem">
-          <div class="what"><b>第 1 装甲师</b> · 战力<br>
-            <span class="chg"><span class="old">5</span> → <span class="new">7</span></span></div>
-          <button class="btn ghost">撤销</button>
-        </div>
-        <div class="ditem">
-          <div class="what"><b>侦察骑兵</b> · 改名<br>
-            <span class="chg"><span class="old">侦察骑兵</span> → <span class="new">第 2 装甲侦察队</span></span></div>
-          <button class="btn ghost">撤销</button>
+        <div class="dlist">
+          <div class="ditem">
+            <div class="what"><b>第 1 装甲师</b> · 兵力<br>
+              <span class="chg">当前血量 <span class="old">5</span> → <span class="new">7</span>
+              &nbsp;·&nbsp; 被压制 <span class="old">1</span> → <span class="new">1</span></span></div>
+            <button class="btn ghost">撤销</button>
+          </div>
+          <div class="ditem">
+            <div class="what"><b>侦察骑兵</b> · 改名<br>
+              <span class="chg"><span class="old">侦察骑兵</span> → <span class="new">第 2 装甲侦察队</span></span></div>
+            <button class="btn ghost">撤销</button>
+          </div>
         </div>
         <div class="df">
           <button class="btn">丢弃全部</button>
@@ -518,7 +562,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
     <div class="mh" style="color:var(--danger)">✕ 无法应用：2 处错误</div>
     <div class="mb">
       <div style="color:var(--danger);font-size:12.5px;line-height:1.9">
-        · 单位 12 的战力 8 超过该类型的上限 7<br>
+        · 单位 12 的兵力 8 超过该类型的上限 7<br>
         · 特种兵 铁拳 的数量 4 超过上限 3
       </div>
       <div style="margin-top:10px;font-size:12px;color:var(--muted)">硬拦：<code>plan.errors</code> 非空时按钮禁用，原存档不会被写入。</div>
@@ -530,7 +574,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
     <div class="mh" style="color:var(--warn)">⚠ 有 1 条软警告</div>
     <div class="mb">
       <div style="color:var(--warn);font-size:12.5px;line-height:1.9">
-        · 单位 5 的战力 7 超过类型上限 6，仍会写入
+        · 单位 5 的兵力 7 超过类型上限 6，仍会写入
       </div>
       <div style="margin-top:10px;font-size:12px;color:var(--muted)">软警告：照写，只是提醒。</div>
     </div>
@@ -566,7 +610,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
           <div style="padding:10px 14px;font-size:12.5px;line-height:2">
             <div>备份　<code>west_BACKUP.usg</code>　10月4日 21:33　<span style="color:var(--accent)">打开目录</span></div>
             <div>　　　<code>west_BACKUP_2.usg</code>　10月4日 21:30　<span style="color:var(--accent)">打开目录</span></div>
-            <div>撤销　① 10月4日 21:33　单位 3 战力 5 → 7</div>
+            <div>撤销　① 10月4日 21:33　单位 3 兵力 5 → 7</div>
             <div>　　　② 10月4日 21:30　商店 3 件商品价格 −50%</div>
           </div>
         </div>
@@ -630,18 +674,19 @@ const PALETTE = [
   ["window","#f4f6f8","窗口底"],["surface","#ffffff","卡片底"],["surface_alt","#eef2f6","工具条"],
   ["border","#d4dbe3","分隔线"],["text","#1f2933","正文"],["muted","#5c6b78","次要文字"],
   ["accent","#245b8f","主色"],["accent_dark","#17456f","深主色"],["accent_light","#dceaf7","浅主色"],
-  ["selection","#cfe3f5","选中行"],["ok","#1e6b3a","已满 / 成功"],["ok_light","#e4f2ea","浅底"],
+  ["selection","#cfe3f5","选中行"],["ok","#1e6b3a","成功提示"],["ok_light","#e4f2ea","浅底"],
   ["warn","#8a5a00","软警告"],["warn_light","#fdf3e0","浅底"],["danger","#a4262c","破坏性操作"],
-  ["danger_light","#fbe9ea","浅底"],["stage_dark","#1b2430","头像衬底"]
+  ["danger_light","#fbe9ea","浅底"],
+  ["stage","#e4eaf1","贴图衬底（温和蓝灰）"],["stage_sup","#b9c6d6","被压制的兵力"]
 ];
 
 const UNITS = [
-  {t:"us_arm_42",     name:"第 1 装甲师",      hq:"北部", st:5, max:7, xp:120, spec:["bel_at_40","cz_s_eng_dlc9"]},
-  {t:"us_inf_42",     name:"第 2 摩托化步兵",  hq:"北部", st:7, max:7, xp:340, full:true},
-  {t:"ger_inf_40",    name:"苏军近卫步兵",     hq:"南部", st:3, max:7, xp:40,  spec:["bel_arty_towed_40"]},
-  {t:"bel_cav_40",    name:"侦察骑兵",         hq:"北部", st:7, max:7, xp:210, spec:["cz_s_recon_dlc9"]},
-  {t:"sws_mtn_40",    name:"山地突击队",       hq:"东部", st:4, max:7, xp:80},
-  {t:"uk_arm_div_late_dlc6", name:"英军装甲师", hq:"东部", st:6, max:7, xp:260}
+  {t:"us_arm_42",     name:"第 1 装甲师",      hq:"北部", st:5, sup:1, max:7, xp:120, spec:["bel_at_40","cz_s_eng_dlc9"]},
+  {t:"us_inf_42",     name:"第 2 摩托化步兵",  hq:"北部", st:7, sup:0, max:7, xp:340},
+  {t:"ger_inf_40",    name:"苏军近卫步兵",     hq:"南部", st:3, sup:2, max:7, xp:40,  spec:["bel_arty_towed_40"]},
+  {t:"bel_cav_40",    name:"侦察骑兵",         hq:"北部", st:7, sup:0, max:7, xp:210, spec:["cz_s_recon_dlc9"]},
+  {t:"sws_mtn_40",    name:"山地突击队",       hq:"东部", st:4, sup:1, max:7, xp:80},
+  {t:"uk_arm_div_late_dlc6", name:"英军装甲师", hq:"东部", st:6, sup:0, max:7, xp:260}
 ];
 
 const SPECIALISTS = [
@@ -669,27 +714,47 @@ PALETTE.forEach(([n,v,d])=>{
 
 function img(el, src, alt){ el.src = src; el.alt = alt||""; el.onerror=function(){this.style.display="none";}; }
 
+/* 单位头像查找规则（设计规范 §5.3，用户 2026-11-18 拍板）：
+   1. 先找 sheet_L.png（大小写不敏感 —— ger_pz_dlc7 是小写 sheet_l.png）
+   2. 找不到回退 sheet_R.png
+   3. 都没有 → 占位方块
+   浏览器里拿不到目录列表，所以这里用 onerror 链实现回退。 */
+function unitImg(el, type, alt){
+  const base = SUR+"unit/"+type+"/";
+  el.onerror = function(){
+    if (!this.dataset.tried){
+      this.dataset.tried = "1";
+      this.src = base+"sheet_R.png";
+    } else {
+      this.style.display="none";
+    }
+  };
+  el.src = base+"sheet_L.png";
+  el.alt = alt||"";
+}
+
 const rows = document.getElementById("units");
 UNITS.forEach((u,i)=>{
   const row=document.createElement("div"); row.className="urow"+(i===0?" sel":"");
+  const act = u.st - u.sup;
   let pips="";
   for(let k=0;k<u.max;k++){
-    pips += `<span class="pip ${k<u.st ? (u.full?"max":"on") : ""}"></span>`;
+    pips += `<span class="pip ${k<act ? "on" : (k<u.st ? "sup" : "")}"></span>`;
   }
   row.innerHTML=`
     <div class="ava"><img alt=""></div>
     <div class="umin">
-      <div class="uname">${u.name}${u.dot?'<span class="dot"></span>':''}${u.full?'<span class="full">★ 满战力</span>':''}</div>
-      <div class="umeta">总部 ${u.hq} · XP ${u.xp}</div>
+      <div class="uname">${u.name}${u.dot?'<span class="dot"></span>':''}</div>
+      <div class="umeta">总部 ${u.hq} · XP ${u.xp}${u.sup?` · 被压制 ${u.sup}`:""}</div>
       <div class="pips">${pips}</div>
     </div>
-    <div class="uv">${u.st} / ${u.max}<small>战力</small></div>`;
-  img(row.querySelector("img"), SUR+"unit/"+u.t+"/sheet_L.png", u.name);
+    <div class="uv">${u.st} / ${u.max}<small>兵力</small></div>`;
+  unitImg(row.querySelector("img"), u.t, u.name);
   rows.appendChild(row);
 });
 
 /* 详情页：第 1 装甲师 = us_arm_42 ⇒ armor/2 ⇒ step_armor_2.png */
-img(document.getElementById("d-ava"), SUR+"unit/us_arm_42/sheet_L.png", "us_arm_42");
+unitImg(document.getElementById("d-ava"), "us_arm_42", "us_arm_42");
 img(document.getElementById("stepimg"), SUR+"steps/step_armor_2.png", "step");
 
 const sp = document.getElementById("specs");
