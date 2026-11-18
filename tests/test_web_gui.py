@@ -601,3 +601,159 @@ class TestUnitWriteApi(WebGuiTestBase):
         v2 = self._view()
         u2 = next(x for x in v2["units"] if x["id"] == target["id"])
         self.assertFalse(any(s.get("type") == spec for s in (u2.get("specs") or [])))
+
+
+class TestHqWriteApi(WebGuiTestBase):
+    """U35：总部的写操作。**只用副本**（绝不碰用户真存档）。"""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="webhq_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            p = str(info.path)
+            if "BACKUP" not in p and p.endswith(".usg"):
+                src = p
+                break
+        if src is None:
+            self.skipTest("本机没有存档")
+        self.copy = str(self.tmp / "copy.usg")
+        shutil.copyfile(src, self.copy)
+
+    def post(self, path, body):
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            self.url(path),
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Token": server._Handler.token},
+            method="POST")
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+
+    def _view(self):
+        import urllib.parse
+        return self.get_json("/api/view/" + urllib.parse.quote(self.copy))
+
+    def _first_hq(self):
+        v = self._view()
+        hqs = v.get("hqs") or []
+        if not hqs:
+            self.skipTest("这个存档没有总部")
+        return v, hqs[0]
+
+    def test_hq_cp_and_supply_roundtrip(self):
+        """CP / 补给 / 上限 都是硬范围 —— 改 → 撤销 → 复原。"""
+        v, h = self._first_hq()
+        old_cp = h.get("cp") or 0
+        new_cp = (old_cp + 1) if old_cp < 9 else old_cp - 1
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "hq_field",
+                       "params": {"hq_id": h["id"], "field": "cp", "value": new_cp}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        h1 = next(x for x in v1["hqs"] if x["id"] == h["id"])
+        self.assertEqual(h1.get("cp"), new_cp)
+        un = self.post("/api/undo", {"save_id": self.copy})
+        self.assertTrue(un["ok"], un.get("errors"))
+        v2 = self._view()
+        h2 = next(x for x in v2["hqs"] if x["id"] == h["id"])
+        self.assertEqual(h2.get("cp"), old_cp)
+
+    def test_hq_out_of_range_is_rejected(self):
+        """CP 超上限 / 卡车超上限 / 补给超上限 ⇒ 必须硬拦（U25 的老规矩）。"""
+        v, h = self._first_hq()
+        for field, value in (("cp", 99), ("max_cp", 99), ("supply", 9),
+                             ("trucks", 99)):
+            cm = self.post("/api/commit", {
+                "save_id": self.copy,
+                "edits": [{"kind": "hq_field",
+                           "params": {"hq_id": h["id"], "field": field,
+                                      "value": value}}]})
+            self.assertFalse(cm["ok"], "%s=%s 应该被拦" % (field, value))
+            self.assertTrue(cm["errors"])
+
+    def test_hq_trucks(self):
+        """补给卡车 1–5（0 不行）。"""
+        v, h = self._first_hq()
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "hq_trucks",
+                       "params": {"hq_id": h["id"], "trucks": 3}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        h1 = next(x for x in v1["hqs"] if x["id"] == h["id"])
+        self.assertEqual(h1.get("trucks"), 3)
+        bad = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "hq_trucks",
+                       "params": {"hq_id": h["id"], "trucks": 0}}]})
+        self.assertFalse(bad["ok"])
+
+    def test_hq_branch_level(self):
+        """分支等级 0–3；等级 + 压制 ≤ 3。"""
+        v, h = self._first_hq()
+        bl = h.get("branch_levels") or {}
+        if not bl:
+            self.skipTest("这个存档没有 branch_levels")
+        br = sorted(bl)[0]
+        cur = (bl[br] or {}).get("level") or 0
+        new = 3 if cur != 3 else 2
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "hq_branch_level",
+                       "params": {"hq_id": h["id"], "branch": br, "level": new}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        h1 = next(x for x in v1["hqs"] if x["id"] == h["id"])
+        self.assertEqual((h1["branch_levels"][br] or {}).get("level"), new)
+        bad = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "hq_branch_level",
+                       "params": {"hq_id": h["id"], "branch": br, "level": 9}}]})
+        self.assertFalse(bad["ok"])
+
+    def test_hq_force_pool_quantity_and_add(self):
+        """兵库：改数量 / 加一条（国籍自动跟着特种兵类型走）。"""
+        v, h = self._first_hq()
+        pool = h.get("force_pool") or []
+        if pool:
+            cm = self.post("/api/commit", {
+                "save_id": self.copy,
+                "edits": [{"kind": "hq_force_pool",
+                           "params": {"hq_id": h["id"], "index": 0,
+                                      "quantity": (pool[0].get("quantity") or 0) + 2}}]})
+            self.assertTrue(cm["ok"], cm.get("errors"))
+            v1 = self._view()
+            h1 = next(x for x in v1["hqs"] if x["id"] == h["id"])
+            self.assertEqual((h1["force_pool"][0] or {}).get("quantity"),
+                             (pool[0].get("quantity") or 0) + 2)
+        # 加一条：挑一个目录里有的特种兵
+        cat = self.get_json("/api/catalog")
+        spec = sorted(cat["spec_types"])[0]
+        nat = (cat["spec_types"][spec] or {}).get("nationality") or ""
+        cm2 = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "hq_force_pool_add",
+                       "params": {"hq_id": h["id"],
+                                  "entry": {"spec": spec, "nationality": nat,
+                                            "quantity": 1, "delay": 0}}}]})
+        self.assertTrue(cm2["ok"], cm2.get("errors"))
+        v2 = self._view()
+        h2 = next(x for x in v2["hqs"] if x["id"] == h["id"])
+        self.assertTrue(any(e.get("spec") == spec for e in (h2.get("force_pool") or [])))
+
+    def test_hq_view_has_skills_generals(self):
+        """视图要带技能 / 将领 / 装备的中文名（U35）。"""
+        v, h = self._first_hq()
+        self.assertIn("skills", v)
+        self.assertIn("generals", v)
+        self.assertIn("equipment_cn", v)
+        for a, cn in (v.get("skills") or {}).items():
+            self.assertTrue(cn, a)

@@ -92,6 +92,9 @@ class HqView:
     cp: int | None = None
     max_cp: int | None = None
     supply: int | None = None
+    #: **补给卡车数**（`trucks`）—— U35 补：视图里原来没有这个字段，
+    #: 导致界面读不到、测试也读不到（`_hq_trucks` 一直在写它）。
+    trucks: int | None = None
     uv: tuple[int, ...] | None = None
     xp: int | None = None
     xp_target: int | None = None
@@ -488,6 +491,7 @@ class Save:
                 cp=h.get("cp"),
                 max_cp=h.get("max_cp"),
                 supply=h.get("supply"),
+                trucks=h.get("trucks"),
                 uv=tuple(h["uv"]) if isinstance(h.get("uv"), list) else None,
                 xp=h.get("xp"),
                 xp_target=h.get("xp_target"),

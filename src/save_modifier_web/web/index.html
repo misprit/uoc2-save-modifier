@@ -273,6 +273,95 @@ table.list td.k{color:var(--muted)}
   border:1px solid #b9d3ea;color:var(--accent-dark)}
 @media (max-width:880px){ .cols{grid-template-columns:1fr} }
 
+
+/* ---------------- 总部页（U35） ---------------- */
+.hqlist{padding:4px 0;max-height:430px;overflow:auto}
+.hqrow{display:flex;align-items:center;gap:9px;padding:8px 12px;
+  border-bottom:1px solid #f0f3f6;font-size:12.5px;cursor:pointer}
+.hqrow:hover{background:var(--accent-light)}
+.hqrow.on{background:var(--selection)}
+.hqrow .nm{flex:1;min-width:0}
+.hqrow .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hqrow .nm span{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.expbar{height:9px;border-radius:5px;background:var(--surface-alt);
+  border:1px solid var(--border);overflow:hidden;margin-top:6px}
+.expbar i{display:block;height:100%;background:var(--accent)}
+.hqhead{display:flex;gap:16px;align-items:stretch;min-height:78px;margin-bottom:12px}
+.hqhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+.hqhead .vsep{width:1px;background:var(--border);flex:none}
+.hqhead .hqcards{flex:none;display:flex;gap:10px;align-items:stretch}
+.hqhead .stat{min-width:210px}
+.hqhead .cphint{font-size:10.5px;color:var(--muted);margin-top:5px;line-height:1.35}
+.trucks{display:flex;align-items:center;gap:9px;padding:8px 12px;
+  border:1px solid var(--border);border-radius:7px;background:var(--surface-alt);margin-bottom:12px}
+.trucks .tl{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.trucks .trk{width:58px;height:45px;cursor:pointer;flex:none;border-radius:4px}
+.trucks .trk img{width:100%;height:100%;object-fit:contain;display:block}
+.trucks .trk:hover{outline:1px solid var(--accent)}
+.trucks .trk.on{outline:2px solid var(--accent)}
+.trucks .cnt{margin-left:auto;font-size:11.5px;color:var(--muted)}
+.trucks .cnt b{font-family:var(--mono);color:var(--accent-dark)}
+.matrix{border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.mx-head,.mx-row{display:grid;grid-template-columns:150px repeat(3,minmax(96px,1fr))}
+.mx-head{background:var(--surface-alt);border-bottom:1px solid var(--border);
+  font-size:11px;color:var(--muted);text-align:center}
+.mx-head>div{padding:5px 0}
+.mx-head .h-branch{text-align:left;padding-left:12px}
+.mx-row{border-bottom:1px solid #f0f3f6}
+.mx-row:last-child{border-bottom:none}
+.mx-branch{display:flex;flex-direction:column;justify-content:center;gap:4px;
+  padding:7px 8px 7px 12px;border-right:1px solid #f0f3f6}
+.mx-branch .bn{font-size:12.5px;font-weight:600;color:var(--accent-dark)}
+.lvctl{display:flex;align-items:center;gap:5px}
+.lvctl button{width:18px;height:18px;line-height:15px;text-align:center;font-size:12px;
+  border:1px solid var(--border);background:var(--surface);color:var(--muted);
+  border-radius:4px;cursor:pointer;padding:0}
+.lvctl button:hover{border-color:var(--accent);color:var(--accent-dark)}
+.lvctl b{font-family:var(--mono);font-size:11.5px;color:var(--accent-dark);min-width:28px;text-align:center}
+.supctl{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.supctl b{font-family:var(--mono);font-size:11.5px;color:var(--muted);min-width:12px;text-align:center}
+.supctl b.on{color:var(--warn);font-weight:700}
+.supctl button{width:16px;height:16px;line-height:13px;text-align:center;font-size:11px;
+  border:1px solid var(--border);background:var(--surface);color:var(--muted);
+  border-radius:4px;cursor:pointer;padding:0}
+.supctl button:hover{border-color:var(--accent);color:var(--accent-dark)}
+.mx-cell{display:flex;align-items:center;gap:5px;padding:6px;border-right:1px solid #f0f3f6;
+  flex-wrap:wrap;min-height:54px}
+.mx-cell.na{justify-content:center;color:var(--muted);font-size:11px}
+.sk{position:relative;width:40px;height:40px;flex:none;cursor:pointer}
+.sk img{width:100%;height:100%;object-fit:contain;display:block}
+.sk .cost{position:absolute;right:-6px;bottom:-6px;font-family:var(--mono);font-size:11px;
+  font-weight:700;color:#fff;background:rgba(22,32,48,.88);border-radius:3px;padding:0 3px;
+  line-height:14px;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.sk .dots{position:absolute;right:0;top:-1px;display:flex;gap:2px}
+.sk .dots i{width:6px;height:6px;border-radius:50%;background:rgba(30,42,60,.28);
+  box-shadow:0 0 0 1px rgba(255,255,255,.75)}
+.sk .dots i.on{background:#f0b429;box-shadow:0 0 0 1px rgba(120,78,0,.55)}
+.sk.locked{opacity:.35;cursor:default}
+.sk .nm{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-size:9.5px;
+  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 兵库表格 */
+.fpool{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.fptitle{font-size:12.5px;font-weight:600;color:var(--accent-dark);padding:8px 11px 6px;
+  display:flex;align-items:center;gap:9px}
+.fptab{width:100%;border-collapse:collapse;font-size:12.5px}
+.fptab th{background:var(--surface-alt);font-weight:600;font-size:11.5px;color:var(--muted);
+  text-align:right;padding:6px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
+.fptab th.l,.fptab td.l{text-align:left}
+.fptab td{padding:6px 9px;border-bottom:1px solid #f0f3f6;text-align:right;
+  font-family:var(--mono);white-space:nowrap;color:var(--text)}
+.fptab td.dim{color:var(--muted)}
+.fptab td.name{color:var(--text);font-family:inherit}
+.fptab td.tags{font-family:inherit}
+.fptab .thumb{width:26px;height:26px;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:4px;display:grid;place-items:center;overflow:hidden}
+.fptab .thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.fptab .fdelay{background:var(--surface-alt);font-size:11px;color:var(--accent-dark);
+  font-weight:400;padding:4px 9px;border-bottom:1px solid var(--border);text-align:left}
+.fptab .fdelay b{font-family:var(--mono);font-weight:700;font-size:12px}
+.fptab .rm{color:var(--danger);cursor:pointer;font-size:11.5px}
+.hqpick{margin-top:10px}
+
 /* 待应用清单（全局底部抽屉 —— 换页也看得见改了什么） */
 .drawer{position:relative;margin:0 14px 8px;background:var(--surface);
   border:1px solid var(--border);border-radius:9px;box-shadow:0 -6px 20px rgba(20,40,60,.08);
@@ -364,6 +453,7 @@ const OPEN_ID = QS.get("open") || "";
 const OPEN_PAGE = QS.get("page") || "";
 let SAVES = [], VIEW = null, PAGE = "overview";
 let UQUERY = "", UHQFILTER = "";
+let HQSTATE = {};
 
 const FEATURE_CN = {units:"单位", hqs:"总部", hand:"手牌", shelf:"货架",
   store:"商店", theater_assets:"战区资产", restore_hand:"恢复上次会议牌局"};
@@ -417,10 +507,17 @@ async function post(path, body){
       `params` = 真正写进存档的内容（**含 value**）。
    两者必须分开 —— 拿 params 去匹配会把「值」也当成目标的一部分，
    于是改了值就匹配不上、界面永远显示原值（U34 实测踩到）。 */
-let PENDING = [];          /* [{kind, key, params, label}] */
-function setPending(kind, key, params, label){
+let PENDING = [];          /* [{kind, key, params, label, value}] */
+function setPending(kind, key, params, label, value){
+  /* ⚠️ 同一 key 再改一次是**替换**，不是删除（U35 实测踩到：
+     「切换」语义会让 CP 从 7 再滚到 8 时把改动整个删掉）。 */
   const i = PENDING.findIndex(x => x.kind===kind && x.key===key);
-  if(i>=0) PENDING.splice(i,1); else PENDING.push({kind, key, params, label});
+  const entry = {kind:kind, key:key, params:params, label:label};
+  /* ⚠️ 值单独存一份 —— 各 kind 的 params 里值的字段名不一样
+     （unit_field 是 value、hq_trucks 是 trucks），
+     统一从 entry.value 取，界面才不会读到 undefined。 */
+  if(value !== undefined) entry.value = value;
+  if(i>=0) PENDING[i] = entry; else PENDING.push(entry);
   paintPending();
 }
 function paintPending(){
@@ -550,7 +647,10 @@ async function loadPickers(unitType){
 /* 待应用里的「覆盖值」：有挂起的编辑就显示编辑后的值，否则显示存档原值 */
 function pendingVal(kind, key, cur){
   const i = PENDING.findIndex(x => x.kind===kind && x.key===key);
-  return i>=0 ? PENDING[i].params.value : cur;
+  if(i<0) return cur;
+  const e = PENDING[i];
+  if(e.value !== undefined) return e.value;
+  return (e.params.value !== undefined) ? e.params.value : cur;
 }
 function pendingHit(kind, key){
   return PENDING.some(x => x.kind===kind && x.key===key);
@@ -565,9 +665,12 @@ function dropPendingKind(kind, key){
    大数字（三位以上）= 输入框（可直接编辑）
    小数字（一般个位数）= Alt+滚轮 ±1（U32 用户拍板） */
 
-/* 小数字：Alt+滚轮 ±1，带范围夹取 */
+/* 小数字：Alt+滚轮 ±1，带范围夹取
+   ⚠️ `base` = **存档原值**（比较与文案都用它）；
+      `cur`  = 当前该显示的值（挂起了改动就显示挂起值，缺省 = base）。 */
 function bindSpin(el, opts){
   const base = opts.base;
+  const cur0 = (opts.cur===undefined) ? base : opts.cur;
   function show(v){
     el.textContent = v;
     el.classList.toggle("dirty", v!==base);
@@ -583,12 +686,12 @@ function bindSpin(el, opts){
     const cur = parseInt(String(el.textContent).replace(/\D/g,""), 10);
     commit((isFinite(cur)?cur:base) + d);
   });
-  show(base);
+  show(cur0);
 }
 
 /* 大数字：输入框，直接编辑 */
 function bindNumIn(el, opts){
-  const base = opts.base;
+  const base = opts.base;      /* 存档原值 */
   function apply(){
     const raw = String(el.value??"").trim();
     const v = Number(raw);
@@ -613,7 +716,7 @@ function bindNumIn(el, opts){
 /* 把一次编辑挂到「待应用」；值等于原值就撤掉 */
 function queueEdit(kind, key, params, base, value, label){
   if(value === base){ dropPendingKind(kind, key); return; }
-  setPending(kind, key, params, `${label} ${base} → ${value}`);
+  setPending(kind, key, params, `${label} ${base} → ${value}`, value);
 }
 
 /* ===================================================================
@@ -816,17 +919,17 @@ function bindUnitControls(u){
   const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
   const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
   const xp  = pendingVal("unit_field", uKey(u.id,"xp"), u.xp||0);
-  if(actEl) bindSpin(actEl, {base:act, min:0, max:null, onChange(v){
+  if(actEl) bindSpin(actEl, {base:u.act_st||0, cur:act, min:0, max:null, onChange(v){
     queueEdit("unit_field", uKey(u.id,"act_st"),
       {unit_id:u.id, field:"act_st", value:v}, u.act_st||0, v, `单位 ${u.id} 现有兵力`);
     SEL.units = u.id; show("units");
   }});
-  if(supEl) bindSpin(supEl, {base:sup, min:0, max:null, onChange(v){
+  if(supEl) bindSpin(supEl, {base:u.sup_st||0, cur:sup, min:0, max:null, onChange(v){
     queueEdit("unit_field", uKey(u.id,"sup_st"),
       {unit_id:u.id, field:"sup_st", value:v}, u.sup_st||0, v, `单位 ${u.id} 增援兵力`);
     SEL.units = u.id; show("units");
   }});
-  if(xpEl) bindNumIn(xpEl, {base:xp, min:0, max:400,
+  if(xpEl) bindNumIn(xpEl, {base:u.xp||0, cur:xp, min:0, max:400,
     kind:"unit_field", key:uKey(u.id,"xp"),
     params:{unit_id:u.id, field:"xp", value:xp},
     onChange(v){
@@ -870,14 +973,375 @@ function removeSpec(unitId, specType){
   show("units");
 }
 
+
+/* ===================================================================
+   总部页（U35）
+   =================================================================== */
+const BRANCHES = ["engineering", "force_pool", "intel", "logistics", "operations"];
+const BRANCH_CN = {engineering:"工程", force_pool:"兵库", intel:"情报",
+  logistics:"后勤", operations:"作战"};
+const TRUCK_RANGE = [5, 8, 10, 11, 12];
+const hqKey = (id, field) => `hq_field:${id}:${field}`;
+const hqBrKey = (id, br) => `hq_branch_level:${id}:${br}`;
+const hqSpKey = (id, br, act) => `hq_branch_sp:${id}:${br}:${act}`;
+const hqPoolKey = (id, i) => `hq_force_pool:${id}:${i}`;
+
+function hqSkillCn(act){ return (VIEW.skills||{})[act] || act; }
+function hqGeneralCn(g){
+  const gg = (VIEW.generals||{})[g];
+  return gg ? (gg.cn || g) : (g || "");
+}
+function hqEquipCn(e){ return (VIEW.equipment_cn||{})[e] || e; }
+
+/* 兵库的「投影」：把待应用里的加/删先算上，界面上才看得到 */
+function projectedPool(h){
+  const pool = (h.force_pool||[]).map(e=>Object.assign({}, e));
+  PENDING.forEach(p=>{
+    if(p.kind==="hq_force_pool_add" && p.params.hq_id===h.id)
+      pool.push(Object.assign({}, p.params.entry));
+    if(p.kind==="hq_force_pool_remove" && p.params.hq_id===h.id){
+      const i = p.params.index;
+      if(i>=0 && i<pool.length) pool.splice(i,1);
+    }
+  });
+  return pool;
+}
+
+function hqRowHTML(h){
+  const cp = pendingVal("hq_field", hqKey(h.id,"cp"), h.cp||0);
+  const mx = pendingVal("hq_field", hqKey(h.id,"max_cp"), h.max_cp||0);
+  const xp = pendingVal("hq_field", hqKey(h.id,"xp"), h.xp||0);
+  const xt = pendingVal("hq_field", hqKey(h.id,"xp_target"), h.xp_target||0);
+  const pct = xt ? Math.max(0, Math.min(100, Math.round(xp*100/xt))) : 0;
+  return `<div class="hqrow ${h.id===SEL.hqs?'on':''}" onclick="pickHq(${h.id})">
+    <div class="nm"><b>${esc(h.name_cn||h.name_brief||("总部 "+h.id))}</b>
+      <span>CP ${cp}/${mx} · 经验 ${xp}/${xt||"—"}</span>
+      <div class="expbar"><i style="width:${pct}%"></i></div></div>
+  </div>`;
+}
+function pickHq(id){ SEL.hqs = id; show("hqs"); }
+
+function hqSkillHTML(h, br, it){
+  const act = it.action;
+  const cn = hqSkillCn(act);
+  const used = pendingVal("hq_branch_sp", hqSpKey(h.id,br,act), it.sp_used||0);
+  const avail = it.sp_avail;
+  const dots = [];
+  const n = (typeof avail==="number") ? avail : 0;
+  for(let i=0;i<n;i++) dots.push(`<i class="${i<used?'on':''}"></i>`);
+  const brLevel = pendingVal("hq_branch_level", hqBrKey(h.id,br),
+    ((h.branch_levels||{})[br]||{}).level||0);
+  const locked = (it.level||1) > brLevel;
+  return `<div class="sk ${locked?'locked':''}" title="${esc(cn)} · CP 消耗 ${it.cost??0}${
+    avail!==null&&avail!==undefined ? (" · 专精 "+used+"/"+avail) : " · 没有技能点"}"
+    ${locked ? "（未解锁）" : "（点击：专精次数 +1，到顶后回到 0）"}"
+    onclick="${locked?'void 0':('hqSpecialize('+h.id+','+esc(JSON.stringify(br))+','+esc(JSON.stringify(act))+','+used+','+(avail===null||avail===undefined?-1:avail)+')')}">
+    ${imgTag("hq_upgrade/hq_upgrade_"+act+"_on.png", cn)}
+    <span class="cost">${it.cost??0}</span>
+    ${dots.length?`<span class="dots">${dots.join("")}</span>`:""}
+    <span class="nm">${esc(cn)}</span>
+  </div>`;
+}
+
+function hqMatrixHTML(h){
+  const bl = h.branch_levels||{};
+  const brs = h.branches||{};
+  const rows = BRANCHES.map(br=>{
+    const node = bl[br]||{};
+    const lvl = pendingVal("hq_branch_level", hqBrKey(h.id,br), node.level||0);
+    const sup = pendingVal("hq_branch_level", hqBrKey(h.id,br)+":sup", node.suppressed||0);
+    const cells = [1,2,3].map(lv=>{
+      const items = (brs[br]||[]).filter(it=>it && it.level===lv);
+      if(!items.length) return `<div class="mx-cell na">—</div>`;
+      return `<div class="mx-cell">${items.map(it=>hqSkillHTML(h,br,it)).join("")}</div>`;
+    }).join("");
+    return `<div class="mx-row">
+      <div class="mx-branch">
+        <div class="bn">${esc(BRANCH_CN[br]||br)}</div>
+        <div class="lvctl"><button onclick="hqBranchLevel(${h.id},'${br}',-1)">−</button>
+          <b>${lvl}</b>
+          <button onclick="hqBranchLevel(${h.id},'${br}',1)">+</button></div>
+        <div class="supctl">压制
+          <button onclick="hqSuppress(${h.id},'${br}',-1)">−</button>
+          <b class="${sup?'on':''}">${sup}</b>
+          <button onclick="hqSuppress(${h.id},'${br}',1)">+</button></div>
+      </div>${cells}</div>`;
+  }).join("");
+  return `<div class="matrix">
+    <div class="mx-head"><div class="h-branch">分支 / 等级</div><div>1 级</div>
+      <div>2 级</div><div>3 级</div></div>${rows}</div>`;
+}
+
+function hqPoolHTML(h){
+  const pool = projectedPool(h);
+  if(!pool.length) return `<div class="fpool"><div class="fptitle">兵库</div>
+    <div style="padding:10px 11px;color:var(--muted);font-size:12px">兵库是空的</div></div>`;
+  /* 按延迟分组（游戏是分批上线的） */
+  const groups = {};
+  pool.forEach((e,i)=>{
+    const d = e.delay||0;
+    (groups[d]=groups[d]||[]).push([i,e]);
+  });
+  const delays = Object.keys(groups).map(Number).sort((a,b)=>a-b);
+  let body = "";
+  delays.forEach(d=>{
+    body += `<tr class="fdelay"><td colspan="6">延迟 <b>${d}</b> 回合 —— 这一批要等 ${d} 个回合才能部署</td></tr>`;
+    groups[d].forEach(([i,e])=>{
+      const isSpec = !!e.spec;
+      const nm = isSpec ? specCn(e.spec) : hqEquipCn(e.equipment);
+      const st = isSpec ? ((CATALOG&&CATALOG.spec_types[e.spec])||{}) : {};
+      const q = pendingVal("hq_force_pool", hqPoolKey(h.id,i), e.quantity||0);
+      const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(f)}</span>`).join("") : "";
+      body += `<tr>
+        <td class="l"><div class="thumb">${isSpec?imgTag(specTex(e.spec), nm)
+          :imgTag("steps/step.png", nm)}</div></td>
+        <td class="l name">${esc(nm)}
+          ${isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:""}</td>
+        <td class="dim">${esc(natCn(e.nationality))}</td>
+        <td class="dim">${isSpec?esc(st.attack??"—"):"—"} / ${isSpec?esc(st.defense??"—"):"—"} /
+          ${isSpec?esc(st.armor??"—"):"—"}</td>
+        <td class="tags">${tags}</td>
+        <td><span class="spin" id="fp_q_${h.id}_${i}"></span></td>
+        <td><span class="rm" onclick="hqPoolRemove(${h.id},${i})">移除</span></td>
+      </tr>`;
+    });
+  });
+  return `<div class="fpool">
+    <div class="fptitle">兵库 · 共 ${pool.length} 条
+      <span style="font-weight:400;font-size:11.5px;color:var(--muted)">
+        同一个总部里，同样的条目 + 同样的延迟不许并存（延迟不同可以共存）</span>
+      <button class="btn" style="margin-left:auto;padding:3px 10px;font-size:12px"
+        onclick="toggleHqPicker(${h.id})">${SEL.hqPicker===h.id?"收起":"加条目"}</button>
+    </div>
+    ${SEL.hqPicker===h.id ? hqPickerHTML(h) : ""}
+    <table class="fptab">
+      <thead><tr><th class="l">图</th><th class="l">名称</th><th>国籍</th>
+        <th>攻 / 防 / 装</th><th>特性</th><th>数量</th><th></th></tr></thead>
+      <tbody>${body}</tbody></table></div>`;
+}
+
+/* 加条目：特种兵选择器（U22 的 .pcell 网格） */
+function hqPickerHTML(h){
+  const pool = (PICK && PICK.campaign_pool) || [];
+  if(!pool.length) return `<div class="hqpick note">还没有取到战役的特种兵池</div>`;
+  const have = projectedPool(h).map(e=>e.spec||("eq:"+e.equipment));
+  const cells = pool.map(t=>{
+    const dup = have.includes(t);
+    const st = (CATALOG&&CATALOG.spec_types[t])||{};
+    return `<div class="pcell ${dup?'blocked':''}" title="${esc(specCn(t))} · ${esc(natCn(st.nationality))}${
+      dup?"（兵库里已经有了）":""}" onclick="${dup?'void 0':('hqPoolAdd('+h.id+','+esc(JSON.stringify(t))+')')}">
+      ${imgTag(specTex(t), specCn(t))}</div>`;
+  }).join("");
+  return `<div class="spick hqpick">
+    <div class="sphd"><span class="spt">加一条兵库条目</span>
+      <span class="spc">战役池 ${pool.length} 种 · 国籍自动跟着特种兵类型走</span></div>
+    <div class="spgrid">${cells}</div></div>`;
+}
+
+function toggleHqPicker(id){ SEL.hqPicker = (SEL.hqPicker===id) ? null : id; show("hqs"); }
+
+function hqDetailHTML(h){
+  if(!h) return `<div class="placeholder"><div class="big">没有总部</div></div>`;
+  const cp = pendingVal("hq_field", hqKey(h.id,"cp"), h.cp||0);
+  const mx = pendingVal("hq_field", hqKey(h.id,"max_cp"), h.max_cp||0);
+  const sup = pendingVal("hq_field", hqKey(h.id,"supply"), h.supply||0);
+  const xp = pendingVal("hq_field", hqKey(h.id,"xp"), h.xp||0);
+  const xt = pendingVal("hq_field", hqKey(h.id,"xp_target"), h.xp_target||0);
+  /* ⚠️ 卡车数走的是 **hq_trucks** 这个 kind（不是 hq_field）——
+     显示与入队必须用同一个 kind + key，否则改了界面不刷新（U35 实测）。 */
+  const tr = pendingVal("hq_trucks", `hq_trucks:${h.id}`, h.trucks||0);
+  const trucks = [];
+  for(let i=1;i<=5;i++){
+    const on = i<=tr;
+    trucks.push(`<div class="trk ${on?'on':''}" title="点第 ${i} 个 ⇒ 卡车数 = ${i}（补给作用范围 ${TRUCK_RANGE[i-1]} 格）"
+      onclick="hqTrucks(${h.id},${i})">
+      <img src="${surf("hq_upgrade/truck_"+i+(on?"_on":"_off")+".png")}" alt="补给卡车 ${i}"></div>`);
+  }
+  return `<div class="hqhead">
+    <div class="idblk">
+      <div class="dtitle" id="htitle_${h.id}">${esc(h.name_cn||h.name_brief||("总部 "+h.id))}
+        <span class="edit" onclick="renameHq(${h.id})">改名</span></div>
+      <div class="dsub">将领：${esc(hqGeneralCn(h.general))}</div>
+    </div>
+    <div class="vsep"></div>
+    <div class="hqcards">
+      <div class="stat">
+        <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
+        <div class="v"><input class="numin" id="h_xp_${h.id}" type="text" inputmode="numeric"
+          autocomplete="off" value="${xp}"></div>
+        <div class="cphint">目标
+          <input class="numin" id="h_xt_${h.id}" type="text" inputmode="numeric"
+            autocomplete="off" value="${xt}" style="width:62px;font-size:13px"></div>
+      </div>
+      <div class="stat">
+        <div class="lb"><span>总部 CP</span><span class="hintw">Alt+滚轮 ±1</span></div>
+        <div class="v"><span class="spin" id="h_cp_${h.id}"></span><small>/</small>
+          <span class="spin" id="h_mcp_${h.id}"></span></div>
+        <div class="cphint">补给 <span class="spin" id="h_sup_${h.id}"></span>
+          （游戏范围 0–3）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="trucks">
+    <span class="tl">补给卡车</span>
+    ${trucks.join("")}
+    <span class="cnt">当前 <b>${tr?tr:"—（存档没记）"}</b> 辆 · 作用范围
+      <b>${tr?TRUCK_RANGE[tr-1]:"—"}</b> 格</span>
+  </div>
+
+  ${hqMatrixHTML(h)}
+  ${hqPoolHTML(h)}`;
+}
+
+function pageHqs(w){
+  const hqs = VIEW.hqs||[];
+  let cur = hqs.find(h=>h.id===SEL.hqs);
+  if(!cur){ cur = hqs[0]; SEL.hqs = cur ? cur.id : null; }
+  w.innerHTML = `<div class="cols">
+    <div class="panel"><h3>总部 · 共 ${hqs.length} 个</h3>
+      <div class="pbody"><div class="hqlist">${hqs.map(hqRowHTML).join("") ||
+        `<div class="placeholder">这个存档没有总部</div>`}</div></div></div>
+    <div class="panel"><h3>总部 · 详情</h3>
+      <div class="detail">${hqDetailHTML(cur)}</div></div>
+  </div>`;
+  if(cur) bindHqControls(cur);
+}
+
+function bindHqControls(h){
+  const ids = ["cp","max_cp","supply"];
+  const spin = (elId, field, cur, min, max, label, base)=>{
+    const el = document.getElementById(elId);
+    if(!el) return;
+    bindSpin(el, {base:(base===undefined?cur:base), cur, min, max, onChange(v){
+      queueEdit("hq_field", hqKey(h.id, field),
+        {hq_id:h.id, field, value:v}, (base===undefined?cur:base), v, `总部 ${h.id} ${label}`);
+      SEL.hqs = h.id; show("hqs");
+    }});
+  };
+  const cpc = pendingVal("hq_field", hqKey(h.id,"cp"), h.cp||0);
+  const mxc = pendingVal("hq_field", hqKey(h.id,"max_cp"), h.max_cp||0);
+  const spc = pendingVal("hq_field", hqKey(h.id,"supply"), h.supply||0);
+  spin("h_cp_"+h.id, "cp", cpc, 0, 9, "CP", h.cp||0);
+  spin("h_mcp_"+h.id, "max_cp", mxc, 3, 9, "CP 上限", h.max_cp||0);
+  spin("h_sup_"+h.id, "supply", spc, 0, 3, "补给", h.supply||0);
+
+  const xpEl = document.getElementById("h_xp_"+h.id);
+  if(xpEl) bindNumIn(xpEl, {base:h.xp||0, cur:pendingVal("hq_field", hqKey(h.id,"xp"), h.xp||0), min:0, max:null,
+    kind:"hq_field", key:hqKey(h.id,"xp"), params:{hq_id:h.id, field:"xp", value:xpEl.value},
+    onChange(v){ queueEdit("hq_field", hqKey(h.id,"xp"),
+      {hq_id:h.id, field:"xp", value:v}, h.xp||0, v, `总部 ${h.id} 经验`); }});
+  const xtEl = document.getElementById("h_xt_"+h.id);
+  if(xtEl) bindNumIn(xtEl, {base:h.xp_target||0, cur:pendingVal("hq_field", hqKey(h.id,"xp_target"), h.xp_target||0), min:0, max:null,
+    kind:"hq_field", key:hqKey(h.id,"xp_target"), params:{hq_id:h.id, field:"xp_target", value:xtEl.value},
+    onChange(v){ queueEdit("hq_field", hqKey(h.id,"xp_target"),
+      {hq_id:h.id, field:"xp_target", value:v}, h.xp_target||0, v, `总部 ${h.id} 经验目标`); }});
+
+  /* 兵库数量（每条一个 Alt+滚轮控件） */
+  const pool = projectedPool(h);
+  pool.forEach((e,i)=>{
+    const el = document.getElementById("fp_q_"+h.id+"_"+i);
+    if(!el) return;
+    bindSpin(el, {base:e.quantity||0, cur:pendingVal("hq_force_pool", hqPoolKey(h.id,i), e.quantity||0), min:0, max:null,
+      onChange(v){
+        queueEdit("hq_force_pool", hqPoolKey(h.id,i),
+          {hq_id:h.id, index:i, quantity:v}, e.quantity||0, v,
+          `总部 ${h.id} 兵库第 ${i+1} 条数量`);
+        SEL.hqs = h.id; show("hqs");
+      }});
+  });
+}
+
+function renameHq(id){
+  const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
+  const el = document.getElementById("htitle_"+id); if(!el) return;
+  const cur = pendingVal("hq_field", hqKey(id,"name_brief"), h.name_cn||h.name_brief||"");
+  el.innerHTML = `<input class="inp" id="hrn_${id}" value="${esc(cur)}" style="width:200px;font-size:15px">
+    <button class="btn pri" onclick="commitRenameHq(${id})">确定</button>
+    <button class="btn" onclick="show('hqs')">取消</button>`;
+  const i = document.getElementById("hrn_"+id);
+  if(i){ i.focus(); i.select(); }
+}
+function commitRenameHq(id){
+  const el = document.getElementById("hrn_"+id); if(!el) return;
+  const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
+  const v = el.value.trim();
+  if(v) queueEdit("hq_field", hqKey(id,"name_brief"),
+    {hq_id:id, field:"name_brief", value:v},
+    h.name_cn||h.name_brief||"", v, `总部 ${id} 改名`);
+  show("hqs");
+}
+
+function hqTrucks(id, n){
+  const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
+  const base = pendingVal("hq_trucks", `hq_trucks:${id}`, h.trucks||0);
+  queueEdit("hq_trucks", `hq_trucks:${id}`,
+    {hq_id:id, trucks:n}, base, n, `总部 ${id} 补给卡车`);
+  show("hqs");
+}
+
+function hqBranchLevel(id, br, d){
+  const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
+  const node = ((h.branch_levels||{})[br]||{});
+  const cur = pendingVal("hq_branch_level", hqBrKey(id,br), node.level||0);
+  let v = cur + d;
+  if(v<0) v=0; if(v>3) v=3;
+  queueEdit("hq_branch_level", hqBrKey(id,br),
+    {hq_id:id, branch:br, level:v}, node.level||0, v, `总部 ${id} ${BRANCH_CN[br]||br} 等级`);
+  show("hqs");
+}
+function hqSuppress(id, br, d){
+  const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
+  const node = ((h.branch_levels||{})[br]||{});
+  const cur = pendingVal("hq_branch_level", hqBrKey(id,br)+":sup", node.suppressed||0);
+  const lvl = pendingVal("hq_branch_level", hqBrKey(id,br), node.level||0);
+  let v = cur + d;
+  if(v<0) v=0; if(v>3-lvl) v=3-lvl;      /* 等级 + 压制 ≤ 3 */
+  queueEdit("hq_branch_level", hqBrKey(id,br)+":sup",
+    {hq_id:id, branch:br, level:lvl, suppressed:v}, node.suppressed||0, v,
+    `总部 ${id} ${BRANCH_CN[br]||br} 被压制等级`);
+  show("hqs");
+}
+function hqSpecialize(id, br, act, used, avail){
+  if(avail<0) return;
+  const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
+  let v = used+1; if(v>avail) v = 0;      /* 到顶后回到 0（循环） */
+  const items = ((h.branches||{})[br]||[]).filter(it=>it&&it.action===act);
+  const it = items[0]||{};
+  queueEdit("hq_branch_sp", hqSpKey(id,br,act),
+    {hq_id:id, branch:br, action:act, sp_used:v}, it.sp_used||0, v,
+    `总部 ${id} ${hqSkillCn(act)} 专精`);
+  show("hqs");
+}
+function hqPoolAdd(id, specType){
+  const st = (CATALOG&&CATALOG.spec_types[specType])||{};
+  const entry = {spec: specType, nationality: st.nationality||"", quantity:1, delay:0};
+  setPending("hq_force_pool_add", `hq_force_pool_add:${id}:${specType}`,
+    {hq_id:id, entry}, `总部 ${id} 兵库加 ${specCn(specType)}`);
+  show("hqs");
+}
+function hqPoolRemove(id, index){
+  const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
+  const pool = (h.force_pool||[]);
+  const e = pool[index]||{};
+  const nm = e.spec ? specCn(e.spec) : hqEquipCn(e.equipment);
+  setPending("hq_force_pool_remove", `hq_force_pool_remove:${id}:${index}`,
+    {hq_id:id, index}, `总部 ${id} 兵库移除 ${nm}`);
+  show("hqs");
+}
+
 /* ---------- 应用 / 撤销 ---------- */
 async function doApply(){
   if(!PENDING.length) return;
   const box = document.getElementById("errBox");
   const wbox = document.getElementById("warnBox");
   box.textContent = ""; wbox.textContent = "";
-  const r = await post("/api/commit", {save_id: VIEW._save_id,
-    edits: PENDING.map(p=>({kind:p.kind, params:p.params}))});
+  /* ⚠️ 兵库**删条目**要排在最后 —— 删了会让后面条目的下标整体前移，
+     先删再改数量就会改错行（U35）。其余编辑保持加入顺序（JS 的 sort 是稳定的）。 */
+  const edits = PENDING.map(p=>({kind:p.kind, params:p.params}));
+  edits.sort((a,b)=>(a.kind==="hq_force_pool_remove"?1:0)
+                    -(b.kind==="hq_force_pool_remove"?1:0));
+  const r = await post("/api/commit", {save_id: VIEW._save_id, edits});
   const d = r.data;
   if(d.ok){
     PENDING = [];
@@ -985,6 +1449,7 @@ function show(p){
     return;
   }
   if(p==="units"){ pageUnits(w); return; }
+  if(p==="hqs"){ pageHqs(w); return; }
   w.innerHTML = `<div class="panel"><h3>${PAGE_CN[p]||p}</h3>
     <div class="placeholder"><div class="big">这一页还没做</div>
     等 GUI 微调需求提完，按最终视觉稿一次性实现（避免返工）。</div></div>`;

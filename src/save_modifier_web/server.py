@@ -165,6 +165,7 @@ def api_view(save_id: str) -> dict:
         # （如 `id_unit_name_brief_97_dot__J_ger`）⇒ 这里查 locale 翻成中文。
         # ⚠️ 查不到就**原样返回**（玩家自己起的名字是明文，不是键）。
         # ⚠️ 中文一律来自游戏包 `localization/chi/strings.yml` —— 不自己翻译（§5.7）。
+        _tr = None
         try:
             from save_modifier_core import locale as _locale
             _tr = _locale.default()
@@ -176,6 +177,37 @@ def api_view(save_id: str) -> dict:
                 _h["full_cn"] = _tr.get(_h.get("name_full") or "", "") or (_h.get("name_full") or "")
         except Exception as exc:
             data["_name_error"] = str(exc)
+
+        # ---- 技能 / 将领 / 装备的中文名（U35）----
+        # 技能：locale 键 = `id_tooltip_hq_bar_<action>`（20 个动作**全覆盖**，
+        #   如 id_tooltip_hq_bar_bridge_repair → 修复桥梁）
+        #   —— `id_<action>` 只有 15 个命中（deploy / reorg / entrenchment /
+        #      security_unit / transfer 查不到），所以以 tooltip 键为主。
+        # 将领：locale 键 = `id_<general>_brief` / `_full`
+        # 装备：locale 键 = `id_equipment_type_<equipment>`（步兵 / 装甲兵）
+        # ⚠️ 查不到就**退回内部 id** —— 绝不自己翻译（规范 §5.7）。
+        skills, generals = {}, {}
+        for _h in (data.get("hqs") or []):
+            for _br, _items in (_h.get("branches") or {}).items():
+                for _it in (_items or []):
+                    if isinstance(_it, dict) and _it.get("action"):
+                        _a = str(_it["action"])
+                        if _a not in skills:
+                            skills[_a] = ((_tr.get("id_tooltip_hq_bar_" + _a, "")
+                                           or _tr.get("id_" + _a, "")) if _tr else "") or _a
+            if _h.get("general"):
+                _g = str(_h["general"])
+                if _g not in generals:
+                    generals[_g] = {
+                        "cn": (_tr.get("id_" + _g + "_brief", "") if _tr else "") or _g,
+                        "full": (_tr.get("id_" + _g + "_full", "") if _tr else "") or "",
+                    }
+        data["skills"] = skills
+        data["generals"] = generals
+        data["equipment_cn"] = {
+            e: ((_tr.get("id_equipment_type_" + e, "") if _tr else "") or e)
+            for e in ("infantry", "armor")
+        }
 
         # 卡牌白名单 —— **本存档 + 本会议**的状态，每次重算（规范 §7.5.1）
         try:
