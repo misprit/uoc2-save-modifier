@@ -5,7 +5,8 @@
 <title>统一指挥 2 存档修改器</title>
 <style>
 :root{
-  --window:#f4f6f8; --surface:#f7f8fa; --surface-alt:#eef1f4;
+  /* 令牌 = 设计稿 §1「色板与字体」实测值（U42 对齐） */
+  --window:#f4f6f8; --surface:#ffffff; --surface-alt:#eef1f6;
   --border:#d4dbe3; --text:#1f2933; --muted:#5c6b7a;
   --accent:#245b8f; --accent-dark:#17456f; --accent-light:#dceaf7; --selection:#cfe3f5;
   --ok:#1e6b3a; --ok-light:#e6f2ea; --warn:#8a5a00; --warn-light:#faf1e2;
@@ -14,9 +15,61 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%}
+/* 字号体系 = 设计稿 §1：页面标题 16 / 区块标题 11–12 / 正文 12.5 / 次要 11 */
 body{margin:0;background:var(--window);color:var(--text);
-  font:13px/1.5 "Microsoft YaHei UI","Segoe UI",system-ui,sans-serif}
-button,input{font:inherit}
+  font:12.5px/1.5 "Microsoft YaHei UI","Segoe UI",system-ui,sans-serif}
+button,input,select{font:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#c3ccd6;border-radius:5px;border:2px solid var(--window)}
+::-webkit-scrollbar-thumb:hover{background:#aab5c1}
+::-webkit-scrollbar-track{background:transparent}
+
+
+/* ---------------- Header / Rail（U42 · 照设计稿 §1/§2） ---------------- */
+.hdr{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--surface);
+  border-bottom:1px solid var(--border)}
+.hdr .brand{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--accent-dark);
+  font-size:14.5px}
+.hdr .brand .logo{width:26px;height:26px;border-radius:6px;background:var(--accent);
+  color:#fff;display:grid;place-items:center;font-size:12.5px;font-weight:700}
+.hdr .save{background:var(--surface-alt);border:1px solid var(--border);border-radius:6px;
+  padding:4px 10px;font-size:12.5px;display:flex;align-items:center;gap:8px;max-width:44vw;
+  overflow:hidden}
+.hdr .save .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr .hint{font-size:11.5px;color:var(--muted)}
+.hdr .sp{flex:1}
+.badge{font-size:10.5px;padding:1px 7px;border-radius:20px;background:var(--accent-light);
+  color:var(--accent-dark);font-weight:600;border:1px solid #b9d3ea;white-space:nowrap}
+.badge.battle{background:var(--danger-light);color:var(--danger);border-color:#eec3c5}
+.btn .badge-n{background:var(--danger);color:#fff;border-radius:20px;font-size:10.5px;
+  padding:0 6px;margin-left:6px;font-weight:700}
+.rail{width:186px;flex:none;background:var(--surface);border-right:1px solid var(--border);
+  padding:10px 8px;display:flex;flex-direction:column;overflow:auto}
+.rail .grp{font-size:10.5px;color:var(--muted);letter-spacing:.08em;padding:6px 10px 4px}
+.rail .nav{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;
+  color:var(--text);font-size:12.5px;cursor:pointer;transition:background .12s}
+.rail .nav:hover{background:var(--surface-alt)}
+.rail .nav.on{background:var(--accent);color:#fff;font-weight:600}
+.rail .nav.on .ic{color:#fff}
+.rail .nav .ic{width:18px;text-align:center;font-size:13px;color:var(--muted)}
+.rail .nav .ct{margin-left:auto;font-size:10.5px;background:var(--danger);color:#fff;
+  border-radius:20px;padding:0 6px;font-weight:700}
+.rail .nav.on .ct{background:rgba(255,255,255,.28)}
+.rail .nav.dis{color:var(--muted);cursor:default}
+.rail .nav.dis:hover{background:transparent}
+.rail .nav.dis .why{margin-left:auto;font-size:10px;color:var(--muted);text-align:right;
+  max-width:88px;line-height:1.25}
+.rail .sep{border-top:1px solid var(--border);margin:10px 6px}
+.rail .undo{font-size:11px;color:var(--muted);padding:4px 10px;line-height:1.5}
+.rail .undo b{color:var(--text)}
+.panel{box-shadow:0 1px 2px rgba(20,40,60,.04)}
+.panel>h3{font-size:12px;padding:8px 12px}
+.toolbar{transition:background .12s}
+.btn{transition:background .12s,border-color .12s,color .12s}
+.btn:hover{background:var(--surface-alt)}
+.btn.pri:hover{background:var(--accent-dark);color:#fff}
+.nav,.pcell,.card,.urow,.hqrow{transition:background .12s,border-color .12s,box-shadow .12s}
+.pcell:hover{box-shadow:0 0 0 2px rgba(36,91,143,.2)}
 
 /* ---------------- 启动页 ---------------- */
 #splash{min-height:100%;display:flex;flex-direction:column;align-items:center;
@@ -587,23 +640,25 @@ table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
 <!-- ============ 主界面 ============ -->
 <div id="app">
   <div class="hdr">
-    <span class="logo">U2</span>
-    <span class="title" id="hTitle">存档修改器</span>
-    <span class="caps" id="hCaps"></span>
+    <span class="brand"><span class="logo">U2</span>存档修改器</span>
+    <span class="save" id="hSave"><span class="nm">—</span></span>
+    <span class="hint">改动会先备份原存档</span>
     <span class="sp"></span>
     <button class="btn" onclick="doUndo()">↶ 撤销</button>
-    <button class="btn pri" id="btnApply" onclick="doApply()">应用更改 <span id="hPending">0</span></button>
+    <button class="btn pri" id="btnApply" onclick="doApply()">应用更改<span class="badge-n" id="hPending">0</span></button>
   </div>
   <div class="body">
     <div class="rail">
       <div class="grp">功能</div>
       <div class="nav on" data-p="overview"><span class="ic">▤</span>概览</div>
-      <div class="nav" data-p="units"><span class="ic">▥</span>单位</div>
-      <div class="nav" data-p="hqs"><span class="ic">▧</span>总部</div>
-      <div class="nav" data-p="cards"><span class="ic">▨</span>卡牌</div>
-      <div class="nav" data-p="store"><span class="ic">▩</span>商店</div>
-      <div class="nav" data-p="theater"><span class="ic">▪</span>战区资产</div>
+      <div class="nav" data-p="units"><span class="ic">▥</span>单位<span class="ct" id="ctUnits"></span></div>
+      <div class="nav" data-p="hqs"><span class="ic">▧</span>总部<span class="ct" id="ctHqs"></span></div>
+      <div class="nav" data-p="cards"><span class="ic">▨</span>卡牌<span class="ct" id="ctCards"></span></div>
+      <div class="nav" data-p="store"><span class="ic">▩</span>商店<span class="ct" id="ctStore"></span></div>
+      <div class="nav" data-p="theater"><span class="ic">▪</span>战区资产<span class="why" id="whyTheater"></span></div>
       <div class="nav" data-p="campaign"><span class="ic">◈</span>战役</div>
+      <div class="sep"></div>
+      <div class="undo" id="railUndo">撤销栈 <b>0</b> 条</div>
     </div>
     <div class="work" id="work"></div>
   </div>
@@ -679,6 +734,43 @@ async function post(path, body){
     headers:{"Content-Type":"application/json","X-Token":TOKEN},
     body: JSON.stringify(body)});
   return {status:r.status, data: await r.json()};
+}
+
+
+/* ===================================================================
+   Header / Rail（U42）—— 照设计稿：品牌 · 存档 · 提示 · 计数徽章 · 禁用原因 · 撤销栈
+   =================================================================== */
+function paintHeader(){
+  const el = document.getElementById("hSave");
+  if(!el || !VIEW) return;
+  const save = VIEW.save||{};
+  const inBattle = (VIEW.theater_assets||[]).length > 0;
+  el.innerHTML = `<span class="nm">${esc(save.display_name||save.file_name||save.save_id||"—")}</span>
+    ${inBattle?'<span class="badge battle">战斗中</span>':""}`;
+}
+function paintRail(){
+  if(!VIEW) return;
+  const set = (id, v)=>{ const e=document.getElementById(id); if(e) e.textContent = v; };
+  set("ctUnits", (VIEW.units||[]).length || "");
+  set("ctHqs", (VIEW.hqs||[]).length || "");
+  set("ctCards", (VIEW.hand||[]).length || "");
+  set("ctStore", (VIEW.store||[]).length || "");
+  /* 战区资产：不在战斗中 ⇒ 禁用 + 写明原因（设计稿的 .nav.dis + .why） */
+  const nav = document.querySelector('.rail .nav[data-p="theater"]');
+  const why = document.getElementById("whyTheater");
+  if(nav && why){
+    const ok = (VIEW.theater_assets||[]).length > 0;
+    nav.classList.toggle("dis", !ok);
+    why.textContent = ok ? "" : "不在战斗中";
+  }
+  const ru = document.getElementById("railUndo");
+  if(ru){
+    const u = USTACK||{};
+    const n = u.count||0;
+    const last = (u.stack||[])[0];
+    ru.innerHTML = `撤销栈 <b>${n}</b> 条` +
+      (last?`<br>最近：${esc(last.summary||((last.entries||[]).join("、")))}`:"");
+  }
 }
 
 /* ---------- 待应用清单 ----------
@@ -2297,6 +2389,7 @@ async function loadUndoStack(){
   if(!VIEW) return;
   try { USTACK = await api("/api/undo-stack?save_id=" + encOnce(VIEW._save_id)); }
   catch(e){ USTACK = {stack:[], backups:[], count:0}; }
+  paintRail();
 }
 
 /* ---------- 路线图 ---------- */
@@ -2492,14 +2585,13 @@ async function openSave(sid){
      商店页与卡牌页都要用（之前只有单位页按需加载 ⇒ 模态框里 0 种）。 */
   PICKCACHE = {};
   loadPickers("").then(()=>{ if(VIEW) show(PAGE); }).catch(()=>{});
-  document.getElementById("hTitle").textContent = VIEW.save.display || VIEW.save.name;
-  document.getElementById("hCaps").innerHTML = (VIEW._features||[]).map(f =>
-    `<span class="pill ${f.ok?'on':'off'}" title="${esc(f.reason)}">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</span>`
-  ).join("");
+  paintHeader();
+  paintRail();
   document.getElementById("status").innerHTML =
     `能力位：${(VIEW._features||[]).filter(f=>f.ok).length}/${(VIEW._features||[]).length} 可用` +
     ` · 声望 <b class="ok">${VIEW.prestige??"—"}</b> · 分数 <b>${VIEW.score??"—"}</b>` +
-    ` · 单位 <b>${(VIEW.units||[]).length}</b> · 总部 <b>${(VIEW.hqs||[]).length}</b>`;
+    ` · 单位 <b>${(VIEW.units||[]).length}</b> · 总部 <b>${(VIEW.hqs||[]).length}</b>` +
+    `<span style="margin-left:auto">${PENDING.length?"有未应用的改动":"就绪 · 未改动磁盘"}</span>`;
   show(PAGE);
 }
 
@@ -2552,7 +2644,16 @@ function show(p){
   if(p==="hqs"){ pageHqs(w); return; }
   if(p==="cards"){ pageCards(w); return; }
   if(p==="store"){ pageStore(w); return; }
-  if(p==="theater"){ pageTheater(w); return; }
+  if(p==="theater"){
+    if(!(VIEW.theater_assets||[]).length){
+      w.innerHTML = `<div class="panel"><h3>战区资产</h3><div class="placeholder">
+        <div class="big">当前不在战斗中</div>
+        战区资产是**战斗中的**东西（存档里的 <code>games/&lt;场景&gt;/main.yml</code>）——
+        不在战斗里就没有这一页的内容。</div></div>`;
+      return;
+    }
+    pageTheater(w); return;
+  }
   if(p==="campaign"){ pageCampaign(w); return; }
   w.innerHTML = `<div class="panel"><h3>${PAGE_CN[p]||p}</h3>
     <div class="placeholder"><div class="big">这一页还没做</div>

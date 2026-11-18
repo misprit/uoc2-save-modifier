@@ -151,6 +151,13 @@ def api_view(save_id: str) -> dict:
             })
         data["_features"] = features
         data["_save_id"] = save_id
+        # ⚠️ `SaveInfo.name` / `display_name` 是**属性**，不是 dataclass 字段
+        # ⇒ `_jsonable` 不会输出它们 ⇒ 前端拿不到存档名（U42 实测 Header 显示「—」）。
+        try:
+            data["save"]["display_name"] = view.save.display_name
+            data["save"]["file_name"] = view.save.name
+        except Exception:
+            pass
 
         # ---- 6 个功能页各自要的东西（U33 补齐）----
         # 战区资产：按当前 phase 取那一组（L3 例外的只读侧）
