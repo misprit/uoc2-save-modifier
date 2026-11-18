@@ -396,3 +396,208 @@ class TestNumericControls(unittest.TestCase):
         """不允许残留「滚轮可调」这类已被覆盖的旧表述。"""
         self.assertNotIn("滚轮可调", self.html)
         self.assertNotIn("Ctrl+滚轮 ±", self.html)
+
+
+class TestCatalogApi(WebGuiTestBase):
+    """U33：游戏包目录 + 选择器候选 + 视图扩展。
+
+    ⚠️ **中文名只能来自游戏包 locale** —— 这里断言「查得到中文」，
+    不是断言「自己翻译对了」（规范 §5.7）。
+    """
+
+    def test_catalog_has_unit_spec_card_nationality(self):
+        cat = self.get_json("/api/catalog")
+        for k in ("unit_types", "spec_types", "card_types", "nationalities"):
+            self.assertIn(k, cat)
+            self.assertGreater(len(cat[k]), 0, k)
+
+    def test_catalog_names_are_localized(self):
+        """抽查：德军步兵 / 盟军步兵 / 一张卡 —— 中文名非空且不是内部 id。"""
+        cat = self.get_json("/api/catalog")
+        ut = cat["unit_types"]
+        found = 0
+        for name, info in ut.items():
+            cn = info.get("cn") or ""
+            self.assertTrue(cn, name)
+            if cn != name:
+                found += 1
+        self.assertGreater(found, 0, "一个中文名都没翻出来？")
+
+    def test_pickers_returns_candidates(self):
+        """选择器：按单位类型给特种兵候选 + 战役池 + 商店可上架范围。"""
+        import urllib.parse
+        from save_modifier_core import list_saves
+
+        sid = None
+        for info in list_saves():
+            if info.is_primary and info.campaign_id:
+                sid = info.save_id
+                break
+        if sid is None:
+            self.skipTest("本机没有战役存档")
+        q = urllib.parse.quote(sid, safe="")
+        pk = self.get_json("/api/pickers?save_id=" + q)
+        self.assertIn("specialists_for_unit", pk)
+        self.assertIn("campaign_pool", pk)
+        self.assertIn("store_universe", pk)
+        self.assertIn("cards", pk)
+        # 商店范围用的是**单数键**（equipment / nationality / spec）
+        for k in ("equipment", "nationality", "spec"):
+            self.assertIn(k, pk["store_universe"])
+
+    def test_view_has_theater_assets_and_names(self):
+        """视图要带战区资产、战役位置、中文名。"""
+        import urllib.parse
+        from save_modifier_core import list_saves
+
+        sid = None
+        for info in list_saves():
+            if info.is_primary:
+                sid = info.save_id
+                break
+        if sid is None:
+            self.skipTest("本机没有存档")
+        v = self.get_json("/api/view/" + urllib.parse.quote(sid, safe=""))
+        self.assertIn("theater_assets", v)
+        self.assertIn("campaign_position", v)
+        self.assertIn("card_whitelist", v)
+        for u in (v.get("units") or [])[:5]:
+            self.assertIn("name_cn", u)
+        for h in (v.get("hqs") or [])[:5]:
+            self.assertIn("name_cn", h)
+
+
+class TestUnitWriteApi(WebGuiTestBase):
+    """U34：单位页的写操作（改名 / 兵力 / 经验 / 特种兵挂卸）。"""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="webunit_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            p = str(info.path)
+            if "BACKUP" not in p and p.endswith(".usg"):
+                src = p
+                break
+        if src is None:
+            self.skipTest("本机没有存档")
+        self.copy = str(self.tmp / "copy.usg")
+        shutil.copyfile(src, self.copy)
+
+    def post(self, path, body):
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            self.url(path),
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Token": server._Handler.token},
+            method="POST")
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+
+    def _view(self):
+        import urllib.parse
+        return self.get_json("/api/view/" + urllib.parse.quote(self.copy))
+
+    def test_unit_xp_edit_roundtrip(self):
+        """改经验 → 提交 → 撤销 → 复原。"""
+        v0 = self._view()
+        units = v0.get("units") or []
+        if not units:
+            self.skipTest("这个存档没有单位")
+        u = units[0]
+        old = u.get("xp") or 0
+        new = min(400, old + 11)
+
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "unit_field",
+                       "params": {"unit_id": u["id"], "field": "xp", "value": new}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+
+        v1 = self._view()
+        u1 = next(x for x in v1["units"] if x["id"] == u["id"])
+        self.assertEqual(u1.get("xp"), new)
+
+        un = self.post("/api/undo", {"save_id": self.copy})
+        self.assertTrue(un["ok"], un.get("errors"))
+        v2 = self._view()
+        u2 = next(x for x in v2["units"] if x["id"] == u["id"])
+        self.assertEqual(u2.get("xp"), old, "撤销后应复原")
+
+    def test_unit_rename_is_accepted(self):
+        """改名：写的是玩家起的明文（不是 locale 键）。"""
+        v0 = self._view()
+        units = v0.get("units") or []
+        if not units:
+            self.skipTest("这个存档没有单位")
+        u = units[0]
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "unit_field",
+                       "params": {"unit_id": u["id"], "field": "name_brief",
+                                  "value": "测试改名"}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        u1 = next(x for x in v1["units"] if x["id"] == u["id"])
+        self.assertEqual(u1.get("name_brief"), "测试改名")
+
+    def test_out_of_range_xp_is_rejected(self):
+        """经验超范围（游戏 schema 是 0–400）⇒ 必须硬拦，不写盘。"""
+        v0 = self._view()
+        units = v0.get("units") or []
+        if not units:
+            self.skipTest("这个存档没有单位")
+        u = units[0]
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "unit_field",
+                       "params": {"unit_id": u["id"], "field": "xp", "value": 9999}}]})
+        self.assertFalse(cm["ok"])
+        self.assertTrue(cm["errors"])
+
+    def test_unit_spec_add_and_remove(self):
+        """挂一个特种兵 → 再卸掉。"""
+        v0 = self._view()
+        units = v0.get("units") or []
+        target = None
+        for u in units:
+            if u.get("type") and not u.get("specs"):
+                target = u
+                break
+        if target is None:
+            self.skipTest("没有可挂特种兵的单位")
+        # 从目录里挑一个该单位类型可挂的
+        cat = self.get_json("/api/catalog")
+        spec = None
+        for name in cat["spec_types"]:
+            st = cat["spec_types"][name]
+            ut = cat["unit_types"].get(target["type"]) or {}
+            if st.get("nationality") == ut.get("nationality"):
+                spec = name
+                break
+        if spec is None:
+            self.skipTest("目录里没有同国籍的特种兵")
+
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "unit_spec_add",
+                       "params": {"unit_id": target["id"], "spec_type": spec}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        u1 = next(x for x in v1["units"] if x["id"] == target["id"])
+        self.assertTrue(any(s.get("type") == spec for s in (u1.get("specs") or [])))
+
+        cm2 = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "unit_spec_remove",
+                       "params": {"unit_id": target["id"], "spec_type": spec}}]})
+        self.assertTrue(cm2["ok"], cm2.get("errors"))
+        v2 = self._view()
+        u2 = next(x for x in v2["units"] if x["id"] == target["id"])
+        self.assertFalse(any(s.get("type") == spec for s in (u2.get("specs") or [])))

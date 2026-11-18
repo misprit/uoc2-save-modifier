@@ -151,7 +151,233 @@ def api_view(save_id: str) -> dict:
             })
         data["_features"] = features
         data["_save_id"] = save_id
+
+        # ---- 6 个功能页各自要的东西（U33 补齐）----
+        # 战区资产：按当前 phase 取那一组（L3 例外的只读侧）
+        data["theater_assets"] = _theater_assets_of(save)
+        # 战役位置（只读）
+        try:
+            pos = save.campaign_position()
+            data["campaign_position"] = _jsonable(pos)
+        except Exception as exc:
+            data["campaign_position"] = {"error": str(exc)}
+        # 单位 / 总部的 `name_brief` / `name_full` 存的是**本地化键**
+        # （如 `id_unit_name_brief_97_dot__J_ger`）⇒ 这里查 locale 翻成中文。
+        # ⚠️ 查不到就**原样返回**（玩家自己起的名字是明文，不是键）。
+        # ⚠️ 中文一律来自游戏包 `localization/chi/strings.yml` —— 不自己翻译（§5.7）。
+        try:
+            from save_modifier_core import locale as _locale
+            _tr = _locale.default()
+            for _u in (data.get("units") or []):
+                _u["name_cn"] = _tr.get(_u.get("name_brief") or "", "") or (_u.get("name_brief") or "")
+                _u["full_cn"] = _tr.get(_u.get("name_full") or "", "") or (_u.get("name_full") or "")
+            for _h in (data.get("hqs") or []):
+                _h["name_cn"] = _tr.get(_h.get("name_brief") or "", "") or (_h.get("name_brief") or "")
+                _h["full_cn"] = _tr.get(_h.get("name_full") or "", "") or (_h.get("name_full") or "")
+        except Exception as exc:
+            data["_name_error"] = str(exc)
+
+        # 卡牌白名单 —— **本存档 + 本会议**的状态，每次重算（规范 §7.5.1）
+        try:
+            wl = catalog.card_whitelist(save)
+            data["card_whitelist"] = {
+                "allowed": wl.allowed_types(),
+                "blocked": dict(wl.blocked),
+                "conference": wl.conference,
+                "campaign_id": wl.campaign_id,
+                "player_faction": wl.player_faction,
+            }
+        except Exception:
+            data["card_whitelist"] = {"allowed": [], "blocked": {}}
         return data
+
+
+# ---------------------------------------------------------------- 目录 / 选择器
+#
+# 「中文名从哪来」：**只**来自游戏包 `localization/chi/strings.yml`（规范 §5.7）。
+# 目录里的类型定义（`entity_types/*.yml`）只给**键**（`name_brief`），
+# 中文要拿键去 locale 查 —— 查不到就退回内部 id，**绝不自己翻译**。
+
+#: 游戏包目录的进程内缓存 —— 装好游戏后不会变，别每次请求都重扫 600 多个 YAML。
+_CATALOG_CACHE: dict | None = None
+
+
+def _catalog_payload() -> dict:
+    """游戏包目录：单位类型 / 特种兵 / 卡牌 / 国籍 + 中文名。"""
+    global _CATALOG_CACHE
+    if _CATALOG_CACHE is not None:
+        return _CATALOG_CACHE
+
+    from save_modifier_core import Catalog, CorePaths, locale
+
+    paths = CorePaths.discover()
+    catalog = Catalog(paths)
+    tr = locale.default()
+
+    def cn(key, fallback: str = "") -> str:
+        """查一条中文；查不到退回 `fallback`（一般是内部 id）。"""
+        if not key:
+            return fallback
+        return tr.get(key, "") or fallback
+
+    unit_types: dict = {}
+    for name in catalog.unit_type_names():
+        t = catalog.unit_type(name)
+        if t is None:
+            continue
+        unit_types[name] = {
+            "cn": cn(t.name_brief, name),
+            "faction": t.faction,
+            "nationality": t.nationality,
+            "movement": t.movement,
+            "attack": t.attack,
+            "defense": t.defense,
+            "armor": t.armor,
+            "max_st": t.max_st,
+            "max_spec": t.max_spec,
+            "step_icon": t.step_icon(),
+            "equipment": t.equipment,
+        }
+
+    spec_types: dict = {}
+    for name in catalog.spec_type_names():
+        s = catalog.spec_type(name)
+        if s is None:
+            continue
+        spec_types[name] = {
+            "cn": cn(s.name_brief, name),
+            "full": cn(s.name_full, ""),
+            "faction": s.faction,
+            "nationality": s.nationality,
+            "attack": s.attack,
+            "defense": s.defense,
+            "armor": s.armor,
+            "artillery": s.artillery,
+            "flags": list(s.flags),
+        }
+
+    card_types: dict = {}
+    for name in catalog.card_type_names():
+        d = catalog.card_type(name) or {}
+        card_types[name] = {
+            "cn": cn(d.get("title"), name),
+            "subtitle": cn(d.get("subtitle"), ""),
+            "description": cn(d.get("description"), ""),
+            "cost": d.get("cost"),
+            "faction": d.get("faction"),
+            "has_unit": bool(d.get("has_unit")),
+            "image": d.get("image"),
+            "meta_type": d.get("meta_type"),
+            "theater_asset": d.get("theater_asset"),
+        }
+
+    nationalities: dict = {}
+    for name in catalog.nationality_names():
+        n = catalog.nationality(name)
+        nationalities[name] = {
+            "cn": cn(n.name_brief if n else None, name),
+            "short": cn(n.short if n else None, ""),
+            "faction": n.faction if n else None,
+            "parent": n.parent_nationality if n else None,
+        }
+
+    _CATALOG_CACHE = {
+        "unit_types": unit_types,
+        "spec_types": spec_types,
+        "card_types": card_types,
+        "nationalities": nationalities,
+    }
+    return _CATALOG_CACHE
+
+
+def api_catalog() -> dict:
+    """`GET /api/catalog` —— 游戏包目录（静态，进程内缓存）。"""
+    return _catalog_payload()
+
+
+def api_pickers(save_id: str, unit_type: str = "") -> dict:
+    """`GET /api/pickers` —— 各页选择器的候选。
+
+    * `specialists_for_unit` —— 某个单位类型能挂的特种兵（战役池 ∩ 游戏规则）
+    * `campaign_pool`      —— 该战役的特种兵池（总部兵库 / 商店上架用）
+    * `store_universe`     —— 游戏自己在该战役该会议会卖的东西（**上架的校验依据**）
+    * `cards`              —— 本存档本会议的卡牌白名单（**每次开卡牌页重算，不缓存**）
+    """
+    from save_modifier_core import Catalog, CorePaths, open_save
+
+    catalog = Catalog(CorePaths.discover())
+    with open_save(save_id) as save:
+        info = save.info
+        campaign_id = info.campaign_id
+
+        names: list[str] = []
+        scope = "none"
+        if unit_type:
+            names, scope = catalog.specialist_candidates(
+                unit_type, campaign_id=campaign_id)
+        pool = sorted(catalog.campaign_specialist_pool(campaign_id))
+
+        conference = None
+        try:
+            pos = save.campaign_position()
+            conference = getattr(pos, "conference_id", None)
+        except Exception:
+            conference = None
+
+        universe = catalog.store_item_universe(campaign_id, conference)
+        wl = catalog.card_whitelist(save)
+        return {
+            "unit_type": unit_type,
+            "specialists_for_unit": {"candidates": list(names), "scope": scope},
+            "campaign_pool": pool,
+            # ⚠️ `store_item_universe()` 的键是**单数**（equipment / nationality / spec）
+            "store_universe": {
+                "equipment": sorted(universe.get("equipment") or []),
+                "nationality": sorted(universe.get("nationality") or []),
+                "spec": sorted(universe.get("spec") or []),
+            },
+            "cards": {
+                "allowed": wl.allowed_types(),
+                "blocked": dict(wl.blocked),
+                "conference": wl.conference,
+                "campaign_id": wl.campaign_id,
+                "player_faction": wl.player_faction,
+            },
+        }
+
+
+def _theater_assets_of(save) -> list:
+    """当前战斗的**战区资产**（按 `phase` 取当前那一组）。
+
+    ⚠️ `theater_assets` 是按 phase 分组的（U20 实测）⇒ 只给当前 phase 那组，
+    别把别的阶段的混进来。
+    """
+    try:
+        data = save.battle_main()
+    except Exception:
+        return []
+    if not isinstance(data, dict):
+        return []
+    theater = data.get("theater_assets")
+    if not isinstance(theater, list) or not theater:
+        return []
+    phase = data.get("phase")
+    idx = (phase if isinstance(phase, int) and not isinstance(phase, bool)
+           and 0 <= phase < len(theater) else 0)
+    items = theater[idx]
+    if not isinstance(items, list):
+        return []
+    out = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        out.append({
+            "asset": it.get("asset"),
+            "to_use": it.get("to_use"),
+            "uses_total": it.get("uses_total"),
+            "uses_turn": it.get("uses_turn"),
+        })
+    return out
 
 
 def _summary_of(obj) -> str:
@@ -314,6 +540,13 @@ class _Handler(BaseHTTPRequestHandler):
                 elif path.startswith("/api/view/"):
                     sid = path[len("/api/view/"):]
                     self._json(api_view(sid))
+                elif path == "/api/catalog":
+                    self._json(api_catalog())
+                elif path == "/api/pickers":
+                    q = parse_qs(urlparse(self.path).query)
+                    sid = (q.get("save_id") or [""])[0]
+                    ut = (q.get("unit_type") or [""])[0]
+                    self._json(api_pickers(sid, ut))
                 else:
                     self._json({"error": "未知接口"}, 404)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务
@@ -435,6 +668,13 @@ def run(serve_only: bool = False, no_window: bool = False) -> int:
     proc = subprocess.Popen(
         [edge, "--app=" + url, "--user-data-dir=" + str(PROFILE_DIR),
          "--no-first-run", "--no-default-browser-check",
+         # ⚠️ **强制缩放系数 = 1**（U34 实测踩坑）：
+         #   Windows 有 150% 缩放时，Edge 的 CSS 视口 ≈ 物理像素 / 1.5
+         #   ⇒ 1690 物理像素的窗口只有 ~1050 CSS 像素 ⇒ 视觉稿的两栏布局
+         #   会被窄屏规则折叠成一栏。锁成 1 之后 **CSS px == 物理 px**，
+         #   窗口多大就是多少 CSS 像素，和视觉稿（1440×900）对得上。
+         "--force-device-scale-factor=1",
+         "--window-size=1500,940",
          "--disable-features=Translate,msEdgeSidebarV2,msEdgeShoppingAssistant"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print("[OK ] Edge 独立窗口已启动（pid=%d）—— 关掉窗口即退出。" % proc.pid)

@@ -73,7 +73,7 @@ table.list td.k{color:var(--muted)}
 .rail .nav.on{background:var(--selection);color:var(--accent-dark);font-weight:600}
 .rail .nav .ic{width:16px;text-align:center;color:var(--muted)}
 .rail .nav.on .ic{color:var(--accent)}
-.work{flex:1;min-width:0;display:flex;flex-direction:column}
+.work{flex:1;min-width:0;display:flex;flex-direction:column;overflow:auto;padding-bottom:8px}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;
   margin:14px;overflow:hidden}
 .panel>h3{margin:0;padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--accent-dark);
@@ -112,7 +112,180 @@ table.list td.k{color:var(--muted)}
 .tun .num.bad{border-color:var(--danger);background:var(--danger-light);color:var(--danger)}
 .tun .hint{font-size:11px;color:var(--muted)}
 .tun .old{font-size:11px;color:var(--muted);font-family:var(--mono)}
-/* 待应用清单 */
+
+/* ===================================================================
+   U34：6 个功能页的组件层 —— 搬自 docs/GUI视觉稿.html（视觉稿即实现）
+   =================================================================== */
+:root{--stage-edge:#c7d2dd; --stage-sup:#8fa3b8}
+.cols{display:grid;grid-template-columns:minmax(290px,0.6fr) minmax(430px,1.4fr);gap:14px}
+.cols>*{min-width:0}
+.cols-wide{grid-template-columns:minmax(520px,1.45fr) minmax(340px,1fr)}
+.cols-half{grid-template-columns:minmax(300px,1fr) minmax(300px,1fr)}
+.toolbar{display:flex;align-items:center;gap:10px;background:var(--surface-alt);
+  border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:12px}
+.inp{background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 9px;
+  font:inherit;font-size:13px;color:var(--text)}
+.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(36,91,143,.13)}
+.toolbar .sp{flex:1}
+.sel{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 9px;font-size:13px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text)}
+.tabs{display:flex;gap:2px;background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:6px;padding:2px;width:fit-content;margin:0 0 12px}
+.tabs .tb{padding:4px 13px;font-size:12.5px;border-radius:5px;color:var(--muted);cursor:pointer}
+.tabs .tb.on{background:var(--surface);color:var(--accent-dark);font-weight:600;
+  box-shadow:0 1px 3px rgba(20,40,60,.12)}
+.tabs .tb .n{font-family:var(--mono);font-size:11px;opacity:.75;margin-left:4px}
+/* 单位行 */
+.rows{max-height:430px;overflow:auto}
+.urow{display:flex;align-items:center;gap:11px;padding:9px 12px;
+  border-bottom:1px solid #f0f3f6;cursor:pointer}
+.urow:hover{background:var(--accent-light)}
+.urow.sel{background:var(--selection)}
+.ava{width:52px;height:52px;border-radius:6px;background:var(--stage);
+  border:1px solid var(--stage-edge);flex:none;display:grid;place-items:center;overflow:hidden}
+.ava img{max-width:100%;max-height:100%;object-fit:contain}
+.umin{flex:1;min-width:0}
+.uname{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px;
+  white-space:nowrap;overflow:hidden}
+.uname .full{color:var(--muted);font-size:11px;font-weight:400;font-family:var(--mono)}
+.umeta{font-size:11.5px;color:var(--muted);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pips{display:flex;gap:2px;margin-top:4px}
+.pip{width:13px;height:9px;border-radius:2px;background:var(--surface-alt);border:1px solid var(--border)}
+.pip.on{background:var(--accent);border-color:var(--accent-dark)}
+.pip.sup{background:var(--stage-sup);border-color:#a9b7c7}
+.ubadges{display:flex;align-items:center;gap:4px;flex:none}
+.ubadge{width:22px;height:22px;border-radius:5px;background:var(--stage);
+  border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;flex:none}
+.ubadge img{max-width:100%;max-height:100%;object-fit:contain}
+.ucount{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--accent-dark);
+  background:var(--accent-light);border:1px solid #b9d3ea;border-radius:9px;padding:0 6px}
+/* 详情抬头 */
+.detail{padding:14px}
+.dhead{display:flex;gap:16px;align-items:stretch}
+.dhead .ava{width:76px;height:76px;flex:none;align-self:center}
+.dhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.dhead .vsep{width:1px;background:var(--border);flex:none}
+.dhead .stats{flex:none;width:440px}
+.dtitle{font-size:17px;font-weight:700;color:var(--accent-dark);display:flex;align-items:center;gap:8px;
+  flex-wrap:wrap}
+.dtitle .edit{font-size:12px;color:var(--muted);font-weight:400;border:1px dashed var(--border);
+  border-radius:5px;padding:1px 7px;cursor:pointer}
+.dtitle .edit:hover{border-color:var(--accent);color:var(--accent)}
+.dsub{font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:9px 11px}
+.stat .lb{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.stat .lb .hintw{color:var(--accent);font-size:10.5px}
+.stat .v{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--accent-dark);margin-top:2px}
+.stat .v small{font-size:12px;color:var(--muted);font-weight:400}
+.blood{display:flex;align-items:center;gap:8px;margin-top:8px}
+.blood .bar{display:flex;gap:3px;padding:3px 5px;border-radius:5px;
+  border:1px solid var(--border);background:var(--surface)}
+.blood .bar .pip{width:13px;height:13px}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:6px;align-items:center;
+  flex-wrap:wrap}
+.legend i{display:inline-block;width:11px;height:8px;border-radius:2px;margin-right:5px;
+  vertical-align:middle}
+/* U32：大数字用输入框、小数字用 Alt+滚轮 —— 两套控件 */
+.numin{width:78px;text-align:center;padding:1px 6px;border:1px dashed var(--border);
+  border-radius:6px;background:var(--surface);font-family:var(--mono);font-weight:700;
+  font-size:17px;color:var(--accent-dark);font-variant-numeric:tabular-nums;outline:none}
+.numin:hover{border-color:var(--accent)}
+.numin:focus{border-color:var(--accent);background:var(--accent-light)}
+.numin.dirty{border-color:var(--accent);background:var(--accent-light)}
+.numin.bad{border-color:var(--danger);background:var(--danger-light);color:var(--danger)}
+.spin{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--accent-dark);
+  border:1px dashed var(--border);border-radius:6px;padding:2px 9px;background:var(--surface);
+  cursor:ns-resize;user-select:none;white-space:nowrap;display:inline-block;
+  min-width:32px;text-align:center}
+.spin:hover{border-color:var(--accent);background:var(--accent-light)}
+.spin.dirty{border-color:var(--accent);background:var(--accent-light)}
+.spin.bad{border-color:var(--danger);background:var(--danger-light);color:var(--danger)}
+.spin .u{font-size:10px;color:var(--muted);font-weight:400}
+.hintline{font-size:11px;color:var(--muted);margin-top:6px}
+/* 特种兵区 */
+.specbox{margin-top:14px;border:1px solid var(--border);border-radius:8px;
+  background:var(--surface);overflow:hidden}
+.sbhead{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--surface-alt);
+  border-bottom:1px solid var(--border);flex-wrap:wrap}
+.sbhead .sbt{font-size:13px;font-weight:700;color:var(--accent-dark);white-space:nowrap}
+.sbhead .sbm{font-size:12px;color:var(--muted);white-space:nowrap}
+.sbhead .sp{flex:1}
+.sbhead .sbsep{width:1px;height:13px;background:var(--border);flex:none}
+.specsplit{display:flex;align-items:stretch;min-height:0}
+.specslots{display:flex;flex-direction:column;gap:7px;padding:10px 12px;width:272px;flex:none;
+  border-right:1px solid var(--border);background:var(--surface)}
+.slot{display:flex;align-items:center;gap:9px;padding:6px 10px 6px 6px;border:1px solid var(--border);
+  border-radius:7px;background:var(--surface-alt);cursor:pointer}
+.slot:hover{border-color:var(--danger);background:var(--danger-light)}
+.slot:hover .slotname{color:var(--danger)}
+.slot .sq{width:34px;height:34px;border-radius:5px;background:var(--stage);
+  border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;flex:none}
+.slot .sq img{max-width:100%;max-height:100%;object-fit:contain}
+.slot .slotinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.slot .slotname{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .slotflags{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.slot .slotflags .none{font-size:10.5px;color:var(--muted)}
+.slot .slotstats{flex:none;display:grid;grid-template-columns:auto 2.1em;gap:1px 7px;
+  align-items:baseline;justify-content:end;padding-left:6px;border-left:1px solid var(--border);
+  font-size:10.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.slot .slotstats .st{display:contents}
+.slot .slotstats .st i{font-style:normal;text-align:right}
+.slot .slotstats .st b{color:var(--accent-dark);font-weight:700;font-size:11.5px;text-align:right;
+  font-variant-numeric:tabular-nums}
+.slot.empty{border-style:dashed;background:var(--surface);color:var(--muted);cursor:default;
+  padding:5px 24px;justify-content:center}
+.slot.empty:hover{border-color:var(--border);background:var(--surface)}
+.ftag{display:inline-block;font-size:10px;padding:0 5px;border-radius:3px;background:var(--surface);
+  border:1px solid var(--border);color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.specpool{display:block;max-height:340px;overflow:auto;flex:1;min-width:0}
+.poolflat{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px}
+.grphead{display:flex;align-items:center;gap:7px;padding:4px 12px;background:var(--surface-alt);
+  border-top:1px solid var(--border);font-size:12px;font-weight:600;color:var(--accent-dark);
+  cursor:pointer;user-select:none}
+.grphead .caret{font-size:10px;display:inline-block}
+.grphead .gcount{font-weight:400;color:var(--muted);font-size:11.5px}
+.grpbody{display:flex;flex-wrap:wrap;gap:6px;padding:9px 12px}
+.pcell{width:42px;height:42px;border-radius:6px;background:var(--stage);
+  border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;cursor:pointer}
+.pcell img{max-width:100%;max-height:100%;object-fit:contain}
+.pcell:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(36,91,143,.2)}
+.pcell.blocked{opacity:.35;filter:grayscale(.9);cursor:not-allowed}
+.pcell.blocked:hover{border-color:var(--stage-edge);box-shadow:none}
+/* 特种兵选择器（U22：商店上架 / 兵库加条目共用同一套组件） */
+.spick{border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);overflow:hidden}
+.spick .sphd{display:flex;align-items:center;gap:9px;padding:8px 11px;
+  background:var(--surface);border-bottom:1px solid var(--border)}
+.spick .spt{font-size:12.5px;font-weight:700;color:var(--accent-dark);white-space:nowrap}
+.spick .spc{font-size:11px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.spick .spgrid{display:flex;flex-wrap:wrap;gap:6px;padding:10px 11px;max-height:190px;overflow:auto}
+.spick .spgrid .pcell{position:relative}
+.spick .spgrid .pcell.on{border-color:var(--accent);background:var(--accent-light);
+  box-shadow:0 0 0 2px rgba(36,91,143,.35)}
+.spick .spfoot{padding:9px 11px;background:var(--surface);border-top:1px solid var(--border)}
+.spick .slot.spcard{cursor:default}
+.spick .slot.spcard:hover{border-color:var(--border);background:var(--surface-alt)}
+.spick .slot.spcard:hover .slotname{color:inherit}
+.spnat{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.spnat b{font-family:var(--mono);color:var(--accent-dark);font-weight:700;font-size:13px}
+.spnat .auto{font-size:10px;padding:0 5px;border-radius:3px;background:var(--accent-light);
+  border:1px solid #b9d3ea;color:var(--accent-dark)}
+@media (max-width:880px){ .cols{grid-template-columns:1fr} }
+
+/* 待应用清单（全局底部抽屉 —— 换页也看得见改了什么） */
+.drawer{position:relative;margin:0 14px 8px;background:var(--surface);
+  border:1px solid var(--border);border-radius:9px;box-shadow:0 -6px 20px rgba(20,40,60,.08);
+  overflow:hidden;flex:none}
+.drawer .dh{background:var(--surface-alt);border-bottom:1px solid var(--border);padding:6px 12px;
+  font-size:12.5px;font-weight:700;color:var(--accent-dark);display:flex;align-items:center;gap:10px}
+.drawer .dh .files{margin-left:auto;font-weight:400;font-size:11px;color:var(--muted);
+  font-family:var(--mono)}
+.drawer .dlist{padding:6px 12px;max-height:132px;overflow:auto}
+.drawer.empty .dlist{display:none}
+.drawer.empty .dh{border-bottom:none}
+.drawer .err,.drawer .warn{padding:0 12px 8px}
+
 .pending{margin:0;padding:0;list-style:none}
 .pending li{display:flex;gap:8px;align-items:center;padding:5px 0;
   border-bottom:1px solid var(--surface-alt);font-size:12px}
@@ -172,6 +345,15 @@ table.list td.k{color:var(--muted)}
     </div>
     <div class="work" id="work"></div>
   </div>
+  <div class="drawer empty" id="drawer">
+    <div class="dh">待应用 <span id="pendCount" style="font-weight:400">0</span> 条
+      <span class="files" id="pendFiles"></span>
+      <button class="btn" onclick="doUndo()">↶ 撤销</button>
+      <button class="btn pri" id="btnApply" onclick="doApply()">应用更改</button>
+    </div>
+    <div class="dlist"><ul class="pending" id="pendList"></ul>
+      <div class="err" id="errBox"></div><div class="warn" id="warnBox"></div></div>
+  </div>
   <div class="status" id="status"></div>
 </div>
 
@@ -179,12 +361,16 @@ table.list td.k{color:var(--muted)}
 const QS = new URLSearchParams(location.search);
 const TOKEN = QS.get("t") || "";
 const OPEN_ID = QS.get("open") || "";
+const OPEN_PAGE = QS.get("page") || "";
 let SAVES = [], VIEW = null, PAGE = "overview";
+let UQUERY = "", UHQFILTER = "";
 
 const FEATURE_CN = {units:"单位", hqs:"总部", hand:"手牌", shelf:"货架",
   store:"商店", theater_assets:"战区资产", restore_hand:"恢复上次会议牌局"};
 const PAGE_CN = {overview:"概览", units:"单位", hqs:"总部", cards:"卡牌",
   store:"商店", theater:"战区资产", campaign:"战役"};
+/* 深链 `?page=单位页名` */
+if(OPEN_PAGE && PAGE_CN[OPEN_PAGE]) PAGE = OPEN_PAGE;
 
 /* U32：禁掉 Edge 的 **Ctrl+滚轮缩放** —— 浏览器默认行为，页面可以阻止。
    实测（2026-11-18 · 本机 Edge 157）：
@@ -226,12 +412,15 @@ async function post(path, body){
   return {status:r.status, data: await r.json()};
 }
 
-/* ---------- 待应用清单 ---------- */
-let PENDING = [];          /* [{kind, params, label}] */
-function setPending(kind, params, label){
-  const i = PENDING.findIndex(x => x.kind===kind &&
-    JSON.stringify(x.params)===JSON.stringify(params));
-  if(i>=0) PENDING.splice(i,1); else PENDING.push({kind, params, label});
+/* ---------- 待应用清单 ----------
+   ⚠️ `key` = 编辑目标的标识（同一目标只挂一条）；
+      `params` = 真正写进存档的内容（**含 value**）。
+   两者必须分开 —— 拿 params 去匹配会把「值」也当成目标的一部分，
+   于是改了值就匹配不上、界面永远显示原值（U34 实测踩到）。 */
+let PENDING = [];          /* [{kind, key, params, label}] */
+function setPending(kind, key, params, label){
+  const i = PENDING.findIndex(x => x.kind===kind && x.key===key);
+  if(i>=0) PENDING.splice(i,1); else PENDING.push({kind, key, params, label});
   paintPending();
 }
 function paintPending(){
@@ -240,10 +429,15 @@ function paintPending(){
     el.innerHTML = PENDING.map((p,i)=>`<li><span class="d">${esc(p.label)}</span>
       <span class="x" onclick="dropPending(${i})">移除</span></li>`).join("")
       || `<li style="color:var(--muted)">（没有待应用的改动）</li>`;
-    document.getElementById("pendCount").textContent = PENDING.length;
+    const cnt = document.getElementById("pendCount");
+    if(cnt) cnt.textContent = PENDING.length;
   }
-  document.getElementById("hPending").textContent = PENDING.length;
-  document.getElementById("btnApply").disabled = !PENDING.length;
+  const hp = document.getElementById("hPending");
+  if(hp) hp.textContent = PENDING.length;
+  const ba = document.getElementById("btnApply");
+  if(ba) ba.disabled = !PENDING.length;
+  const dr = document.getElementById("drawer");
+  if(dr) dr.classList.toggle("empty", !PENDING.length);
 }
 function dropPending(i){ PENDING.splice(i,1); paintPending(); }
 
@@ -296,19 +490,15 @@ function bindTun(){
       el.classList.toggle("bad", !!bad);
       el.title = bad || "";
       if(bad){                              /* 非法值 ⇒ 不入待应用 */
-        const i = PENDING.findIndex(x => x.kind==="progress" && x.params.field===f);
-        if(i>=0) PENDING.splice(i,1);
-        paintPending();
+        dropPendingKind("progress", f);
         return;
       }
       el.classList.toggle("dirty", v !== base);
       const params = {field: f, value: v};
       if(v === base){
-        const i = PENDING.findIndex(x => x.kind==="progress" &&
-          JSON.stringify(x.params)===JSON.stringify(params));
-        if(i>=0) PENDING.splice(i,1);
+        dropPendingKind("progress", f);
       } else {
-        setPending("progress", params, `${f==="prestige"?"声望":"分数"} ${base} → ${v}`);
+        setPending("progress", f, params, `${f==="prestige"?"声望":"分数"} ${base} → ${v}`);
       }
       paintPending();
     }
@@ -316,6 +506,368 @@ function bindTun(){
     el.addEventListener("change", apply);
     el.addEventListener("keydown", ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); apply(); el.blur(); } });
   });
+}
+
+
+/* ===================================================================
+   U34：6 个功能页的公共件
+   =================================================================== */
+let CATALOG = null;      /* /api/catalog —— 游戏包目录（静态，进程内缓存） */
+let PICK = null;         /* /api/pickers —— 当前选择器的候选 */
+let SEL = {};            /* 每页当前选中项 */
+let PICKCACHE = {};      /* unit_type → 候选池（省得来回切单位就重拉） */
+
+/* 贴图：必须走服务端代理（http 页面读不到 file://）—— U29
+   `/surfaces/*` 要 token ⇒ 只能走 query（<img> 带不了 header）。 */
+function surf(p){
+  return "/surfaces/" + String(p||"") + "?t=" + encodeURIComponent(TOKEN);
+}
+function imgTag(p, alt){
+  return `<img src="${surf(p)}" alt="${esc(alt||"")}" loading="lazy">`;
+}
+const unitTex  = t => "unit/" + t + "/sheet_L.png";
+const specTex  = t => "specialist/" + t + "/hq_action_icon.png";
+const specBig  = t => "specialist/" + t + "/sheet_large.png";
+const theaterTex = a => "theater/" + a + "_neutral.png";
+
+function unitCn(type){ return (CATALOG&&CATALOG.unit_types[type]||{}).cn || type || "?"; }
+function specCn(type){ return (CATALOG&&CATALOG.spec_types[type]||{}).cn || type || "?"; }
+function natCn(nat){ return (CATALOG&&CATALOG.nationalities[nat]||{}).cn || nat || "?"; }
+
+async function loadCatalog(){
+  if(!CATALOG) CATALOG = await api("/api/catalog");
+  return CATALOG;
+}
+async function loadPickers(unitType){
+  const k = unitType || "";
+  if(PICKCACHE[k]) return PICKCACHE[k];
+  const q = "?save_id=" + encOnce(VIEW._save_id) + (unitType ? "&unit_type=" + encOnce(unitType) : "");
+  PICKCACHE[k] = await api("/api/pickers" + q);
+  PICK = PICKCACHE[k];
+  return PICK;
+}
+
+/* 待应用里的「覆盖值」：有挂起的编辑就显示编辑后的值，否则显示存档原值 */
+function pendingVal(kind, key, cur){
+  const i = PENDING.findIndex(x => x.kind===kind && x.key===key);
+  return i>=0 ? PENDING[i].params.value : cur;
+}
+function pendingHit(kind, key){
+  return PENDING.some(x => x.kind===kind && x.key===key);
+}
+/* 取消一条挂起的编辑（值回到原值时用） */
+function dropPendingKind(kind, key){
+  const i = PENDING.findIndex(x => x.kind===kind && x.key===key);
+  if(i>=0){ PENDING.splice(i,1); paintPending(); }
+}
+
+/* ---------- 通用数值控件 ----------
+   大数字（三位以上）= 输入框（可直接编辑）
+   小数字（一般个位数）= Alt+滚轮 ±1（U32 用户拍板） */
+
+/* 小数字：Alt+滚轮 ±1，带范围夹取 */
+function bindSpin(el, opts){
+  const base = opts.base;
+  function show(v){
+    el.textContent = v;
+    el.classList.toggle("dirty", v!==base);
+    el.classList.toggle("bad", false);
+  }
+  function commit(v){
+    if(opts.min!==undefined && opts.min!==null && v<opts.min) v=opts.min;
+    if(opts.max!==undefined && opts.max!==null && v>opts.max) v=opts.max;
+    show(v);
+    opts.onChange(v);
+  }
+  altWheel(el, function(d){
+    const cur = parseInt(String(el.textContent).replace(/\D/g,""), 10);
+    commit((isFinite(cur)?cur:base) + d);
+  });
+  show(base);
+}
+
+/* 大数字：输入框，直接编辑 */
+function bindNumIn(el, opts){
+  const base = opts.base;
+  function apply(){
+    const raw = String(el.value??"").trim();
+    const v = Number(raw);
+    let bad = null;
+    if(raw==="") bad = "不能为空";
+    else if(!/^-?\d+$/.test(raw)) bad = "必须是整数";
+    else if(!Number.isSafeInteger(v)) bad = "数字太大了";
+    else if(opts.min!==undefined && opts.min!==null && v<opts.min) bad = "不能小于 " + opts.min;
+    else if(opts.max!==undefined && opts.max!==null && v>opts.max) bad = "不能大于 " + opts.max;
+    el.classList.toggle("bad", !!bad);
+    el.title = bad || "";
+    if(bad){ dropPendingKind(opts.kind, opts.key); return; }
+    el.classList.toggle("dirty", v!==base);
+    opts.onChange(v);
+  }
+  el.addEventListener("input", apply);
+  el.addEventListener("change", apply);
+  el.addEventListener("keydown", ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); apply(); el.blur(); } });
+  apply();
+}
+
+/* 把一次编辑挂到「待应用」；值等于原值就撤掉 */
+function queueEdit(kind, key, params, base, value, label){
+  if(value === base){ dropPendingKind(kind, key); return; }
+  setPending(kind, key, params, `${label} ${base} → ${value}`);
+}
+
+/* ===================================================================
+   单位页
+   =================================================================== */
+/* 编辑目标的标识（同一个目标只挂一条待应用） */
+const uKey = (id, field) => `unit_field:${id}:${field}`;
+function projectedSpecs(u){
+  /* 已挂的特种兵 + 「待应用」里新加/卸下的（还没写盘，先在界面上体现） */
+  const specs = (u.specs||[]).map(s => Object.assign({}, s));
+  PENDING.forEach(p=>{
+    if(p.kind==="unit_spec_add" && p.params.unit_id===u.id){
+      if(!specs.some(s=>s.type===p.params.spec_type))
+        specs.push({idx:specs.length, type:p.params.spec_type, active:true, captured:false});
+    }
+    if(p.kind==="unit_spec_remove" && p.params.unit_id===u.id){
+      const i = specs.findIndex(s => s.type===p.params.spec_type &&
+        (p.params.idx===undefined || p.params.idx===null || s.idx===p.params.idx));
+      if(i>=0) specs.splice(i,1);
+    }
+  });
+  return specs;
+}
+
+function unitRowHTML(u){
+  const ut = (CATALOG&&CATALOG.unit_types[u.type])||{};
+  const specs = projectedSpecs(u);
+  const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
+  const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
+  const max = u.max_st || ut.max_st || 0;
+  const pips = [];
+  for(let i=0;i<Math.max(max, act+sup);i++){
+    const cls = i<act ? "on" : (i<act+sup ? "sup" : "");
+    pips.push(`<span class="pip ${cls}"></span>`);
+  }
+  const badges = specs.slice(0,3).map(s=>
+    `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type))}</span>`).join("");
+  const hq = (VIEW.hqs||[]).find(h=>h.id===u.hq_id);
+  return `<div class="urow ${u.id===SEL.units?'sel':''}" onclick="pickUnit(${u.id})">
+    <div class="ava">${u.type ? imgTag(unitTex(u.type), unitCn(u.type)) : ""}</div>
+    <div class="umin">
+      <div class="uname">${esc(unitCn(u.type))}
+        <span class="full">${esc(u.type||"")}</span></div>
+      <div class="umeta">${esc(u.name_cn||u.name_brief||u.name_full||("单位 "+u.id))}
+        ${hq?(" · 总部 "+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):""}
+        ${u.xp!==null&&u.xp!==undefined?(" · 经验 "+u.xp):""}</div>
+      <div class="pips">${pips.join("")}</div>
+    </div>
+    <div class="ubadges">${badges}</div>
+  </div>`;
+}
+
+function pickUnit(id){ SEL.units = id; show("units"); }
+
+function unitDetailHTML(u){
+  if(!u) return `<div class="placeholder"><div class="big">没有单位</div></div>`;
+  const ut = (CATALOG&&CATALOG.unit_types[u.type])||{};
+  const specs = projectedSpecs(u);
+  const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
+  const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
+  const xp  = pendingVal("unit_field", uKey(u.id,"xp"), u.xp||0);
+  const max = u.max_st || ut.max_st || 0;
+  const pips = [];
+  for(let i=0;i<Math.max(max, act+sup);i++){
+    const cls = i<act ? "on" : (i<act+sup ? "sup" : "");
+    pips.push(`<span class="pip ${cls}"></span>`);
+  }
+  const slots = specs.length ? specs.map(s=>{
+    const st = (CATALOG&&CATALOG.spec_types[s.type])||{};
+    const flag = (st.flags||[]).map(f=>`<span class="ftag">${esc(f)}</span>`).join("");
+    return `<div class="slot" onclick="removeSpec(${u.id},${esc(JSON.stringify(s.type))})" title="点击卸下这个特种兵">
+      <span class="sq">${imgTag(specTex(s.type), specCn(s.type))}</span>
+      <span class="slotinfo">
+        <span class="slotname">${esc(specCn(s.type))}</span>
+        <span class="slotflags">${flag||'<span class="none">无特性</span>'}</span>
+      </span>
+      <span class="slotstats">
+        <span class="st"><i>攻</i><b>${st.attack??"—"}</b></span>
+        <span class="st"><i>防</i><b>${st.defense??"—"}</b></span>
+        <span class="st"><i>装</i><b>${st.armor??"—"}</b></span>
+        <span class="st"><i>炮</i><b>${st.artillery??"—"}</b></span>
+      </span></div>`;
+  }).join("") : `<div class="slot empty">还没有挂特种兵</div>`;
+
+  const pool = (PICK && PICK.specialists_for_unit) || {candidates:[], scope:"none"};
+  const poolHTML = pool.candidates.length ? pool.candidates.map(t=>{
+    const st = (CATALOG&&CATALOG.spec_types[t])||{};
+    const has = specs.some(s=>s.type===t);
+    return `<div class="pcell ${has?'blocked':''}" title="${esc(specCn(t))} · ${esc(natCn(st.nationality))}"
+      onclick="${has?'void 0':('addSpec('+u.id+','+esc(JSON.stringify(t))+')')}">
+      ${imgTag(specTex(t), specCn(t))}</div>`;
+  }).join("") : `<div style="padding:12px;color:var(--muted);font-size:12px">没有可用候选</div>`;
+
+  const scopeTip = {campaign:"战役默认池 ∩ 游戏规则",
+                    no_campaign:"找不到战役包 ⇒ 只按游戏规则",
+                    empty_intersection:"该单位与战役池无交集 ⇒ 只按游戏规则",
+                    none:"—"}[pool.scope] || pool.scope;
+
+  return `<div class="dhead">
+    <div class="ava">${u.type ? imgTag(unitTex(u.type), unitCn(u.type)) : ""}</div>
+    <div class="idblk">
+      <div class="dtitle" id="dtitle_${u.id}">${esc(u.name_cn||u.name_brief||u.name_full||("单位 "+u.id))}
+        <span class="edit" onclick="renameUnit(${u.id})">改名</span></div>
+      <div class="dsub">${esc(u.type||"—")} · 编制只读 · ${esc(natCn(ut.nationality))}</div>
+    </div>
+    <div class="vsep"></div>
+    <div class="stats">
+      <div class="stat">
+        <div class="lb"><span>兵力</span><span class="hintw">Alt+滚轮 ±1</span></div>
+        <div class="v"><span class="spin" id="sp_act_${u.id}"></span>
+          <small>现有</small> + <span class="spin" id="sp_sup_${u.id}"></span>
+          <small>增援</small></div>
+        <div class="blood"><div class="bar">${pips.join("")}</div></div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>现有</span>
+          <span><i style="background:var(--stage-sup)"></i>增援</span>
+          <span>上限 ${max||"—"}</span></div>
+      </div>
+      <div class="stat">
+        <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
+        <div class="v"><input class="numin" id="in_xp_${u.id}" type="text" inputmode="numeric"
+          autocomplete="off" value="${xp}"></div>
+        <div class="hintline">范围 0 – 400（游戏 schema 的硬范围）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="specbox">
+    <div class="sbhead">
+      <span class="sbt">特种兵</span>
+      <span class="sbm">已挂 <b>${specs.length}</b> / 上限 ${u.max_spec||ut.max_spec||3}</span>
+      <span class="sbsep"></span>
+      <span class="sbm">候选口径：${esc(scopeTip)}</span>
+      <span class="sp"></span>
+      <span class="sbhint">点图标挂上 · 点已挂的卸下</span>
+    </div>
+    <div class="specsplit">
+      <div class="specslots">${slots}</div>
+      <div class="specpool"><div class="poolflat">${poolHTML}</div></div>
+    </div>
+  </div>`;
+}
+
+function pageUnits(w){
+  const units = VIEW.units||[];
+  let cur = units.find(u=>u.id===SEL.units);
+  if(!cur){ cur = units[0]; SEL.units = cur ? cur.id : null; }
+  const q = (UQUERY||"").trim().toLowerCase();
+  const hqf = UHQFILTER;
+  const list = units.filter(u=>{
+    if(hqf!=="" && String(u.hq_id??"")!==hqf) return false;
+    if(!q) return true;
+    const hay = (unitCn(u.type)+" "+(u.type||"")+" "+(u.name_brief||"")+" "+
+                 (u.name_full||"")+" "+(u.id)).toLowerCase();
+    return hay.includes(q);
+  });
+  const hqs = VIEW.hqs||[];
+  w.innerHTML = `<div class="cols">
+    <div class="panel"><h3>单位 · 共 ${units.length} 个</h3>
+      <div class="pbody">
+        <div class="toolbar">
+          <input class="inp" id="uq" placeholder="搜索单位 / 类型 / 编号…" value="${esc(UQUERY||"")}"
+                 style="flex:1;min-width:120px">
+          <select class="sel" id="uhq"><option value="">全部总部</option>
+            ${hqs.map(h=>`<option value="${h.id}" ${String(h.id)===hqf?'selected':''}>${
+              esc(h.name_cn||h.name_brief||h.name_full||("总部 "+h.id))}</option>`).join("")}
+          </select>
+        </div>
+        <div class="rows">${list.map(unitRowHTML).join("") ||
+          `<div class="placeholder">没有匹配的单位</div>`}</div>
+      </div></div>
+    <div class="panel"><h3>单位 · 详情</h3>
+      <div class="detail" id="udetail">${unitDetailHTML(cur)}</div>
+    </div>
+  </div>`;
+
+  const uq = document.getElementById("uq");
+  if(uq) uq.addEventListener("input", function(){
+    UQUERY = this.value;
+    const pos = this.selectionStart;
+    show("units");
+    const n = document.getElementById("uq");
+    if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} }
+  });
+  const uh = document.getElementById("uhq");
+  if(uh) uh.addEventListener("change", function(){ UHQFILTER = this.value; show("units"); });
+
+  if(cur) bindUnitControls(cur);
+  /* 候选池要按单位类型取 —— 换单位就重拉（带缓存） */
+  if(cur && cur.type && PICKCACHE[cur.type] === undefined){
+    loadPickers(cur.type).then(()=>{
+      if(PAGE==="units") show("units");
+    }).catch(()=>{});
+  }
+}
+
+function bindUnitControls(u){
+  const actEl = document.getElementById("sp_act_"+u.id);
+  const supEl = document.getElementById("sp_sup_"+u.id);
+  const xpEl  = document.getElementById("in_xp_"+u.id);
+  const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
+  const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
+  const xp  = pendingVal("unit_field", uKey(u.id,"xp"), u.xp||0);
+  if(actEl) bindSpin(actEl, {base:act, min:0, max:null, onChange(v){
+    queueEdit("unit_field", uKey(u.id,"act_st"),
+      {unit_id:u.id, field:"act_st", value:v}, u.act_st||0, v, `单位 ${u.id} 现有兵力`);
+    SEL.units = u.id; show("units");
+  }});
+  if(supEl) bindSpin(supEl, {base:sup, min:0, max:null, onChange(v){
+    queueEdit("unit_field", uKey(u.id,"sup_st"),
+      {unit_id:u.id, field:"sup_st", value:v}, u.sup_st||0, v, `单位 ${u.id} 增援兵力`);
+    SEL.units = u.id; show("units");
+  }});
+  if(xpEl) bindNumIn(xpEl, {base:xp, min:0, max:400,
+    kind:"unit_field", key:uKey(u.id,"xp"),
+    params:{unit_id:u.id, field:"xp", value:xp},
+    onChange(v){
+      queueEdit("unit_field", uKey(u.id,"xp"),
+        {unit_id:u.id, field:"xp", value:v}, u.xp||0, v, `单位 ${u.id} 经验`);
+    }});
+}
+
+function renameUnit(id){
+  const u = (VIEW.units||[]).find(x=>x.id===id); if(!u) return;
+  const el = document.getElementById("dtitle_"+id); if(!el) return;
+  const cur = pendingVal("unit_field", uKey(id,"name_brief"), u.name_cn||u.name_brief||"");
+  el.innerHTML = `<input class="inp" id="rn_${id}" value="${esc(cur)}" style="width:220px;font-size:15px">
+    <button class="btn pri" onclick="commitRename(${id})">确定</button>
+    <button class="btn" onclick="show('units')">取消</button>`;
+  const i = document.getElementById("rn_"+id);
+  if(i){ i.focus(); i.select(); }
+}
+function commitRename(id){
+  const el = document.getElementById("rn_"+id); if(!el) return;
+  const u = (VIEW.units||[]).find(x=>x.id===id); if(!u) return;
+  const v = el.value.trim();
+  if(v) queueEdit("unit_field", uKey(id,"name_brief"),
+    {unit_id:id, field:"name_brief", value:v},
+    u.name_cn||u.name_brief||"", v, `单位 ${id} 改名`);
+  show("units");
+}
+
+function addSpec(unitId, specType){
+  setPending("unit_spec_add", `unit_spec_add:${unitId}:${specType}`,
+    {unit_id:unitId, spec_type:specType},
+    `单位 ${unitId} 加特种 ${specCn(specType)}`);
+  show("units");
+}
+function removeSpec(unitId, specType){
+  const u = (VIEW.units||[]).find(x=>x.id===unitId);
+  const s = (u&&projectedSpecs(u).find(x=>x.type===specType))||null;
+  setPending("unit_spec_remove", `unit_spec_remove:${unitId}:${specType}`,
+    {unit_id:unitId, spec_type:specType, idx: s ? s.idx : null},
+    `单位 ${unitId} 卸特种 ${specCn(specType)}`);
+  show("units");
 }
 
 /* ---------- 应用 / 撤销 ---------- */
@@ -381,6 +933,7 @@ async function openSave(sid){
   }
   document.getElementById("splash").style.display = "none";
   document.getElementById("app").style.display = "flex";
+  loadCatalog().catch(()=>{});
   document.getElementById("hTitle").textContent = VIEW.save.display || VIEW.save.name;
   document.getElementById("hCaps").innerHTML = (VIEW._features||[]).map(f =>
     `<span class="pill ${f.ok?'on':'off'}" title="${esc(f.reason)}">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</span>`
@@ -422,17 +975,16 @@ function show(p){
         <div class="note" style="margin-top:10px">
           <b>这一版能做什么</b>：读存档、列能力位、<b>改战役进度</b>（改完进「待应用」，
           点右上角「应用更改」才写盘，写前自动备份、可撤销）。<br>
-          <b>还不能做什么</b>：单位 / 总部 / 卡牌 / 商店 / 战区资产 / 战役 这几页的界面
-          —— 等 GUI 微调需求定稿后按最终稿一次性实现（核心库的 Edit 早就有）。
+          <b>各页进度</b>：单位页 ✅（列表 / 详情 / 改名 / 兵力 / 经验 / 特种兵挂卸）；
+          总部 / 卡牌 / 商店 / 战区资产 / 战役 待做。
         </div>
       </div></div>
-      <div class="panel"><h3>待应用 <span id="pendCount" style="font-weight:400">0</span> 条</h3>
-        <div class="pbody"><ul class="pending" id="pendList"></ul>
-        <div class="err" id="errBox"></div><div class="warn" id="warnBox"></div></div></div>`;
+      `;
     bindTun();
     paintPending();
     return;
   }
+  if(p==="units"){ pageUnits(w); return; }
   w.innerHTML = `<div class="panel"><h3>${PAGE_CN[p]||p}</h3>
     <div class="placeholder"><div class="big">这一页还没做</div>
     等 GUI 微调需求提完，按最终视觉稿一次性实现（避免返工）。</div></div>`;
