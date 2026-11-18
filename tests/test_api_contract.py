@@ -98,17 +98,42 @@ class TestEightFunctions(unittest.TestCase):
             self.assertTrue(callable(getattr(cat, name)), name)
 
 
+class TestCampaignSurface(unittest.TestCase):
+    """战役只读层（U18）的公开方法 —— GUI 按这个来调。"""
+
+    def test_campaign_data_methods(self):
+        from save_modifier_core.campaigns import CampaignData
+        for name in ("campaign_dir", "scenario_dir", "scenario_ids",
+                     "roster", "store", "fronts", "front_name",
+                     "conferences_of_front", "position"):
+            self.assertTrue(callable(getattr(CampaignData, name, None)), name)
+
+    def test_campaign_index_methods(self):
+        from save_modifier_core.campaigns import CampaignIndex
+        for name in ("campaign_ids", "campaign", "campaign_name",
+                     "campaign_packages", "routes", "conferences",
+                     "find_conference", "scenarios_of", "find_scenario"):
+            self.assertTrue(callable(getattr(CampaignIndex, name, None)), name)
+
+    def test_save_has_campaign_position(self):
+        from save_modifier_core import Save
+        self.assertTrue(callable(getattr(Save, "campaign_position", None)))
+
+
 class TestPackageSurface(unittest.TestCase):
     """核心包的公开名单 —— 新增公开 API 必须先改这里。"""
 
+    # ⚠️ 2026-11-18 U18：新增战役只读层的公开 API（`campaigns` 模块）。
     EXPECTED = {
-        "Capabilities", "CardView", "CardWhitelist", "Catalog", "CommitResult",
+        "Capabilities", "CampaignData", "CampaignIndex", "CampaignPosition",
+        "CardView", "CardWhitelist", "Catalog", "CommitResult", "Conference",
         "CorePaths", "Edit", "FileChange", "HqView", "Plan", "Save",
-        "SaveInfo", "StoreEntryView", "TranslationStore", "UndoRecord",
-        "UndoResult", "UnitType", "UnitView", "ValidationResult", "View",
-        "catalog", "commit", "list_saves", "locale", "make_backup",
-        "open_save", "plan_edit", "resolve_save_id", "stack_path_for",
-        "validate",
+        "SaveInfo", "Scenario", "ScenarioRoster", "StoreEntryView",
+        "StoreListing", "TranslationStore", "UndoRecord", "UndoResult",
+        "UnitType", "UnitView", "ValidationResult", "View",
+        "campaigns", "catalog", "commit", "list_saves", "locale",
+        "make_backup", "open_save", "plan_edit", "resolve_save_id",
+        "stack_path_for", "validate",
     }
 
     def test_all_is_frozen(self):

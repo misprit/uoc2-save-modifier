@@ -395,6 +395,43 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fprow .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fprow .q{font-family:var(--mono);font-weight:700;color:var(--accent-dark);width:32px;text-align:right}
 /* U16：兵库改成类表格 —— 表头写攻击/防御/…，下面给数值，不叠在名字底下 */
+/* U18：战役页（只读）—— 位置条 / 路线图 / 名册 / 商店 */
+.cpos{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;
+  background:var(--accent-light);border:1px solid var(--border);border-radius:7px;
+  font-size:12.5px}
+.cpos b{color:var(--accent-dark);font-weight:700}
+.cpos .sep{width:1px;height:15px;background:var(--border);flex:none}
+.cpos .mut{color:var(--muted);font-size:11.5px}
+.cpos .ro{font-size:10.5px;padding:0 6px;border-radius:3px;background:var(--surface);
+  border:1px solid var(--border);color:var(--muted);font-family:var(--mono)}
+.route{display:flex;gap:0;align-items:stretch;overflow-x:auto;padding:4px 2px 8px}
+.rmeet{flex:none;width:168px;padding:0 10px 0 0;position:relative}
+.rmeet .dot{width:11px;height:11px;border-radius:50%;background:var(--surface);
+  border:2px solid var(--border);margin-bottom:7px;position:relative;z-index:2}
+.rmeet .line{position:absolute;left:5px;top:5px;width:calc(100% - 5px);height:2px;
+  background:var(--border);z-index:1}
+.rmeet:last-child .line{display:none}
+.rmeet.done .dot{background:var(--accent);border-color:var(--accent)}
+.rmeet.now .dot{background:#fff;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light)}
+.rmeet .mt{font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:2px}
+.rmeet.now .mt{color:var(--accent-dark)}
+.rmeet .sc{font-size:10.5px;color:var(--muted);line-height:1.55}
+.rmeet .sc b{color:var(--text);font-weight:500}
+.rlist{width:100%;border-collapse:collapse;font-size:12px}
+.rlist th{background:var(--surface-alt);font-weight:600;font-size:11px;color:var(--muted);
+  text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+.rlist td{padding:5px 8px;border-bottom:1px solid #f0f3f6}
+.rlist td.n{text-align:right;font-family:var(--mono)}
+.rlist .ava{width:22px;height:22px;border-radius:4px;background:var(--stage);
+  border:1px solid var(--stage-edge);overflow:hidden;flex:none;display:inline-block;
+  vertical-align:middle}
+.rlist .ava img{max-width:100%;max-height:100%;object-fit:contain}
+.rlist .sp{font-size:10px;color:var(--muted)}
+.rlist .spimg{width:16px;height:16px;vertical-align:-3px;margin-right:4px;
+  background:var(--stage);border:1px solid var(--stage-edge);border-radius:3px;object-fit:contain}
+#cstore .csimg{width:26px;height:26px;flex:none;background:var(--stage);
+  border:1px solid var(--stage-edge);border-radius:4px;object-fit:contain;
+  object-position:center}
 .fptitle{font-size:12.5px;font-weight:600;color:var(--accent-dark);padding:8px 11px 6px}
 .fptab{width:100%;border-collapse:collapse;font-size:12.5px}
 .fptab th{background:var(--surface-alt);font-weight:600;font-size:11.5px;color:var(--muted);
@@ -1162,7 +1199,57 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>8 · 写盘确认框</h2>
+<h2>8 · 战役页（只读 · 路线图 / 名册 / 商店）</h2>
+<p class="lead">第 7 个功能页，<b>全页只读</b> —— 不产出任何 Edit，不进待应用面板。三层数据：<b>内置索引</b>（34 KB，管「会议→可选场景」）+ <b>游戏包</b>（管场景名册 / 商店，mod 改了自动生效）+ <b>locale</b>（管所有中文名）。<br>
+⚠️ 场景名册是<b>游戏包的默认配置</b>，不是玩家存档 —— 单位不一定存活 / 继承 / 登场。商店是<b>包默认商店</b>，存档里的商店会覆盖它 ⇒ 不是玩家当前库存。</p>
+<div class="app">
+  <div class="body" style="min-height:0">
+    <div class="rail" style="width:150px">
+      <div class="grp">功能</div>
+      <div class="nav"><span class="ic">▪</span>概览</div>
+      <div class="nav"><span class="ic">▪</span>单位</div>
+      <div class="nav"><span class="ic">▪</span>总部</div>
+      <div class="nav"><span class="ic">▪</span>卡牌</div>
+      <div class="nav"><span class="ic">▪</span>商店</div>
+      <div class="nav"><span class="ic">▪</span>战区资产</div>
+      <div class="nav on"><span class="ic">▪</span>战役</div>
+    </div>
+    <div class="work">
+      <div class="cpos">
+        <b>西线大捷</b><span class="sep"></span>
+        <span>第1次会议</span><span class="mut">c_43_04</span><span class="sep"></span>
+        <span>战线 <b>地中海</b></span><span class="mut">激活：地中海</span><span class="sep"></span>
+        <span>战斗中：<b>哈士奇</b></span>
+        <span class="ro">只读</span>
+      </div>
+      <div class="panel">
+        <h3>路线图 · 西线大捷（historical）</h3>
+        <div class="route" id="route"></div>
+        <div class="note">⚠️ <b>路线版本</b>（historical / fantasy / relief…）是<b>版本化的静态规划投影</b>，不是玩家实际走过的路线。
+          会议→场景这份列表来自内置索引（游戏包的 <code>tracks</code> 是段图，推不出场景）；场景名与单位名<b>全部走 locale</b>（游戏自带官方译名）。</div>
+      </div>
+      <div class="panel">
+        <h3>场景名册 · 哈士奇</h3>
+        <div class="note" style="padding:0 11px 8px">地图 <b>europe_10</b> │ 开局 <b>1943-07-09</b> │ <b>11</b> 回合 │ 参战顺序 <b>盟军 → 轴心</b> │ 单位 <b>25</b>（在途 6）│ HQ <b>4</b> │ <span style="color:var(--muted)">（示例展示前 10 个）</span> │ <span style="color:var(--danger)">⚠ 游戏包默认配置，不是玩家存档</span></div>
+        <table class="rlist">
+          <thead><tr><th>单位</th><th>总部</th>
+            <th style="text-align:right">兵力 / 压制</th><th style="text-align:right">XP</th>
+            <th>特种兵</th></tr></thead>
+          <tbody id="roster"></tbody>
+        </table>
+        <div class="note" style="padding:8px 11px 0">HQ：第6军（古佐尼 · CP —/6 · 补给 3 · 卡车 2）· 英国第8军（蒙哥马利 · CP —/8）· 美国第7军（巴顿 · CP —/8）· 第14装甲兵团（胡贝 · CP —/8）</div>
+      </div>
+      <div class="panel">
+        <h3>这场会议的商店 · 地中海战线 · 第1次会议</h3>
+        <div class="note" style="padding:0 11px 8px">来自游戏包 <code>fronts/italy/conferences/c_43_04.yml</code> 的 <code>store</code> —— <b>包默认商店</b>（<b>20</b> 条，示例展示前 8 条）。
+          存档里的商店会覆盖它 ⇒ 这里<b>不是</b>玩家当前库存，也不是钱包余额。</div>
+        <div id="cstore" style="padding:0 11px 11px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>9 · 写盘确认框</h2>
 <p class="lead">任何写盘前都要先出现"要改什么"。软警告不拦、硬拦禁用按钮。</p>
 <div style="display:flex;gap:18px;flex-wrap:wrap">
   <div class="modal">
@@ -1205,7 +1292,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>9 · 其它页 · 概览（存档体检）</h2>
+<h2>10 · 其它页 · 概览（存档体检）</h2>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -1242,7 +1329,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>10 · 启动页（选存档）</h2>
+<h2>11 · 启动页（选存档）</h2>
 <div class="app" style="max-width:760px">
   <div class="body" style="min-height:0;justify-content:center;padding:34px">
     <div style="width:100%;max-width:600px">
@@ -2246,6 +2333,95 @@ if(hqtabs){
     });
   });
 }
+
+/* ---------- 战役页（U18 · 只读） ----------
+   数据 = 真实存档 west-Husky.usg（西线大捷·第1次会议·地中海·战斗中哈士奇）
+          + 游戏包 west.usc + 内置索引 + locale —— 全部真实值，无一处编造 */
+const ROUTE_W=   /* west / historical：会议 → 可选场景（内置索引，386 场景全复核过） */
+[
+  ["第1次会议", ["瓦迪阿卡利特", "突尼斯", "哈士奇"]],
+  ["第2次会议", ["雪崩", "沃土诺防线", "卡西诺山战役"]],
+  ["第3次会议", ["第4次卡西诺战役", "霸王行动", "罗马之路", "波卡基之战", "诺曼底突围战"]],
+  ["第4次会议", ["进军安特卫普", "龙骑兵", "哥德防线", "横穿法国", "市场花园行动"]],
+  ["第5次会议", ["斯海尔德河", "贝尔福隘口", "许特根", "洛林", "坦克大决战", "科尔马口袋", "伐木工行动和低音行动", "真实与手榴弹"]],
+  ["第6次会议", ["掠夺", "从莱茵河到多瑙河", "波河流域", "横扫易北河"]]
+],
+  ROSTER=   /* 哈士奇 husky 的真实单位（游戏包 west.usc/scenarios/husky/units.yml） */
+[
+  ["港口防御E", "第6军", "4/0", 0, []],
+  ["法国第202骑兵师", "第6军", "4/0", 0, []],
+  ["特拉帕尼海军基地", "第6军", "4/0", 0, []],
+  ["第26”阿希耶塔”步兵师", "第6军", "5/0", 0, [["ita_spec_42", "黑衫军"]]],
+  ["第28“奥斯塔”步兵师", "第6军", "5/0", 0, [["ita_spec_42", "黑衫军"]]],
+  ["第15装甲掷弹兵师", "第14装甲兵团", "5/0", 220, []],
+  ["港口防御N", "第6军", "4/0", 0, []],
+  ["法国第207骑兵师", "第6军", "4/0", 0, []],
+  ["第4“里窝那”步兵师", "第6军", "5/0", 220, [["ita_at_42", "自走炮"]]],
+  ["法国第206骑兵师", "第6军", "5/0", 0, []]
+],
+  CSTORE=   /* west/italy/c_43_04 的真实商店条目（游戏包 fronts/italy/conferences/） */
+[
+  ["英国步兵", "英国", 5, 20, "unit/uk_inf_42/sheet_L.png"],
+  ["英国装甲兵", "英国", 5, 10, "unit/uk_arm_42/sheet_L.png"],
+  ["QF 25磅炮", "英国", 25, 4, "specialist/uk_towed_arty_42/hq_action_icon.png"],
+  ["M7牧师", "英国", 30, 4, "specialist/uk_arty_42/hq_action_icon.png"],
+  ["QF 17磅炮", "英国", 10, 3, "specialist/uk_towed_at_42/hq_action_icon.png"],
+  ["皇家工兵", "英国", 30, 1, "specialist/uk_eng_42/hq_action_icon.png"],
+  ["戴姆勒", "英国", 15, 3, "specialist/uk_recon_42/hq_action_icon.png"],
+  ["突击队", "英国", 30, 1, "specialist/uk_spec_42_opt/hq_action_icon.png"],
+  ["邱吉尔坦克", "英国", 30, 1, "specialist/uk_heavy_43/hq_action_icon.png"],
+  ["新西兰步兵", "新西兰", 10, 1, "unit/nz_inf_42/sheet_L.png"],
+  ["印度步兵", "印度", 5, 2, "unit/ind_inf_42/sheet_L.png"],
+  ["美国步兵", "美国", 5, 20, "unit/us_inf_42/sheet_L.png"],
+  ["美国装甲兵", "美国", 5, 10, "unit/us_arm_42/sheet_L.png"],
+  ["M8灰狗", "美国", 15, 3, "specialist/us_recon_42/hq_action_icon.png"],
+  ["105毫米M2A1", "美国", 25, 4, "specialist/us_towed_arty_42/hq_action_icon.png"],
+  ["M7牧师", "美国", 30, 4, "specialist/us_arty_42/hq_action_icon.png"],
+  ["M10", "美国", 15, 3, "specialist/us_at_42/hq_action_icon.png"],
+  ["M4谢尔曼", "美国", 20, 3, "specialist/us_armx_42/hq_action_icon.png"],
+  ["美国工兵", "美国", 30, 1, "specialist/us_eng_42/hq_action_icon.png"],
+  ["加拿大步兵", "加拿大", 10, 4, "unit/can_inf_40/sheet_L.png"]
+],
+  ROUTE_NOW=0,   /* 存档 west-Husky.usg 停在第1次会议 */
+  ROSTER_TOTAL=25;   /* 名册共 25 个单位 */
+
+const rEl=document.getElementById("route");
+ROUTE_W.forEach((m,i)=>{
+  const d=document.createElement("div");
+  d.className="rmeet"+(i<ROUTE_NOW?" done":(i===ROUTE_NOW?" now":""));
+  d.innerHTML=`<div class="line"></div><div class="dot"></div><div class="mt">${m[0]}</div>`
+    +`<div class="sc">${m[1].map(s=>`<b>${s}</b>`).join("<br>")}</div>`;
+  rEl.appendChild(d);
+});
+
+/* 名册行：⚠ 场景 units.yml 里**没有单位的 equipment/type 字段**（只有 name_brief）
+   ⇒ 拿不到单位贴图，第一列留空；特种兵有真实贴图（specialist/<type>/sheet_large.png）。 */
+const roEl=document.getElementById("roster");
+ROSTER.forEach(u=>{
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td>${u[0]}</td><td style="color:var(--muted)">${u[1]}</td>`
+    +`<td class="n">${u[2]}</td><td class="n">${u[3]}</td>`
+    +`<td class="sp"><img class="spimg" alt="">${u[4].map(s=>s[1]).join("、")||"—"}</td>`;
+  roEl.appendChild(tr);
+  const sp=tr.querySelector(".spimg");
+  if(u[4].length) img(sp, SUR+"specialist/"+u[4][0][0]+"/sheet_large.png", u[4][0][1]);
+  else sp.style.display="none";
+});
+
+const csEl=document.getElementById("cstore");
+CSTORE.slice(0,8).forEach(e=>{
+  const d=document.createElement("div");
+  d.style.cssText="display:flex;align-items:center;gap:8px;padding:5px 0;"
+    +"border-bottom:1px solid #f0f3f6;font-size:12px;min-height:34px";
+  d.innerHTML=`<img class="csimg" alt=""><span style="flex:1">${e[0]}</span>`
+    +`<span style="color:var(--muted);font-size:11px">${e[1]}</span>`
+    +`<span style="font-family:var(--mono);font-weight:600;width:44px;text-align:right">${e[2]}¢</span>`
+    +`<span style="font-family:var(--mono);width:44px;text-align:right">× ${e[3]}</span>`;
+  csEl.appendChild(d);
+  const im=d.querySelector(".csimg");
+  if(e[4]) img(im, SUR+e[4], e[0]);
+  else im.style.display="none";
+});
 
 /* ---------- 总部页 ---------- */
 const hql=document.getElementById("hqlist");

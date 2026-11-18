@@ -24,8 +24,12 @@ uoc2-save-modifier/
 **不打进去的**
 * `dist/` 自身、`__pycache__/`、`*.pyc` —— 构建产物与缓存；
 * 仓库根的 `*.usg` 存档样本 —— **玩家的存档不进包**（`.gitignore` 也忽略）；
-* `config/` `config.yml` `data/` —— 本机配置与运行时状态；
+* `config/` `config.yml` `data/`（**仅仓库根层级**）—— 本机配置与运行时状态；
 * `docs/证据脚本/v6_check.txt` —— 终检输出（生成物）。
+
+⚠️ **`src/save_modifier_core/data/` 要进包** —— 那是**内置索引**
+（`campaign_index.json`，U18 起，33.5 KB）⇒ 战役只读页的「会议→可选场景」靠它。
+漏掉它 ⇒ 换台机器就降级成「没有会议→场景列表」。
 
 跑法（仓库根目录）：
 ```
@@ -55,8 +59,15 @@ INCLUDE_DIRS = ("python", "lib", "src", "tests", "docs")
 INCLUDE_FILES = ("run.bat", "run_gui.bat", "run_tests.bat", "使用说明.txt")
 
 #: 目录名黑名单（任意层级）
-SKIP_DIRS = {"__pycache__", ".git", ".gitignore", "dist", "data",
+#:
+#: ⚠️ **`data` 只在仓库根层级跳过** —— `src/save_modifier_core/data/`
+#:    装的是**内置索引**（campaign_index.json，U18 起），
+#:    漏掉它 ⇒ 战役只读页在别的机器上降级成「没有会议→场景列表」。
+SKIP_DIRS = {"__pycache__", ".git", ".gitignore", "dist",
              ".pytest_cache", ".idea", ".vscode"}
+
+#: 只在**仓库根层级**跳过的目录名
+SKIP_DIRS_ROOT = {"data"}
 
 #: 文件名 / 后缀黑名单
 #:
@@ -91,6 +102,9 @@ def collect() -> list[tuple[Path, str]]:
                 continue
             rel = p.relative_to(REPO)
             if any(part in SKIP_DIRS for part in rel.parts):
+                continue
+            # 根层级的 data/（运行时状态）不进包；包内的 src/*/data/ 要进
+            if rel.parts and rel.parts[0] in SKIP_DIRS_ROOT:
                 continue
             if _skip_file(rel):
                 continue
@@ -136,6 +150,8 @@ def main() -> int:
         f"{PKG_NAME}/run_gui.bat",
         f"{PKG_NAME}/src/save_modifier_core/__init__.py",
         f"{PKG_NAME}/src/save_modifier_core/locale.py",
+        f"{PKG_NAME}/src/save_modifier_core/campaigns.py",            # U18 战役只读
+        f"{PKG_NAME}/src/save_modifier_core/data/campaign_index.json",  # U18 内置索引（33.5 KB）
         f"{PKG_NAME}/src/save_modifier_gui/__init__.py",
         f"{PKG_NAME}/src/save_modifier_gui/main.py",
         f"{PKG_NAME}/src/save_modifier_gui/app.py",
@@ -159,7 +175,7 @@ def main() -> int:
         for m in missing:
             print("   ", m)
         return 1
-    print("自检 OK：run.bat / run_gui.bat / 核心库 / GUI / locale / Tcl-Tk / PyYAML / tkinter 都在包里")
+    print("自检 OK：run.bat / run_gui.bat / 核心库 / GUI / locale / 战役索引 / Tcl-Tk / PyYAML / tkinter 都在包里")
     return 0
 
 

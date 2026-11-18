@@ -593,6 +593,15 @@ class Save:
             self._invalidate()
         return res
 
+    def campaign_position(self):
+        """这个存档在战役里的位置（U18 · 只读）。
+
+        返回 `campaigns.CampaignPosition` —— 战役名 / 会议 / 战线 /
+        正在打的场景 / 这场会议的可选场景。
+        """
+        from . import campaigns as camp_mod
+        return camp_mod.CampaignData(self.paths).position(self)
+
     def undo_available(self) -> bool:
         """撤销栈里有没有东西可撤（GUI 用来决定按钮是否可点）。"""
         from .undo import peek
