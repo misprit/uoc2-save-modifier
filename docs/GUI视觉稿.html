@@ -366,6 +366,55 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fprow .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fprow .q{font-family:var(--mono);font-weight:700;color:var(--accent-dark);width:32px;text-align:right}
 
+/* ---------- 总部页 · 技能矩阵（U12：照游戏内升级面板重做） ---------- */
+.hqtabs{display:flex;gap:2px;background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:6px;padding:2px;width:fit-content;margin:11px 0 12px}
+.hqtabs .tb{padding:4px 15px;font-size:12.5px;border-radius:5px;color:var(--muted);
+  cursor:pointer;user-select:none}
+.hqtabs .tb.on{background:var(--surface);color:var(--accent-dark);font-weight:600;
+  box-shadow:0 1px 3px rgba(20,40,60,.12)}
+.hqtabs .tb .n{font-family:var(--mono);font-size:11px;opacity:.7;margin-left:4px}
+.matrix{border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.mx-head,.mx-row{display:grid;grid-template-columns:106px repeat(3,minmax(88px,1fr)) 74px}
+.mx-head{background:var(--surface-alt);border-bottom:1px solid var(--border);
+  font-size:11px;color:var(--muted);text-align:center}
+.mx-head>div{padding:5px 0}
+.mx-head .h-branch{text-align:left;padding-left:12px}
+.mx-row{border-bottom:1px solid #f0f3f6}
+.mx-row:last-child{border-bottom:none}
+.mx-branch{display:flex;flex-direction:column;justify-content:center;gap:4px;
+  padding:7px 8px 7px 12px;border-right:1px solid #f0f3f6}
+.mx-branch .bn{font-size:12.5px;font-weight:600;color:var(--accent-dark)}
+.lvctl{display:flex;align-items:center;gap:5px}
+.lvctl button{width:18px;height:18px;line-height:15px;text-align:center;font-size:12px;
+  border:1px solid var(--border);background:var(--surface);color:var(--muted);
+  border-radius:4px;cursor:pointer;padding:0}
+.lvctl button:hover{border-color:var(--accent);color:var(--accent-dark)}
+.lvctl b{font-family:var(--mono);font-size:11.5px;color:var(--accent-dark);min-width:28px;text-align:center}
+.mx-cell{display:flex;align-items:center;gap:5px;padding:6px;border-right:1px solid #f0f3f6;
+  flex-wrap:wrap;min-height:54px}
+.mx-cell.na{justify-content:center;color:var(--muted);font-size:11px}
+.mx-price{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-size:10px;color:var(--muted);text-align:center;padding:0 4px}
+.mx-price b{font-family:var(--mono);font-size:12.5px;color:var(--warn)}
+.mx-price .free{font-size:9.5px;color:var(--accent);font-weight:700}
+/* 技能图标：140×140 游戏原贴图，右下角数字 = CP 消耗，右上角小点 = 专精槽位 */
+.sk{position:relative;width:40px;height:40px;flex:none;cursor:pointer}
+.sk img{width:100%;height:100%;object-fit:contain;display:block}
+.sk .cost{position:absolute;right:-6px;bottom:-6px;font-family:var(--mono);font-size:11px;
+  font-weight:700;color:#fff;background:rgba(22,32,48,.88);border-radius:3px;padding:0 3px;
+  line-height:14px;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.sk .dots{position:absolute;right:0;top:-1px;display:flex;gap:2px}
+.sk .dots i{width:6px;height:6px;border-radius:50%;background:rgba(30,42,60,.28);
+  box-shadow:0 0 0 1px rgba(255,255,255,.75)}
+.sk .dots i.on{background:#f0b429;box-shadow:0 0 0 1px rgba(120,78,0,.55)}
+.sk.locked{cursor:not-allowed}
+.sk.locked .cost{background:rgba(22,32,48,.55)}
+.sk.max .dots i{background:#f0b429}
+.sk.max .cost{background:#8a6a12}
+/* 卡牌页：手牌 / 商店 50/50 */
+.cols-half{grid-template-columns:minmax(300px,1fr) minmax(300px,1fr)}
+
 /* ---------- 卡牌页 ---------- */
 .hand{display:flex;gap:12px;padding:12px;flex-wrap:wrap}
 .hcard{width:92px}
@@ -749,10 +798,13 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   <br>⇒ 悬停提示直接显示这些中文名，不用自己翻译。
 </div>
 
-<h2>4 · 总部页（经验 / 升级 / 兵库）</h2>
-<p class="lead"><code>hqs.yml</code> 里每个总部 <b>26 个字段</b>：「经验」= <code>xp / xp_target</code>，
-「升级」= 五个分支 <code>branch_levels</code>（工程/兵库/情报/后勤/作战），
-「兵库」= <code>force_pool</code>。<b>三样都在存档里，都能改。</b></p>
+<h2>4 · 总部页（技能矩阵 / 兵库）</h2>
+<p class="lead">总部在存档里有<b>两棵不同的树</b>：<b>分支等级</b> = <code>branch_levels</code>
+（五个分支各一个等级，<b>决定解锁到哪一级</b>），<b>技能树</b> = <code>branches</code>
+（<b>每个总部自己的</b>技能清单，249 个总部 / 4818 条技能实测）。<br>
+本页照<b>游戏内的升级面板</b>重做：<b>行 = 分支、列 = 级别 1/2/3</b>，格子里是技能图标 ——
+<b>右下角数字 = 该技能 CP 消耗</b>，<b>右上角小点 = 专精槽位</b>（金色实心 = 已专精）。
+图标、徽章全部<b>取游戏原贴图</b>（<code>surfaces/hq_upgrade/</code>，140×140，20 个动作全覆盖）。</p>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -768,7 +820,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
         <input class="inp" placeholder="搜索总部…" style="width:190px">
         <span class="sel">按战线 ▾</span><span class="sel">按阵营 ▾</span>
         <span class="sp"></span>
-        <span style="font-size:12px;color:var(--muted)">经验 / 分支等级：滚轮可调</span>
+        <span style="font-size:12px;color:var(--muted)">分支等级：− / ＋ 可升可降 · 技能图标：点一下 = 专精一次</span>
       </div>
       <div class="cols">
         <div class="panel">
@@ -780,51 +832,55 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
           <div class="detail">
             <div class="dhead">
               <div>
-                <div class="dtitle">北方集团军 <span class="edit">✎ 改名</span></div>
-                <div class="dsub">ger_hq_dlc4_17 · 将军 冯·博克 · CP 6/6 · 补给 3</div>
+                <div class="dtitle">A集团军群 <span class="edit">✎ 改名</span></div>
+                <div class="dsub">格尔德·冯·伦德施泰特 · CP 8/8 · 补给 3</div>
               </div>
             </div>
 
-            <div class="stat" style="margin-top:12px">
+            <div class="hqtabs" id="hqtabs">
+              <span class="tb on" data-tab="mx">升级矩阵</span>
+              <span class="tb" data-tab="fp">兵库 <span class="n">4</span></span>
+            </div>
+
+            <div class="stat">
               <div class="lb"><span>总部经验</span><span class="hintw">滚轮调 xp</span></div>
               <div class="v">87 <small>/ 220 升到下一级</small></div>
               <div class="expbar"><i style="width:40%"></i></div>
             </div>
 
-            <div class="branches">
-              <div class="brow"><span class="bn">工程</span><span class="bl">Lv3</span>
-                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
-                <span class="hint">升到 Lv3 解锁：架桥 / 渡河 / 强攻渡河 / 固守</span></div>
-              <div class="brow"><span class="bn">兵库</span><span class="bl">Lv1</span>
-                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
-                <span class="hint">解锁：整编 / 输送 / 警戒部队</span></div>
-              <div class="brow"><span class="bn">情报</span><span class="bl">Lv1</span>
-                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
-                <span class="hint">解锁：补给紧急状态 / 补给倾泻</span></div>
-              <div class="brow"><span class="bn">后勤</span><span class="bl">Lv2</span>
-                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
-                <span class="hint">解锁：摩托化兵库</span></div>
-              <div class="brow"><span class="bn">作战</span><span class="bl">Lv2</span>
-                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
-                <span class="hint">解锁：压制射击 / 固守反击 / 前出侦察</span></div>
+            <div id="tab-mx">
+              <div class="matrix" id="matrix"></div>
+              <div class="note">
+                ⓘ 灰色图标 = <b>未解锁</b>（该列的级别 &gt; 该行的分支等级）——
+                <b>降一级就会重新锁上</b>。<br>
+                ⓘ <b>点图标 = 专精一次</b>（该技能发动时 <b>CP 消耗 −1</b>），再点 = 取消；
+                小点画满 = 不能再专精；<b>兵库行的技能没有小点</b>（不能专精）。<br>
+                ⓘ 右侧 ¢ 是<b>游戏内</b>升这一级的声望价；
+                <b>本工具升级 / 专精都不扣声望</b>（白拿）。<br>
+                ⓘ <b>情报分支没有技能</b>（存档里恒为空）⇒ 整行不活跃。
+              </div>
             </div>
 
-            <div class="fpool">
-              <div class="fprow" style="background:var(--surface-alt);font-weight:600">
-                <span style="width:28px"></span><span style="flex:1">总部兵库 · 4 条</span>
-                <span class="q">存量</span><span style="width:74px"></span></div>
-              <div class="fprow"><div class="thumb"><img alt=""></div>
-                <span style="flex:1">第 1 装甲师</span><span class="q">2</span>
-                <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
-              <div class="fprow"><div class="thumb"><img alt=""></div>
-                <span style="flex:1">摩托化步兵</span><span class="q">0</span>
-                <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
-              <div class="fprow"><div class="thumb"><img alt=""></div>
-                <span style="flex:1">特种兵 · 工兵</span><span class="q">1</span>
-                <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
-              <div class="fprow" style="justify-content:flex-end;gap:8px">
-                <button class="btn" style="font-size:11.5px">＋ 添加条目</button>
-                <button class="btn danger" style="font-size:11.5px">－ 移除条目</button></div>
+            <div id="tab-fp" style="display:none">
+              <div class="fpool" style="margin-top:0">
+                <div class="fprow" style="background:var(--surface-alt);font-weight:600">
+                  <span style="width:28px"></span><span style="flex:1">总部兵库 · 4 条</span>
+                  <span class="q">存量</span><span style="width:74px"></span></div>
+                <div class="fprow"><div class="thumb"><img alt=""></div>
+                  <span style="flex:1">第 1 装甲师</span><span class="q">2</span>
+                  <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
+                <div class="fprow"><div class="thumb"><img alt=""></div>
+                  <span style="flex:1">摩托化步兵</span><span class="q">0</span>
+                  <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
+                <div class="fprow"><div class="thumb"><img alt=""></div>
+                  <span style="flex:1">特种兵 · 工兵</span><span class="q">1</span>
+                  <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
+                <div class="fprow" style="justify-content:flex-end;gap:8px">
+                  <button class="btn" style="font-size:11.5px">＋ 添加条目</button>
+                  <button class="btn danger" style="font-size:11.5px">－ 移除条目</button></div>
+              </div>
+              <div class="note">兵库条目 = <code>{delay, nationality, quantity, spec|equipment}</code>，
+                可<b>加 / 删 / 改存量</b>；名字里的「第 N 号」是游戏的阶梯命名，<b>原样显示</b>。</div>
             </div>
           </div>
         </div>
@@ -833,10 +889,11 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>5 · 卡牌页（手牌 + 卡牌商店 + 图鉴）</h2>
+<h2>5 · 卡牌页（手牌 + 卡牌商店 · 50/50）</h2>
 <p class="lead"><b>卡牌商店 = <code>main.yml.card_store</code></b>，和手牌 <code>cards.yml</code> <b>同一套字段</b>
 <code>{card_type, is_free, position, unit_id, used}</code>。只在<b>会议阶段</b>存在。
-货架按<b>权重</b>抽出来（基础 15/6/3 三档 → 公共会议覆盖 → 前线缩放），购买<b>扣声望</b>。</p>
+货架按<b>权重</b>抽出来（基础 15/6/3 三档 → 公共会议覆盖 → 前线缩放），购买<b>扣声望</b>。<br>
+<b>手牌 / 商店对半分</b>（不跟单位页 30/70）；<b>卡牌图鉴已删除</b> —— 只留两块。</p>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -856,7 +913,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
         <button class="btn">＋ 加一张到手牌</button>
         <button class="btn">恢复上次会议的牌局</button>
       </div>
-      <div class="cols">
+      <div class="cols cols-half">
         <div class="panel">
           <h3>手牌 · 4 / 上限 4 <span class="ro">cards.yml</span></h3>
           <div class="hand" id="hand"></div>
@@ -872,24 +929,10 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
             ⇒ 改免费就是<b>白嫖</b>，改收费按卡牌 <code>cost</code> 扣。
             ⓘ <b>加载时不会重掷</b>，但<b>进入新会议会按权重重掷</b> —— 改了只管这一场。<br>
             ⓘ <b>换牌 / 上架只能选白名单里的卡</b>（本存档本会议本来就能抽到的那 13 种）——
-            登陆 / 空降卡会召唤单位，本战役没有登记的<b>一律屏蔽</b>。</div>
-        </div>
-      </div>
-      <div class="cols" style="margin-top:14px">
-        <div class="panel" style="grid-column:1 / -1">
-          <h3>卡牌图鉴 · 39 种 <span class="ro">只读</span></h3>
-          <div class="grid" id="cardgrid" style="grid-template-columns:repeat(auto-fill,minmax(96px,1fr))"></div>
-          <div class="costs"><span>抽卡权重（只读）：</span>
-            <span>基础 15 分：空袭 / 远程侦察 / 卡车</span>
-            <span>基础 6 分：空中补给 / 舰炮轰击 / 饱和攻击 / 间谍 / 飞行炮兵</span>
-            <span>基础 3 分：伞兵 / 破坏 / 商店 / 精确轰炸 / 航空舰队 / 总部强化 …</span></div>
-          <div class="note">贴图文件名 ≠ <code>image</code> 字段 ⇒ 查找顺序
-            <code>bgt_</code> → <code>bgmf_</code> → <code>bgm_</code> → <code>logo_</code> → 原名
-            → <b>去掉阵营后缀再试</b> → <b>用类型名兜底</b> → 占位（实测 <b>39/39 全部命中</b>）。<br>
-            ⓘ <b>灰色 = 本战役商店不会抽到</b>（换牌 / 上架时不可选），悬停看原因。屏蔽有三种：
-            <b>①</b> 阵营不是玩家阵营（本存档玩家 = <b>axis</b>，所以 26 张盟军 / 苏联牌全灰）；
-            <b>②</b> 本次会议权重被覆盖成 0（如 <code>naval_bombardment</code>）；
-            <b>③</b> 登陆 / 空降卡<b>本战役没有可召唤的单位</b>。</div>
+            登陆 / 空降卡会召唤单位，本战役没有登记的<b>一律屏蔽</b>。<br>
+            <b>抽卡权重（只读）</b>：基础 15 分 = 空袭 / 远程侦察 / 卡车；
+            6 分 = 空中补给 / 舰炮轰击 / 饱和攻击 / 间谍 / 飞行炮兵；
+            3 分 = 伞兵 / 破坏 / 商店 / 精确轰炸 / 航空舰队 / 总部强化 …</div>
         </div>
       </div>
     </div>
@@ -905,7 +948,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
     <div class="mb">
       <div style="font-size:13px;margin-bottom:10px">
         只列<b>本存档本会议商店本来就能抽到</b>的卡 —— 玩家阵营 <b>axis</b>，共 <b>13</b> 种。
-        <span style="color:var(--muted)">（其余 26 种被屏蔽，见图鉴的灰色卡）</span>
+        <span style="color:var(--muted)">（其余 26 种被屏蔽，不在上架清单里）</span>
       </div>
       <div class="grid" id="pickgrid" style="grid-template-columns:repeat(auto-fill,minmax(104px,1fr));padding:0"></div>
       <div class="note" style="border:1px solid var(--border);border-radius:7px;margin-top:12px">
@@ -1657,7 +1700,7 @@ const THEATER = [
 
 /* 总部：字段结构来自真实 hqs.yml（xp/xp_target/branch_levels/force_pool…） */
 const HQS = [
-  ["ger_hq_dlc4_17","北方集团军","冯·博克","德",6,6,3,87,220,"Lv3/Lv1/Lv1/Lv2/Lv2",4],
+  ["ger_hq_dlc1_hg","A集团军群","格尔德·冯·伦德施泰特","德",8,8,3,87,220,"Lv1/Lv0/Lv2/Lv2/Lv1",4],
   ["ger_hq_dlc4_4","西部集团军","伦茨 · 冯 · 曼陀菲尔","德",8,8,2,140,220,"Lv2/Lv1/Lv2/Lv2/Lv1",6],
   ["ger_hq_dlc4_9","东部集团军","约德尔 · 冯 · 克莱因希特","德",4,8,4,60,220,"Lv1/Lv1/Lv1/Lv1/Lv3",3],
   ["sws_hq_dlc4_3","苏军北方方面军","朱可夫","苏",7,9,5,196,220,"Lv3/Lv2/Lv2/Lv3/Lv2",5],
@@ -1957,6 +2000,103 @@ img(document.getElementById("s1"), SUR+"unit/ger_jag_dlc4/sheet_L.png");
 img(document.getElementById("s2"), SUR+"unit/us_arm_42/sheet_L.png");
 img(document.getElementById("s3"), SUR+"specialist/ger_towed_arty_42/hq_action_icon.png");
 img(document.getElementById("s4"), SUR+"specialist/ger_towed_at_dlc3/hq_action_icon.png");
+
+/* ---------- 总部页 · 技能矩阵 ----------
+   数据 = 真实存档 campaigns/Blitzkrieg-ahistorical-Conference4-alter.usg
+          hq#3「A集团军群」/ ger_von_rundstedt —— 与游戏内面板截图**逐格一致**。
+   技能 = [action, cost, sp_avail, sp_used]
+     cost      = 该技能当前 CP 消耗（已扣专精减免）
+     sp_avail  = 还能专精几次（null = 没有技能点，不能专精）
+     sp_used   = 已专精次数
+   分支等级 = branch_levels[分支].level（0–3），tier > 等级 ⇒ 锁定（置灰） */
+const HQ_BRANCH_ROWS=[["force_pool","兵库"],["intel","情报"],["operations","作战"],
+                      ["logistics","后勤"],["engineering","工程建设"]];
+const HQ_BRANCH_PRICE={force_pool:[25,25,50],intel:[25,50,75],operations:[25,50,50],
+                        logistics:[25,25,50],engineering:[25,50,50]};
+const HQ_SKILL_CN={assault_crossing:"强渡",bridge_create:"架设桥梁",
+  bridge_destroy:"摧毁桥梁",bridge_repair:"修复桥梁",deploy:"deploy",
+  elastic_defense:"反击",entrenchment:"掘壕 / 筑垒",motor_pool:"车辆调度场",
+  no_retreat:"不能撤退",pindown:"佯攻",rearguard:"后卫部队",
+  recon_in_force:"武力侦察",reorg:"reorg",river_crossing:"渡河",
+  security_unit:"警卫队",set_piece_attack:"定位攻击",supply_dump:"补给点",
+  supply_emergency:"显示可补给单位",suppressive_fire:"火力压制",transfer:"transfer"};
+const HQ_SKILLS={
+  force_pool:{lv:1,t:{1:[["deploy",0,null,null],["reorg",1,null,null],["transfer",2,null,null]],
+                    2:[["security_unit",2,null,null]],3:[]}},
+  intel:{lv:0,t:{1:[],2:[],3:[]}},
+  operations:{lv:2,t:{1:[["no_retreat",1,1,1],["set_piece_attack",1,1,1]],
+                      2:[["pindown",3,2,0],["suppressive_fire",2,2,1]],
+                      3:[["rearguard",3,2,0],["elastic_defense",4,2,0],["recon_in_force",4,2,0]]}},
+  logistics:{lv:2,t:{1:[["supply_emergency",2,2,1]],2:[["supply_dump",2,2,1]],3:[]}},
+  engineering:{lv:1,t:{1:[["bridge_repair",2,2,1],["river_crossing",1,1,1],["entrenchment",1,1,1]],
+                        2:[["bridge_destroy",2,1,0],["assault_crossing",3,2,0]],
+                        3:[["bridge_create",3,2,0]]}}
+};
+const mxEl=document.getElementById("matrix");
+if(mxEl){
+  const head=document.createElement("div"); head.className="mx-head";
+  head.innerHTML='<div class="h-branch">分支</div><div>1 级</div><div>2 级</div>'
+                +'<div>3 级</div><div>升级价</div>';
+  mxEl.appendChild(head);
+  HQ_BRANCH_ROWS.forEach(([b,cn])=>{
+    const m=HQ_SKILLS[b]; const row=document.createElement("div"); row.className="mx-row";
+    const left=document.createElement("div"); left.className="mx-branch";
+    left.innerHTML=`<span class="bn">${cn}</span>`
+      +`<span class="lvctl"><button title="降一级">−</button><b>Lv${m.lv}</b>`
+      +`<button title="升一级">＋</button></span>`;
+    row.appendChild(left);
+    for(let t=1;t<=3;t++){
+      const cell=document.createElement("div"); cell.className="mx-cell";
+      const list=(m.t[t]||[]);
+      if(!list.length){cell.classList.add("na"); cell.textContent="不活跃";}
+      else{
+        list.forEach(([act,cost,av,used])=>{
+          const locked=t>m.lv;
+          const cn=HQ_SKILL_CN[act]||act;
+          const sk=document.createElement("div");
+          sk.className="sk"+(locked?" locked":"")+(av!==null&&used>=av?" max":"");
+          sk.title=cn+"  ("+act+")\nCP 消耗 "+cost
+            +(av===null?"\n没有技能点 —— 不能专精"
+                       :"\n专精 "+used+"/"+av+"（每次 −1 CP）");
+          const im=document.createElement("img");
+          img(im, SUR+"hq_upgrade/hq_upgrade_"+act+(locked?"_off":"_on")+".png", cn);
+          sk.appendChild(im);
+          if(cost>0){const c=document.createElement("span");c.className="cost";c.textContent=cost;
+            sk.appendChild(c);}
+          if(av!==null){
+            const d=document.createElement("span"); d.className="dots";
+            for(let i=0;i<av;i++){const dot=document.createElement("i");
+              if(i<used) dot.className="on"; d.appendChild(dot);}
+            sk.appendChild(d);
+          }
+          cell.appendChild(sk);
+        });
+      }
+      row.appendChild(cell);
+    }
+    const seq=HQ_BRANCH_PRICE[b]||[];
+    const price=(m.lv<seq.length)?seq[m.lv]:null;
+    const pr=document.createElement("div"); pr.className="mx-price";
+    pr.innerHTML=(price!==null)
+      ? `<b>¢${price}</b><span>游戏内价</span>`
+      : `<b>—</b><span>已满级</span>`;
+    row.appendChild(pr);
+    mxEl.appendChild(row);
+  });
+}
+/* 总部详情两个标签 */
+const hqtabs=document.getElementById("hqtabs");
+if(hqtabs){
+  hqtabs.querySelectorAll(".tb").forEach(t=>{
+    t.addEventListener("click",()=>{
+      hqtabs.querySelectorAll(".tb").forEach(x=>x.classList.remove("on"));
+      t.classList.add("on");
+      const k=t.getAttribute("data-tab");
+      document.getElementById("tab-mx").style.display=(k==="mx")?"":"none";
+      document.getElementById("tab-fp").style.display=(k==="fp")?"":"none";
+    });
+  });
+}
 
 /* ---------- 总部页 ---------- */
 const hql=document.getElementById("hqlist");
