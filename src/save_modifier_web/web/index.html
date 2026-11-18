@@ -325,6 +325,39 @@ table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
 .rlist td{padding:5px 8px;border-bottom:1px solid #f0f3f6}
 .rlist td.n{text-align:right;font-family:var(--mono)}
 
+
+/* ---------------- 战役页三块 + 概览页备份栈（U41） ---------------- */
+.route{display:flex;gap:0;align-items:stretch;overflow-x:auto;padding:6px 2px 10px}
+.rmeet{flex:none;width:176px;padding:0 10px 0 0;position:relative}
+.rmeet .dot{width:11px;height:11px;border-radius:50%;background:var(--surface);
+  border:2px solid var(--border);margin-bottom:7px;position:relative;z-index:2}
+.rmeet .line{position:absolute;left:5px;top:5px;width:calc(100% - 5px);height:2px;
+  background:var(--border);z-index:1}
+.rmeet:last-child .line{display:none}
+.rmeet.done .dot{background:var(--accent);border-color:var(--accent)}
+.rmeet.now .dot{background:#fff;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light)}
+.rmeet .mt{font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:2px}
+.rmeet.now .mt{color:var(--accent-dark)}
+.rmeet .sc{font-size:10.5px;color:var(--muted);line-height:1.55}
+.rmeet .sc b{color:var(--text);font-weight:500}
+.rlist{width:100%;border-collapse:collapse;font-size:12px}
+.rlist th{background:var(--surface-alt);font-weight:600;font-size:11px;color:var(--muted);
+  text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+.rlist td{padding:5px 8px;border-bottom:1px solid #f0f3f6}
+.rlist td.n{text-align:right;font-family:var(--mono)}
+.rlist .spimg{width:16px;height:16px;vertical-align:-3px;margin-right:4px;
+  background:var(--stage);border:1px solid var(--stage-edge);border-radius:3px;object-fit:contain}
+.cstore{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px}
+.cstore .csrow{display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--border);
+  border-radius:7px;background:var(--surface);font-size:12px;min-width:210px}
+.cstore .csrow img{width:26px;height:26px;flex:none;background:var(--stage);
+  border:1px solid var(--stage-edge);border-radius:4px;object-fit:contain}
+.cstore .csrow .csn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cstore .csrow .csp{font-family:var(--mono);color:var(--accent-dark);font-weight:700}
+.bkrow{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12px;color:var(--muted)}
+.bkrow b{font-family:var(--mono);color:var(--text);font-weight:600}
+.bkrow .n{margin-left:auto;font-size:11px}
+
 /* ---------------- 卡牌页（U36） ---------------- */
 .cardgrid{display:flex;flex-wrap:wrap;gap:9px;padding:10px 12px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;
@@ -1507,6 +1540,10 @@ function cardTileHTML(c, kind){
     <button class="btn rm" onclick="${kind==="hand"
       ? ("cardRemove("+c.position+")") : ("cardStoreRemove("+c.position+")")}">
       ${kind==="hand"?"从手牌移除":"下架"}</button>
+    <button class="btn rm" onclick="${kind==="hand"
+      ? ("cardSetFree("+c.position+","+(c.is_free?"false":"true")+")")
+      : ("cardStoreSetFree("+c.position+","+(c.is_free?"false":"true")+")")}">
+      ${c.is_free?"改成收费":"改成免费"}</button>
   </div>`;
 }
 
@@ -1828,6 +1865,7 @@ function theaterToggleTotal(asset){
    =================================================================== */
 function pageCampaign(w){
   const cp = VIEW.campaign_position || {};
+  if(!CDETAIL) loadCampaignDetail().then(()=>{ if(PAGE==="campaign") show("campaign"); });
   const scenes = cp.available_scenes || [];
   const pos = `<div class="cpos">
     <b>${esc(cp.campaign_name||cp.campaign_id||"—")}</b>
@@ -1850,8 +1888,13 @@ function pageCampaign(w){
       <td class="n">${h.xp??"—"}/${h.xp_target??"—"}</td>
       <td class="n">${(h.force_pool||[]).length}</td>
     </tr>`).join("");
+  const routeName = (CDETAIL&&CDETAIL.route_name)||"historical";
   w.innerHTML = `<div class="panel"><h3>战役位置</h3><div class="pbody">
       ${pos}
+      <div class="storegrp" style="margin-top:12px">
+        <div class="storetitle">路线图 · ${esc(cp.campaign_name||cp.campaign_id||"")}（${esc(routeName)}）</div>
+        ${routeHTML()}
+      </div>
       <div class="cols-wide" style="display:grid;gap:14px;margin-top:12px">
         <div class="storegrp"><div class="storetitle">这场会议的可选场景 · ${scenes.length} 个</div>
           <table class="rlist"><thead><tr><th>名称</th><th>场景 id</th><th>变体</th></tr></thead>
@@ -1861,8 +1904,19 @@ function pageCampaign(w){
           <table class="rlist"><thead><tr><th>名称</th><th>CP</th><th>经验</th><th>兵库</th></tr></thead>
             <tbody>${hqs}</tbody></table></div>
       </div>
+      <div class="storegrp" style="margin-top:12px">
+        <div class="storetitle">场景名册 · ${esc(cp.scenario_name||cp.scenario_id||"—")}</div>
+        <div style="padding:0 12px 12px">${rosterHTML()}</div>
+      </div>
+      <div class="storegrp" style="margin-top:12px">
+        <div class="storetitle">这场会议的商店 · ${esc(cp.front_name||cp.front||"—")}战线
+          · ${esc(cp.conference_text||cp.conference_id||"—")}</div>
+        ${conferenceStoreHTML()}
+      </div>
       <div class="note">这一页是<b>只读</b>的 —— 战役推进是游戏自己的逻辑，
-        修改器只告诉你「现在在哪儿、能打哪几场」（§7.8）。</div>
+        修改器只告诉你「现在在哪儿、能打哪几场」（§7.8）。<br>
+        ⚠️ <b>名册与会议商店来自游戏包</b>（战役包默认配置）——
+        <b>不是玩家存档</b>：单位不一定存活 / 一定继承 / 一定登场。</div>
   </div></div>`;
 }
 
@@ -2227,6 +2281,122 @@ function alertModal(msg){
     <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`);
 }
 
+
+/* ===================================================================
+   战役页三块（U41）+ 概览页备份与撤销栈 + 卡牌 is_free
+   =================================================================== */
+let CDETAIL = null;      /* /api/campaign-detail */
+let USTACK = null;       /* /api/undo-stack */
+
+async function loadCampaignDetail(){
+  if(!VIEW) return;
+  try { CDETAIL = await api("/api/campaign-detail?save_id=" + encOnce(VIEW._save_id)); }
+  catch(e){ CDETAIL = {error:String(e.message||e)}; }
+}
+async function loadUndoStack(){
+  if(!VIEW) return;
+  try { USTACK = await api("/api/undo-stack?save_id=" + encOnce(VIEW._save_id)); }
+  catch(e){ USTACK = {stack:[], backups:[], count:0}; }
+}
+
+/* ---------- 路线图 ---------- */
+function routeHTML(){
+  const d = CDETAIL||{};
+  const route = d.route||[];
+  if(!route.length) return `<div style="padding:10px;color:var(--muted);font-size:12px">
+    没有索引到这条战役的会议路线</div>`;
+  return `<div class="route">${route.map(c=>`<div class="rmeet ${c.done?'done':''} ${c.now?'now':''}">
+    <div class="line"></div><div class="dot"></div>
+    <div class="mt">${esc(c.text||c.id||"")}</div>
+    <div class="sc">${(c.scenes||[]).map(s=>`<div><b>${esc(s.name||s.id)}</b>${
+      s.variant&&s.variant!=="base"?"（变体）":""}</div>`).join("")}</div>
+  </div>`).join("")}</div>`;
+}
+
+/* ---------- 场景名册（游戏包默认配置，**不是玩家存档**） ---------- */
+function rosterHTML(){
+  const r = (CDETAIL&&CDETAIL.roster)||null;
+  if(!r) return `<div style="padding:10px;color:var(--muted);font-size:12px">
+    这个存档不在战斗里 ⇒ 没有场景名册</div>`;
+  const hqName = {};
+  (r.hqs||[]).forEach(h=>hqName[h.id] = h.name_cn||h.name_brief||h.id);
+  const units = (r.units||[]).map(u=>{
+    const st = (u.act_st||0)+(u.sup_st||0);
+    const specs = (u.specs||[]).map(s=>`<img class="spimg" src="${surf(specTex(s.type))}"
+      alt="${esc(specCn(s.type))}" title="${esc(specCn(s.type))}">`).join("");
+    return `<tr>
+      <td>${esc(u.name_cn||u.name_brief||("单位 "+u.id))}</td>
+      <td class="dim">${esc(hqName[u.hq_id]||u.hq_id||"—")}</td>
+      <td class="n">${st||"—"}</td>
+      <td class="n">${u.entr!==undefined?u.entr:"—"}</td>
+      <td class="n">${u.xp!==undefined?u.xp:"—"}</td>
+      <td>${specs||"—"}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="note" style="margin:0 0 10px">
+    地图 ${esc(r.map_name||"—")} │ 开局 ${esc(r.start||"—")} │ ${esc(r.base_num_turns??"—")} 回合
+    │ 参战顺序 ${(r.turn_seq||[]).join(" → ")||"—"}
+    │ 单位 ${(r.units||[]).length}（在途 ${(r.enroute_units||[]).length}）│ HQ ${(r.hqs||[]).length}
+    <span style="color:var(--danger)"> ⚠ 游戏包默认配置，不是玩家存档</span></div>
+    <table class="rlist"><thead><tr><th>单位</th><th>总部</th><th>兵力</th>
+      <th>压制</th><th>XP</th><th>特种兵</th></tr></thead>
+      <tbody>${units||`<tr><td colspan="6" class="dim">（没有名册）</td></tr>`}</tbody></table>`;
+}
+
+/* ---------- 这场会议的商店（游戏包默认） ---------- */
+function conferenceStoreHTML(){
+  const st = (CDETAIL&&CDETAIL.store)||null;
+  if(!st) return `<div style="padding:10px;color:var(--muted);font-size:12px">
+    没有这场会议的商店清单</div>`;
+  const row = e=>{
+    const isSpec = !!e.spec;
+    const nm = isSpec ? specCn(e.spec) : hqEquipCn(e.equipment);
+    const tex = isSpec ? specTex(e.spec) : "steps/step.png";
+    return `<div class="csrow"><img src="${surf(tex)}" alt="${esc(nm)}">
+      <span class="csn">${esc(nm)}</span>
+      <span class="dim">${esc(natCn(e.nationality))}</span>
+      <span class="csp">${e.price??0}¢</span>
+      <span class="dim">× ${e.quantity??0}</span></div>`;
+  };
+  const items = (st.items||[]).map(row).join("");
+  const elite = (st.elite_items||[]).map(row).join("");
+  return `<div class="cstore">${items||`<div class="dim">（空）</div>`}</div>
+    ${elite?`<div class="storetitle" style="padding-left:0">精英商店</div>
+      <div class="cstore">${elite}</div>`:""}`;
+}
+
+/* ---------- 概览页：备份与撤销栈 ---------- */
+function backupStackHTML(){
+  const u = USTACK||{};
+  const bks = (u.backups||[]).map(b=>`<div class="bkrow">备份
+    <b>${esc(b.name)}</b><span>${esc(b.mtime)}</span>
+    <span class="n">${esc(b.size||"")}</span></div>`).join("");
+  const st = (u.stack||[]).map((r,i)=>`<div class="bkrow">撤销 ${i+1}
+    <b>${esc((r.time||"").replace("T"," "))}</b>
+    <span>${esc(r.summary||((r.entries||[]).join("、")))}</span></div>`).join("");
+  if(!bks && !st) return `<div class="bkrow" style="color:var(--muted)">
+    还没有备份，也没有撤销记录</div>`;
+  return bks + st;
+}
+
+/* ---------- 卡牌：改成免费 / 改成收费 ---------- */
+function cardSetFree(position, free){
+  const c = (VIEW.hand||[]).find(x=>x.position===position);
+  const key = `card_set:${position}`;
+  queueEdit("card_set", key,
+    {position:position, field:"is_free", value:!!free}, c?(c.is_free?true:false):false, !!free,
+    `手牌槽位 ${position} 改成${free?"免费":"收费"}`);
+  show("cards");
+}
+function cardStoreSetFree(position, free){
+  const c = (VIEW.shelf||[]).find(x=>x.position===position);
+  const key = `card_store_set:${position}:is_free`;
+  queueEdit("card_store_set", key,
+    {position:position, is_free:!!free}, c?(c.is_free?true:false):false, !!free,
+    `货架槽位 ${position} 改成${free?"免费":"收费"}`);
+  show("cards");
+}
+
 /* ---------- 应用 / 撤销 ---------- */
 /* 待应用的编辑列表 → 请求体（兵库**删条目**要排在最后：
    删了会让后面条目的下标整体前移，先删再改数量就会改错行，U35） */
@@ -2340,7 +2510,11 @@ document.querySelectorAll(".rail .nav").forEach(n =>
 
 function show(p){
   const w = document.getElementById("work");
+  /* 导航高亮跟随当前页（`?page=` 深链进来时原来还亮在「概览」） */
+  document.querySelectorAll(".rail .nav").forEach(x=>
+    x.classList.toggle("on", x.dataset.p===p));
   if(p==="overview"){
+    if(!USTACK) loadUndoStack().then(()=>{ if(PAGE==="overview") show("overview"); });
     const caps = (VIEW._features||[]).map(f=>`
       <div class="capcard ${f.ok?'ok':'off'}">
         <div class="h">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</div>
@@ -2348,6 +2522,8 @@ function show(p){
       </div>`).join("");
     w.innerHTML = `<div class="panel"><h3>概览 · 能力位体检</h3>
       <div class="pbody"><div class="capgrid">${caps}</div></div></div>
+      <div class="panel"><h3>备份与撤销栈</h3>
+        <div class="pbody">${backupStackHTML()}</div></div>
       <div class="panel"><h3>战役进度（可直接输入 · Alt+滚轮 ±1）</h3>
       <div class="pbody">
         <div class="tun"><span class="k">声望</span>

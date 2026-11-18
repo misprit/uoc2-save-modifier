@@ -518,6 +518,111 @@ def find_surface(rel: str):
     return None
 
 
+# ---------------------------------------------------------------- 战役页 / 撤销栈
+
+
+def api_campaign_detail(save_id: str) -> dict:
+    """战役页的三块：**路线图** / **场景名册** / **这场会议的商店**。
+
+    ⚠️ 名册与会议商店来自**游戏包**（战役包默认配置），**不是玩家存档** ——
+    单位不一定存活 / 一定继承 / 一定登场（§7.8）。
+    """
+    from save_modifier_core import CorePaths, open_save
+    from save_modifier_core.campaigns import CampaignData, default_campaign_index
+
+    paths = CorePaths.discover()
+    with open_save(save_id) as save:
+        try:
+            pos = save.campaign_position()
+        except Exception as exc:
+            return {"error": str(exc)}
+        cid = pos.campaign_id or save.info.campaign_id
+        if not cid:
+            return {"error": "这个存档没有战役信息（独立场景？）"}
+        index = default_campaign_index()
+        data = CampaignData(paths, index)
+
+        # 路线图：挑**包含当前会议**的那条路线
+        cur = pos.conference_id
+        routes = list(index.routes(cid))
+        chosen_route, confs = None, ()
+        for r in routes:
+            cs = index.conferences(cid, r)
+            if any(c.id == cur for c in cs):
+                chosen_route, confs = r, cs
+                break
+        if chosen_route is None:
+            chosen_route = routes[0] if routes else "historical"
+            confs = index.conferences(cid, chosen_route)
+        cur_idx = next((i for i, c in enumerate(confs) if c.id == cur), -1)
+
+        route = []
+        for i, c in enumerate(confs):
+            route.append({
+                "id": c.id, "text": c.text,
+                "scenes": [{"id": s.id, "name": s.name, "variant": s.variant}
+                           for s in c.scenes],
+                "done": i < cur_idx,
+                "now": i == cur_idx,
+            })
+
+        roster = None
+        if pos.scenario_id:
+            r = data.roster(cid, pos.scenario_id)
+            if r is not None:
+                roster = _jsonable(r)
+                # 名册单位的 name_brief 是**本地化键** ⇒ 翻成中文（§5.7）
+                try:
+                    from save_modifier_core import locale as _locale2
+                    _tr2 = _locale2.default()
+                    for _u in (roster.get("units") or []):
+                        _u["name_cn"] = (_tr2.get(str(_u.get("name_brief") or ""), "")
+                                          or str(_u.get("name_brief") or ""))
+                    for _h in (roster.get("hqs") or []):
+                        _h["name_cn"] = (_tr2.get(str(_h.get("name_brief") or ""), "")
+                                         or str(_h.get("name_brief") or ""))
+                except Exception:
+                    pass
+
+        store = None
+        if pos.front and cur:
+            sl = data.store(cid, pos.front, cur)
+            if sl is not None:
+                store = _jsonable(sl)
+
+        return {
+            "campaign_id": cid,
+            "route_name": chosen_route,
+            "route": route,
+            "roster": roster,
+            "store": store,
+            "position": _jsonable(pos),
+        }
+
+
+def api_undo_stack(save_id: str) -> dict:
+    """撤销栈 + 备份文件列表（概览页的「备份与撤销栈」面板）。"""
+    from save_modifier_core import open_save
+    from save_modifier_core.undo import load_stack
+
+    with open_save(save_id) as save:
+        path = Path(save.path)
+        records, _ = load_stack(path)
+        stack = [{"id": r.id, "time": r.time, "summary": r.summary,
+                  "entries": [e.entry for e in r.entries]} for r in reversed(records)]
+        # 备份文件：存档旁边的 <名字>_BACKUP.usg / _BACKUP_2.usg …
+        backups = []
+        try:
+            for p in sorted(path.parent.glob(path.stem + "_BACKUP*.usg")):
+                backups.append({"name": p.name, "size": p.stat().st_size,
+                                "mtime": _mtime(p.stat().st_mtime)})
+        except OSError:
+            pass
+        return {"stack": stack, "backups": backups,
+                "undo_available": bool(records),
+                "count": len(records)}
+
+
 def api_plan(payload) -> dict:
     """规划一批编辑（**不碰磁盘**）。"""
     from save_modifier_core import Catalog, CorePaths, open_save
@@ -640,6 +745,14 @@ class _Handler(BaseHTTPRequestHandler):
                     sid = (q.get("save_id") or [""])[0]
                     ut = (q.get("unit_type") or [""])[0]
                     self._json(api_pickers(sid, ut))
+                elif path == "/api/campaign-detail":
+                    q = parse_qs(urlparse(self.path).query)
+                    sid = (q.get("save_id") or [""])[0]
+                    self._json(api_campaign_detail(sid))
+                elif path == "/api/undo-stack":
+                    q = parse_qs(urlparse(self.path).query)
+                    sid = (q.get("save_id") or [""])[0]
+                    self._json(api_undo_stack(sid))
                 else:
                     self._json({"error": "未知接口"}, 404)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务

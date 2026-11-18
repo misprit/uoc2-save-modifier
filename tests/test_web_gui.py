@@ -1168,3 +1168,52 @@ class TestFrontendGateExists(unittest.TestCase):
         """设计稿 §9②③④：加兵库条目 / 换牌 / 上架新商品。"""
         for fn in ("openHqPoolModal", "openCardPickerModal", "openStoreAddModal"):
             self.assertIn("function " + fn, self.html)
+
+
+class TestCampaignDetailApi(WebGuiTestBase):
+    """U41：战役页的三块（路线图 / 场景名册 / 会议商店）。"""
+
+    def _save_id(self):
+        from save_modifier_core import list_saves
+        for info in list_saves():
+            if info.is_primary and info.campaign_id:
+                return info.save_id
+        self.skipTest("本机没有战役存档")
+
+    def test_campaign_detail_has_route_roster_store(self):
+        sid = self._save_id()
+        d = self.get_json("/api/campaign-detail?save_id=" + _quote(sid))
+        self.assertNotIn("error", d, d.get("error"))
+        self.assertTrue(d.get("route"), "没有路线图")
+        for c in d["route"]:
+            self.assertIn("id", c)
+            self.assertIn("text", c)
+            self.assertIn("done", c)
+            self.assertIn("now", c)
+        # 当前会议至多一个是 now
+        self.assertLessEqual(len([c for c in d["route"] if c["now"]]), 1)
+
+    def test_campaign_detail_route_marks_current_conference(self):
+        """路线图里要有一个 now（= 存档所在的会议）。"""
+        sid = self._save_id()
+        d = self.get_json("/api/campaign-detail?save_id=" + _quote(sid))
+        now = [c for c in d["route"] if c["now"]]
+        if not now:
+            self.skipTest("这个存档的会议不在索引里")
+        self.assertTrue(now[0]["scenes"] or now[0]["id"])
+
+    def test_undo_stack_endpoint(self):
+        """撤销栈 + 备份列表。"""
+        from save_modifier_core import list_saves
+        sid = None
+        for info in list_saves():
+            if info.is_primary:
+                sid = info.save_id
+                break
+        if sid is None:
+            self.skipTest("本机没有存档")
+        d = self.get_json("/api/undo-stack?save_id=" + _quote(sid))
+        self.assertIn("stack", d)
+        self.assertIn("backups", d)
+        self.assertIsInstance(d["stack"], list)
+        self.assertIsInstance(d["backups"], list)
