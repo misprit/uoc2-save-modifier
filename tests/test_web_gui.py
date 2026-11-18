@@ -213,5 +213,39 @@ class TestWriteApi(WebGuiTestBase):
         self.assertEqual(cm.exception.code, 403)
 
 
+class TestSurfaces(WebGuiTestBase):
+    """贴图代理 —— http 页面**不能**直接读 `file:///`（同源策略会拦掉）。
+
+    ⇒ 游戏贴图必须走 `GET /surfaces/<相对路径>`，由服务端从游戏包读出来。
+    """
+
+    def test_unit_surface_is_served(self):
+        body = self.get("/surfaces/unit/ger_inf_42/sheet_L.png")
+        self.assertTrue(body.startswith(b"\x89PNG"), "不是 PNG")
+
+    def test_specialist_surface_is_served(self):
+        body = self.get("/surfaces/specialist/ger_arty_40/hq_action_icon.png")
+        self.assertTrue(body.startswith(b"\x89PNG"), "不是 PNG")
+
+    def test_theater_surface_is_served(self):
+        body = self.get("/surfaces/theater/air_attack_neutral.png")
+        self.assertTrue(body.startswith(b"\x89PNG"), "不是 PNG")
+
+    def test_path_traversal_is_blocked(self):
+        """贴图代理也不能被 `..` 钻出去。"""
+        import urllib.error
+        for p in ("/surfaces/../../secret", "/surfaces/unit/../../../etc/passwd"):
+            with self.assertRaises(urllib.error.HTTPError) as cm:
+                self.get(p)
+            self.assertIn(cm.exception.code, (403, 404), p)
+
+    def test_missing_surface_is_404(self):
+        """查不到 ⇒ 404（界面退化成占位方块，§5.6，不报错）。"""
+        import urllib.error
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self.get("/surfaces/unit/definitely_not_a_type/sheet_L.png")
+        self.assertEqual(cm.exception.code, 404)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -184,6 +184,29 @@ def _edits_from(payload):
     return out
 
 
+def find_surface(rel: str):
+    """在游戏包里找 `assets/surfaces/<rel>` —— **用户包优先**（mod 覆盖）。
+
+    返回 `Path` 或 `None`。找不到**不报错**（界面退化成占位方块，§5.6）。
+    ⚠️ `package_roots()` 是**容器**目录（`_packages`）；真正的包在它下面
+    （`base` / `dlc1` … / 用户 mod）⇒ 要用 `packages()`。
+    """
+    from save_modifier_core import CorePaths
+
+    rel = (rel or "").replace("\\", "/").lstrip("/")
+    if not rel or ".." in rel.split("/"):
+        return None
+    paths = CorePaths.discover()
+    for pkg in paths.packages():
+        cand = Path(pkg) / "assets" / "surfaces" / rel
+        try:
+            if cand.is_file():
+                return cand
+        except OSError:
+            continue
+    return None
+
+
 def api_plan(payload) -> dict:
     """规划一批编辑（**不碰磁盘**）。"""
     from save_modifier_core import Catalog, CorePaths, open_save
@@ -295,6 +318,21 @@ class _Handler(BaseHTTPRequestHandler):
                     self._json({"error": "未知接口"}, 404)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务
                 self._json({"error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+            return
+
+        # ---- 游戏贴图（代理；http 页面不能直接读 file://）----
+        if path.startswith("/surfaces/"):
+            if not self._check_token():
+                return
+            target = find_surface(path[len("/surfaces/"):])
+            if target is None:
+                self._send(404, b"surface not found", "text/plain; charset=utf-8")
+                return
+            ctype = mimetypes.guess_type(str(target))[0] or "image/png"
+            try:
+                self._send(200, target.read_bytes(), ctype)
+            except OSError:
+                self._send(404, b"surface unreadable", "text/plain; charset=utf-8")
             return
 
         # ---- 静态文件 ----
