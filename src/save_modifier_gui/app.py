@@ -29,7 +29,6 @@ __all__ = ["Application", "AppShell"]
 #: Rail / 状态栏上显示的能力位（顺序 = 规范 §2 的页面表）
 CAPABILITY_ITEMS = (
     ("单位", "units"),
-    ("特种兵", "units"),
     ("总部", "hqs"),
     ("卡牌", "cards"),
     ("商店", "store"),
@@ -168,7 +167,7 @@ class AppShell(tk.Frame):
         self.work.pack(side="left", fill="both", expand=True)
         for cls in PAGES:
             page = cls(self.work, self.app)
-            # ⚠️ **不要在这里 pack** —— 全部 pack 会让 7 个页竖着堆在一起。
+            # ⚠️ **不要在这里 pack** —— 全部 pack 会让所有页竖着堆在一起。
             # 页面由 `select()` 负责 pack / pack_forget。
             self.pages[cls.key] = page
 

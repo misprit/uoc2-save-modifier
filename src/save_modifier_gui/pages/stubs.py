@@ -1,4 +1,4 @@
-"""其余 6 页的占位实现（G1 阶段）。
+"""其余 5 页的占位实现（G1 阶段）。
 
 **每个页面在它自己的阶段被填实**（G2–G5）：
 G2 单位头像 / G3 单位页完整 / G4 待应用面板 / G5 其余各页。
@@ -11,8 +11,7 @@ from __future__ import annotations
 
 from .base import SimplePage
 
-__all__ = ["UnitsPage", "SpecialistsPage", "HqPage", "CardsPage",
-           "StorePage", "TheaterPage"]
+__all__ = ["UnitsPage", "HqPage", "CardsPage", "StorePage", "TheaterPage"]
 
 
 class UnitsPage(SimplePage):
@@ -25,24 +24,11 @@ class UnitsPage(SimplePage):
     def build(self) -> None:
         super().build()
         self.placeholder(
-            "单位页（G2–G3）：左侧名册列表（头像 / 战力阶梯 / 血量段），"
-            "右侧详情（经验、战力、特种兵挂载、改名）。\n\n"
-            "数值上限在游戏包里 —— 改不了上限，只能改当前值。")
-
-
-class SpecialistsPage(SimplePage):
-    key = "specialists"
-    icon = "▦"
-    title = "特种兵"
-    caption = "图鉴（只读）+ 挂载（可改）"
-    capability = "units"
-
-    def build(self) -> None:
-        super().build()
-        self.placeholder(
-            "特种兵页：左边是 375 种特种兵的图鉴（**只读**，数值在游戏包里），"
-            "右边是挂载到当前单位的挂载区（**可改**）。\n\n"
-            "点左侧图鉴卡片 = 挂到当前单位。")
+            "单位页（G2–G3）：左侧名册列表（头像 / 兵力段格条），"
+            "右侧详情（抬头精简、兵力与经验并排、特种兵挂载区、改名）。\n\n"
+            "数值上限在游戏包里 —— 改不了上限，只能改当前值。\n"
+            "特种兵挂载**并入本页**（2026-11-18 用户拍板）："
+            "点备选图标挂到第一个空槽位，点已挂图标卸下。")
 
 
 class HqPage(SimplePage):

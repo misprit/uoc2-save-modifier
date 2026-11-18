@@ -3,12 +3,12 @@
 **测什么**
 ----------
 
-1. 7 个页面都能建起来（不抛异常），且 Rail 顺序 = 规范 §2 的页面表；
+1. 6 个页面都能建起来（不抛异常），且 Rail 顺序 = 规范 §2 的页面表；
 2. **概览页不能有通用占位框** —— 它是唯一有真内容的页，叠了占位框
    就会在页首显示「这一页将在后续阶段实现」，与下方的真实体检结果
    自相矛盾（2026-11-18 实测踩到，已修）；
 3. 概览页必须真的显示「能力位体检 / 战役进度 / 注意事项」三个面板；
-4. 其余 6 页**必须**保留占位框 —— 别把「这一页还没做」的信息弄丢了；
+4. 其余 5 页**必须**保留占位框 —— 别把「这一页还没做」的信息弄丢了；
 5. 能力位判定只认能力位、不认阶段（`capability_ok`）。
 
 ⚠️ **需要能开窗**。起不来（无桌面会话 / 缺 tcl/tk）就整个跳过 ——
@@ -58,16 +58,24 @@ class GuiSmokeTest(unittest.TestCase):
 
     # ---- 页面注册表 ----
 
-    def test_seven_pages_registered(self):
+    def test_six_pages_registered(self):
         from save_modifier_gui.pages import PAGES
-        self.assertEqual(len(PAGES), 7)
+        self.assertEqual(len(PAGES), 6)
 
     def test_page_order_matches_spec(self):
-        """Rail 顺序 = 《GUI设计规范.md》§2 的页面表。"""
+        """Rail 顺序 = 《GUI设计规范.md》§2 的页面表。
+
+        ⚠ 2026-11-18 用户拍板（U9）：「特种兵」页整页取消，挂载并入单位页。
+        """
         from save_modifier_gui.pages import PAGES
         self.assertEqual(
             [p.key for p in PAGES],
-            ["overview", "units", "specialists", "hq", "cards", "store", "theater"])
+            ["overview", "units", "hq", "cards", "store", "theater"])
+
+    def test_no_specialists_page(self):
+        """特种兵页必须**不存在**（U9 拍板：并入单位页）。"""
+        from save_modifier_gui.pages import PAGES
+        self.assertNotIn("specialists", [p.key for p in PAGES])
 
     def test_all_pages_build(self):
         from save_modifier_gui.pages import PAGES
@@ -93,14 +101,13 @@ class GuiSmokeTest(unittest.TestCase):
         for want in ("能力位体检", "战役进度", "注意事项"):
             self.assertIn(want, texts)
 
-    # ---- 其余 6 页：占位框要留着 ----
+    # ---- 其余 5 页：占位框要留着 ----
 
     def test_stub_pages_keep_placeholder(self):
         from save_modifier_gui.pages.stubs import (CardsPage, HqPage,
-                                                   SpecialistsPage, StorePage,
-                                                   TheaterPage, UnitsPage)
-        for cls in (UnitsPage, SpecialistsPage, HqPage, CardsPage,
-                    StorePage, TheaterPage):
+                                                   StorePage, TheaterPage,
+                                                   UnitsPage)
+        for cls in (UnitsPage, HqPage, CardsPage, StorePage, TheaterPage):
             with self.subTest(page=cls.__name__):
                 page = self._page(cls)
                 self.assertIsNotNone(page._placeholder_box,
