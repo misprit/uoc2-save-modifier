@@ -414,6 +414,104 @@ def _hq_branch_level(w, e: Edit) -> Outcome:
     return oc
 
 
+def _hq_branch_sp(w, e: Edit) -> Outcome:
+    """总部分支里**某个技能的专精次数**（`branches` → `sp_used`）。
+
+    **专精 = 该技能发动时的 CP 消耗 −1**（`e165` 字节码：`a.cost = max(0, a.cost - 1)`）。
+
+    ⚠️ 存档里 `cost` 存的是**已经扣减过的** CP ⇒ 原始 CP = `cost + sp_used`。
+    所以本函数**同时**改 `sp_used` 和 `cost`（两边一起动，存档才自洽）。
+
+    * `sp_used` 必须落在 `[0, sp_avail]`；`sp_avail` 是存档里给的权威上限；
+    * `sp_avail` 为 `null` 的技能（`force_pool` 分支的四个动作 + `motor_pool`）
+      **没有技能点** ⇒ 报错，不静默忽略。
+    """
+    oc = Outcome()
+    hq_id = e.params.get("hq_id")
+    branch = e.params.get("branch")
+    action = e.params.get("action")
+    sp_used = e.params.get("sp_used")
+    if not w.require(w.caps.can_edit_hqs, "hqs", "hqs.yml"):
+        return oc
+    if branch not in HQ_BRANCHES:
+        oc.errors.append(
+            f"未知的分支 {branch!r}；合法取值：{', '.join(HQ_BRANCHES)}")
+        return oc
+    if not isinstance(action, str) or not action:
+        oc.errors.append(f"必须指定技能（action），收到 {action!r}")
+        return oc
+    if not isinstance(sp_used, int) or isinstance(sp_used, bool) or sp_used < 0:
+        oc.errors.append(f"专精次数必须是非负整数，收到 {sp_used!r}")
+        return oc
+
+    hqs = w.table("hqs.yml", [])
+    hq = _find_by_id(hqs, hq_id)
+    if hq is None:
+        oc.errors.append(f"存档里没有 id 为 {hq_id} 的总部")
+        return oc
+    branches = hq.get("branches")
+    if not isinstance(branches, dict):
+        oc.errors.append(f"总部 {hq_id} 没有 branches（技能树）结构")
+        return oc
+    items = branches.get(branch)
+    if not isinstance(items, list):
+        oc.errors.append(
+            f"总部 {hq_id} 的 {branch} 分支没有技能列表"
+            f"（存档里有：{', '.join(sorted(branches))}）")
+        return oc
+    node = None
+    for it in items:
+        if isinstance(it, dict) and it.get("action") == action:
+            node = it
+            break
+    if node is None:
+        have = ", ".join(str(i.get("action")) for i in items if isinstance(i, dict))
+        oc.errors.append(
+            f"总部 {hq_id} 的 {branch} 分支里没有技能 {action!r}（有：{have}）")
+        return oc
+
+    sp_avail = node.get("sp_avail")
+    if sp_avail is None:
+        oc.errors.append(
+            f"技能 {action!r} 没有技能点（sp_avail 为空）—— "
+            "兵库分支的动作与车辆调度场不能专精")
+        return oc
+    if not isinstance(sp_avail, int) or isinstance(sp_avail, bool) or sp_avail < 0:
+        oc.errors.append(f"技能 {action!r} 的 sp_avail 非法：{sp_avail!r}")
+        return oc
+    if sp_used > sp_avail:
+        oc.errors.append(
+            f"技能 {action!r} 最多能专精 {sp_avail} 次，请求 {sp_used} 次")
+        return oc
+
+    old_used = node.get("sp_used")
+    if not isinstance(old_used, int) or isinstance(old_used, bool):
+        old_used = 0
+    old_cost = node.get("cost")
+    if not isinstance(old_cost, int) or isinstance(old_cost, bool):
+        old_cost = 0
+    base_cost = old_cost + old_used          # 原始 CP 消耗（扣减前的）
+    new_cost = base_cost - sp_used          # 专精 sp_used 次之后的 CP 消耗
+    if new_cost < 0:
+        oc.errors.append(
+            f"技能 {action!r} 专精 {sp_used} 次会让 CP 消耗变成 {new_cost}（负数）")
+        return oc
+
+    node["sp_used"] = sp_used
+    node["cost"] = new_cost
+    w.touch("hqs.yml")
+    oc.summary = (f"总部 {hq_id} 的 {branch} 分支 · {action}："
+                  f"专精 {old_used} → {sp_used}（CP 消耗 {old_cost} → {new_cost}）")
+    if sp_used < old_used:
+        oc.warnings.append(
+            f"**取消专精**（{old_used} → {sp_used}）—— "
+            "该技能发动时的 CP 消耗会涨回去")
+    if sp_used > old_used:
+        oc.warnings.append(
+            f"专精会让 **{action}** 发动时的 CP 消耗从 {old_cost} 降到 {new_cost}")
+    return oc
+
+
 def _hq_force_pool_add(w, e: Edit) -> Outcome:
     """总部兵库加一条。"""
     oc = Outcome()
@@ -1087,6 +1185,7 @@ _HANDLERS = {
     "hq_force_pool": _hq_force_pool,
     "hq_field": _hq_field,
     "hq_branch_level": _hq_branch_level,
+    "hq_branch_sp": _hq_branch_sp,
     "hq_force_pool_add": _hq_force_pool_add,
     "hq_force_pool_remove": _hq_force_pool_remove,
     "card_add": _card_add,

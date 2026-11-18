@@ -96,6 +96,10 @@ class HqView:
     xp: int | None = None
     xp_target: int | None = None
     branch_levels: dict | None = None
+    #: **技能树**（`branches`）：`{分支: [{action, cost, level, sp_avail, sp_used}]}`
+    #: —— `level` 是该动作所在的级别（1/2/3 = 游戏 UI 矩阵的列），
+    #: `sp_used` 是**已专精次数 = 技能等级**（`e165` 字节码坐实）
+    branches: dict | None = None
     persistent: bool | None = None
     overrun: bool | None = None
     turn_disbanded: bool | None = None
@@ -103,6 +107,35 @@ class HqView:
     @property
     def display_name(self) -> str:
         return self.name_brief or self.name_full or f"总部 {self.id}"
+
+    @property
+    def branch_tiers(self) -> dict[str, dict[int, list[dict]]]:
+        """技能树按 **分支 → 级别** 分好组 —— GUI 画「分支 × 级别」矩阵直接用。
+
+        ```
+        { "engineering": { 1: [{action, cost, level, sp_avail, sp_used}, ...],
+                          2: [...], 3: [...] },
+          ... }
+        ```
+
+        * 级别来自每条技能自己的 `level`（**不是**分支等级）；
+        * 分支等级在 `branch_levels[分支]["level"]` —— 两者**不是一回事**：
+          分支等级决定哪些级别已解锁（`tier <= 分支等级`）；
+        * 存档里没有的分支**不出现**在结果里（不凭空造）。
+        """
+        out: dict[str, dict[int, list[dict]]] = {}
+        for branch, items in (self.branches or {}).items():
+            if not isinstance(items, list):
+                continue
+            tiers = out.setdefault(branch, {})
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                tier = it.get("level")
+                if not isinstance(tier, int) or isinstance(tier, bool):
+                    continue
+                tiers.setdefault(tier, []).append(it)
+        return out
 
 
 @dataclass(frozen=True)
@@ -459,6 +492,7 @@ class Save:
                 xp=h.get("xp"),
                 xp_target=h.get("xp_target"),
                 branch_levels=h.get("branch_levels"),
+                branches=h.get("branches"),
                 persistent=h.get("persistent"),
                 overrun=h.get("overrun"),
                 turn_disbanded=h.get("turn_disbanded"),

@@ -27,6 +27,7 @@ EDIT_KINDS = (
     "hq_force_pool",       # 总部兵库数量（根 hqs.yml）
     "hq_field",            # 总部的某个字段（根 hqs.yml）
     "hq_branch_level",     # 总部分支等级（根 hqs.yml）
+    "hq_branch_sp",        # 总部技能的专精次数（根 hqs.yml → branches）
     "hq_force_pool_add",   # 总部兵库加一条（根 hqs.yml）
     "hq_force_pool_remove",  # 总部兵库删一条（根 hqs.yml）
     "card_add",            # 加卡到手牌（根 cards.yml）
@@ -101,6 +102,25 @@ class Edit:
         """改总部的**分支等级**（总部"升级"= 五个分支各一个等级）。"""
         return Edit("hq_branch_level", {"hq_id": hq_id, "branch": branch,
                                         "level": level, "suppressed": suppressed})
+
+    @staticmethod
+    def hq_branch_sp(hq_id: int, branch: str, action: str,
+                     sp_used: int) -> "Edit":
+        """改总部分支里**某个技能的专精次数**（`branches` 里那条的 `sp_used`）。
+
+        **专精（specialization）= 让该技能发动时消耗的 CP 减 1**（`e165` 字节码坐实：
+        `a.cost = max(0, a.cost - 1)`）。
+
+        ⇒ 写 `sp_used` 的同时**必须同步 `cost`** —— 存档里存的是**已经扣减过的** CP，
+        原始 CP = `cost + sp_used`。核心库会自动同步，调用方只管给 `sp_used`。
+
+        * 上限 = 该技能的 `sp_avail`（默认 `min(2, 原始cost - 1)` ⇒ 最多 2 次）；
+        * `force_pool` 分支的四个动作与 `motor_pool` **没有技能点**
+          （`sp_avail = null`）⇒ 传 `sp_used` 会报错。
+        """
+        return Edit("hq_branch_sp",
+                    {"hq_id": hq_id, "branch": branch, "action": action,
+                     "sp_used": sp_used})
 
     @staticmethod
     def hq_force_pool_add(hq_id: int, entry: Mapping[str, Any],
@@ -230,6 +250,9 @@ class Edit:
         if k == "hq_branch_level":
             return (f"总部 {p.get('hq_id')} 的 {p.get('branch')} 分支："
                     f"等级 {p.get('level')}")
+        if k == "hq_branch_sp":
+            return (f"总部 {p.get('hq_id')} 的 {p.get('branch')} 分支 · "
+                    f"{p.get('action')}：专精 {p.get('sp_used')}")
         if k == "hq_force_pool_add":
             entry = p.get("entry") or {}
             return (f"总部 {p.get('hq_id')} 兵库加一条"
