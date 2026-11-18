@@ -71,6 +71,18 @@ HQ_FIELD_ALLOWED = {
 #: 总部的五个分支（§7.4）
 HQ_BRANCHES = ("engineering", "force_pool", "intel", "logistics", "operations")
 
+#: 分支等级的**上限**（游戏 `BRANCH_MAX = 3`；`can_add_branch_level` 里
+#: `current_level = level + suppressed`，`== 3` 就不许再加）
+HQ_BRANCH_MAX = 3
+
+#: 补给卡车数 → **总部补给作用范围**（游戏 `game.yml` → `supply_hubs_ranges` =
+#: `[5, 8, 10, 11, 12]`，按 1-based 读：1 辆 → 5 格、2 辆 → 8、3 辆 → 10、
+#: 4 辆 → 11、5 辆 → 12）。只作文案参考，**改卡车不动声望**。
+TRUCK_RANGES = (5, 8, 10, 11, 12)
+
+#: 卡车数的合法区间（0 不行 —— 总部至少要有一辆补给卡车）
+TRUCK_MIN, TRUCK_MAX = 1, len(TRUCK_RANGES)
+
 #: 商店的两个子商店（`store.yml` 是两层结构，`e154` 实证）
 STORE_SUBS = ("store", "elite_store")
 
@@ -360,14 +372,27 @@ def _hq_field(w, e: Edit) -> Outcome:
     if field == "xp_target" and isinstance(old, int) and value < old:
         oc.warnings.append(
             "降低经验目标会让下属单位立刻算成欠账")
-    if field in ("prisoners", "loss_count", "intels_revealed", "trucks"):
+    if field in ("prisoners", "loss_count", "intels_revealed"):
         oc.warnings.append(
             f"{field} 是游戏自己累计的统计值，改了不会被重算，但界面可能对不上")
+    if field == "trucks":
+        oc.warnings.append(
+            f"卡车数决定总部的补给作用范围（{TRUCK_MIN}–{TRUCK_MAX} 辆 → "
+            f"{'/'.join(str(r) for r in TRUCK_RANGES)} 格）；改它**不扣声望**")
     return oc
 
 
 def _hq_branch_level(w, e: Edit) -> Outcome:
-    """总部的分支等级（总部"升级"= 五个分支各一个等级）。"""
+    """总部的分支等级（总部"升级"= 五个分支各一个等级）。
+
+    存档里 `branch_levels[分支] = {level, suppressed}`（`e166` 字节码坐实）：
+
+    * `level` = **当前生效**的等级（技能能不能用，看它）；
+    * `suppressed` = **被压制的等级数**（被扣住几级）——
+      游戏内部「解锁到几级」= `level + suppressed`（`can_add_branch_level`）。
+
+    ⚠️ `suppressed` 是**整数**（被压制的级数），**不是布尔开关**。
+    """
     oc = Outcome()
     hq_id = e.params.get("hq_id")
     branch = e.params.get("branch")
@@ -382,9 +407,24 @@ def _hq_branch_level(w, e: Edit) -> Outcome:
     if not isinstance(level, int) or isinstance(level, bool) or level < 0:
         oc.errors.append(f"分支等级必须是非负整数，收到 {level!r}")
         return oc
-    if suppressed is not None and not isinstance(suppressed, bool):
-        oc.errors.append(f"suppressed 必须是 True / False，收到 {suppressed!r}")
+    if level > HQ_BRANCH_MAX:
+        oc.errors.append(f"分支等级不能超过 {HQ_BRANCH_MAX}，收到 {level!r}")
         return oc
+    if suppressed is not None:
+        if not isinstance(suppressed, int) or isinstance(suppressed, bool):
+            oc.errors.append(
+                f"suppressed 必须是整数（被压制的等级数，0–{HQ_BRANCH_MAX}），"
+                f"收到 {suppressed!r}")
+            return oc
+        if suppressed < 0 or suppressed > HQ_BRANCH_MAX:
+            oc.errors.append(
+                f"被压制的等级数必须在 0–{HQ_BRANCH_MAX} 之间，收到 {suppressed!r}")
+            return oc
+        if level + suppressed > HQ_BRANCH_MAX:
+            oc.errors.append(
+                f"等级 {level} + 被压制 {suppressed} 超过上限 {HQ_BRANCH_MAX}"
+                "（游戏内部「解锁到几级」= 等级 + 被压制）")
+            return oc
 
     hqs = w.table("hqs.yml", [])
     hq = _find_by_id(hqs, hq_id)
@@ -402,15 +442,141 @@ def _hq_branch_level(w, e: Edit) -> Outcome:
         return oc
 
     old = node.get("level")
+    old_supp = node.get("suppressed")
+    if not isinstance(old_supp, int) or isinstance(old_supp, bool):
+        old_supp = 0
     node["level"] = level
     if suppressed is not None:
         node["suppressed"] = suppressed
     w.touch("hqs.yml")
     oc.summary = f"总部 {hq_id} 的 {branch} 分支：等级 {old} → {level}"
+    if suppressed is not None and suppressed != old_supp:
+        oc.summary += f"，被压制 {old_supp} → {suppressed}"
     if isinstance(old, int) and level < old:
         oc.warnings.append(
             f"**降级**（{old} → {level}）—— 总部已经投过的点不会退回来，"
             "而且这个分支提供的加成/容量会立刻变小")
+    return oc
+
+
+def _hq_branch_suppressed(w, e: Edit) -> Outcome:
+    """调**被压制的等级数**（`branch_levels[分支].suppressed`）。
+
+    语义 = 游戏的 `branch_suppress`（`e166` 字节码）：压制 N 级 ⇒
+    **生效等级 −N**、被压制数 **+N**，而「真实等级（`level + suppressed`）」不变。
+
+    ⇒ 这里**自动重算 `level`**：
+
+        新 level = (旧 level + 旧 suppressed) − 新 suppressed
+
+    ⚠️ 压制只写在**战役进行中**的存档里才有意义 —— 游戏在一局结束时
+    （`set_end_game` → `unsuppress_branch_levels`）会把压制全部还原。
+    """
+    oc = Outcome()
+    hq_id = e.params.get("hq_id")
+    branch = e.params.get("branch")
+    suppressed = e.params.get("suppressed")
+    if not w.require(w.caps.can_edit_hqs, "hqs", "hqs.yml"):
+        return oc
+    if branch not in HQ_BRANCHES:
+        oc.errors.append(
+            f"未知的分支 {branch!r}；合法取值：{', '.join(HQ_BRANCHES)}")
+        return oc
+    if not isinstance(suppressed, int) or isinstance(suppressed, bool):
+        oc.errors.append(
+            f"被压制的等级数必须是整数（0–{HQ_BRANCH_MAX}），收到 {suppressed!r}")
+        return oc
+    if suppressed < 0 or suppressed > HQ_BRANCH_MAX:
+        oc.errors.append(
+            f"被压制的等级数必须在 0–{HQ_BRANCH_MAX} 之间，收到 {suppressed!r}")
+        return oc
+
+    hqs = w.table("hqs.yml", [])
+    hq = _find_by_id(hqs, hq_id)
+    if hq is None:
+        oc.errors.append(f"存档里没有 id 为 {hq_id} 的总部")
+        return oc
+    levels = hq.get("branch_levels")
+    if not isinstance(levels, dict):
+        oc.errors.append(f"总部 {hq_id} 没有 branch_levels 结构")
+        return oc
+    node = levels.get(branch)
+    if not isinstance(node, dict):
+        oc.errors.append(
+            f"总部 {hq_id} 没有 {branch} 分支（存档里有：{', '.join(sorted(levels))}）")
+        return oc
+
+    old_level = node.get("level")
+    old_supp = node.get("suppressed")
+    if not isinstance(old_level, int) or isinstance(old_level, bool):
+        old_level = 0
+    if not isinstance(old_supp, int) or isinstance(old_supp, bool):
+        old_supp = 0
+    real = old_level + old_supp            # 真实等级 = 解锁到几级
+    if real > HQ_BRANCH_MAX:
+        oc.errors.append(
+            f"总部 {hq_id} 的 {branch} 分支等级 {old_level} + 被压制 {old_supp} "
+            f"已经超过上限 {HQ_BRANCH_MAX}，先修正等级")
+        return oc
+    if suppressed > real:
+        oc.errors.append(
+            f"被压制 {suppressed} 级超过该分支的总等级 {real}（{branch} 分支）")
+        return oc
+
+    new_level = real - suppressed
+    node["level"] = new_level
+    node["suppressed"] = suppressed
+    w.touch("hqs.yml")
+    oc.summary = (f"总部 {hq_id} 的 {branch} 分支：被压制 {old_supp} → {suppressed}"
+                  f"（生效等级 {old_level} → {new_level}，解锁到 {real} 级不变）")
+    if suppressed > old_supp:
+        oc.warnings.append(
+            "压制期间，这个分支的**生效等级**会下降"
+            f"（{old_level} → {new_level}）；游戏在一局结束时会把压制还原")
+    elif suppressed < old_supp:
+        oc.warnings.append(
+            f"解除压制 —— 生效等级回到 {new_level}（解锁到 {real} 级不变）")
+    return oc
+
+
+def _hq_trucks(w, e: Edit) -> Outcome:
+    """总部的**补给卡车数**（`hqs.yml` → `trucks`）。
+
+    * 合法值 **1–5**（0 不行 —— 总部至少要有一辆补给卡车）；
+    * 1–5 辆依次对应补给作用范围 **5 / 8 / 10 / 11 / 12** 格
+      （游戏 `game.yml` → `supply_hubs_ranges`）；
+    * **不涉及声望** —— 改卡车不动 `main.yml` 的任何数值。
+    """
+    oc = Outcome()
+    hq_id = e.params.get("hq_id")
+    trucks = e.params.get("trucks")
+    if not w.require(w.caps.can_edit_hqs, "hqs", "hqs.yml"):
+        return oc
+    if not isinstance(trucks, int) or isinstance(trucks, bool):
+        oc.errors.append(f"卡车数必须是整数，收到 {trucks!r}")
+        return oc
+    if trucks < TRUCK_MIN or trucks > TRUCK_MAX:
+        oc.errors.append(
+            f"卡车数必须在 {TRUCK_MIN}–{TRUCK_MAX} 之间，收到 {trucks!r}"
+            "（0 不行 —— 总部至少要有一辆补给卡车）")
+        return oc
+
+    hqs = w.table("hqs.yml", [])
+    hq = _find_by_id(hqs, hq_id)
+    if hq is None:
+        oc.errors.append(f"存档里没有 id 为 {hq_id} 的总部")
+        return oc
+
+    old = hq.get("trucks")
+    hq["trucks"] = trucks
+    w.touch("hqs.yml")
+    oc.summary = (f"总部 {hq_id} 的补给卡车：{old} → {trucks} 辆"
+                  f"（补给作用范围 {TRUCK_RANGES[trucks - 1]} 格）")
+    if isinstance(old, int) and trucks < old:
+        oc.warnings.append(
+            f"减少卡车会让总部的补给作用范围变小"
+            f"（{TRUCK_RANGES[old - 1] if 1 <= old <= TRUCK_MAX else '?'} → "
+            f"{TRUCK_RANGES[trucks - 1]} 格）")
     return oc
 
 
@@ -1184,7 +1350,9 @@ _HANDLERS = {
     "unit_spec_remove": _unit_spec_remove,
     "hq_force_pool": _hq_force_pool,
     "hq_field": _hq_field,
+    "hq_trucks": _hq_trucks,
     "hq_branch_level": _hq_branch_level,
+    "hq_branch_suppressed": _hq_branch_suppressed,
     "hq_branch_sp": _hq_branch_sp,
     "hq_force_pool_add": _hq_force_pool_add,
     "hq_force_pool_remove": _hq_force_pool_remove,

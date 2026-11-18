@@ -127,11 +127,15 @@ class TestEditKinds(unittest.TestCase):
     总部 4 种 + 商店 1 种 + 卡牌货架 3 种 + 手牌字段 1 种。
 
     ⚠️ 2026-11-18 再 +1 种（U12 / `e165`）：`hq_branch_sp` —— 总部技能的专精次数。
+
+    ⚠️ 2026-11-18 再 +2 种（U13 / `e166`）：`hq_trucks`（补给卡车数）、
+    `hq_branch_suppressed`（分支「被压制的等级数」）。
     """
 
     EXPECTED = {
         "progress", "unit_field", "unit_spec_add", "unit_spec_remove",
-        "hq_force_pool", "hq_field", "hq_branch_level", "hq_branch_sp",
+        "hq_force_pool", "hq_field", "hq_trucks", "hq_branch_level",
+        "hq_branch_suppressed", "hq_branch_sp",
         "hq_force_pool_add",
         "hq_force_pool_remove", "card_add", "card_remove", "card_set",
         "store_set", "store_remove", "store_add", "card_store_set",
@@ -149,7 +153,8 @@ class TestEditKinds(unittest.TestCase):
     def test_factories_exist(self):
         for name in ("progress", "unit_field", "unit_spec_add",
                      "unit_spec_remove", "hq_force_pool", "hq_field",
-                     "hq_branch_level", "hq_branch_sp", "hq_force_pool_add",
+                     "hq_trucks", "hq_branch_level", "hq_branch_suppressed",
+                     "hq_branch_sp", "hq_force_pool_add",
                      "hq_force_pool_remove", "card_add", "card_remove",
                      "card_set", "store_set", "store_remove", "store_add",
                      "card_store_set", "card_store_remove", "card_store_add",

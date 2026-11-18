@@ -26,7 +26,9 @@ EDIT_KINDS = (
     "unit_spec_remove",    # 卸特种（根 units.yml）
     "hq_force_pool",       # 总部兵库数量（根 hqs.yml）
     "hq_field",            # 总部的某个字段（根 hqs.yml）
+    "hq_trucks",           # 总部补给卡车数（根 hqs.yml）
     "hq_branch_level",     # 总部分支等级（根 hqs.yml）
+    "hq_branch_suppressed",  # 总部分支「被压制的等级数」（根 hqs.yml）
     "hq_branch_sp",        # 总部技能的专精次数（根 hqs.yml → branches）
     "hq_force_pool_add",   # 总部兵库加一条（根 hqs.yml）
     "hq_force_pool_remove",  # 总部兵库删一条（根 hqs.yml）
@@ -97,11 +99,45 @@ class Edit:
         return Edit("hq_field", {"hq_id": hq_id, "field": field, "value": value})
 
     @staticmethod
+    def hq_trucks(hq_id: int, trucks: int) -> "Edit":
+        """改总部的**补给卡车数**（`hqs.yml` → `trucks`）。
+
+        * 合法值 **1–5**（0 不行 —— 总部至少要有一辆补给卡车）；
+        * 1–5 辆依次对应补给作用范围 **5 / 8 / 10 / 11 / 12** 格；
+        * **不涉及声望** —— 改卡车不动 `main.yml` 的任何数值。
+        """
+        return Edit("hq_trucks", {"hq_id": hq_id, "trucks": trucks})
+
+    @staticmethod
     def hq_branch_level(hq_id: int, branch: str, level: int,
-                        suppressed: bool | None = None) -> "Edit":
-        """改总部的**分支等级**（总部"升级"= 五个分支各一个等级）。"""
+                        suppressed: int | None = None) -> "Edit":
+        """改总部的**分支等级**（总部"升级"= 五个分支各一个等级）。
+
+        `branch_levels[分支] = {level, suppressed}`：
+
+        * `level` = **当前生效**的等级（0–3）；
+        * `suppressed` = **被压制的等级数**（0–3，**不是布尔开关**）——
+          游戏内部「解锁到几级」= `level + suppressed`。
+
+        想调压制请用 `Edit.hq_branch_suppressed`（它会自动重算 `level`）。
+        """
         return Edit("hq_branch_level", {"hq_id": hq_id, "branch": branch,
                                         "level": level, "suppressed": suppressed})
+
+    @staticmethod
+    def hq_branch_suppressed(hq_id: int, branch: str, suppressed: int) -> "Edit":
+        """调总部分支的**被压制的等级数**（`branch_levels[分支].suppressed`）。
+
+        语义 = 游戏的 `branch_suppress`：压制 N 级 ⇒ 生效等级 −N、被压制数 +N，
+        而「真实等级（`level + suppressed`）」**不变**。核心库会自动重算 `level`：
+
+            新 level = (旧 level + 旧 suppressed) − 新 suppressed
+
+        ⚠️ 压制只写在**战役进行中**的存档里才有意义 —— 游戏在一局结束时
+        （`set_end_game` → `unsuppress_branch_levels`）会把压制还原。
+        """
+        return Edit("hq_branch_suppressed",
+                    {"hq_id": hq_id, "branch": branch, "suppressed": suppressed})
 
     @staticmethod
     def hq_branch_sp(hq_id: int, branch: str, action: str,

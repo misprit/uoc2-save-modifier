@@ -9,6 +9,13 @@
 `level` 是**级别 tier**（游戏里矩阵的列），`sp_used` 是**已专精次数 = 技能等级**，
 `sp_avail` 是还能再专精几次（≤2）；专精 = 该技能发动时 **CP 消耗 −1**
 ⇒ 存档里的 `cost` 存的是**已扣减**的值（原始 CP = `cost + sp_used`）。
+
+实测依据（`e166`，U13）：
+* `branch_levels[分支].suppressed` = **被压制的等级数**（整数 0–3，**不是布尔开关**）——
+  `branch_suppress` → `level -= n; suppressed += n`；
+  `unsuppress_branch_levels` → `level += suppressed; suppressed = 0`；
+  游戏内部「解锁到几级」= `level + suppressed`（`can_add_branch_level`）；
+* `hqs[].trucks` = 补给卡车数（1–5，对应补给作用范围 5/8/10/11/12 格）。
 """
 
 import shutil
@@ -95,10 +102,30 @@ class TestHqBranchLevel(HqTestBase):
         self.assertEqual(self.hq()["branch_levels"]["force_pool"]["level"], 1)
 
     def test_set_suppressed(self):
+        """`suppressed` = **被压制的等级数**（整数，0–3）—— 不是布尔开关。"""
         plan, res = self.commit(
-            [Edit.hq_branch_level(5, "intel", 2, suppressed=True)])
+            [Edit.hq_branch_level(5, "intel", 2, suppressed=1)])
         self.assertTrue(plan.ok, plan.errors)
-        self.assertTrue(self.hq()["branch_levels"]["intel"]["suppressed"])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self.hq()["branch_levels"]["intel"]["suppressed"], 1)
+
+    def test_suppressed_must_be_int(self):
+        plan, _ = self.commit(
+            [Edit.hq_branch_level(5, "intel", 2, suppressed=True)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("suppressed 必须是整数" in e for e in plan.errors),
+                        plan.errors)
+
+    def test_level_plus_suppressed_over_max_is_blocked(self):
+        """游戏内部「解锁到几级」= level + suppressed，不能超过 3。"""
+        plan, _ = self.commit(
+            [Edit.hq_branch_level(5, "operations", 3, suppressed=1)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("超过上限" in e for e in plan.errors), plan.errors)
+
+    def test_level_over_max_is_blocked(self):
+        plan, _ = self.commit([Edit.hq_branch_level(5, "engineering", 4)])
+        self.assertFalse(plan.ok)
 
     def test_unknown_branch_is_blocked(self):
         plan, _ = self.commit([Edit.hq_branch_level(5, "nuclear", 1)])
@@ -114,6 +141,106 @@ class TestHqBranchLevel(HqTestBase):
         plan, _ = self.commit([Edit.hq_branch_level(5, "force_pool", 0)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(any("降级" in w for w in plan.warnings), plan.warnings)
+
+
+class TestHqBranchSuppressed(HqTestBase):
+    """`hq_branch_suppressed` = 调**被压制的等级数**（联动重算 `level`）。
+
+    语义 = 游戏的 `branch_suppress`（`e166`）：压制 N 级 ⇒ 生效等级 −N、
+    被压制数 +N，**真实等级（level + suppressed）不变**。
+    """
+
+    def test_suppress_one_keeps_real_level(self):
+        plan, res = self.commit([Edit.hq_branch_suppressed(5, "operations", 1)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        node = self.hq()["branch_levels"]["operations"]
+        self.assertEqual(node["suppressed"], 1)
+        self.assertEqual(node["level"], 1)          # 2 − 1
+        self.assertEqual(node["level"] + node["suppressed"], 2)   # 真实等级不变
+
+    def test_release_suppression(self):
+        self.commit([Edit.hq_branch_suppressed(5, "operations", 1)])
+        plan, res = self.commit([Edit.hq_branch_suppressed(5, "operations", 0)])
+        self.assertTrue(plan.ok, plan.errors)
+        node = self.hq()["branch_levels"]["operations"]
+        self.assertEqual(node["suppressed"], 0)
+        self.assertEqual(node["level"], 2)
+
+    def test_suppress_more_than_total_is_blocked(self):
+        """压制数不能超过该分支的总等级。"""
+        plan, _ = self.commit([Edit.hq_branch_suppressed(5, "engineering", 2)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("超过该分支的总等级" in e for e in plan.errors),
+                        plan.errors)
+
+    def test_negative_is_blocked(self):
+        plan, _ = self.commit([Edit.hq_branch_suppressed(5, "operations", -1)])
+        self.assertFalse(plan.ok)
+
+    def test_bool_is_blocked(self):
+        plan, _ = self.commit([Edit.hq_branch_suppressed(5, "operations", True)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("必须是整数" in e for e in plan.errors), plan.errors)
+
+    def test_unknown_branch_is_blocked(self):
+        plan, _ = self.commit([Edit.hq_branch_suppressed(5, "nuclear", 1)])
+        self.assertFalse(plan.ok)
+
+    def test_summary_mentions_suppression(self):
+        plan, _ = self.commit([Edit.hq_branch_suppressed(5, "operations", 1)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(any("被压制" in n for n in plan.notes), plan.notes)
+
+    def test_only_hqs_yml_changes(self):
+        plan, res = self.commit([Edit.hq_branch_suppressed(5, "operations", 1)])
+        self.assertEqual(res.changed, ["hqs.yml"])
+
+
+class TestHqTrucks(HqTestBase):
+    """`hq_trucks` = 总部的**补给卡车数**（1–5，0 不行，不涉及声望）。"""
+
+    def test_set_trucks(self):
+        plan, res = self.commit([Edit.hq_trucks(5, 5)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self.hq()["trucks"], 5)
+
+    def test_zero_is_blocked(self):
+        """总部至少要有一辆补给卡车。"""
+        plan, _ = self.commit([Edit.hq_trucks(5, 0)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("卡车数必须在 1–5 之间" in e for e in plan.errors),
+                        plan.errors)
+
+    def test_over_max_is_blocked(self):
+        plan, _ = self.commit([Edit.hq_trucks(5, 6)])
+        self.assertFalse(plan.ok)
+
+    def test_summary_mentions_range(self):
+        plan, _ = self.commit([Edit.hq_trucks(5, 3)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(any("10 格" in n for n in plan.notes), plan.notes)
+
+    def test_fewer_trucks_warns(self):
+        plan, _ = self.commit([Edit.hq_trucks(5, 1)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(any("补给作用范围" in w for w in plan.warnings),
+                        plan.warnings)
+
+    def test_does_not_touch_prestige(self):
+        """改卡车**不涉及声望** —— `main.yml` 一个字节都不动。"""
+        before = self.read("main.yml")
+        plan, res = self.commit([Edit.hq_trucks(5, 4)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertEqual(res.changed, ["hqs.yml"])
+        self.assertEqual(self.read("main.yml"), before)
+
+    def test_hq_field_trucks_no_longer_called_statistic(self):
+        """`trucks` 不是"游戏自己累计的统计值" —— 不再挂那条提示。"""
+        plan, _ = self.commit([Edit.hq_field(5, "trucks", 2)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertFalse(any("统计值" in w for w in plan.warnings), plan.warnings)
 
 
 class TestHqForcePoolAddRemove(HqTestBase):

@@ -91,13 +91,17 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
          "supply": 3, "uv": [10, 20], "xp": 0, "xp_target": 100,
          "persistent": True, "overrun": False, "turn_disbanded": False,
          "loss_count": 0, "intels_revealed": 0, "prisoners": 0,
-         "trucks": 0, "fixed_movement": False, "fixed_range": False,
+         "trucks": 3, "fixed_movement": False, "fixed_range": False,
          "motor_pool_flag": False, "moved": False,
-         "branch_levels": {"force_pool": {"level": 1, "suppressed": False},
-                           "intel": {"level": 0, "suppressed": False},
-                           "operations": {"level": 2, "suppressed": False},
-                           "logistics": {"level": 2, "suppressed": False},
-                           "engineering": {"level": 1, "suppressed": False}},
+         # **被压制的等级数是整数**（不是布尔开关）—— `e166` 字节码：
+         # `branch_suppress` → level −= n; suppressed += n；
+         # `unsuppress_branch_levels` → level += suppressed; suppressed = 0。
+         # 游戏内部「解锁到几级」= level + suppressed（`can_add_branch_level`）。
+         "branch_levels": {"force_pool": {"level": 1, "suppressed": 0},
+                           "intel": {"level": 0, "suppressed": 0},
+                           "operations": {"level": 2, "suppressed": 0},
+                           "logistics": {"level": 2, "suppressed": 0},
+                           "engineering": {"level": 1, "suppressed": 0}},
          # **技能树**（`e165`）：分支 → 技能列表；每条 = {action, cost, level,
          # sp_avail, sp_used}。`level` 是**级别 tier**（矩阵的列），**不是**分支等级；
          # `sp_used` = 已专精次数 = 技能等级；`sp_avail` = 还能再专精几次（≤2）。
