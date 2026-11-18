@@ -2531,6 +2531,51 @@ PNG 文件
 
 ---
 
+### 10.9 ★ 不合规操作拦截总表（U25 · 逐字段对游戏 schema 核过）
+
+> **【2026-11-18 · U25 用户要求】** 「你确定好相关规则就行。
+> **玩家要能（阻止）玩家进行不合规操作。**」
+>
+> ⇒ 本节是**全部写入入口 × 全部可写字段**的核对结果：
+> 每一个能写进存档的数值，都对照**游戏自己的 voluptuous schema** 核过，
+> 超范围的一律**硬拦**（进 `plan.errors`），不靠 GUI 自律。
+
+**为什么必须硬拦**：游戏读存档时用 voluptuous 校验 schema，
+**超范围 ⇒ 校验失败 ⇒ 存档直接打不开** —— 不是「显示异常」，是**把存档搞崩**。
+
+**总表**
+
+| 层 | 入口 | 字段 | 合法范围 | 游戏 schema 依据 |
+|---|---|---|---|---|
+| 单位 | `unit_field` | `xp` | **0 – 400** | `All(int, Range(min=0, max=400))` |
+| 单位 | `unit_field` | `entr` / `supply` / `ap` | 0 – 2 / 0 – 3 / 0 – 3 | `Range(max=unit_max_entr_level)` 等 |
+| 单位 | `unit_field` | `act_st` / `sup_st` | ≥ 0（**上限在类型表**，不在存档） | `nonnegative_int_schema` |
+| 单位 | `unit_field` | `name_brief` / `name_full` | 字符串或 `null` | `Or(str, bool)` |
+| 单位 | `unit_spec_add` | 特种兵类型 | 必须在 375 个里 + 槽位没满 | `entity_types/specialists/` |
+| 总部 | `hq_field` | `cp` | **0 – 9** | `All(int, Range(min=0, max=hq_max_cp))` |
+| 总部 | `hq_field` | `max_cp` | **3 – 9** | `All(int, Range(min=hq_min_max_cp, max=hq_max_cp))` |
+| 总部 | `hq_field` | **`supply`** | **0 – 3** | `All(int, Range(min=0, max=3))` ← **U25 补** |
+| 总部 | `hq_field` | **`trucks`** | **1 – 5** | `All(int, Range(min=1, max=5))` ← **U25 补** |
+| 总部 | `hq_field` | `xp` / `xp_target` / `prisoners` / `loss_count` / `intels_revealed` | ≥ 0 | `nonnegative_int_schema` |
+| 总部 | `hq_branch_level` | `level` / `suppressed` | 各 0 – 3，且 **level + suppressed ≤ 3** | `Range(min=0, max=3)` + `_branch_levels_check` |
+| 总部 | `hq_branch_suppressed` | `suppressed` | 0 – 3，且 ≤ 该分支总等级 | 同上 |
+| 总部 | `hq_branch_sp` | `sp_used` | ≤ `sp_avail`（≤ 2），且 `cost` 不为负 | `branches_with_sps_schema` |
+| 总部 | `hq_trucks` | `trucks` | **1 – 5** | `All(int, Range(min=1, max=5))` |
+| 总部 | `hq_force_pool` | `quantity` | ≥ 0；`spec` 与 `equipment` **二选一** | `force_pool_schema` |
+| 总部 | `hq_force_pool_add` | 同上 + `spec` 必须存在 | quantity ≥ 0；国籍跟着类型；**同身份 + 同延迟不重复** | §7.3.7 / §7.4.7a |
+| 卡牌 | `card_add` | `card_type` | 必须在 39 种里；`unit_id` 必须等于**预留 id** | §7.5.1 |
+| 卡牌 | `card_add` | **`position`** | **1 – `card_deck_limit[难度]`**（超限的槽位**游戏读不到**） | 游戏按槽位索引读手牌 ← **U25 补** |
+| 卡牌 | `card_set` | `is_free` | `True` / `False` | `bool` |
+| 货架 | `card_store_set` / `card_store_add` | `card_type` / `position` | 必须在**白名单**里；`position` ≤ 5 | §7.5.1 |
+| 商店 | `store_set` | `price` / `quantity` | ≥ 0 / **≥ 1**（0 库存会被 schema 拒） | `store_schema` |
+| 商店 | `store_add` | 同上 + 商品必须游戏定义过 | price ≥ 0 / quantity ≥ 1；**同店不重复** | §7.3.7 |
+| 战区资产 | `theater_asset` | `to_use` / `uses_total` / `uses_turn` | ≥ 0 / ≥ 0 或 `None` / **≥ 1**；且 `to_use ≤ uses_total` | §7.7 |
+| 进度 | `progress` | `prestige` / `score` | ≥ 0 | `nonnegative_int_schema` |
+
+**同一条规则的多个入口必须一致**（U25 的教训）：
+`trucks` 能从 `hq_field` 和 `hq_trucks` 两条路改 ⇒ **两条路必须用同一套范围**，
+否则 `hq_field` 就成了绕过硬拦的**后门**（U25 审计发现并修掉了两处）。
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
@@ -3453,6 +3498,37 @@ eff = uses_turn                (uses_total 为 None 时)
 
 ⇒ **U24 有核心库改动**，自动化测试 369 → **370**。
 
+### 13.2o 批次十八 · U25（2026-11-18 用户要求）
+
+> 用户一句：
+> 「你确定好相关规则就行。**玩家要能（阻止）玩家进行不合规操作。**」
+>
+> ⇒ 换句话说：**规则我定，但底线是玩家不能做出会让存档坏掉的操作。**
+
+**U25 做了什么**：把**全部 23 种写入入口 × 全部可写字段**逐条对照
+**游戏自己的 voluptuous schema** 核了一遍（`state/entities/data_validation/`）。
+
+**审计发现的 3 个漏洞（已修）**
+
+| # | 漏洞 | 后果 | 修法 |
+|---|---|---|---|
+| 1 | `hq_field(hq, "trucks", 999)` 只校验「≥ 0」 | 游戏 schema 是 `Range(1, 5)` ⇒ **存档打不开**（而且绕过了 `_hq_trucks` 的 1–5 硬拦） | `_hq_field` 补 `trucks` 1–5 硬拦，两个入口同一套规则 |
+| 2 | `hq_field(hq, "supply", 4)` 只校验「≥ 0」 | 游戏 schema 是 `Range(0, 3)` ⇒ **存档打不开** | `_hq_field` 补 `supply` 0–3 硬拦 |
+| 3 | `card_add(position=99)` 没有上限 | 不会让存档打不开（游戏的 card schema 里**没有** position 字段），但游戏**按槽位索引读手牌** ⇒ **那张卡读不到**（白写） | `position` 必须在 `1..card_deck_limit[难度]`；自动分配改成「找第一个空槽」 |
+
+⇒ **漏洞 1、2 都是「后门」型**：`hq_field` 与专用入口 `_hq_trucks` 规则不一致 ⇒
+`hq_field` 成了绕过点。**同一条规则的多个入口必须一致。**
+
+**顺带修正一个错误前提**：既有测试 `test_add_card_with_explicit_position`
+用的是 `position=7`（hard 难度上限 3）—— 它建立在一个**错的前提**上
+（以为槽位可以超限）。已改成合法槽位，并新增「超限被拦」的用例。
+
+⇒ **U25 有核心库改动**，自动化测试 370 → **378**。
+
+**U25 的交付物**：规范新增 **§10.9「不合规操作拦截总表」** ——
+全部写入入口 × 全部可写字段 × 合法范围 × **游戏 schema 依据**，
+一眼看得到「哪些会被拦、为什么」。
+
 ### 13.3 我自己定的技术细节（只报备，不占你时间）
 
 #### U19 新增（批次十三）
@@ -3566,6 +3642,16 @@ eff = uses_turn                (uses_total 为 None 时)
 | 存量里完全相同的重复算合法吗？ | **不算合法**，但是**冗余表示** —— 游戏部署时会合并，不会出错；修改器**不清理** |
 | 商店侧有游戏自己的判重规则吗？ | **没有** —— 游戏里根本没有「上架」命令（只能买/部署）⇒ 商店规则**按用户口径定** |
 
+#### U25 新增（批次十八）
+
+| 问题 | 结论 |
+|---|---|
+| 「不合规操作」怎么定义？ | **会让游戏读档失败的写入** —— 即超出游戏 voluptuous schema 范围的值 |
+| 为什么要硬拦而不是警告？ | 超范围 ⇒ 校验失败 ⇒ **存档直接打不开**，警告没用 |
+| 同一规则有多个入口怎么办？ | **必须用同一套范围** —— 否则另一个入口就是后门（U25 抓到两处） |
+| 写了不崩但没效果算不算不合规？ | **算** —— 例如超限的手牌槽位（游戏按 position 索引，读不到）⇒ 也要拦 |
+| 怎么保证不漏？ | 把 23 种写入入口 × 全部可写字段**逐条**对游戏 schema 核一遍，列成 §10.9 总表 |
+
 ### 13.4 已由数据 / 实证回答，不再问
 
 | 问题 | 答案 | 出处 |
@@ -3601,6 +3687,7 @@ eff = uses_turn                (uses_total 为 None 时)
 | 商店 / 兵库能加重复条目吗？ | **不能** —— 商店：同 **(战线, 子商店)** 内任何重复都不许；兵库：同总部内**同身份 + 同延迟**不许并存（**延迟不同可以共存**） | U23 用户口径 |
 | 游戏自己的兵库合并键是什么？ | **`(delay, nationality, spec / equipment)`** —— 命中就 `quantity +=` 合并，**不新建** | U24 字节码（`ForcePool.add`） |
 | 延迟的特种兵是整体处理还是逐个？ | **逐个** —— `deploy_with_delay(N)` 只部署 `delay == N` 的那批，按延迟分批上线 | U24 字节码 |
+| 总部的 `trucks` / `supply` 合法范围？ | **1 – 5** / **0 – 3** —— 游戏 schema 的硬范围，超了**存档打不开** | U25 字节码 |
 | 特种兵分几个国籍？ | **31 个**（375 种里） | `e164` ② |
 | 国籍中文名会撞车吗？ | **会，6 组**（苏联 / 意大利 / 波兰 / 罗马尼亚 / 瑞士 / 南斯拉夫）—— 每组两个 id 分属不同阵营 | `e164` ① ② |
 | 国籍表在哪？ | `entity_types/nationalities.yml`（40 个）+ `nationalities_2.yml`（空模板 `{}`）—— **是文件不是目录** | `e164` ① |

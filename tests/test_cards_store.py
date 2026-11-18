@@ -199,11 +199,25 @@ class TestCards(CardStoreTestBase):
         self.assertFalse(cards[1]["used"])
 
     def test_add_card_with_explicit_position(self):
-        plan, res = self.commit([Edit.card_add("air_attack_allies", position=7)])
+        """显式指定槽位（夹具难度 hard ⇒ 手牌上限 3）。"""
+        plan, res = self.commit([Edit.card_add("air_attack_allies", position=3)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
         cards = self.read("cards.yml")
-        self.assertEqual(cards[1]["position"], 7)
+        self.assertEqual(cards[1]["position"], 3)
+
+    def test_position_over_limit_is_blocked(self):
+        """⚠️ U25：超限的槽位**游戏读不到**（按 position 索引读手牌）⇒ 白写 ⇒ 拦。
+
+        原来的用例用 position=7，**建立在一个错的前提上**（以为槽位可以超限）。
+        """
+        plan, _ = self.commit([Edit.card_add("air_attack_allies", position=7)])
+        self.assertFalse(plan.ok)
+        self.assertIn("上限", plan.errors[0])
+
+    def test_position_zero_is_blocked(self):
+        plan, _ = self.commit([Edit.card_add("air_attack_allies", position=0)])
+        self.assertFalse(plan.ok)
 
     def test_duplicate_position_is_blocked(self):
         plan, _ = self.commit([Edit.card_add("air_attack_allies", position=1)])

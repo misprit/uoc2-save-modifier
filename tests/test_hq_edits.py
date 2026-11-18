@@ -511,5 +511,62 @@ class TestHqViewBranches(unittest.TestCase):
         self.assertEqual(self.hq.branch_tiers.get("nosuch", {}), {})
 
 
+class TestHqFieldHardRange(unittest.TestCase):
+    """U25 审计：**`hq_field` 是绕过硬范围的后门**，已堵上。
+
+    游戏 schema（`state/entities/data_validation/hq.pyc::_scenario_base_hq_schema`）：
+
+    * `trucks` → `All(int, Range(min=1, max=5))`
+    * `supply` → `All(int, Range(min=0, max=3))`
+
+    ⇒ 超范围 ⇒ voluptuous 校验失败 ⇒ **存档直接打不开**。
+    审计前 `_hq_field` 只校验「非负整数」⇒ 写 `trucks=999` 能绕过
+    `_hq_trucks` 的 1–5 拦截。
+    """
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="hq_range_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.save_path = make_save(self.tmp / "s.usg")
+        self.paths = CorePaths.discover()
+
+    def plan(self, edits):
+        with open_save(str(self.save_path), self.paths) as save:
+            return save.plan_edit(edits)
+
+    def test_trucks_over_max_is_blocked(self):
+        plan = self.plan([Edit.hq_field(5, "trucks", 999)])
+        self.assertFalse(plan.ok)
+        self.assertIn("trucks", plan.errors[0])
+
+    def test_trucks_zero_is_blocked(self):
+        """游戏的 trucks 下限是 **1**（0 辆卡车没有补给作用范围）。"""
+        plan = self.plan([Edit.hq_field(5, "trucks", 0)])
+        self.assertFalse(plan.ok)
+        self.assertIn("trucks", plan.errors[0])
+
+    def test_trucks_in_range_is_allowed(self):
+        plan = self.plan([Edit.hq_field(5, "trucks", 5)])
+        self.assertTrue(plan.ok, plan.errors)
+
+    def test_supply_over_max_is_blocked(self):
+        """游戏的 supply 上限是 **3**（Range(0, 3)）。"""
+        plan = self.plan([Edit.hq_field(5, "supply", 4)])
+        self.assertFalse(plan.ok)
+        self.assertIn("supply", plan.errors[0])
+
+    def test_supply_in_range_is_allowed(self):
+        for v in (0, 3):
+            plan = self.plan([Edit.hq_field(5, "supply", v)])
+            self.assertTrue(plan.ok, plan.errors)
+
+    def test_both_entry_points_agree_on_trucks(self):
+        """`_hq_field` 与 `_hq_trucks` 必须是同一套规则。"""
+        for v in (0, 6):
+            p1 = self.plan([Edit.hq_field(5, "trucks", v)])
+            p2 = self.plan([Edit.hq_trucks(5, v)])
+            self.assertFalse(p1.ok, v)
+            self.assertFalse(p2.ok, v)
+
 if __name__ == "__main__":
     unittest.main()

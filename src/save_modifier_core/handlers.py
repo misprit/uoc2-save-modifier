@@ -92,6 +92,12 @@ HQ_BRANCHES = ("engineering", "force_pool", "intel", "logistics", "operations")
 HQ_CP_MIN, HQ_CP_MAX = 0, 9
 HQ_MAX_CP_MIN, HQ_MAX_CP_MAX = 3, 9
 
+#: 总部的**补给数**合法范围 —— 游戏 schema 是硬范围（U25 字节码取证）：
+#: `state/entities/data_validation/hq.pyc::_scenario_base_hq_schema`
+#: ⇒ `Required('supply'): All(int, Range(min=0, max=3))`
+#: ⇒ 写 4 以上**存档直接打不开**（voluptuous 校验失败）。
+HQ_SUPPLY_MIN, HQ_SUPPLY_MAX = 0, 3
+
 #: 战区资产三个字段的**合法范围**（U20 字节码取证 —— `lib/uoc2/` 反汇编）：
 #:
 #: | 字段 | 游戏里的含义 | 游戏的 voluptuous schema | 合法范围 |
@@ -397,7 +403,8 @@ def _hq_field(w, e: Edit) -> Outcome:
         oc.errors.append(f"{field} 必须是非负整数，收到 {value!r}")
         return oc
 
-    # ⚠️ CP 的合法区间比「非负整数」严 —— 游戏 schema 是硬范围（U19 字节码取证）
+    # ⚠️ 合法区间比「非负整数」严 —— 游戏 schema 是硬范围（U19 / U25 字节码取证）
+    #    超范围**不是显示异常，是 voluptuous 校验失败 ⇒ 存档直接打不开**。
     if field == "max_cp" and not (HQ_MAX_CP_MIN <= value <= HQ_MAX_CP_MAX):
         oc.errors.append(
             f"max_cp 必须在 {HQ_MAX_CP_MIN}–{HQ_MAX_CP_MAX} 之间（游戏的硬范围），收到 {value}")
@@ -405,6 +412,17 @@ def _hq_field(w, e: Edit) -> Outcome:
     if field == "cp" and not (HQ_CP_MIN <= value <= HQ_CP_MAX):
         oc.errors.append(
             f"cp 必须在 {HQ_CP_MIN}–{HQ_CP_MAX} 之间（游戏的硬范围），收到 {value}")
+        return oc
+    # ⚠️ U25：trucks / supply 也是**硬范围**，原先只校验「非负整数」——
+    #    于是 `hq_field(hq, "trucks", 999)` 能绕过 `_hq_trucks` 的 1–5 拦截，
+    #    写出来的存档**打不开**。两个入口现在用同一套规则。
+    if field == "trucks" and not (TRUCK_MIN <= value <= TRUCK_MAX):
+        oc.errors.append(
+            f"trucks 必须在 {TRUCK_MIN}–{TRUCK_MAX} 之间（游戏的硬范围），收到 {value}")
+        return oc
+    if field == "supply" and not (HQ_SUPPLY_MIN <= value <= HQ_SUPPLY_MAX):
+        oc.errors.append(
+            f"supply 必须在 {HQ_SUPPLY_MIN}–{HQ_SUPPLY_MAX} 之间（游戏的硬范围），收到 {value}")
         return oc
 
     hqs = w.table("hqs.yml", [])
@@ -900,10 +918,27 @@ def _card_add(w, e: Edit) -> Outcome:
     if not isinstance(cards, list):
         oc.errors.append("根 cards.yml 结构异常")
         return oc
+    # ⚠️ U25：手牌槽位有上限（`card_deck_limit[难度]`），超限的槽位**游戏读不到**
+    #    （游戏的 card schema 里压根没有 position 字段，是按槽位索引读的）
+    #    ⇒ 写进去不会让存档打不开，但那张卡等于白写 ⇒ 必须拦。
+    limit = CARD_DECK_LIMIT.get(_level_of(w), 5)
     if position is None:
-        positions = [c.get("position") for c in cards
-                     if isinstance(c, dict) and isinstance(c.get("position"), int)]
-        position = (max(positions) + 1) if positions else 1
+        used = {c.get("position") for c in cards
+                if isinstance(c, dict) and isinstance(c.get("position"), int)}
+        position = next((p for p in range(1, limit + 1) if p not in used), None)
+        if position is None:
+            oc.errors.append(
+                f"手牌已满（本难度「{_level_of(w)}」的上限是 {limit} 张）—— 先删一张再添加")
+            return oc
+    else:
+        if not isinstance(position, int) or isinstance(position, bool) or position < 1:
+            oc.errors.append(f"槽位号必须是 ≥ 1 的整数，收到 {position!r}")
+            return oc
+        if position > limit:
+            oc.errors.append(
+                f"槽位 {position} 超过本难度（{_level_of(w)}）的手牌上限 {limit} —— "
+                "游戏按槽位索引读手牌，超限的槽位**读不到**（白写）")
+            return oc
     if any(isinstance(c, dict) and c.get("position") == position for c in cards):
         oc.errors.append(f"槽位 {position} 已经被占了")
         return oc
