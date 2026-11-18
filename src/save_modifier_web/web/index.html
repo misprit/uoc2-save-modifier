@@ -190,6 +190,16 @@ window.onerror = function(msg, src, line){
   return false;
 };
 
+/* 幂等编码：已经编码过的不再编码（U31 修双重编码的 bug）。
+   `encodeURIComponent` 不编码 `'`（单引号）—— 存档名里有单引号会破坏 JS 字面量
+   ⇒ 这里把 `'` 一并编码成 %27。 */
+function encOnce(s){
+  const raw = String(s??"");
+  // 已经编码过的（含 %XX 且能解码回来）=> **原样返回**，不要再编码一次
+  try { if(decodeURIComponent(raw) !== raw) return raw; } catch(e){}
+  return encodeURIComponent(raw).replace(/'/g, "%27");
+}
+
 async function api(path){
   const r = await fetch(path, {headers:{"X-Token":TOKEN}});
   if(!r.ok) throw new Error(await r.text());
@@ -289,7 +299,7 @@ function paint(){
   document.getElementById("cnt").textContent = list.length + " 个存档";
   document.getElementById("empty").style.display = list.length ? "none":"block";
   document.getElementById("rows").innerHTML = list.map(s => `
-    <tr onclick="openSave('${encodeURIComponent(s.save_id)}')">
+    <tr onclick="openSave('${encodeURIComponent(s.save_id).replace(/'/g, "%27")}')">
       <td>${esc(s.name)}<div style="color:var(--muted);font-size:11.5px">${esc(s.display)}</div></td>
       <td class="k">${esc(s.kind)}</td>
       <td class="k">${esc(s.scenario||"—")}</td>
@@ -304,7 +314,7 @@ function esc(s){ return String(s??"").replace(/[&<>"]/g,
 
 async function openSave(sid){
   try {
-    VIEW = await api("/api/view/" + encodeURIComponent(sid));
+    VIEW = await api("/api/view/" + encOnce(sid));
   } catch(e) {
     const r = document.getElementById("rows");
     if(r) r.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">`

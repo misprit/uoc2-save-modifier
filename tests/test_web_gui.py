@@ -247,5 +247,108 @@ class TestSurfaces(WebGuiTestBase):
         self.assertEqual(cm.exception.code, 404)
 
 
+class TestPathEncoding(WebGuiTestBase):
+    """U31：**前端只编码一次**（`encOnce` 幂等）+ 服务端 `unquote` 一次。
+
+    ⚠️ 曾经的 bug：表格模板已经 `encodeURIComponent` 过一次，`openSave` 里又编码一次
+    ⇒ `%20` → `%2520`、斜杠 → `%252F` ⇒ 服务端解一次后仍是编码串
+    ⇒ **含空格的路径（`Old Saves/…`）打不开**。
+    """
+
+    @staticmethod
+    def enc_once(raw):
+        """复刻前端的 `encOnce()`。"""
+        from urllib.parse import quote, unquote
+        try:
+            if unquote(raw) != raw:
+                return raw                 # 已编码 => 原样
+        except Exception:
+            pass
+        # JS 的 encodeURIComponent 不编码 ' ! ~ * ( ) —— 但我们额外把 ' 转 %27
+        # （单引号会破坏 JS 字面量）⇒ 这里照做。
+        return quote(raw, safe="!~*()").replace("'", "%27")
+
+    def test_plain_id_roundtrip(self):
+        from urllib.parse import unquote
+        raw = "campaigns/Stalingrad.usg"
+        self.assertEqual(unquote(self.enc_once(raw)), raw)
+
+    def test_id_with_spaces_roundtrip(self):
+        """`Old Saves/…` —— 就是打不开的那一类。"""
+        from urllib.parse import unquote
+        raw = "Old Saves/Stalingrad/Stalingrad-Conference3-2.usg"
+        self.assertEqual(unquote(self.enc_once(raw)), raw)
+
+    def test_id_with_chinese_roundtrip(self):
+        from urllib.parse import unquote
+        raw = "Old Saves/Victory in the West/困难难度-史实线/west-f.usg"
+        self.assertEqual(unquote(self.enc_once(raw)), raw)
+
+    def test_single_quote_is_escaped(self):
+        """`encodeURIComponent` **不编码单引号** ⇒ 会破坏 JS 字面量。"""
+        enc = self.enc_once("Player's save.usg")
+        self.assertNotIn("'", enc)
+
+    def test_already_encoded_is_not_encoded_again(self):
+        """★ 核心断言：已编码的输入**不能再编码一次**（那就是原来的 bug）。"""
+        from urllib.parse import quote, unquote
+        raw = "Old Saves/Stalingrad/Stalingrad-Conference3-2.usg"
+        once = quote(raw, safe="!~*()").replace("'", "%27")   # 模拟模板里 encodeURIComponent
+        twice = self.enc_once(once)                # openSave 里再来一次
+        self.assertEqual(twice, once, "被二次编码了")
+        self.assertEqual(unquote(twice), raw)
+
+    def _get_view(self, sid):
+        import json
+        import urllib.request
+        enc = self.enc_once(sid)
+        req = urllib.request.Request(self.url("/api/view/" + enc))
+        req.add_header("X-Token", server._Handler.token)
+        body = urllib.request.urlopen(req, timeout=60).read()
+        return json.loads(body.decode("utf-8"))
+
+    def test_server_side_handles_absolute_path_with_spaces(self):
+        """**副本的绝对路径**（带空格）⇒ 服务端能打开。
+
+        ⚠️ 副本**不在存档根下** ⇒ `save_id` 必须用**绝对路径**
+        （`open_save()` 接受绝对路径）。只读 GET，不写任何东西。
+        """
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves
+
+        tmp = Path(tempfile.mkdtemp(prefix="web enc "))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            p = str(info.path)
+            if "BACKUP" not in p and p.endswith(".usg"):
+                src = p
+                break
+        if src is None:
+            self.skipTest("本机没有存档")
+        copy = str(tmp / "copy usg.usg")
+        shutil.copyfile(src, copy)
+        data = self._get_view(copy)
+        self.assertIn("units", data)
+        self.assertIn("_features", data)
+
+    def test_server_side_handles_archived_save_id(self):
+        """**归档存档**的 save_id（`Old Saves/…`，含空格）⇒ 能打开。
+
+        这是用户实际点的那一类（63 个归档存档）⇒ **只读** GET。
+        """
+        from save_modifier_core import list_saves
+        olds = [i.save_id for i in list_saves() if "Old Saves" in i.save_id]
+        if not olds:
+            self.skipTest("本机没有归档存档")
+        sid = olds[0]
+        self.assertIn(" ", sid, "这个用例要的就是含空格的 save_id")
+        data = self._get_view(sid)
+        self.assertIn("units", data)
+        self.assertIn("_features", data)
+
+
 if __name__ == "__main__":
     unittest.main()
