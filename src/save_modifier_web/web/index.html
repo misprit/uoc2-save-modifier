@@ -411,6 +411,45 @@ table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
 .bkrow b{font-family:var(--mono);color:var(--text);font-weight:600}
 .bkrow .n{margin-left:auto;font-size:11px}
 
+
+/* ---------------- 悬停浮层 .tip（U43 · 设计稿 §1） ---------------- */
+.tip{position:absolute;z-index:300;background:#1b2430;color:#fff;border-radius:6px;padding:7px 10px;
+  font-size:11.5px;line-height:1.55;white-space:nowrap;pointer-events:none;opacity:0;
+  transition:opacity .12s;box-shadow:0 8px 22px rgba(10,20,30,.32);max-width:320px;white-space:normal}
+.tip.show{opacity:1}
+.tip .tn{font-weight:700;font-size:12.5px;display:block;margin-bottom:1px}
+.tip .tr{color:#a9bacb}
+.tip .tag{display:inline-block;background:#2c3a4a;border-radius:3px;padding:0 5px;margin:3px 3px 0 0;
+  font-size:10.5px}
+/* 备选池：阵营分隔带 + 国籍组（U43） */
+.facband{display:flex;align-items:center;gap:8px;padding:8px 12px 3px;font-size:11px;
+  color:var(--muted);letter-spacing:.06em;background:var(--surface)}
+.facband .fline{flex:1;height:1px;background:var(--border)}
+.grphead{display:flex;align-items:center;gap:7px;padding:4px 12px;background:var(--surface-alt);
+  border-top:1px solid var(--border);font-size:12px;font-weight:600;color:var(--accent-dark);
+  cursor:pointer;user-select:none}
+.grphead .caret{font-size:10px;display:inline-block;transition:transform .12s}
+.grphead.closed .caret{transform:rotate(-90deg)}
+.grphead .gcount{font-weight:400;color:var(--muted);font-size:11.5px}
+.grphead .gcan{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--accent-dark);
+  background:var(--accent-light);border:1px solid #b9d3ea;border-radius:9px;padding:0 7px}
+.grpbody{display:flex;flex-wrap:wrap;gap:6px;padding:9px 12px}
+/* 总部页签（U43） */
+.hqtabs{display:flex;gap:2px;background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:6px;padding:2px;width:fit-content;margin:0 0 12px}
+.hqtabs .tb{padding:4px 15px;font-size:12.5px;border-radius:5px;color:var(--muted);
+  cursor:pointer;user-select:none}
+.hqtabs .tb.on{background:var(--surface);color:var(--accent-dark);font-weight:600;
+  box-shadow:0 1px 3px rgba(20,40,60,.12)}
+.hqtabs .tb .n{font-family:var(--mono);font-size:11px;opacity:.7;margin-left:4px}
+/* 启动页：历史存档分隔带 + 警示（U43） */
+.histband{display:flex;align-items:center;gap:10px;padding:14px 12px 6px;
+  font-size:11.5px;color:var(--muted)}
+.histband .fline{flex:1;height:1px;background:var(--border)}
+tr.oldrow{opacity:.6}
+.warnbar{border:1px solid #e6cf9a;background:var(--warn-light);color:var(--warn);
+  border-radius:7px;padding:9px 12px;font-size:11.5px;margin-top:12px}
+
 /* ---------------- 卡牌页（U36） ---------------- */
 .cardgrid{display:flex;flex-wrap:wrap;gap:9px;padding:10px 12px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;
@@ -626,9 +665,17 @@ table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
       <thead><tr><th>存档</th><th>类型</th><th>状态</th><th>最后修改</th><th style="text-align:right">大小</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
+    <div class="histband" id="histBand" style="display:none"><span>历史存档（游戏自己的「Old Saves」）</span>
+      <span class="fline"></span></div>
+    <table class="list" id="oldTable" style="display:none">
+      <tbody id="oldRows"></tbody>
+    </table>
     <div class="empty" id="empty" style="display:none">没有匹配的存档</div>
   </div>
-  <div class="note" style="width:min(1180px,100%);margin-top:14px">
+  <div class="warnbar" style="width:min(1180px,100%);margin-top:12px">
+    ⚠ <b>改存档前请先退出游戏</b> —— 文件被占用时写回会失败。
+  </div>
+  <div class="note" style="width:min(1180px,100%);margin-top:12px">
     <b>界面层说明</b>：这一版是 <b>U26 技术路线</b>的落地 —— 界面 = HTML/CSS，
     Python 只起一个本地 <code>127.0.0.1</code> 服务（带随机 token），核心库
     <code>save_modifier_core</code> 负责读存档与校验。<br>
@@ -1037,7 +1084,8 @@ function unitRowHTML(u){
         <span class="full">${esc(u.type||"")}</span></div>
       <div class="umeta">${esc(u.name_cn||u.name_brief||u.name_full||("单位 "+u.id))}
         ${hq?(" · 总部 "+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):""}
-        ${u.xp!==null&&u.xp!==undefined?(" · 经验 "+u.xp):""}</div>
+        ${u.xp!==null&&u.xp!==undefined?(" · 经验 "+u.xp):""}
+        ${u.entr?(" · 被压制 "+u.entr):""}</div>
       <div class="pips">${pips.join("")}</div>
     </div>
     <div class="ubadges">${badges}</div>
@@ -1077,13 +1125,19 @@ function unitDetailHTML(u){
   }).join("") : `<div class="slot empty">还没有挂特种兵</div>`;
 
   const pool = (PICK && PICK.specialists_for_unit) || {candidates:[], scope:"none"};
-  const poolHTML = pool.candidates.length ? pool.candidates.map(t=>{
-    const st = (CATALOG&&CATALOG.spec_types[t])||{};
-    const has = specs.some(s=>s.type===t);
-    return `<div class="pcell ${has?'blocked':''}" title="${esc(specCn(t))} · ${esc(natCn(st.nationality))}"
-      onclick="${has?'void 0':('addSpec('+u.id+','+esc(JSON.stringify(t))+')')}">
-      ${imgTag(specTex(t), specCn(t))}</div>`;
-  }).join("") : `<div style="padding:12px;color:var(--muted);font-size:12px">没有可用候选</div>`;
+  let poolHTML;
+  if(SEL.fullPool){
+    poolHTML = fullPoolHTML(u, specs);
+  } else {
+    poolHTML = pool.candidates.length ? pool.candidates.map(t=>{
+      const st = (CATALOG&&CATALOG.spec_types[t])||{};
+      const has = specs.some(s=>s.type===t);
+      const tip = specTipHTML(t, has?"已经挂上了":"点击挂到这个单位").replace(/"/g,"&quot;");
+      return `<div class="pcell ${has?'blocked':''}" data-tip="${esc(tip)}"
+        onclick="${has?'void 0':('addSpec('+u.id+','+esc(JSON.stringify(t))+')')}">
+        ${imgTag(specTex(t), specCn(t))}</div>`;
+    }).join("") : `<div style="padding:12px;color:var(--muted);font-size:12px">没有可用候选</div>`;
+  }
 
   const scopeTip = {campaign:"战役默认池 ∩ 游戏规则",
                     no_campaign:"找不到战役包 ⇒ 只按游戏规则",
@@ -1125,7 +1179,9 @@ function unitDetailHTML(u){
       <span class="sbsep"></span>
       <span class="sbm">候选口径：${esc(scopeTip)}</span>
       <span class="sp"></span>
-      <span class="sbhint">点图标挂上 · 点已挂的卸下</span>
+      <label class="chk"><input type="checkbox" id="allcb" ${SEL.fullPool?'checked':''}
+        onchange="toggleFullPool()">显示全部</label>
+      <span class="sbhint">点图标挂上 · 点已挂的卸下 · 悬停看数值</span>
     </div>
     <div class="specsplit">
       <div class="specslots">${slots}</div>
@@ -1295,6 +1351,7 @@ function hqRowHTML(h){
   </div>`;
 }
 function pickHq(id){ SEL.hqs = id; show("hqs"); }
+function pickHqTab(t){ SEL.hqTab = t; show("hqs"); }
 
 function hqSkillHTML(h, br, it){
   const act = it.action;
@@ -1367,8 +1424,10 @@ function hqPoolHTML(h){
       const st = isSpec ? ((CATALOG&&CATALOG.spec_types[e.spec])||{}) : {};
       const q = pendingVal("hq_force_pool", hqPoolKey(h.id,i), e.quantity||0);
       const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(f)}</span>`).join("") : "";
+      const tip = isSpec ? specTipHTML(e.spec, "延迟 "+d+" 回合 · 数量 "+(e.quantity||0)).replace(/"/g,"&quot;")
+        : esc(hqEquipCn(e.equipment)+" · 延迟 "+d+" 回合");
       body += `<tr>
-        <td class="l"><div class="thumb">${isSpec?imgTag(specTex(e.spec), nm)
+        <td class="l"><div class="thumb" data-tip="${tip}">${isSpec?imgTag(specTex(e.spec), nm)
           :imgTag("steps/step.png", nm)}</div></td>
         <td class="l name">${esc(nm)}
           ${isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:""}</td>
@@ -1411,9 +1470,13 @@ function hqDetailHTML(h){
   const trucks = [];
   for(let i=1;i<=5;i++){
     const on = i<=tr;
+    const src = "hq_upgrade/truck_"+i+(on?"_on":"_off")+".png";
+    const hov = "hq_upgrade/truck_"+i+"_hover.png";
     trucks.push(`<div class="trk ${on?'on':''}" title="点第 ${i} 个 ⇒ 卡车数 = ${i}（补给作用范围 ${TRUCK_RANGE[i-1]} 格）"
-      onclick="hqTrucks(${h.id},${i})">
-      <img src="${surf("hq_upgrade/truck_"+i+(on?"_on":"_off")+".png")}" alt="补给卡车 ${i}"></div>`);
+      onclick="hqTrucks(${h.id},${i})"
+      onmouseover="this.querySelector('img').src='${surf(hov)}'"
+      onmouseout="this.querySelector('img').src='${surf(src)}'">
+      <img src="${surf(src)}" alt="补给卡车 ${i}"></div>`);
   }
   return `<div class="hqhead">
     <div class="idblk">
@@ -1448,8 +1511,12 @@ function hqDetailHTML(h){
       <b>${tr?TRUCK_RANGE[tr-1]:"—"}</b> 格</span>
   </div>
 
-  ${hqMatrixHTML(h)}
-  ${hqPoolHTML(h)}`;
+  <div class="hqtabs">
+    <div class="tb ${SEL.hqTab!=="fp"?'on':''}" onclick="pickHqTab('mx')">升级矩阵</div>
+    <div class="tb ${SEL.hqTab==="fp"?'on':''}" onclick="pickHqTab('fp')">兵库
+      <span class="n">${projectedPool(h).length}</span></div>
+  </div>
+  ${SEL.hqTab==="fp" ? hqPoolHTML(h) : hqMatrixHTML(h)}`;
 }
 
 function pageHqs(w){
@@ -1698,6 +1765,9 @@ function pageCards(w){
       <div class="pbody">
         <div class="hand">${handHTML}</div>
         <div class="costs">
+          <span>会议 <b>${esc(wl.conference||"—")}</b></span>
+          <span>难度 <b>${esc(VIEW.level||"—")}</b></span>
+          <span>声望 <b>${VIEW.prestige??"—"}</b></span>
           <span>手牌上限 <b>${VIEW.hand_limit||5}</b> 张（难度 ${esc(VIEW.level||"—")}）</span>
           <span>白名单可加的卡：<b>${(wl.allowed||[]).length}</b> 种</span>
           <span>被屏蔽：<b>${Object.keys(wl.blocked||{}).length}</b> 种</span>
@@ -1919,6 +1989,14 @@ function pageTheater(w){
           <span class="xnum"><span class="spin" id="th_ut_${a.asset}"></span></span></div>
         ${(cur.uses_total!==null&&cur.uses_total!==undefined&&cur.to_use>cur.uses_total)
           ? `<div class="twarn">当前可用 ${cur.to_use} 次 大于 本场景剩余 ${cur.uses_total} 次 ⇒ 游戏读档会失败</div>`:""}
+        ${(cur.uses_total!==null&&cur.uses_total!==undefined&&cur.uses_turn>cur.uses_total)
+          ? `<div class="twarn">每回合恢复 ${cur.uses_turn} 次 大于 本场景剩余 ${cur.uses_total} 次 ——
+             实际每回合只能用 ${cur.uses_total} 次</div>`:""}
+        ${(cur.uses_total!==null&&cur.uses_total!==undefined
+            && cur.to_use > Math.min(cur.uses_turn, cur.uses_total))
+          ? `<div class="twarn">当前可用 ${cur.to_use} 次 大于 回合开始后的有效值
+             ${Math.min(cur.uses_turn, cur.uses_total)} 次 —— 回合开始会重置为
+             ${Math.min(cur.uses_turn, cur.uses_total)} 次</div>`:""}
       </div></div>`;
   }).join("");
   w.innerHTML = `<div class="panel"><h3>战区资产 · 当前战斗的 ${list.length} 项</h3>
@@ -2490,6 +2568,114 @@ function cardStoreSetFree(position, free){
   show("cards");
 }
 
+
+/* ===================================================================
+   U43：悬停浮层 + 备选池全量视图 + 总部页签 + 卡车 hover + 启动页细节
+   =================================================================== */
+/* ---------- 悬停浮层（设计稿 §1 的 .tip） ---------- */
+let TIPEL = null;
+function initTip(){
+  if(TIPEL) return;
+  TIPEL = document.createElement("div");
+  TIPEL.className = "tip";
+  document.body.appendChild(TIPEL);
+  document.addEventListener("mousemove", function(ev){
+    const el = ev.target && ev.target.closest ? ev.target.closest("[data-tip]") : null;
+    if(!el){ TIPEL.classList.remove("show"); return; }
+    TIPEL.innerHTML = el.getAttribute("data-tip");
+    TIPEL.classList.add("show");
+    const w = TIPEL.offsetWidth, h2 = TIPEL.offsetHeight;
+    let x = ev.clientX + 14, y = ev.clientY + 16;
+    if(x + w > window.innerWidth - 8) x = ev.clientX - w - 10;
+    if(y + h2 > window.innerHeight - 8) y = ev.clientY - h2 - 10;
+    TIPEL.style.left = Math.max(4, x) + "px";
+    TIPEL.style.top = Math.max(4, y) + "px";
+  });
+}
+/* 特种兵/商品的浮层内容 */
+function specTipHTML(t, extra){
+  const st = (CATALOG&&CATALOG.spec_types[t])||{};
+  const tags = (st.flags||[]).map(f=>`<span class="tag">${esc(f)}</span>`).join("");
+  return `<span class="tn">${esc(specCn(t))}</span>
+    <span class="tr">攻 ${st.attack??"—"} · 防 ${st.defense??"—"} · 装 ${st.armor??"—"} · 炮 ${st.artillery??"—"}</span>
+    <br><span class="tr">国籍 ${esc(natCn(st.nationality))}</span>
+    ${tags?`<br>${tags}`:""}${extra?`<br><span class="tr">${extra}</span>`:""}`;
+}
+
+/* ---------- 备选池：全量视图（按阵营 + 国籍分组，可折叠） ---------- */
+function specCanAttach(specName, unitType){
+  const cat = CATALOG||{};
+  const sp = (cat.spec_types||{})[specName];
+  const ut = (cat.unit_types||{})[unitType];
+  if(!sp || !ut) return false;
+  if(sp.faction !== ut.faction) return false;
+  if(sp.nationality === ut.nationality) return true;
+  const nat = (cat.nationalities||{})[sp.nationality];
+  return !!(nat && nat.parent === ut.nationality);
+}
+function fullPoolHTML(u, selected){
+  const cat = CATALOG||{};
+  const all = Object.keys(cat.spec_types||{});
+  /* 按阵营分组 */
+  const facs = {};
+  all.forEach(t=>{
+    const f = (cat.spec_types[t]||{}).faction || "?";
+    (facs[f]=facs[f]||[]).push(t);
+  });
+  /* 阵营顺序：本方阵营排最前 */
+  const myFac = (cat.unit_types||{})[u.type] ? ((cat.unit_types[u.type]||{}).faction||"") : "";
+  const facKeys = Object.keys(facs).sort((a,b)=>{
+    if(a===myFac) return -1; if(b===myFac) return 1;
+    return a.localeCompare(b);
+  });
+  let out = "";
+  facKeys.forEach(f=>{
+    const list = facs[f];
+    /* 按国籍分组 */
+    const nats = {};
+    list.forEach(t=>{
+      const n = (cat.spec_types[t]||{}).nationality || "?";
+      (nats[n]=nats[n]||[]).push(t);
+    });
+    const natKeys = Object.keys(nats).sort((a,b)=>{
+      const ca = nats[a].filter(t=>specCanAttach(t,u.type)).length;
+      const cb = nats[b].filter(t=>specCanAttach(t,u.type)).length;
+      if(cb!==ca) return cb-ca;
+      return (cat.nationalities[b]||{}).cn > (cat.nationalities[a]||{}).cn ? 1 : -1;
+    });
+    out += `<div class="facband"><span>${esc(f==="allies"?"盟军":f==="axis"?"轴心":f==="soviet"?"苏联":f)}</span>
+      <span class="fline"></span><span>${list.length} 种</span></div>`;
+    natKeys.forEach(n=>{
+      const items = nats[n].map(t=>{
+        const can = specCanAttach(t,u.type);
+        const has = selected.some(s=>s.type===t);
+        const myNat = ((cat.unit_types||{})[u.type]||{}).nationality;
+        const why = can ? "点击挂到这个单位"
+          : ("不可挂：国籍 " + natCn(n) + " ≠ " + natCn(myNat));
+        const tip = esc(specTipHTML(t, why)).replace(/"/g, "&quot;");
+        return `<div class="pcell ${can?'':'blocked'} ${has?'on':''}"
+          data-tip="${tip}"
+          onclick="${can&&!has ? ('addSpec('+u.id+','+esc(JSON.stringify(t))+')') : 'void 0'}">
+          ${imgTag(specTex(t), specCn(t))}</div>`;
+      }).join("");
+      const canN = nats[n].filter(t=>specCanAttach(t,u.type)).length;
+      out += `<div class="grphead${SEL.poolClosed&&SEL.poolClosed[n]?' closed':''}"
+        onclick="togglePoolGroup('${esc(n)}')">
+        <span class="caret">▼</span>${esc(natCn(n))}
+        <span class="gcount">· ${nats[n].length} 种</span>
+        <span class="gcan">可挂 ${canN}</span></div>
+        <div class="grpbody" ${SEL.poolClosed&&SEL.poolClosed[n]?'style="display:none"':""}>${items}</div>`;
+    });
+  });
+  return out;
+}
+function togglePoolGroup(nat){
+  SEL.poolClosed = SEL.poolClosed||{};
+  SEL.poolClosed[nat] = !SEL.poolClosed[nat];
+  show("units");
+}
+function toggleFullPool(){ SEL.fullPool = !SEL.fullPool; show("units"); }
+
 /* ---------- 应用 / 撤销 ---------- */
 /* 待应用的编辑列表 → 请求体（兵库**删条目**要排在最后：
    删了会让后面条目的下标整体前移，先删再改数量就会改错行，U35） */
@@ -2550,20 +2736,35 @@ async function reload(){
 }
 function paint(){
   const q = (document.getElementById("q").value||"").trim().toLowerCase();
-  const list = SAVES.filter(s => !q ||
+  const all = SAVES.filter(s => !q ||
     (s.name+" "+s.display+" "+s.campaign).toLowerCase().includes(q));
-  document.getElementById("cnt").textContent = list.length + " 个存档";
+  /* 历史存档（游戏自己的「Old Saves」）单独一段 */
+  const isOld = s => /Old Saves/i.test(s.save_id||"") || /old saves/i.test(s.display||"");
+  const list = all.filter(s=>!isOld(s));
+  const olds = all.filter(isOld);
+  document.getElementById("cnt").textContent = list.length + " 个存档" +
+    (olds.length?(" · " + olds.length + " 个历史存档"):"");
   document.getElementById("empty").style.display = list.length ? "none":"block";
-  document.getElementById("rows").innerHTML = list.map(s => `
+  const rowHTML = s => `
     <tr onclick="openSave('${encodeURIComponent(s.save_id).replace(/'/g, "%27")}')">
       <td>${esc(s.name)}<div style="color:var(--muted);font-size:11.5px">${esc(s.display)}</div></td>
       <td class="k">${esc(s.kind)}</td>
       <td class="k">${esc(s.scenario||"—")}</td>
       <td class="num">${esc(s.mtime)}</td>
       <td class="num">${esc(s.size)}</td>
-    </tr>`).join("");
+    </tr>`;
+  document.getElementById("rows").innerHTML = list.map(rowHTML).join("");
+  const band = document.getElementById("histBand");
+  const ot = document.getElementById("oldTable");
+  if(band && ot){
+    band.style.display = olds.length ? "flex" : "none";
+    ot.style.display = olds.length ? "block" : "none";
+    document.getElementById("oldRows").innerHTML =
+      olds.map(s=>rowHTML(s).replace("<tr ", '<tr class="oldrow" ')).join("");
+  }
 }
 document.getElementById("q").addEventListener("input", paint);
+initTip();
 
 function esc(s){ return String(s??"").replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }

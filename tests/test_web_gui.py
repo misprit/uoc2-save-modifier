@@ -1217,3 +1217,43 @@ class TestCampaignDetailApi(WebGuiTestBase):
         self.assertIn("backups", d)
         self.assertIsInstance(d["stack"], list)
         self.assertIsInstance(d["backups"], list)
+
+
+class TestUiDetailsPresent(unittest.TestCase):
+    """U43：界面细节必须在（前端源码存在性检查）。
+
+    ⚠️ 这些是**表现层**的东西，Python 测不了行为 ⇒ 只锁「有没有」。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "src", "save_modifier_web", "web", "index.html")
+        cls.html = io.open(p, encoding="utf-8").read()
+
+    def test_hover_tip_exists(self):
+        """悬停浮层（设计稿 §1 的 .tip）。"""
+        self.assertIn("function initTip()", self.html)
+        self.assertIn("data-tip=", self.html)
+        self.assertIn(".tip{", self.html)
+
+    def test_full_pool_view_exists(self):
+        """备选池「显示全部」+ 国籍分组 + 折叠。"""
+        self.assertIn("function fullPoolHTML(", self.html)
+        self.assertIn("grphead", self.html)
+        self.assertIn("togglePoolGroup", self.html)
+
+    def test_hq_tabs_exist(self):
+        """总部的「升级矩阵 / 兵库」页签。"""
+        self.assertIn("function pickHqTab(", self.html)
+        self.assertIn("hqtabs", self.html)
+
+    def test_splash_warning_exists(self):
+        """启动页的「改存档前请先退出游戏」警示 + 历史存档分隔带。"""
+        self.assertIn("改存档前请先退出游戏", self.html)
+        self.assertIn("histband", self.html)
+
+    def test_theater_linked_warnings_exist(self):
+        """战区资产的两条联动警告（设计稿 §7）。"""
+        self.assertIn("每回合恢复", self.html)
+        self.assertIn("回合开始后的有效值", self.html)
