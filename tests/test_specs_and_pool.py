@@ -181,7 +181,7 @@ class TestForcePoolAddNationality(SpecPoolTestBase):
     def test_nationality_is_filled_from_spec_type(self):
         """不传 nationality ⇒ 自动填成该特种兵自己的国籍（原来填的是空串）。"""
         plan, res = self.commit([Edit.hq_force_pool_add(
-            5, {"quantity": 2, "spec": "ger_arty_40"})])
+            5, {"quantity": 2, "spec": "ger_arty_40", "delay": 1})])
         self.assertTrue(res.ok, res.errors)
         pool = self._pool()
         self.assertEqual(pool[-1]["spec"], "ger_arty_40")
@@ -191,7 +191,8 @@ class TestForcePoolAddNationality(SpecPoolTestBase):
     def test_mismatched_nationality_warns(self):
         """显式填了别的国籍 ⇒ 警告（不硬拦，但要说清游戏自己的规矩）。"""
         plan, res = self.commit([Edit.hq_force_pool_add(
-            5, {"quantity": 2, "spec": "ger_arty_40", "nationality": "us"})])
+            5, {"quantity": 2, "spec": "ger_arty_40", "nationality": "us",
+                "delay": 1})])
         self.assertTrue(res.ok, res.errors)
         self.assertTrue(any("国籍" in w for w in plan.warnings), plan.warnings)
         self.assertEqual(self._pool()[-1]["nationality"], "us")
@@ -210,6 +211,63 @@ class TestForcePoolAddNationality(SpecPoolTestBase):
         self.assertTrue(res.ok, res.errors)
         self.assertEqual(self._pool()[-1]["nationality"], "")
         self.assertTrue(any("国籍" in w for w in plan.warnings), plan.warnings)
+
+
+class TestForcePoolDuplicate(SpecPoolTestBase):
+    """U23：总部兵库的**重复条目**规则（用户口径 2026-11-18）。
+
+    * **每个总部的兵库独立** —— 判重范围 = 单个 hq 的 `force_pool`。
+    * **同身份 + 同延迟**不许并存（「肯定不允许同时出现两个 0 延迟的同样特种兵」）；
+      **延迟不同可以共存**（X 回合延迟 = 那个部队等几个回合才能部署，是合法机制）。
+    """
+
+    def setUp(self):
+        super().setUp()
+        if not self.catalog.has_spec_type("ger_arty_40"):
+            self.skipTest("本机没有游戏包")
+
+    def _pool(self, hq_id=5):
+        with zipfile.ZipFile(self.save_path) as zf:
+            hqs = yaml.safe_load(zf.read("hqs.yml"))
+        for hq in hqs:
+            if hq.get("id") == hq_id:
+                return hq["force_pool"]
+        return None
+
+    def test_duplicate_in_same_hq_is_rejected(self):
+        """同一个总部里已经有同样一条（0 延迟）⇒ 不许再加。"""
+        plan = self.plan([Edit.hq_force_pool_add(
+            5, {"quantity": 2, "spec": "ger_arty_40"})])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("已经有" in e for e in plan.errors), plan.errors)
+
+    def test_same_spec_with_different_delay_is_allowed(self):
+        """**延迟不同可以共存** —— 这是游戏自己的合法机制。"""
+        plan, res = self.commit([Edit.hq_force_pool_add(
+            5, {"quantity": 2, "spec": "ger_arty_40", "delay": 1})])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self._pool()[-1]["delay"], 1)
+
+    def test_same_spec_in_another_hq_is_allowed(self):
+        """**每个总部的兵库独立** —— 另一个总部可以随便加。"""
+        plan, res = self.commit([Edit.hq_force_pool_add(
+            6, {"quantity": 2, "spec": "ger_arty_40"})])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self._pool(6)[-1]["spec"], "ger_arty_40")
+
+    def test_different_nationality_is_a_different_entry(self):
+        """国籍**算进身份** —— 同样是德国特种兵，`german` 和 `us` 是两样东西。"""
+        plan, res = self.commit([Edit.hq_force_pool_add(
+            5, {"quantity": 2, "spec": "ger_arty_40", "nationality": "us"})])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self._pool()[-1]["nationality"], "us")
+
+    def test_duplicate_equipment_is_rejected_too(self):
+        """装备条目同样按身份判重（身份 = 类别 + 国籍）。"""
+        plan = self.plan([Edit.hq_force_pool_add(
+            5, {"quantity": 2, "equipment": "infantry", "nationality": "us"})])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("已经有" in e for e in plan.errors), plan.errors)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,8 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
+import copy
+
 import yaml
 
 GAME_STAMP = (2026, 1, 2, 3, 4, 6)
@@ -22,6 +24,7 @@ def dump(obj) -> bytes:
 
 def make_save(path: Path, *, main_overrides: dict | None = None,
               battle_overrides: dict | None = None,
+              store_overrides: dict | None = None,
               extra_entries: dict | None = None) -> Path:
     """造一个"像游戏"的 .usg。
 
@@ -29,7 +32,8 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
     以及一个进行中的战斗 `games/avalanche/`（含 theater_assets）。
 
     `battle_overrides` 用来覆盖**战斗** `games/avalanche/main.yml` 的内容
-    （比如换 `phase`、换 theater_assets 分组）—— 根 `main.yml` 用 `main_overrides`。
+    （比如换 `phase`、换 theater_assets 分组）—— 根 `main.yml` 用 `main_overrides`；
+    `store_overrides` 用来覆盖根 `store.yml`（比如加一条战线）。
     """
     main = {
         "campaign_id": "west",
@@ -169,6 +173,14 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
               "spec": "ger_arty_40"},
          ]},
     ]
+    # U23：**每个总部的兵库独立** ⇒ 判重范围 = 单个 hq。
+    # 加第二个总部，用来验证「同一条特种兵在另一个总部可以再加」。
+    _hq6 = copy.deepcopy(hqs[0])
+    _hq6["id"] = 6
+    _hq6["name_brief"] = "id_hq_6_brief"
+    _hq6["uv"] = [11, 21]
+    _hq6["force_pool"] = []          # 空兵库 —— 加什么都行
+    hqs.append(_hq6)
     cards = [
         {"card_type": "air_attack_allies", "is_free": True, "position": 1,
          "unit_id": None, "used": False},
@@ -239,6 +251,10 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
         _bm = yaml.safe_load(entries["games/avalanche/main.yml"])
         _bm.update(battle_overrides)
         entries["games/avalanche/main.yml"] = dump(_bm)
+    if store_overrides:
+        _sm = yaml.safe_load(entries["store.yml"])
+        _sm.update(store_overrides)
+        entries["store.yml"] = dump(_sm)
     if extra_entries:
         entries.update(extra_entries)
 

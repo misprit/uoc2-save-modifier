@@ -326,5 +326,54 @@ class TestRestoreHand(CardStoreTestBase):
         self.assertIn("检查点", plan.errors[0])
 
 
+class TestStoreDuplicate(CardStoreTestBase):
+    """U23：商店的**重复条目**规则（用户口径 2026-11-18）。
+
+    * 同一个 **(战线, 子商店)** 里**不能出现重复条目** —— 价格/库存不同**也算重复**；
+    * **多个前线的商店库存彼此独立** —— 判重**不能跨战线**。
+    """
+
+    def test_duplicate_entry_in_same_store_is_rejected(self):
+        plan, _ = self.commit([Edit.store_add("south", "store", {
+            "equipment": "infantry", "nationality": "us",
+            "price": 5, "quantity": 20})])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("已经有" in e for e in plan.errors), plan.errors)
+
+    def test_duplicate_with_different_price_is_also_rejected(self):
+        """价格 / 库存不同**也**是重复条目。"""
+        plan, _ = self.commit([Edit.store_add("south", "store", {
+            "equipment": "infantry", "nationality": "us",
+            "price": 99, "quantity": 1})])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("已经有" in e for e in plan.errors), plan.errors)
+
+    def test_same_item_in_another_front_is_allowed(self):
+        """**多个前线的商店库存彼此独立** —— 不能混着判重。
+
+        north 战线里**没有** `infantry/us`（south 有）⇒ 在 north 上架它应当通过。
+        """
+        p = make_save(self.tmp / "north.usg", store_overrides={
+            "north": {
+                "store": [
+                    {"equipment": "armor", "nationality": "german",
+                     "price": 12, "quantity": 3},
+                ],
+                "elite_store": None,
+            },
+        })
+        with open_save(str(p), self.paths) as save:
+            plan = save.plan_edit([Edit.store_add("north", "store", {
+                "equipment": "infantry", "nationality": "us",
+                "price": 5, "quantity": 20})], catalog=self.catalog)
+            self.assertTrue(plan.ok, plan.errors)
+            res = save.commit(plan)
+            self.assertTrue(res.ok, res.errors)
+        with zipfile.ZipFile(p) as zf:
+            entries = yaml.safe_load(zf.read("store.yml"))["north"]["store"]
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[1]["equipment"], "infantry")
+
+
 if __name__ == "__main__":
     unittest.main()

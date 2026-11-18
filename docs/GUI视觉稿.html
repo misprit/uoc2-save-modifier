@@ -255,8 +255,16 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .spick .spt{font-size:12.5px;font-weight:700;color:var(--accent-dark);white-space:nowrap}
 .spick .spc{font-size:11px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
 .spick .spgrid{display:flex;flex-wrap:wrap;gap:6px;padding:10px 11px;max-height:156px;overflow:auto}
+.spick .spgrid .pcell{position:relative}
 .spick .spgrid .pcell.on{border-color:var(--accent);background:var(--accent-light);
   box-shadow:0 0 0 2px rgba(36,91,143,.35)}
+/* U23：容器里**已经有的条目** —— 角标标出来，别让玩家白加一遍 */
+.spick .spgrid .pcell .dup{position:absolute;right:0;bottom:0;font-size:8.5px;line-height:1;
+  padding:1.5px 3px;border-radius:3px 0 5px 0;background:var(--muted);color:#fff;
+  font-family:var(--mono);letter-spacing:-.02em}
+.spick .spgrid .pcell.blocked{opacity:.42;filter:grayscale(.9);cursor:not-allowed}
+.spick .spgrid .pcell.blocked:hover{border-color:var(--stage-edge);box-shadow:none}
+.spick .spgrid .pcell.blocked .dup{background:var(--danger)}
 .spick .spfoot{padding:9px 11px;background:var(--surface);border-top:1px solid var(--border)}
 /* 详情卡用 .slot 的样式，但去掉「点击 = 卸下」的悬停变红语义 */
 .spick .slot.spcard{cursor:default}
@@ -1171,6 +1179,8 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
       <div class="note" style="border:1px solid var(--border);border-radius:7px;margin-top:12px;border-top:1px solid var(--border)">
         ⓘ 条目 = <code>{delay, nationality, quantity, spec|equipment}</code>。<br>
         ⓘ <b>特种兵的国籍跟着特种兵自动</b> —— 实测真实存档里兵库 1747 条<b>全是</b>跟着类型走的。<br>
+        ⓘ <b>同一个总部里不能有两条延迟相同的同样条目</b>（0 延迟尤其不行）；
+        已有的会标「已有 N」—— 但**延迟不同可以共存**，所以仍可加。<br>
         ⓘ 装备条目的国籍是<b>独立组合</b>（实测 20+ 种），那个要手选。
       </div>
     </div>
@@ -1361,6 +1371,8 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
         ⓘ 商品必须是游戏里定义过的（<b>特种兵 / 兵种 × 国籍</b>）—— schema 会校验。<br>
         ⓘ <b>特种兵的国籍跟着特种兵自动</b>，不用手选 —— 实测真实存档里商店 1043 条 +
         兵库 1747 条<b>全是</b>跟着类型走的，<b>0 条例外</b>。<br>
+        ⓘ <b>同一个商店不能出现重复条目</b> —— 已有的一律<b>置灰</b>并标「已有」，
+        要改它就直接改那一条（<b>多个前线彼此库存独立</b>，判重不跨战线）。<br>
         ⓘ 库存<b>不能为 0</b> —— 游戏没有"售罄"标记，要下架请删条目。<br>
         ⓘ <code>spec</code> 与 <code>equipment</code> <b>二选一</b>，不能同时给。
       </div>
@@ -2790,23 +2802,30 @@ if(pg){
    图标网格 = 单位页备选池的 .pcell；详情卡 = 单位页已挂槽位的 .slot（同一套样式）。
    候选集：商店 = 本战役商店里出现过的（= 核心库 store_item_universe 的 spec 集合，
            选了必定过校验）；兵库 = 本战役默认池（与单位页备选池同口径）。 */
-function mountSpicker(rootId, list, countText){
+function mountSpicker(rootId, list, countText, existing, blockDup){
   const root=document.getElementById(rootId);
   if(!root || !list.length) return;
   const grid=root.querySelector(".spgrid"), card=root.querySelector(".spcard"),
         cnt=root.querySelector(".spc"), nat=root.querySelector(".spnat b");
+  /* existing = [{k:"类型|国籍", n:已有条数, delay:已有延迟}] */
+  const hasOf = s => (existing||[]).filter(e => e.k === s[0] + "|" + s[6]);
   let sel=list[0];
   function paint(){
     grid.innerHTML="";
     list.forEach(function(s){
+      const hits=hasOf(s);
+      const blocked = blockDup && hits.length > 0;      /* 商店：重复不许上架 */
       const c=document.createElement("div");
-      c.className="pcell"+(s===sel?" on":"");
-      c.innerHTML=`<img alt="">`;
+      c.className="pcell"+(s===sel && !blocked ? " on":"")+(blocked?" blocked":"");
+      c.innerHTML=`<img alt="">`+(hits.length ? `<span class="dup">${blocked?"已有":"已有 "+hits.length}</span>` : "");
       img(c.querySelector("img"), SUR+"specialist/"+s[0]+"/hq_action_icon.png", s[1]);
       c.dataset.tip=`<span class="tn">${s[1]}</span>`
         +`<span class="tr">攻击 ${s[2]} · 防御 ${s[3]} · 装甲 ${s[4]} · 炮术 ${s[5]}</span><br>`
-        +`<span class="tr">国籍 ${NAT_CN[s[6]]||s[6]}</span>`;
-      c.addEventListener("click", function(){ sel=s; paint(); });
+        +`<span class="tr">国籍 ${NAT_CN[s[6]]||s[6]}</span>`
+        +(hits.length ? `<br><span class="tr">${blocked
+            ? "本店已有这条 —— 不能重复上架，请直接改那一条"
+            : "本总部兵库已有 "+hits.length+" 条（延迟不同可以共存）"}</span>` : "");
+      if(!blocked) c.addEventListener("click", function(){ sel=s; paint(); });
       grid.appendChild(c);
     });
     card.innerHTML=specSlotHTML(sel);
@@ -2817,8 +2836,14 @@ function mountSpicker(rootId, list, countText){
   paint();
 }
 const SP_CAMPAIGN=SPECIALISTS.filter(s=>s[9]==="1");
-mountSpicker("spickStore", SP_CAMPAIGN, "本战役可上架 "+SP_CAMPAIGN.length+" 种");
-mountSpicker("spickPool",  SP_CAMPAIGN, "本战役 "+SP_CAMPAIGN.length+" 种");
+/* 商店侧已有的条目（战线 南部 / 普通商店）：德国步兵、德国装甲兵、leFH 18、88毫米高射炮 */
+const STORE_EXIST=[{k:"ger_inf_40|german"},{k:"ger_arm_40|german"},
+                   {k:"ger_arty_40|german"},{k:"ger_towed_at_42|german"}];
+/* 兵库侧已有的条目（A集团军群）：同身份但**延迟不同也可以共存** ⇒ 只标记、不禁用 */
+const POOL_EXIST=[{k:"ger_arty_40|german"},{k:"ger_towed_at_42|german"},
+                  {k:"ger_recon_39|german"}];
+mountSpicker("spickStore", SP_CAMPAIGN, "本战役可上架 "+SP_CAMPAIGN.length+" 种", STORE_EXIST, true);
+mountSpicker("spickPool",  SP_CAMPAIGN, "本战役 "+SP_CAMPAIGN.length+" 种", POOL_EXIST, false);
 
 /* 战区资产 —— U20：三个字段都是 X/X 形式的可调数字（借用总部 CP 卡的做法）
    联动与核心库完全一致：

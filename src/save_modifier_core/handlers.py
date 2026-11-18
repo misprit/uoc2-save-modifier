@@ -790,6 +790,26 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
             new["nationality"] = nat
         else:
             new.setdefault("nationality", "")
+    # ★ 同身份 + **同延迟**不许并存（U23 用户口径）：
+    #   「肯定不允许同时出现两个 0 延迟的同样特种兵」；
+    #   延迟不同**可以共存**（X 回合延迟 = 那个部队等几个回合才能部署，是合法机制）。
+    #   判重范围**只限这一个总部** —— 每个总部的兵库独立。
+    ident = _entry_identity(new)
+    delay = new.get("delay", 0)
+    for i, e in enumerate(pool):
+        if not isinstance(e, dict):
+            continue
+        if _entry_identity(e) != ident:
+            continue
+        if e.get("delay", 0) != delay:
+            continue
+        oc.errors.append(
+            f"总部 {hq_id} 的兵库已经有「{_entry_label(new)}」了"
+            f"（第 {i + 1} 条，延迟 {e.get('delay', 0)} 回合，数量 {e.get('quantity')}）—— "
+            f"**同一个总部里不能有两条延迟同为 {delay} 的同样条目**；"
+            "延迟不同的可以共存")
+        return oc
+
     pool.insert(index, new)
     hq["force_pool"] = pool
     w.touch("hqs.yml")
@@ -1024,6 +1044,35 @@ def _validate_store_entry(entry) -> list[str]:
     if not isinstance(nat, str) or not nat:
         errs.append("nationality 必须是国籍 id（uk / us / german …），不是阵营")
     return errs
+
+
+def _entry_identity(entry) -> tuple:
+    """一条商品 / 兵库条目的**身份**。
+
+    * 特种兵（`spec`）⇒ `("spec", 类型名, 国籍)`
+    * 装备（`equipment`）⇒ `("equipment", 类别, 国籍)`
+    * 两者都没有 ⇒ `("?", None, 国籍)`
+
+    国籍**算进身份** —— 同样是「德国步兵」，`german` 和 `uk` 是两样东西。
+    """
+    if not isinstance(entry, dict):
+        return ("?", None, None)
+    if entry.get("spec"):
+        return ("spec", entry["spec"], entry.get("nationality"))
+    if entry.get("equipment"):
+        return ("equipment", entry["equipment"], entry.get("nationality"))
+    return ("?", None, entry.get("nationality"))
+
+
+def _entry_label(entry) -> str:
+    """条目的人话名字（给报错文案用）。"""
+    if not isinstance(entry, dict):
+        return "?"
+    if entry.get("spec"):
+        return f"特种兵 {entry['spec']}"
+    if entry.get("equipment"):
+        return f"装备 {entry['equipment']}（{entry.get('nationality') or '无国籍'}）"
+    return "?"
 
 
 def _check_store_universe(w, entry) -> list[str]:
@@ -1353,6 +1402,21 @@ def _store_add(w, e: Edit) -> Outcome:
         new.pop("spec")
     if new["equipment"] is None:
         new.pop("equipment")
+
+    # ★ 同一个 (战线, 子商店) 里**不允许重复条目**（U23 用户口径）。
+    #   判重范围**只限这一个商店** —— 多个前线彼此库存独立，不能混着判。
+    ident = _entry_identity(new)
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            continue
+        if _entry_identity(e) != ident:
+            continue
+        oc.errors.append(
+            f"{front}/{sub} 里已经有「{_entry_label(new)}」了"
+            f"（第 {i + 1} 条，价格 {e.get('price')}，库存 {e.get('quantity')}）—— "
+            "**同一个商店不能出现重复条目**；要改它就直接改那一条，别再上一份")
+        return oc
+
     entries.append(new)
     w.touch("store.yml")
     oc.summary = (f"上架商品 {new.get('spec') or new.get('equipment')}"
