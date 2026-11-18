@@ -12,10 +12,11 @@ zip 里有一个顶层目录 `uoc2-save-modifier/`，**不是**散文件。
 uoc2-save-modifier/
   python/            Python 3.14 运行时（含 PyYAML + tkinter）
   lib/{tcl8.6,tk8.6} Tcl/Tk 脚本库（Tcl 的 <prefix> 是包根 ⇒ 必须在 lib/）
-  src/               核心库 + 命令行外壳
+  src/               核心库 + 命令行外壳 + GUI
   tests/             自动化测试
   docs/              规范文档 + 证据脚本
-  run.bat            双击启动
+  run.bat            双击启动（命令行外壳）
+  run_gui.bat        双击启动（图形界面）
   run_tests.bat      跑自检
   使用说明.txt
 ```
@@ -51,7 +52,7 @@ OUT = OUT_DIR / f"{PKG_NAME}-v{VERSION}.zip"
 INCLUDE_DIRS = ("python", "lib", "src", "tests", "docs")
 
 #: 单个文件打进去
-INCLUDE_FILES = ("run.bat", "run_tests.bat", "使用说明.txt")
+INCLUDE_FILES = ("run.bat", "run_gui.bat", "run_tests.bat", "使用说明.txt")
 
 #: 目录名黑名单（任意层级）
 SKIP_DIRS = {"__pycache__", ".git", ".gitignore", "dist", "data",
@@ -132,8 +133,16 @@ def main() -> int:
         names = set(zf.namelist())
     must = [
         f"{PKG_NAME}/run.bat",
+        f"{PKG_NAME}/run_gui.bat",
         f"{PKG_NAME}/src/save_modifier_core/__init__.py",
         f"{PKG_NAME}/src/save_modifier_core/locale.py",
+        f"{PKG_NAME}/src/save_modifier_gui/__init__.py",
+        f"{PKG_NAME}/src/save_modifier_gui/main.py",
+        f"{PKG_NAME}/src/save_modifier_gui/app.py",
+        f"{PKG_NAME}/src/save_modifier_gui/theme.py",
+        f"{PKG_NAME}/src/save_modifier_gui/names.py",
+        f"{PKG_NAME}/src/save_modifier_gui/splash.py",
+        f"{PKG_NAME}/src/save_modifier_gui/pages/__init__.py",
         f"{PKG_NAME}/lib/tcl8.6/init.tcl",
         f"{PKG_NAME}/lib/tk8.6/ttk/ttk.tcl",
         f"{PKG_NAME}/python/python314.zip",          # 标准库
@@ -150,7 +159,7 @@ def main() -> int:
         for m in missing:
             print("   ", m)
         return 1
-    print("自检 OK：run.bat / 核心库 / locale / Tcl-Tk / PyYAML / tkinter 都在包里")
+    print("自检 OK：run.bat / run_gui.bat / 核心库 / GUI / locale / Tcl-Tk / PyYAML / tkinter 都在包里")
     return 0
 
 

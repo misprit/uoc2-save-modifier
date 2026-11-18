@@ -574,6 +574,15 @@ class Save:
             return rec.summary
         return f"改了 {len(rec.entries)} 个文件：{'、'.join(rec.entry_names)}"
 
+    def undo_count(self) -> int:
+        """撤销栈里有多少条记录（GUI 的 Rail 显示"撤销栈 N 条"）。"""
+        from .undo import load_stack
+        try:
+            records, _ = load_stack(self.info.path)
+        except Exception:
+            return 0
+        return len(records)
+
     def _invalidate(self) -> None:
         """写回之后，缓存的 YAML 解析结果与条目清单都过期了。"""
         self._yaml_cache.clear()

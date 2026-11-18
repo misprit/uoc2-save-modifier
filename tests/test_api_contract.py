@@ -253,6 +253,15 @@ class TestAuxiliaryApi(unittest.TestCase):
             self.assertTrue(save.undo_available())
             self.assertIsNotNone(save.undo_peek())
 
+    def test_undo_count(self):
+        """GUI 的 Rail 要显示"撤销栈 N 条"。"""
+        with open_save(str(self.save_path)) as save:
+            self.assertEqual(sig(Save.undo_count), "(self)")
+            self.assertEqual(save.undo_count(), 0)
+            plan = save.plan_edit([Edit.progress("prestige", 11)])
+            save.commit(plan)
+            self.assertEqual(save.undo_count(), 1)
+
     def test_capabilities_helper_properties(self):
         """能力位矩阵 —— GUI 的启用/禁用全看它。"""
         with open_save(str(self.save_path)) as save:

@@ -1363,18 +1363,55 @@ PNG 文件
 
 ## 11. 实施路线
 
-| 阶段 | 内容 | 验收 |
-|---|---|---|
-| **G0** | 给随包 runtime 补 tcl/tk；`run_gui.bat` 弹出一个空窗口 | 双击 bat 出窗口；`python -c "import tkinter"` 通过 |
-| **G1** | 应用骨架：Header / Rail / Status / 7 个空页 + 启动页 + 存档列表 | 能打开存档并看到能力位体检 |
-| **G2** | **PNG 管线** + 单位头像 + 战力段格条 | 单位页能显示头像，滚动流畅 |
-| **G3** | 单位页完整：详情、滚轮调值、改名、特种兵挂载 | 判据 A1 / C1 / C2 达成 |
-| **G4** | 待应用面板 + 确认框 + commit + 撤销 | 判据 A3 / A5 / C3 达成 |
-| **G5** | 其余 6 页 | 每页能力位开关正确 |
-| **G6** | 视觉打磨：皮肤、tooltip、动效、空态 | 判据 B1–B4 达成 |
-| **G7** | 出成品 zip + 解压验收 + 写《使用说明》 | 解压即用，测试全绿 |
+| 阶段 | 内容 | 验收 | 状态 |
+|---|---|---|---|
+| **G0** | 给随包 runtime 补 tcl/tk；`run_gui.bat` 弹出一个空窗口 | 双击 bat 出窗口；`python -c "import tkinter"` 通过 | ✅ 2026-11-18 |
+| **G1** | 应用骨架：Header / Rail / Status / 7 个空页 + 启动页 + 存档列表 | 能打开存档并看到能力位体检 | ✅ 2026-11-18 |
+| **G2** | **PNG 管线** + 单位头像 + 战力段格条 | 单位页能显示头像，滚动流畅 | ⬜ 下一步 |
+| **G3** | 单位页完整：详情、滚轮调值、改名、特种兵挂载 | 判据 A1 / C1 / C2 达成 | ⬜ |
+| **G4** | 待应用面板 + 确认框 + commit + 撤销 | 判据 A3 / A5 / C3 达成 | ⬜ |
+| **G5** | 其余 6 页 | 每页能力位开关正确 | ⬜ |
+| **G6** | 视觉打磨：皮肤、tooltip、动效、空态 | 判据 B1–B4 达成 | ⬜ |
+| **G7** | 出成品 zip + 解压验收 + 写《使用说明》 | 解压即用，测试全绿 | ⬜ |
 
 **每个阶段一个 commit**，测试全绿是硬门槛。
+
+### 11.1 G0 / G1 已建成什么样（2026-11-18）
+
+G0 + G1 一次做完并提交。**GUI 现在能双击 `run_gui.bat` 起来**，
+但只有骨架 —— 除概览页外，其余 6 页是占位（`pages/stubs.py`）。
+
+**G0 —— runtime 与启动**
+
+* 随包 `python/` 早在 commit `adb991e` 就补齐了 tcl/tk，本阶段只补 `run_gui.bat`：
+  **纯 ASCII + CRLF**，显式设 `TCL_LIBRARY` / `TK_LIBRARY` 兜底，支持 `--check` 自检。
+* `python -m save_modifier_gui.main --check` 依次验 4 件事：
+  tkinter/ttk 可用 → `Tk()` 起得来 → 核心库可 import 且列到存档 → GUI 模块可导入。
+
+**G1 —— 应用骨架**
+
+```
+src/save_modifier_gui/
+  theme.py       设计令牌（颜色/字号/间距）+ apply_theme() + configure_tree()
+  names.py       pretty_name() / campaign_cn() —— 中文名统一走核心库 locale
+  splash.py      启动页：搜索 + 刷新 + 存档表 + 打开按钮
+  app.py         Application 根窗口 / AppShell（Header + Rail + Work + Status）
+  main.py        命令行入口（--check 自检）
+  pages/
+    base.py      Page / SimplePage / FlatButton / Badge / Panel / PlaceholderEntry
+    overview.py  概览页（能力位体检 + 战役进度 + 注意事项）★ 目前唯一真的页
+    stubs.py     其余 6 页占位
+```
+
+* **能力位按位开关，不按状态分支**：`app.py` 的模块层 `capability_ok()` /
+  `capability_items()` 是**唯一判定入口** —— 禁用页连点都点不动。
+* **Rail 显示「撤销栈 N 条」** ⇒ 核心库补了 `Save.undo_count()`。
+* **Header 显示中文战役名** ⇒ `SaveInfo` 补了 `campaign_name`（本地化键，非中文）。
+* 启动页的搜索框占位符是**输入框内的灰字**（`PlaceholderEntry`：聚焦清空、离焦放回），
+  不是旁边的独立标签。
+* 实测：列到 **71 个存档**；打开会议阶段存档 ⇒ Header 显示
+  「战役 · 闪电战 / 会议界面（已发牌）」，状态栏列出 **6 项能力位体检**
+  （战区资产 ✗ 并带原因），7 页都能切，被禁用的页拒绝切页。
 
 ---
 

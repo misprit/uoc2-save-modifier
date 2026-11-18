@@ -113,6 +113,7 @@ def open_save(save_id: str, paths: CorePaths | None = None) -> Save:
         archived="Old Saves" in path.parts,
         is_primary=True,
         campaign_id=main.get("campaign_id") or None,
+        campaign_name=main.get("campaign_name") or None,
         scenario=in_state.get("scenario") or None,
         standalone_scenario=standalone,
         mtime=mtime,

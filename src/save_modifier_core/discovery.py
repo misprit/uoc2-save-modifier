@@ -45,6 +45,9 @@ class SaveInfo:
     scenario: str | None = None
     #: 独立场景 id（`standalone_scenario`）
     standalone_scenario: str | None = None
+    #: 战役名的**本地化键**（如 `id_campaign_name_c_stalingrad_p_dlc4`）
+    #: —— 中文名要用 `locale` 查，别自己猜（实测 → 「斯大林格勒」）
+    campaign_name: str | None = None
     #: 最后修改时间（epoch 秒）
     mtime: float = 0.0
     #: 文件字节数
@@ -117,6 +120,7 @@ def _scan_dir(directory: Path, kind: str, archived: bool,
             archived=archived,
             is_primary=not _is_backup_name(p.stem),
             campaign_id=main.get("campaign_id") or None,
+            campaign_name=main.get("campaign_name") or None,
             scenario=scenario,
             standalone_scenario=standalone,
             mtime=st.st_mtime,
