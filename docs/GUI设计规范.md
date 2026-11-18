@@ -394,6 +394,39 @@ cat.step_icon("us_arm_42")   # "step_armor_2"
 
 ⇒ 图标是**装饰**，不是数据。查不到图只能影响好看，不能影响能不能改。
 
+### 5.7 中文名从哪来（不是存档，也不是类型定义）
+
+**【实证 · 2026-11-18 · `e159`】** 所有**中文显示名**都在游戏包的
+`_packages/base/localization/chi/strings.yml` —— **扁平 id → 文本，16786 条，2 MB**。
+实体类型与存档里存的都只是**键**：
+
+| 对象 | 键在哪 | 字段 | 例 |
+|---|---|---|---|
+| 单位类型 | `entity_types/unit_types/*.yml` | `name_brief` | `id_aus_inf_41_brief` → **澳大利亚步兵** |
+| 特种兵 | `entity_types/specialists/*.yml` | `name_brief` / `name_full` | `id_bel_arty_towed_40_brief` → **155L Mod.1917** |
+| 卡牌 | `entity_types/cards/*.yml` | `title` / `subtitle` | `id_card_Ju_87` → **Ju 87**；`id_card_PRECISION_BOMBING` → **精准轰炸** |
+| 总部 | **存档 `hqs.yml` 的每一条** | `name_brief` / `name_full` / `name_super_brief` | `id_hq_name_brief_AOK_17` → **第17集团军** |
+| 通用文本 | — | — | `id_n_steps_infantry` → `{}步兵战力（{}）` |
+
+* 总部类型定义 `entity_types/hq_types/*.yml` 里**没有** name 字段 ——
+  名字键在**存档**里（每个总部自带 `name_brief` / `name_full`）。
+* 语言目录：`localization/{chi,eng,ger,rus}/`；
+  **中文只有一个大 `strings.yml`**，英文是按主题拆成 40 个 yml。
+
+**⚠️ 核心库现在完全没有 locale 能力** ——
+`Catalog.unit_type_names()` / `hq_type_names()` / `spec_type_names()`
+返回的都是**英文类型标识符**（`aus_inf_41` / `aus_hq` / `bel_arty_towed_40`），
+**不是中文显示名**。
+
+⇒ **GUI 要显示中文，就得有人读这个 yml。**
+【决策】把它做成核心库能力（§8.1），GUI 不自己解析 2 MB 的字符串表：
+GUI 要么调 `Catalog.locale_text(key)`，要么让核心库直接给
+`Catalog.unit_type_cn(type_name)` 这样的成品。
+
+* 找不到 locale 文件时（游戏目录缺失）⇒ 退回显示**类型标识符**，
+  并在页面顶部挂一条提示"未找到游戏目录，中文名不可用"。
+  **功能不缺**，只是名字难看。
+
 ---
 
 ## 6. 交互规范
@@ -972,6 +1005,12 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 | `Edit.card_store_remove(position)` | **下架**一张卡 | `main.yml` → `card_store` | |
 | `Edit.card_store_add(position, card_type, is_free?)` | **上架**一张卡 | `main.yml` → `card_store` | `position` ≤ `card_store_limit[level]`（恒为 5） |
 
+**另外一处要新增的读能力**（不是 Edit，是 Catalog）：
+
+| 缺的 | 为什么需要 | 落点 | 备注 |
+|---|---|---|---|
+| `Catalog.locale_text(key)` | 所有中文显示名都在 `localization/chi/strings.yml`（16786 条），核心库现在**一个都不解析** | 游戏包 | 见 §5.7；找不到文件时返回 `None`，GUI 退回显示类型标识符 |
+
 **另外两处要改判定逻辑的**（不是新增，是修正）：
 
 1. `store_set` / `store_remove` 的 `index` 现在是**战线下的第几条**——
@@ -1284,6 +1323,7 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 | `e156_specialist_hq_types.py` | 特种兵数值在游戏包（存档只有引用）+ 总部 26 字段与分支等级结构 |
 | `e157_card_store.py` | **会议阶段存档**的 `main.yml.card_store`（卡牌商店货架，5 条）+ 与手牌同字段 |
 | `e158_cardshop_bytecode.py` | 卡牌商店常量（`card_store_limit` / `card_store_free_cards` / `card_deck_limit`）+ 基础权重 15/6/3 + `BuyCard` 扣声望 + `load` 不重掷 / `set_conference` 才重掷 |
+| `e159_locale_names.py` | 中文名全在 `localization/chi/strings.yml`（16786 条）+ 各类实体只存键 + 核心库**不解析** locale |
 | `e135_assetmap.py` | 贴图全清单 + 实测尺寸（629 单位类型 / 379 特种兵目录 / 11 step / 44 theater） |
 | `e136_fphelper.py` | `_fp_helper` 反汇编 ⇒ step 图标命名规则与步数来源 |
 | `e137_scan_pyc.py` | 全量 pyc 字符串扫描 ⇒ 定位 `n_steps` / `force_pool` 的定义方 |

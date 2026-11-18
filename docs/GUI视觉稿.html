@@ -1001,16 +1001,51 @@ const HQS = [
   ["rom_hq_dlc4_1","罗马尼亚军集群","安东内斯库","罗",2,6,1,31,220,"Lv1/Lv1/Lv1/Lv1/Lv1",1]
 ];
 
-/* 卡牌：cost / theater_asset / image 全部来自 entity_types/cards/*.yml */
+/* 卡牌：**全部 39 种**，数据直接取自游戏包 ——
+   cost / image / meta_type / theater_asset 来自 entity_types/cards/*.yml，
+   中文标题与副标题来自 localization/chi/strings.yml（core 库暂未暴露 locale，
+   GUI 需要自己读或让 core 加一个 lookup —— 见《GUI设计规范.md》§8.1） */
 const CARDS = [
-  ["precision_bombing_axis","精确轰炸",75,"精确轰炸"],["flying_artillery_axis","飞行炮兵",40,"飞行炮兵"],
-  ["air_fleet_axis","航空舰队",60,"空袭"],["air_hq_axis","空中总部",50,"飞行炮兵"],
-  ["naval_bombardment_axis","舰炮轰击",45,"舰炮轰击"],["sabotage_axis","破坏行动",30,"破坏"],
-  ["store_allies","物资补给",20,"—"],["truck_allies","卡车运输",25,"—"],
-  ["espionage_allies","间谍行动",30,"间谍"],["power_hq_axis","总部强化",20,"—"],
-  ["long_range_recon_allies","远程侦察",10,"远程侦察"],["saturation_strike_allies","饱和攻击",40,"饱和攻击"]
+  ["air_attack_allies","B-26",40,"轰炸机"],
+  ["air_attack_axis","He 111",40,"轰炸机"],
+  ["air_attack_soviet","伊尔-2攻击机",40,"轰炸机"],
+  ["air_fleet_axis","航空舰队",60,"前进空中管制员"],
+  ["air_hq_axis","飞行旅",50,"非洲"],
+  ["air_supply_allies","C-47",30,"空中补给"],
+  ["air_supply_axis","Ju 52",30,"空中补给"],
+  ["air_supply_soviet","里-2运输机",30,"空中补给"],
+  ["arty_prep_soviet","炮火",30,"准备"],
+  ["divisional_para_allies_1","第1空降兵",120,"红魔鬼"],
+  ["divisional_para_allies_101","第101空降兵",120,"啸鹰"],
+  ["divisional_para_allies_82","第82空降兵",120,"全美"],
+  ["espionage_allies","超级机密情报",30,"情报"],
+  ["espionage_soviet","苏联国防人民委员部反间谍总局",30,"情报"],
+  ["flying_artillery_axis","第8航空兵团",40,"空中炮击"],
+  ["long_range_recon_allies","蚊式侦察机",10,"空中侦察"],
+  ["long_range_recon_axis","Bf 109 E-5",10,"空中侦察"],
+  ["long_range_recon_soviet","雅克-2轰炸机",10,"空中侦察"],
+  ["naval_bombardment_allies","伊丽莎白女王级战列舰",45,"炮舰轰炸"],
+  ["naval_bombardment_axis","德国",45,"炮舰轰炸"],
+  ["power_hq_axis","闪电战",20,"移动指挥"],
+  ["precision_bombing_axis","Ju 87",75,"精准轰炸"],
+  ["sabotage_allies","特别行动处",20,"破坏"],
+  ["sabotage_axis","勃兰登堡",30,"破坏"],
+  ["sabotage_soviet","苏联侦察部队",30,"破坏"],
+  ["saturation_strike_allies","兰开斯特轰炸机",40,"饱和打击"],
+  ["store_allies","盟军总部/盟军远征军最高统帅部",20,"精英替补"],
+  ["store_axis","国防军最高统帅部",20,"精英替补"],
+  ["store_soviet","苏联武装部队最高统帅部",20,"精英替补"],
+  ["tactical_naval_assault_uk","突击旅",50,"炮舰着陆"],
+  ["tactical_naval_assault_us","美国两栖军团战斗队",50,"炮舰着陆"],
+  ["tactical_para_german","空降猎兵",75,"空降"],
+  ["tactical_para_polish","波兰兵旅",75,"空降"],
+  ["tactical_para_soviet","第204空降旅",75,"空降"],
+  ["tactical_para_uk","第1伞兵旅",75,"空降"],
+  ["tactical_para_us","第517伞兵团战斗队",75,"空降"],
+  ["truck_allies","季姆西十轮大卡车",25,"运输"],
+  ["truck_axis","欧宝闪电卡车",25,"运输"],
+  ["truck_soviet","吉斯-5卡车",25,"运输"]
 ];
-
 /* 卡牌 image 字段 → 实际 PNG：文件名带前缀，且 image 字段**不总是**等于文件名
    （实测 image='cards/generic_para' 的文件其实是 logo_divisional_para_allies_1.png） */
 const CARD_IMG = {
