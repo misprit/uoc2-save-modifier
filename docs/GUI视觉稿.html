@@ -183,23 +183,32 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .sbhead .sbm{font-size:12px;color:var(--muted);white-space:nowrap}
 .sbhead .sbm b{font-family:var(--mono);color:var(--accent-dark);font-size:13px}
 .sbhead .sbhint{font-size:11px;color:var(--muted);white-space:nowrap}
-/* 备选池的提示语另起一行 —— 挤在一行会把标题顶得换行 */
-.sbhead.pool .sbhint{flex-basis:100%;margin-top:-3px}
 .sbhead .sp{flex:1}
-/* 已挂槽位：图标 + 名字（点击 = 卸下） */
-.specslots{display:flex;gap:9px;padding:11px 12px;align-items:center;flex-wrap:wrap}
-.slot{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;border:1px solid var(--border);
+.sbhead .sbsep{width:1px;height:13px;background:var(--border);flex:none}
+/* U14：左 = 已挂槽位（竖排）‖ 右 = 备选池 —— 宽度全给候选 */
+.specsplit{display:flex;align-items:stretch;min-height:0}
+.specslots{display:flex;flex-direction:column;gap:7px;padding:10px 12px;width:222px;flex:none;
+  border-right:1px solid var(--border);background:var(--surface)}
+/* 已挂槽位：图标 + 名字 + 攻/防/装甲/火力 + 特性（点击 = 卸下） */
+.slot{display:flex;align-items:center;gap:8px;padding:5px 9px 5px 5px;border:1px solid var(--border);
   border-radius:7px;background:var(--surface-alt);cursor:pointer}
 .slot:hover{border-color:var(--danger);background:var(--danger-light)}
 .slot:hover .slotname{color:var(--danger)}
 .slot .sq{width:34px;height:34px;border-radius:5px;background:var(--stage);border:1px solid var(--stage-edge);
   display:grid;place-items:center;overflow:hidden;flex:none}
 .slot .sq img{max-width:100%;max-height:100%;object-fit:contain}
-.slot .slotname{font-size:12.5px;font-weight:600}
-.slot.empty{border-style:dashed;background:var(--surface);color:var(--muted);cursor:default;padding:5px 24px}
+.slot .slotinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.slot .slotname{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .slotstat{font-size:10.5px;color:var(--muted);font-family:var(--mono);
+  display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+/* 特性小标签（浅色版；深色版是 .tip .tag） */
+.ftag{display:inline-block;font-size:10px;padding:0 5px;border-radius:3px;background:var(--surface);
+  border:1px solid var(--border);color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.slot.empty{border-style:dashed;background:var(--surface);color:var(--muted);cursor:default;padding:5px 24px;
+  justify-content:center}
 .slot.empty:hover{border-color:var(--border);background:var(--surface)}
 /* 备选池：只图标；悬停出名字 + 数值 */
-.specpool{display:block;max-height:320px;overflow:auto}
+.specpool{display:block;max-height:340px;overflow:auto;flex:1;min-width:0}
 .poolflat{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px}
 /* U11：全量视图按国籍分一层（阵营分隔带 → 国籍组，组标题可折叠） */
 .facband{display:flex;align-items:center;gap:8px;padding:8px 12px 3px;font-size:11px;
@@ -350,6 +359,11 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .expbar{height:9px;border-radius:5px;background:var(--surface-alt);border:1px solid var(--border);
   overflow:hidden;margin-top:6px}
 .expbar i{display:block;height:100%;background:var(--accent)}
+/* U14：总部详情抬头 —— 经验块与「改名」并列，不再单独占一整行 */
+.hqhead{display:flex;gap:16px;align-items:stretch}
+.hqhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.hqhead .vsep{width:1px;background:var(--border);flex:none}
+.hqhead .xpblk{flex:none;width:240px}
 .branches{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
 .brow{display:flex;align-items:center;gap:9px;padding:6px 11px;border-bottom:1px solid #f0f3f6;font-size:12.5px}
 .brow:last-child{border-bottom:none}
@@ -365,6 +379,10 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   border-radius:4px;display:grid;place-items:center;overflow:hidden;flex:none}
 .fprow .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fprow .q{font-family:var(--mono);font-weight:700;color:var(--accent-dark);width:32px;text-align:right}
+/* U14：兵库条目 = 名字 + 数值/特性（特种兵条目显示攻/防/装甲/火力 + 特性） */
+.fprow .fpname{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.fprow .fmeta{font-size:11px;color:var(--muted);font-family:var(--mono);
+  display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 
 /* ---------- 总部页 · 技能矩阵（U12：照游戏内升级面板重做） ---------- */
 .hqtabs{display:flex;gap:2px;background:var(--surface-alt);border:1px solid var(--border);
@@ -543,8 +561,11 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 
 <h2>2 · 主窗口 · 单位页</h2>
 <p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 6 个功能页（<b>特种兵已并入本页</b>），底部是常驻的待应用面板（展开时压矮工作区，永不遮挡详情区）。<br>
-<b>2026-11-18 · U11</b>：左边<b>名册列表收窄</b>（删掉血量文字「5 / 7」，换成「特种兵兵牌 + 已挂 N 个」小标记）⇒
-右边<b>单位详情加宽</b> ⇒ 抬头一行里<b>兵力 / 经验两块挤到改名右侧</b> ⇒ 抬头下面整块都归<b>特种兵</b>。</p>
+<b>2026-11-18 · U11</b>：左边<b>名册列表收窄</b>（删掉血量文字「5 / 7」，换成「特种兵兵牌 + 已挂 N 个」小标记）⇒   右边<b>单位详情加宽</b> ⇒ 抬头一行里<b>兵力 / 经验两块挤到改名右侧</b> ⇒
+   抬头下面整块都归<b>特种兵</b>。<br>
+   <b>2026-11-18 · U14</b>：特种兵区改成<b>左「已挂槽位」竖排 ‖ 右「备选池」</b>，
+   「备选 · 9 种（西线战役默认）」并进<b>标题行</b> ⇒ 省掉一整行，池子也宽多了；
+   槽位顺带显示<b>攻/防/装甲/火力 + 特性</b>。</p>
 
 <div class="app">
   <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>
@@ -626,23 +647,20 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                 </div>
               </div>
               </div>
-            </div>
-
-            <div class="specbox">
+            </div>            <div class="specbox">
               <div class="sbhead">
                 <span class="sbt">特种兵</span>
                 <span class="sbm">可挂 <b>3</b> · 已挂 <b>2</b></span>
-                <span class="sp"></span>
-                <span class="sbhint">点下方图标 = 挂到第一个空槽位 · 点已挂的图标 = 卸下</span>
-              </div>
-              <div class="specslots" id="slots"></div>
-              <div class="sbhead pool" style="border-top:1px solid var(--border)">
-                <span class="sbm">备选 · <b id="pooln">9</b> 种（<span id="poolscope">西线战役默认</span>）</span>
+                <span class="sbsep"></span>
+                <span class="sbm">备选 <b id="pooln">9</b> 种（<span id="poolscope">西线战役默认</span>）</span>
                 <label class="chk"><input type="checkbox" id="allcb"> 显示全部 375 种</label>
                 <span class="sp"></span>
-                <span class="sbhint">默认只列本战役（1943–45 西方线）有的特种兵 · 勾「显示全部」后按国籍分组 · 悬停看细节</span>
+                <span class="sbhint">点右侧图标 = 挂到第一个空槽位 · 点已挂的 = 卸下 · 悬停看数值</span>
               </div>
-              <div class="specpool" id="pool"></div>
+              <div class="specsplit">
+                <div class="specslots" id="slots"></div>
+                <div class="specpool" id="pool"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -821,7 +839,9 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 <b>右下角数字 = 该技能 CP 消耗</b>，<b>右上角小点 = 专精槽位</b>（金色实心 = 已专精）。
 图标、徽章全部<b>取游戏原贴图</b>（<code>surfaces/hq_upgrade/</code>，140×140，20 个动作全覆盖）。<br>
 <b>U13 追加</b>：顶部加<b>补给卡车链</b>（5 个卡车图标，点哪里激活到几辆、<b>不扣声望</b>）、
-删掉最右的「升级价」列、每行加回<b>「压制 N」</b>（被压制的等级数）。</p>
+删掉最右的「升级价」列、每行加回<b>「压制 N」</b>（被压制的等级数）。<br>
+<b>U14 追加</b>：<b>总部经验并入抬头</b>（和改名并列，不再自己占一行）、
+兵库里的<b>特种兵条目显示攻/防/装甲/火力 + 特性</b>。</p>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -846,23 +866,22 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
         </div>
         <div class="panel">
           <h3>总部详情</h3>
-          <div class="detail">
-            <div class="dhead">
-              <div>
+          <div class="detail">            <div class="hqhead">
+              <div class="idblk">
                 <div class="dtitle">A集团军群 <span class="edit">✎ 改名</span></div>
                 <div class="dsub">格尔德·冯·伦德施泰特 · CP 8/8 · 补给 3</div>
+              </div>
+              <div class="vsep"></div>
+              <div class="stat xpblk">
+                <div class="lb"><span>总部经验</span><span class="hintw">滚轮调 xp</span></div>
+                <div class="v">87 <small>/ 220 升到下一级</small></div>
+                <div class="expbar"><i style="width:40%"></i></div>
               </div>
             </div>
 
             <div class="hqtabs" id="hqtabs">
               <span class="tb on" data-tab="mx">升级矩阵</span>
               <span class="tb" data-tab="fp">兵库 <span class="n">4</span></span>
-            </div>
-
-            <div class="stat">
-              <div class="lb"><span>总部经验</span><span class="hintw">滚轮调 xp</span></div>
-              <div class="v">87 <small>/ 220 升到下一级</small></div>
-              <div class="expbar"><i style="width:40%"></i></div>
             </div>
 
             <div id="tab-mx">
@@ -893,16 +912,19 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                   <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
                 <div class="fprow"><div class="thumb"><img alt=""></div>
                   <span style="flex:1">摩托化步兵</span><span class="q">0</span>
-                  <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
-                <div class="fprow"><div class="thumb"><img alt=""></div>
-                  <span style="flex:1">特种兵 · 工兵</span><span class="q">1</span>
+                  <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>                <div class="fprow"><div class="thumb"><img alt=""></div>
+                  <span class="fpname">特种兵 · 工兵
+                    <span class="fmeta">攻 4 · 防 3 · 装甲 1 · 火力 0 <span class="ftag">工程兵</span></span></span>
+                  <span class="q">1</span>
                   <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
                 <div class="fprow" style="justify-content:flex-end;gap:8px">
                   <button class="btn" style="font-size:11.5px">＋ 添加条目</button>
                   <button class="btn danger" style="font-size:11.5px">－ 移除条目</button></div>
-              </div>
-              <div class="note">兵库条目 = <code>{delay, nationality, quantity, spec|equipment}</code>，
-                可<b>加 / 删 / 改存量</b>；名字里的「第 N 号」是游戏的阶梯命名，<b>原样显示</b>。</div>
+              </div>              <div class="note">兵库条目 = <code>{delay, nationality, quantity, spec|equipment}</code>，
+                可<b>加 / 删 / 改存量</b>；名字里的「第 N 号」是游戏的阶梯命名，<b>原样显示</b>。<br>
+                ⓘ <b>特种兵条目</b>额外显示<b>攻 / 防 / 装甲 / 火力 + 特性</b> ——
+                数值与特性都在游戏包 <code>entity_types/specialists/*.yml</code>，
+                核心库 <code>Catalog.spec_type()</code> 直接给（存档里只有类型引用）。</div>
             </div>
           </div>
         </div>
@@ -1905,12 +1927,17 @@ function blockReason(s){
   return "";
 }
 
-/* 已挂槽位：图标 + 名字；点击 = 卸下 */
+/* U14：已挂槽位竖排（左侧栏）—— 图标 + 名字 + 攻/防/装甲/火力 + 特性；点击 = 卸下 */
 const slots=document.getElementById("slots");
 MOUNTED.forEach(t=>{
   const s=SPECIALISTS.find(x=>x[0]===t); if(!s) return;
   const d=document.createElement("div"); d.className="slot";
-  d.innerHTML=`<div class="sq"><img alt=""></div><div class="slotname">${s[1]}</div>`;
+  const fl=s[8] ? s[8].split(",").map(f=>FLAG_CN[f]||f) : [];
+  d.innerHTML=`<div class="sq"><img alt=""></div>`
+    +`<div class="slotinfo"><div class="slotname">${s[1]}</div>`
+    +`<div class="slotstat"><span>攻 ${s[2]} · 防 ${s[3]} · 装甲 ${s[4]} · 火力 ${s[5]}</span>`
+    +(fl.length ? fl.map(f=>`<span class="ftag">${f}</span>`).join("") : "")
+    +`</div></div>`;
   img(d.querySelector("img"), SUR+"specialist/"+t+"/hq_action_icon.png", s[1]);
   d.title="点击卸下这个特种兵";
   slots.appendChild(d);
