@@ -542,10 +542,10 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
               </div>
               <div class="specslots" id="slots"></div>
               <div class="sbhead pool" style="border-top:1px solid var(--border)">
-                <span class="sbm">备选 · <b id="pooln">23</b> 种（当前单位可挂）</span>
+                <span class="sbm">备选 · <b id="pooln">9</b> 种（<span id="poolscope">西线战役默认</span>）</span>
                 <label class="chk"><input type="checkbox" id="allcb"> 显示全部 375 种</label>
                 <span class="sp"></span>
-                <span class="sbhint">悬停看 攻 / 防 / 装甲 / 火力 + 特殊类型</span>
+                <span class="sbhint">默认只列本战役（1943–45 西方线）有的特种兵 · 悬停看细节</span>
               </div>
               <div class="specpool" id="pool"></div>
             </div>
@@ -601,6 +601,23 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   而 <code>max_spec = min(3, 类型表的 max_spec)</code>（实测分布：1×233 / 2×314 / 3×80）。
 </div>
 
+<div class="note">
+  <b>备选池的口径：默认只列「本战役有的」</b>（2026-11-18 用户拍板）
+  <ol style="margin:8px 0 0;padding-left:20px">
+    <li><b>战役默认池</b> = 该战役<b>所有战线 × 所有会议</b>的商店 <code>spec:</code> 条目
+        ∪ 该战役<b>场景</b> <code>units.yml</code> 里游戏自己挂过的 <code>specs[].type</code>；
+        <br>实测每个战役的商店<b>只卖玩家一方阵营</b>（allies / axis / soviet 各自纯净），
+        且<b>年代自洽</b>（blitzkrieg 只有 _39/_40/_42，desert 只有 _42）;</li>
+    <li><b>最终候选</b> = 战役默认池 ∩ 上面那条游戏规则（阵营 + 国籍）;</li>
+    <li><b>兜底</b>：找不到战役包 / 某个单位交集为空 ⇒ 放宽成「仅规则」并标注原因。</li>
+  </ol>
+  <br>⚠ <b>只用商店是不够的</b> —— 商店会漏掉 <b>113 种</b>游戏自己在该战役场景里挂过的特种兵
+  （<code>us_spec_42</code> / <code>ff_recon_42</code> / <code>ger_at_40</code> …）；
+  加上场景集合后<b>漏 0 种</b>（<code>e163</code> 实测）。
+  <br>⚠ <b>不能靠名字后缀判年代</b> —— DLC 战役用 <code>_dlcN</code> 命名（<code>ger_at_dlc10</code>），
+  18~41 个条目根本没有年份。
+</div>
+
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="panel" style="flex:1">
@@ -609,21 +626,30 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
         <tr style="background:var(--surface-alt)">
           <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">单位类型</td>
           <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">阵营 / 国籍</td>
-          <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">可挂种数</td>
+          <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">战役</td>
+          <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">规则内可挂</td>
           <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">备选区默认显示</td>
         </tr>
         <tr><td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">us_arm_42</td>
             <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6">allies / us</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">base/west</td>
             <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">23</td>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--muted)">23 种</td></tr>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--accent-dark);font-weight:600">9 种</td></tr>
         <tr><td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">ger_inf_40</td>
             <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6">axis / german</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">dlc4/stalingrad</td>
             <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">97</td>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--muted)">97 种</td></tr>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--accent-dark);font-weight:600">18 种</td></tr>
         <tr><td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">sov_inf_41</td>
             <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6">soviet / soviet</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">dlc9/berlin</td>
             <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">61</td>
-            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--muted)">61 种</td></tr>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--accent-dark);font-weight:600">19 种</td></tr>
+        <tr><td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">us_arm_42</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6">allies / us（<b>敌国单位</b>）</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">dlc9/berlin</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">23</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--warn)">0 种 → <b>放宽为 23 种</b></td></tr>
       </table>
     </div>
   </div>
@@ -1070,34 +1096,37 @@ const UNITS = [
   {t:"uk_arm_div_late_dlc6", name:"英军装甲师", hq:"东部", st:6, sup:0, max:7, xp:260}
 ];
 
+/* 第 10 个字段 = 在不在【base/west 战役默认池】里（e163 实测）
+   池 = 该战役 商店 spec ∪ 场景 units.yml 里 specs[].type
+   ⇒ us_arm_42 的 23 个可挂项里，只有 9 个属于本战役；其余 14 个都是别的战役的货 */
 const SPECIALISTS = [
-  ["us_armx_42","M4谢尔曼","9","5","2","0","us","allies",""],
-  ["us_armx_42_opt","DD谢尔曼","9","5","2","0","us","allies","lci"],
-  ["us_armx_dlc10","M4谢尔曼","8","7","3","0","us","allies",""],
-  ["us_armx_dlc6","M4谢尔曼","8","5","4","0","us","allies",""],
-  ["us_armx_dlc8","M4谢尔曼","8","7","3","0","us","allies",""],
-  ["us_arty_42","M7牧师","0","6","0","2","us","allies","arty"],
-  ["us_arty_dlc10","M7牧师","0","6","0","2","us","allies","arty"],
-  ["us_at_42","M10","4","7","3","0","us","allies","at"],
-  ["us_at_dlc10","M10","6","6","4","0","us","allies","at"],
-  ["us_at_dlc6","M10","4","5","4","0","us","allies","at"],
-  ["us_at_dlc8","M10","6","6","4","0","us","allies","at"],
-  ["us_eng_42","美国工兵","6","8","0","0","us","allies","engineers"],
-  ["us_eng_dlc10","美国工兵","6","8","0","0","us","allies","engineers"],
-  ["us_heavy_45_opt","M26重型坦克","12","9","4","0","us","allies",""],
-  ["us_heavy_dlc10","M26重型坦克","12","9","4","0","us","allies",""],
-  ["us_recon_42","M8灰狗","7","4","1","0","us","allies","recon"],
-  ["us_recon_dlc10","M8灰狗","7","4","1","0","us","allies","recon"],
-  ["us_spec_42","游骑兵","10","8","0","0","us","allies","special,lci"],
-  ["us_spec_dlc10_opt","游骑兵","9","8","0","0","us","allies","special,lci"],
-  ["us_spec_dlc8_opt","游骑兵","9","8","0","0","us","allies","special,lci"],
-  ["us_towed_arty_42","105毫米M2A1","0","6","0","3","us","allies","towed,arty"],
-  ["us_towed_arty_dlc10","105毫米M2A1","0","6","0","3","us","allies","towed,arty"],
-  ["us_towed_arty_dlc10_opt","155毫米“长腿汤姆”榴弹炮","0","8","0","4","us","allies","towed,arty"],
-  ["bel_arty_towed_40","155L Mod.1917","0","6","0","4","belgian","allies","towed,arty"],
-  ["bel_at_40","T-13","1","4","2","0","belgian","allies","at"],
-  ["nl_arty_towed_40","105毫米野战炮","0","5","0","2","dutch","allies","towed,arty"],
-  ["nl_recon_40","哈扎伦","3","2","0","0","dutch","allies","recon"]
+  ["us_armx_42","M4谢尔曼","9","5","2","0","us","allies","","1"],
+  ["us_armx_42_opt","DD谢尔曼","9","5","2","0","us","allies","lci","1"],
+  ["us_armx_dlc10","M4谢尔曼","8","7","3","0","us","allies","","0"],
+  ["us_armx_dlc6","M4谢尔曼","8","5","4","0","us","allies","","0"],
+  ["us_armx_dlc8","M4谢尔曼","8","7","3","0","us","allies","","0"],
+  ["us_arty_42","M7牧师","0","6","0","2","us","allies","arty","1"],
+  ["us_arty_dlc10","M7牧师","0","6","0","2","us","allies","arty","0"],
+  ["us_at_42","M10","4","7","3","0","us","allies","at","1"],
+  ["us_at_dlc10","M10","6","6","4","0","us","allies","at","0"],
+  ["us_at_dlc6","M10","4","5","4","0","us","allies","at","0"],
+  ["us_at_dlc8","M10","6","6","4","0","us","allies","at","0"],
+  ["us_eng_42","美国工兵","6","8","0","0","us","allies","engineers","1"],
+  ["us_eng_dlc10","美国工兵","6","8","0","0","us","allies","engineers","0"],
+  ["us_heavy_45_opt","M26重型坦克","12","9","4","0","us","allies","","1"],
+  ["us_heavy_dlc10","M26重型坦克","12","9","4","0","us","allies","","0"],
+  ["us_recon_42","M8灰狗","7","4","1","0","us","allies","recon","1"],
+  ["us_recon_dlc10","M8灰狗","7","4","1","0","us","allies","recon","0"],
+  ["us_spec_42","游骑兵","10","8","0","0","us","allies","special,lci","1"],
+  ["us_spec_dlc10_opt","游骑兵","9","8","0","0","us","allies","special,lci","0"],
+  ["us_spec_dlc8_opt","游骑兵","9","8","0","0","us","allies","special,lci","0"],
+  ["us_towed_arty_42","105毫米M2A1","0","6","0","3","us","allies","towed,arty","1"],
+  ["us_towed_arty_dlc10","105毫米M2A1","0","6","0","3","us","allies","towed,arty","0"],
+  ["us_towed_arty_dlc10_opt","155毫米“长腿汤姆”榴弹炮","0","8","0","4","us","allies","towed,arty","0"],
+  ["bel_arty_towed_40","155L Mod.1917","0","6","0","4","belgian","allies","towed,arty","0"],
+  ["bel_at_40","T-13","1","4","2","0","belgian","allies","at","0"],
+  ["nl_arty_towed_40","105毫米野战炮","0","5","0","2","dutch","allies","towed,arty","0"],
+  ["nl_recon_40","哈扎伦","3","2","0","0","dutch","allies","recon","0"]
 ];
 const THEATER = [
   ["air_attack","空袭"],["air_supply","空中补给"],["flying_artillery","飞行炮兵"],
@@ -1283,24 +1312,29 @@ for(let i=MOUNTED.length;i<CAP;i++){
   slots.appendChild(e);
 }
 
-/* 备选池：只显示图标；默认只显示「当前单位可挂的」 */
+/* 备选池：只显示图标；默认只显示【当前单位可挂 ∩ 本战役默认池】 */
 const pool=document.getElementById("pool"), pooln=document.getElementById("pooln");
+const scope=document.getElementById("poolscope");
 const allcb=document.getElementById("allcb");
+const inCampaign=s=>s[9]==="1";               /* 在 base/west 战役默认池内 */
 const mountable=SPECIALISTS.filter(canMount);
+const inPool=mountable.filter(inCampaign);     /* 默认显示的 */
 const blocked=SPECIALISTS.filter(s=>!canMount(s));
 function renderPool(){
   pool.innerHTML="";
-  const list=allcb.checked ? mountable.concat(blocked) : mountable;
-  pooln.textContent=allcb.checked ? SPECIALISTS.length : mountable.length;
+  const list=allcb.checked ? mountable.concat(blocked) : inPool;
+  pooln.textContent=allcb.checked ? SPECIALISTS.length : inPool.length;
+  scope.textContent=allcb.checked ? "全部" : "西线战役默认";
   list.forEach(s=>{
     const ok=canMount(s);
     const c=document.createElement("div"); c.className="pcell"+(ok?"":" blocked");
     c.innerHTML=`<img alt="">`;
     img(c.querySelector("img"), SUR+"specialist/"+s[0]+"/hq_action_icon.png", s[1]);
     const fl=s[8] ? s[8].split(",").map(f=>FLAG_CN[f]||f) : [];
-    const why=ok ? "点击挂到这个单位"
-                 : (s[7]!=="allies" ? `不可挂：阵营 ${s[7]} ≠ allies`
-                                    : `不可挂：国籍 ${s[6]} ≠ ${UNIT_NAT}`);
+    const why=!ok ? (s[7]!=="allies" ? `不可挂：阵营 ${s[7]} ≠ allies`
+                                      : `不可挂：国籍 ${s[6]} ≠ ${UNIT_NAT}`)
+                 : (inCampaign(s) ? "点击挂到这个单位"
+                                  : "不在本战役默认池内 · 点击仍可挂");
     c.dataset.tip=`<span class="tn">${s[1]}</span>`
       +`<span class="tr">攻 ${s[2]} · 防 ${s[3]} · 装甲 ${s[4]} · 火力 ${s[5]}</span><br>`
       +(fl.length ? fl.map(f=>`<span class="tag">${f}</span>`).join("")
