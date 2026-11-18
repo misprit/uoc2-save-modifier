@@ -208,11 +208,8 @@ table.list td.k{color:var(--muted)}
 .pip.on{background:var(--accent);border-color:var(--accent-dark)}
 .pip.sup{background:var(--stage-sup);border-color:#a9b7c7}
 .ubadges{display:flex;align-items:center;gap:4px;flex:none}
-.ubadge{width:22px;height:22px;border-radius:5px;background:var(--stage);
+.ubadge{position:relative;width:26px;height:26px;border-radius:6px;background:var(--stage);
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;flex:none}
-.ubadge img{max-width:100%;max-height:100%;object-fit:contain}
-.ucount{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--accent-dark);
-  background:var(--accent-light);border:1px solid #b9d3ea;border-radius:9px;padding:0 6px}
 /* 详情抬头 */
 .detail{padding:14px}
 .dhead{display:flex;gap:16px;align-items:stretch}
@@ -273,9 +270,19 @@ table.list td.k{color:var(--muted)}
   border-radius:7px;background:var(--surface-alt);cursor:pointer}
 .slot:hover{border-color:var(--danger);background:var(--danger-light)}
 .slot:hover .slotname{color:var(--danger)}
-.slot .sq{width:34px;height:34px;border-radius:5px;background:var(--stage);
-  border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;flex:none}
-.slot .sq img{max-width:100%;max-height:100%;object-fit:contain}
+/* U46：图标**不再单独套一个方框底** —— 整张特种兵卡片自带边框，
+   再框一层是多余的视觉符号；去掉后图标可以更大。 */
+.slot .sq{position:relative;width:40px;height:40px;display:grid;place-items:center;
+  overflow:hidden;flex:none}
+/* 特种兵图标放大（U46）：游戏贴图 hq_action_icon.png 是 160×160 画布、
+   图形只占 60×69（实测 378/378 个完全一致 ⇒ 只占边长的 40%），
+   所以把 img 放大 200%、让方框裁掉透明边 ⇒ 图标从「占框 40%」变成「占框 ~78%」。 */
+.ubadge img,.pcell img,.slot .sq img{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:200%;height:200%;max-width:none;max-height:none;object-fit:contain}
+table.spec-tbl .thumb img.spico,.fptab .thumb img.spico{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:200%;height:200%;max-width:none;max-height:none;object-fit:contain}
 .slot .slotinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .slot .slotname{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slot .slotflags{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
@@ -300,9 +307,8 @@ table.list td.k{color:var(--muted)}
 .grphead .caret{font-size:10px;display:inline-block}
 .grphead .gcount{font-weight:400;color:var(--muted);font-size:11.5px}
 .grpbody{display:flex;flex-wrap:wrap;gap:6px;padding:9px 12px}
-.pcell{width:42px;height:42px;border-radius:6px;background:var(--stage);
+.pcell{position:relative;width:42px;height:42px;border-radius:6px;background:var(--stage);
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;cursor:pointer}
-.pcell img{max-width:100%;max-height:100%;object-fit:contain}
 .pcell:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(36,91,143,.2)}
 .pcell.blocked{opacity:.35;filter:grayscale(.9);cursor:not-allowed}
 .pcell.blocked:hover{border-color:var(--stage-edge);box-shadow:none}
@@ -342,8 +348,8 @@ table.spec-tbl td.num{font-family:var(--mono);text-align:right}
 table.spec-tbl td.dim{color:var(--muted)}
 table.spec-tbl td.tags{white-space:nowrap}
 table.spec-tbl td.tags .ftag{margin-right:4px}
-table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border:1px solid var(--stage-edge);
-  border-radius:4px;display:grid;place-items:center;overflow:hidden}
+table.spec-tbl .thumb{position:relative;width:30px;height:30px;background:var(--stage);
+  border:1px solid var(--stage-edge);border-radius:4px;display:grid;place-items:center;overflow:hidden}
 table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 table.spec-tbl .rm{color:var(--danger);cursor:pointer;font-size:11.5px}
 table.spec-tbl .numin{width:62px;font-size:13px;padding:1px 5px}
@@ -411,8 +417,11 @@ table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
   text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
 .rlist td{padding:5px 8px;border-bottom:1px solid #f0f3f6}
 .rlist td.n{text-align:right;font-family:var(--mono)}
-.rlist .spimg{width:16px;height:16px;vertical-align:-3px;margin-right:4px;
-  background:var(--stage);border:1px solid var(--stage-edge);border-radius:3px;object-fit:contain}
+.rlist .spimg{position:relative;width:20px;height:20px;vertical-align:-4px;margin-right:4px;
+  display:inline-block;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:3px;overflow:hidden}
+.rlist .spimg img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:200%;height:200%;max-width:none;max-height:none;object-fit:contain}
 .cstore{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px}
 .cstore .csrow{display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--border);
   border-radius:7px;background:var(--surface);font-size:12px;min-width:210px}
@@ -575,8 +584,8 @@ tr.oldrow{opacity:.6}
 .fptab td.dim{color:var(--muted)}
 .fptab td.name{color:var(--text);font-family:inherit}
 .fptab td.tags{font-family:inherit}
-.fptab .thumb{width:26px;height:26px;background:var(--stage);border:1px solid var(--stage-edge);
-  border-radius:4px;display:grid;place-items:center;overflow:hidden}
+.fptab .thumb{position:relative;width:26px;height:26px;background:var(--stage);
+  border:1px solid var(--stage-edge);border-radius:4px;display:grid;place-items:center;overflow:hidden}
 .fptab .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fptab .fdelay{background:var(--surface-alt);font-size:11px;color:var(--accent-dark);
   font-weight:400;padding:4px 9px;border-bottom:1px solid var(--border);text-align:left}
@@ -963,8 +972,9 @@ let PICKCACHE = {};      /* unit_type → 候选池（"" = 通用那一份；换
 function surf(p){
   return "/surfaces/" + String(p||"") + "?t=" + encodeURIComponent(TOKEN);
 }
-function imgTag(p, alt){
-  return `<img src="${surf(p)}" alt="${esc(alt||"")}" loading="lazy">`;
+function imgTag(p, alt, cls){
+  /* `cls` = 额外 class（特种兵图标用 "spico" 走 200% 放大规则） */
+  return `<img src="${surf(p)}" alt="${esc(alt||"")}"${cls?(' class="'+cls+'"'):""} loading="lazy">`;
 }
 const unitTex  = t => "unit/" + t + "/sheet_L.png";
 const specTex  = t => "specialist/" + t + "/hq_action_icon.png";
@@ -1101,7 +1111,7 @@ function unitRowHTML(u){
     pips.push(`<span class="pip ${cls}"></span>`);
   }
   const badges = specs.slice(0,3).map(s=>
-    `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type))}</span>`).join("");
+    `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>`).join("");
   const hq = (VIEW.hqs||[]).find(h=>h.id===u.hq_id);
   return `<div class="urow ${u.id===SEL.units?'sel':''}" onclick="pickUnit(${u.id})">
     <div class="ava">${u.type ? imgTag(unitTex(u.type), unitCn(u.type)) : ""}</div>
@@ -1137,7 +1147,7 @@ function unitDetailHTML(u){
     const st = (CATALOG&&CATALOG.spec_types[s.type])||{};
     const flag = (st.flags||[]).map(f=>`<span class="ftag">${esc(f)}</span>`).join("");
     return `<div class="slot" onclick="removeSpec(${u.id},${esc(JSON.stringify(s.type))})" title="点击卸下这个特种兵">
-      <span class="sq">${imgTag(specTex(s.type), specCn(s.type))}</span>
+      <span class="sq">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>
       <span class="slotinfo">
         <span class="slotname">${esc(specCn(s.type))}</span>
         <span class="slotflags">${flag||'<span class="none">无特性</span>'}</span>
@@ -1161,7 +1171,7 @@ function unitDetailHTML(u){
       const tip = specTipHTML(t, has?"已经挂上了":"点击挂到这个单位").replace(/"/g,"&quot;");
       return `<div class="pcell ${has?'blocked':''}" data-tip="${esc(tip)}"
         onclick="${has?'void 0':('addSpec('+u.id+','+esc(JSON.stringify(t))+')')}">
-        ${imgTag(specTex(t), specCn(t))}</div>`;
+        ${imgTag(specTex(t), specCn(t), "spico")}</div>`;
     }).join("") : `<div style="padding:12px;color:var(--muted);font-size:12px">没有可用候选</div>`;
   }
 
@@ -1453,7 +1463,7 @@ function hqPoolHTML(h){
       const tip = isSpec ? specTipHTML(e.spec, "延迟 "+d+" 回合 · 数量 "+(e.quantity||0)).replace(/"/g,"&quot;")
         : esc(hqEquipCn(e.equipment)+" · 延迟 "+d+" 回合");
       body += `<tr>
-        <td class="l"><div class="thumb" data-tip="${tip}">${isSpec?imgTag(specTex(e.spec), nm)
+        <td class="l"><div class="thumb" data-tip="${tip}">${isSpec?imgTag(specTex(e.spec), nm, "spico")
           :imgTag("steps/step.png", nm)}</div></td>
         <td class="l name">${esc(nm)}
           ${isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:""}</td>
@@ -1881,8 +1891,9 @@ function pageStore(w){
     const qty = pendingVal("store_set", storeKey(e.front,e.sub,index,"quantity"), e.quantity||0);
     const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(f)}</span>`).join("") : "";
     const tex = isSpec ? specTex(e.spec) : "steps/step.png";
+    const texCls = isSpec ? "spico" : "";
     return `<tr>
-      <td><div class="thumb">${imgTag(tex, storeEntryCn(e))}</div></td>
+      <td><div class="thumb">${imgTag(tex, storeEntryCn(e), texCls)}</div></td>
       <td>${esc(storeEntryCn(e))}<div style="color:var(--muted);font-size:10.5px">${esc(e.spec||e.equipment||"")}</div></td>
       <td class="dim">${esc(natCn(e.nationality))}</td>
       <td class="dim">${isSpec?esc(st.attack??"—"):"—"} / ${isSpec?esc(st.defense??"—"):"—"} /
@@ -2336,7 +2347,7 @@ function openConfirm(mode, info){
 function spickCellsHTML(items, onPick){
   return items.map(it=>`<div class="pcell ${it.blocked?'blocked':''} ${it.sel?'on':''}"
     title="${esc(it.title||it.name)}" onclick="${it.blocked?'void 0':onPick.replace("@ID", esc(JSON.stringify(it.id)))}">
-    ${imgTag(it.tex, it.name)}${it.dup?`<span class="dup">${esc(it.dup)}</span>`:""}</div>`).join("");
+    ${imgTag(it.tex, it.name, "spico")}${it.dup?`<span class="dup">${esc(it.dup)}</span>`:""}</div>`).join("");
 }
 /* 详情卡（复用 .slot 样式，但去掉「点击=卸下」的语义） */
 function spickCardHTML(it){
@@ -2667,8 +2678,9 @@ function rosterHTML(){
   (r.hqs||[]).forEach(h=>hqName[h.id] = h.name_cn||h.name_brief||h.id);
   const units = (r.units||[]).map(u=>{
     const st = (u.act_st||0)+(u.sup_st||0);
-    const specs = (u.specs||[]).map(s=>`<img class="spimg" src="${surf(specTex(s.type))}"
-      alt="${esc(specCn(s.type))}" title="${esc(specCn(s.type))}">`).join("");
+    const specs = (u.specs||[]).map(s=>`<span class="spimg"><img class="spico"
+      src="${surf(specTex(s.type))}" alt="${esc(specCn(s.type))}"
+      title="${esc(specCn(s.type))}"></span>`).join("");
     return `<tr>
       <td>${esc(u.name_cn||u.name_brief||("单位 "+u.id))}</td>
       <td class="dim">${esc(hqName[u.hq_id]||u.hq_id||"—")}</td>
@@ -2830,7 +2842,7 @@ function fullPoolHTML(u, selected){
         return `<div class="pcell ${can?'':'blocked'} ${has?'on':''}"
           data-tip="${tip}"
           onclick="${can&&!has ? ('addSpec('+u.id+','+esc(JSON.stringify(t))+')') : 'void 0'}">
-          ${imgTag(specTex(t), specCn(t))}</div>`;
+          ${imgTag(specTex(t), specCn(t), "spico")}</div>`;
       }).join("");
       const canN = nats[n].filter(t=>specCanAttach(t,u.type)).length;
       out += `<div class="grphead${SEL.poolClosed&&SEL.poolClosed[n]?' closed':''}"

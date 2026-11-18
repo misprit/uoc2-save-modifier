@@ -115,15 +115,12 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .pip{width:13px;height:9px;border-radius:2px;background:var(--surface-alt);border:1px solid var(--border)}
 .pip.on{background:var(--accent);border-color:var(--accent-dark)}
 .pip.sup{background:var(--stage-sup);border-color:#a9b7c7}
-/* U11：血量文字「5 / 7」删掉（段格条已经说清）→ 右边换「特种兵兵牌 + 已挂 N 个」 */
+/* U11：血量文字「5 / 7」删掉（段格条已经说清）→ 右边换「特种兵兵牌」
+   U46：**「已挂 N 个」那个数字也删掉** —— 挂几个看一眼就知道，写数字是冗余的。 */
 .ubadges{display:flex;align-items:center;gap:4px;flex:none}
-.ubadge{width:22px;height:22px;border-radius:5px;background:var(--stage);
+.ubadge{position:relative;width:26px;height:26px;border-radius:6px;background:var(--stage);
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;flex:none}
-.ubadge img{max-width:100%;max-height:100%;object-fit:contain}
 .ubadge.empty{border-style:dashed;background:var(--surface);color:var(--muted);font-size:10px}
-.ucount{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--accent-dark);
-  background:var(--accent-light);border:1px solid #b9d3ea;border-radius:9px;padding:0 6px}
-.ucount.zero{color:var(--muted);background:var(--surface-alt);border-color:var(--border);font-weight:400}
 
 /* 详情 */
 .detail{padding:14px}
@@ -195,9 +192,18 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
   border-radius:7px;background:var(--surface-alt);cursor:pointer}
 .slot:hover{border-color:var(--danger);background:var(--danger-light)}
 .slot:hover .slotname{color:var(--danger)}
-.slot .sq{width:34px;height:34px;border-radius:5px;background:var(--stage);border:1px solid var(--stage-edge);
-  display:grid;place-items:center;overflow:hidden;flex:none}
-.slot .sq img{max-width:100%;max-height:100%;object-fit:contain}
+/* U46：图标**不再单独套一个方框底** —— 整张特种兵卡片自带边框，再框一层是多余的视觉符号 */
+.slot .sq{position:relative;width:40px;height:40px;display:grid;place-items:center;
+  overflow:hidden;flex:none}
+/* 特种兵图标放大（U46）：游戏贴图 hq_action_icon.png 是 160×160 画布、
+   图形只占 60×69（实测 378/378 个完全一致 ⇒ 只占边长的 40%），
+   所以把 img 放大 200%、让方框裁掉透明边 ⇒ 图标从「占框 40%」变成「占框 ~78%」。 */
+.ubadge img,.pcell img,.slot .sq img{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:200%;height:200%;max-width:none;max-height:none;object-fit:contain}
+table.spec-tbl .thumb img.spico,.fprow .thumb img.spico,.fptab .thumb img.spico{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:200%;height:200%;max-width:none;max-height:none;object-fit:contain}
 .slot .slotinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .slot .slotname{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slot .slotflags{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
@@ -238,9 +244,8 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 /* 置灰的过滤器 */
 .chk.dis{color:var(--muted);cursor:not-allowed}
 .chk.dis input{cursor:not-allowed}
-.pcell{width:42px;height:42px;border-radius:6px;background:var(--stage);
+.pcell{position:relative;width:42px;height:42px;border-radius:6px;background:var(--stage);
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;cursor:pointer}
-.pcell img{max-width:100%;max-height:100%;object-fit:contain}
 .pcell:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(36,91,143,.2)}
 .pcell.blocked{opacity:.32;filter:grayscale(.92);cursor:not-allowed}
 .pcell.blocked:hover{border-color:var(--stage-edge);box-shadow:none}
@@ -398,8 +403,8 @@ table.spec-tbl td.num{font-family:var(--mono);text-align:right}
 table.spec-tbl td.dim{color:var(--muted)}
 table.spec-tbl td.tags{white-space:nowrap}
 table.spec-tbl td.tags .ftag{margin-right:4px}
-table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border:1px solid var(--stage-edge);
-  border-radius:4px;display:grid;place-items:center;overflow:hidden}
+table.spec-tbl .thumb{position:relative;width:30px;height:30px;background:var(--stage);
+  border:1px solid var(--stage-edge);border-radius:4px;display:grid;place-items:center;overflow:hidden}
 table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 
 /* ---------- 只读徽章（游戏包里的数值） ---------- */
@@ -464,8 +469,9 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fpool{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
 .fprow{display:flex;align-items:center;gap:10px;padding:7px 11px;border-bottom:1px solid #f0f3f6;font-size:12.5px}
 .fprow:last-child{border-bottom:none}
-.fprow .thumb{width:28px;height:28px;background:var(--stage);border:1px solid var(--stage-edge);
-  border-radius:4px;display:grid;place-items:center;overflow:hidden;flex:none}
+.fprow .thumb{position:relative;width:28px;height:28px;background:var(--stage);
+  border:1px solid var(--stage-edge);border-radius:4px;display:grid;place-items:center;
+  overflow:hidden;flex:none}
 .fprow .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fprow .q{font-family:var(--mono);font-weight:700;color:var(--accent-dark);width:32px;text-align:right}
 /* U16：兵库改成类表格 —— 表头写攻击/防御/…，下面给数值，不叠在名字底下 */
@@ -501,8 +507,11 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   vertical-align:middle}
 .rlist .ava img{max-width:100%;max-height:100%;object-fit:contain}
 .rlist .sp{font-size:10px;color:var(--muted)}
-.rlist .spimg{width:16px;height:16px;vertical-align:-3px;margin-right:4px;
-  background:var(--stage);border:1px solid var(--stage-edge);border-radius:3px;object-fit:contain}
+.rlist .spimg{position:relative;width:20px;height:20px;vertical-align:-4px;margin-right:4px;
+  display:inline-block;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:3px;overflow:hidden}
+.rlist .spimg img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:200%;height:200%;max-width:none;max-height:none;object-fit:contain}
 #cstore .csimg{width:26px;height:26px;flex:none;background:var(--stage);
   border:1px solid var(--stage-edge);border-radius:4px;object-fit:contain;
   object-position:center}
@@ -516,8 +525,8 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .fptab td.dim{color:var(--muted)}
 .fptab td.name{color:var(--text)}
 .fptab td.tags{font-family:inherit}
-.fptab .thumb{width:26px;height:26px;background:var(--stage);border:1px solid var(--stage-edge);
-  border-radius:4px;display:grid;place-items:center;overflow:hidden}
+.fptab .thumb{position:relative;width:26px;height:26px;background:var(--stage);
+  border:1px solid var(--stage-edge);border-radius:4px;display:grid;place-items:center;overflow:hidden}
 .fptab .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 
 /* ---------- 总部页 · 技能矩阵（U12：照游戏内升级面板重做） ---------- */
@@ -2274,10 +2283,9 @@ UNITS.forEach((u,i)=>{
   const specs=u.spec||[];
   let badges=specs.map(t=>{
     const s=SPECIALISTS.find(x=>x[0]===t);
-    return `<div class="ubadge" title="${s?s[1]:t}"><img alt=""></div>`;
+    return `<div class="ubadge" title="${s?s[1]:t}"><img class="spico" alt=""></div>`;
   }).join("");
   if(!specs.length) badges=`<div class="ubadge empty">无</div>`;
-  const cnt=`<span class="ucount${specs.length?"":" zero"}">${specs.length}</span>`;
   row.innerHTML=`
     <div class="ava"><img alt=""></div>
     <div class="umin">
@@ -2285,7 +2293,7 @@ UNITS.forEach((u,i)=>{
       <div class="umeta">总部 ${u.hq} · XP ${u.xp}${u.sup?` · 被压制 ${u.sup}`:""}</div>
       <div class="pips">${pips}</div>
     </div>
-    <div class="ubadges">${badges}${cnt}</div>`;
+    <div class="ubadges">${badges}</div>`;
   unitImg(row.querySelector(".ava img"), u.t, u.name);
   row.querySelectorAll(".ubadge img").forEach((im,k)=>{
     const t=specs[k]; if(t) img(im, SUR+"specialist/"+t+"/hq_action_icon.png", t);
@@ -2321,7 +2329,7 @@ function blockReason(s){
    单位页的「已挂槽位」与商店/兵库的「选择器详情卡」共用它 ⇒ 永远长得一样。 */
 function specSlotHTML(s){
   const fl=s[8] ? s[8].split(",").filter(Boolean) : [];
-  return `<div class="sq"><img alt=""></div>`
+  return `<div class="sq"><img class="spico" alt=""></div>`
     +`<div class="slotinfo"><div class="slotname">${s[1]}</div>`
     +`<div class="slotflags">`
     +(fl.length ? fl.map(f=>`<span class="ftag">${FLAG_CN[f]||f}</span>`).join("")
@@ -2362,7 +2370,7 @@ const collapsed=new Set();                     /* 折叠起来的国籍组 */
 function cell(s){
   const ok=canMount(s);
   const c=document.createElement("div"); c.className="pcell"+(ok?"":" blocked");
-  c.innerHTML=`<img alt="">`;
+  c.innerHTML=`<img class="spico" alt="">`;
   img(c.querySelector("img"), SUR+"specialist/"+s[0]+"/hq_action_icon.png", s[1]);
   const fl=s[8] ? s[8].split(",").map(f=>FLAG_CN[f]||f) : [];
   const why=!ok ? blockReason(s)
@@ -2654,10 +2662,10 @@ ROSTER.forEach(u=>{
   const tr=document.createElement("tr");
   tr.innerHTML=`<td>${u[0]}</td><td style="color:var(--muted)">${u[1]}</td>`
     +`<td class="n">${u[2]}</td><td class="n">${u[3]}</td>`
-    +`<td class="sp"><img class="spimg" alt="">${u[4].map(s=>s[1]).join("、")||"—"}</td>`;
+    +`<td class="sp"><span class="spimg"><img class="spico" alt=""></span>${u[4].map(s=>s[1]).join("、")||"—"}</td>`;
   roEl.appendChild(tr);
   const sp=tr.querySelector(".spimg");
-  if(u[4].length) img(sp, SUR+"specialist/"+u[4][0][0]+"/sheet_large.png", u[4][0][1]);
+  if(u[4].length) img(sp.querySelector("img"), SUR+"specialist/"+u[4][0][0]+"/hq_action_icon.png", u[4][0][1]);
   else sp.style.display="none";
 });
 
@@ -2719,6 +2727,8 @@ HQS.forEach(([t,n,g,nat,cp,mcp,sup,xp,xpt,lv,fp],i)=>{
 });
 /* 总部兵库缩略 —— U19：按 data-tex 给真实贴图（特种兵用 hq_action_icon） */
 document.querySelectorAll(".fpool .thumb img[data-tex]").forEach(im=>{
+  /* 只有特种兵用 200% 放大规则（兵种图 steps/step.png 不是正方形，放大会裁掉） */
+  if(im.dataset.tex.indexOf("specialist/")===0) im.classList.add("spico");
   img(im, SUR+im.dataset.tex);
 });
 
@@ -2844,7 +2854,7 @@ function mountSpicker(rootId, list, countText, existing, blockDup){
       const blocked = blockDup && hits.length > 0;      /* 商店：重复不许上架 */
       const c=document.createElement("div");
       c.className="pcell"+(s===sel && !blocked ? " on":"")+(blocked?" blocked":"");
-      c.innerHTML=`<img alt="">`+(hits.length ? `<span class="dup">${blocked?"已有":"已有 "+hits.length}</span>` : "");
+      c.innerHTML=`<img class="spico" alt="">`+(hits.length ? `<span class="dup">${blocked?"已有":"已有 "+hits.length}</span>` : "");
       img(c.querySelector("img"), SUR+"specialist/"+s[0]+"/hq_action_icon.png", s[1]);
       c.dataset.tip=`<span class="tn">${s[1]}</span>`
         +`<span class="tr">攻击 ${s[2]} · 防御 ${s[3]} · 装甲 ${s[4]} · 炮术 ${s[5]}</span><br>`
