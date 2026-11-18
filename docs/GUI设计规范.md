@@ -2847,6 +2847,71 @@ params = {unit_id:12, field:"xp", value:350}   ← 真正写进存档的内容
 `hq_force_pool_remove` 删掉一条会让**后面条目的下标整体前移**
 ⇒ 提交时把删条目排到最后，其余编辑保持加入顺序（JS 的 `sort` 是稳定的）。
 
+#### 10.10.8 ★ 卡牌页 / 商店页 / 战区资产页 / 战役页（U36 – U39）
+
+| 页 | 内容 | 可调 |
+|---|---|---|
+| **卡牌** | 手牌（你手里已拿到的牌）+ 货架（这一场会议能买的牌，5 格） | 加卡 / 移除 / 上架 / 下架 / 恢复上次会议牌局 |
+| **商店** | 按 **战线 → 子商店** 分组的商品表（名称 / 国籍 / 攻防装炮 / 特性 / 价格 / 库存） | 价格（输入框）、库存（Alt+滚轮）、上架 / 下架 |
+| **战区资产** | 当前战斗的资产卡（游戏原贴图 + 中文名 + 三个字段） | 当前可用 / 本场景剩余 / 每回合恢复 |
+| **战役** | 战役位置条 + 这场会议的可选场景 + 总部一览 | **只读** |
+
+**格数上限跟难度走**（`e158` 字节码实证）
+
+| | easy | normal | classic | hard |
+|---|---|---|---|---|
+| 手牌 `card_deck_limit` | 5 | 5 | **4** | **3** |
+| 货架 `card_store_limit` | 5 | 5 | 5 | 5 |
+
+⇒ 界面找空槽位**必须按上限找**（classic 只有 4 个槽位）⇒
+`/api/view` 给出 `hand_limit` / `shelf_limit` / `level`。
+
+**战区资产的三个字段**（U20 / U21 口径）
+
+| 字段 | 含义 | 范围 | 控件 |
+|---|---|---|---|
+| `to_use` | 当前剩余可用次数 | 0 – ∞ | Alt+滚轮 |
+| `uses_total` | 本场景剩余总次数（`None` = 无限） | 0 – ∞ 或 无限制 | 输入框 + 「改成无限」 |
+| `uses_turn` | 每回合恢复次数 | 1 – ∞ | Alt+滚轮 |
+
+⚠️ **写战区资产时三个字段要一起给** —— `theater_asset` 的 handler 用 `UNSET`
+表示「这次不改」，而 JSON 传不了 `UNSET` ⇒ 前端每次都把**当前三个值**一起发。
+
+⚠️ **不变式**：当前可用 ≤ 本场景剩余（游戏每用一次就让剩余减 1，减成负数存档会打不开）。
+
+#### 10.10.9 ★ 写回层的 float 序列化 bug（U38 实测发现 · 严重）
+
+**现象**：写回 `games/<场景>/main.yml` 后，**游戏读这个战斗文件会直接崩**
+（YAML 解析失败：`could not convert string to float: "'80.0'"`）。
+
+**根因**：`yamlio._Dumper.float_representer` 写成了
+
+```python
+return self.represent_float(str(float(data)))     # ← 错
+```
+
+PyYAML 的 `represent_float(data)` 内部是 `value = repr(data).lower()` ——
+传进去的是**字符串** ⇒ `repr("80.0")` = `"'80.0'"`（**又套一层引号**）
+⇒ 输出的 YAML 是 `score_multiplier: !!float "'80.0'"`
+⇒ 解析时按 float 解析失败。
+
+**修法**：按游戏自己的写法，直接给 `represent_scalar` 一个**纯数字串**：
+
+```python
+return self.represent_scalar('tag:yaml.org,2002:float', str(float(data)))
+```
+
+**影响面（实测）**：抽查 12 个存档 —— 456 处 float **全在 `games/*/main.yml`（L3 战斗文件）**里
+（`camera_position` / `score_multiplier` 等）；
+根 5 张 L1 表（main / units / hqs / cards / store）**没有 float**
+⇒ **常规写操作不受影响**，只有战区资产页（L3 写入）会踩到 ——
+所以这个 bug 一直藏到 U38 才有界面能触发它。
+
+**回归测试**：`tests/test_core.py::TestYamlFloatSerialization`（4 项）——
+① float 必须是纯数字；② 解析→序列化→解析 要一致；
+③ 写出的字节不能含 `!!float` 且必须能被 yaml 解析回 float；
+④ **真实存档里的战斗文件解析→序列化必须字节一致**（兑现 §0.4「未改动的一切原样搬运」）。
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |

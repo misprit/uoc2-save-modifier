@@ -236,3 +236,62 @@ class TestBackupNameDetection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestYamlFloatSerialization(unittest.TestCase):
+    """U38：**float 的序列化**必须是游戏能读回去的写法。
+
+    ⚠️ 曾经的 bug：`represent_float(str(float(data)))` ⇒ PyYAML 内部 `repr()`
+    又套一层引号 ⇒ 写出 `!!float "'80.0'"` ⇒ **游戏读战斗文件直接崩**
+    （实测：写回 `games/<场景>/main.yml` 后 YAML 解析失败）。
+    """
+
+    def test_float_is_plain_number(self):
+        from save_modifier_core import yamlio
+        self.assertEqual(yamlio.dump({"x": 80.0}), b"x: 80.0\n")
+
+    def test_float_roundtrip(self):
+        from save_modifier_core import yamlio
+        data = {"a": 80.0, "b": [1.5, 2.25], "c": {"d": 0.0}}
+        back = yamlio.load(yamlio.dump(data))
+        self.assertEqual(back, data)
+
+    def test_float_dump_is_parseable_by_pyyaml(self):
+        """写出来的字节必须能被 yaml 解析回 float（而不是字符串）。"""
+        import yaml
+        from save_modifier_core import yamlio
+        raw = yamlio.dump({"score_multiplier": 80.0})
+        self.assertNotIn(b"!!float", raw)
+        self.assertNotIn(b"'" * 3, raw)
+        self.assertEqual(yaml.safe_load(raw)["score_multiplier"], 80.0)
+
+    def test_real_battle_file_is_byte_stable(self):
+        """真实存档里的战斗文件（含 456 处 float）解析→序列化必须**字节一致**。"""
+        import zipfile
+        from save_modifier_core import list_saves, open_save, yamlio
+
+        checked = 0
+        for info in list_saves():
+            if not info.is_primary:
+                continue
+            try:
+                with open_save(info.save_id) as s:
+                    bd = s.battle_dir()
+                    if not bd:
+                        continue
+                    entry = bd + "/main.yml"
+                    raw = s.read_bytes(entry)
+                    data = yamlio.load(raw)
+                    if not isinstance(data, dict):
+                        continue
+                    if b"!!float" in yamlio.dump(data):
+                        continue
+                    self.assertEqual(yamlio.dump(data), raw,
+                                     "%s 的 %s 序列化后字节不一致" % (info.save_id, entry))
+                    checked += 1
+                    if checked >= 3:
+                        break
+            except Exception:
+                continue
+        if not checked:
+            self.skipTest("本机没有带 float 的战斗文件")

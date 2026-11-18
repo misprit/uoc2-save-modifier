@@ -204,10 +204,31 @@ def api_view(save_id: str) -> dict:
                     }
         data["skills"] = skills
         data["generals"] = generals
+        # 战区资产的中文名 = locale `id_<asset>_view`（如 id_air_supply_view → 空中补给）
+        data["theater_cn"] = {
+            str(a.get("asset")): (((_tr.get("id_" + str(a.get("asset")) + "_view", ""))
+                                    if _tr else "") or str(a.get("asset")))
+            for a in (data.get("theater_assets") or []) if isinstance(a, dict)
+        }
         data["equipment_cn"] = {
             e: ((_tr.get("id_equipment_type_" + e, "") if _tr else "") or e)
             for e in ("infantry", "armor")
         }
+
+        # 手牌 / 货架的**格数上限跟难度走**（e158 字节码实证）：
+        #   手牌 card_deck_limit  = easy 5 / normal 5 / classic 4 / hard 3
+        #   货架 card_store_limit = 四个难度恒为 5
+        # ⚠️ 界面找空槽位必须按这个上限找 —— classic 只有 4 个槽位。
+        try:
+            from save_modifier_core.handlers import CARD_DECK_LIMIT, CARD_STORE_LIMIT
+            _lv = str((save.root_main() or {}).get("level") or "")
+            data["hand_limit"] = CARD_DECK_LIMIT.get(_lv, 5)
+            data["shelf_limit"] = CARD_STORE_LIMIT.get(_lv, 5)
+            data["level"] = _lv
+        except Exception:
+            data["hand_limit"] = 5
+            data["shelf_limit"] = 5
+            data["level"] = ""
 
         # 卡牌白名单 —— **本存档 + 本会议**的状态，每次重算（规范 §7.5.1）
         try:
@@ -301,6 +322,7 @@ def _catalog_payload() -> dict:
             "image": d.get("image"),
             "meta_type": d.get("meta_type"),
             "theater_asset": d.get("theater_asset"),
+            "image_resolved": _resolve_card_image(name, d),
         }
 
     nationalities: dict = {}
@@ -320,6 +342,37 @@ def _catalog_payload() -> dict:
         "nationalities": nationalities,
     }
     return _CATALOG_CACHE
+
+
+def _resolve_card_image(card_type: str, info: dict) -> str:
+    """卡牌贴图 —— `image` 字段**不总是**等于文件名。
+
+    实测：`image='cards/generic_para'` 的文件其实是
+    `logo_divisional_para_allies_1.png` ⇒ 直接按 image 拼路径会 404。
+
+    ⇒ 按候选链找**第一个真实存在**的相对路径（找不到就退回 image 猜测值，
+    前端会显示占位块，§5.6）。
+    """
+    rel = str(info.get("image") or ("cards/" + card_type)).replace("\\", "/")
+    base = rel.split("/")[-1]
+    b2 = base
+    for suf in ("_allies", "_axis", "_soviet"):
+        if b2.endswith(suf):
+            b2 = b2[: -len(suf)]
+            break
+    cands = []
+    for p in ("bgt_", "bgmf_", "bgm_", "logo_"):
+        cands.append(p + base + ".png")
+    cands.append(base + ".png")
+    for p in ("bgt_", "bgmf_", "bgm_", "logo_"):
+        cands.append(p + b2 + ".png")
+    cands.append(b2 + ".png")
+    cands.append("logo_" + card_type + ".png")
+    cands.append("bgt_" + card_type + ".png")
+    for c in cands:
+        if find_surface("cards/" + c) is not None:
+            return "cards/" + c
+    return rel + ".png"
 
 
 def api_catalog() -> dict:

@@ -274,6 +274,90 @@ table.list td.k{color:var(--muted)}
 @media (max-width:880px){ .cols{grid-template-columns:1fr} }
 
 
+
+
+/* ---------------- 商店页（U37） ---------------- */
+.storegrp{margin-top:10px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.storetitle{font-size:12.5px;font-weight:600;color:var(--accent-dark);padding:7px 11px;
+  background:var(--surface-alt);display:flex;align-items:center;gap:9px}
+.storetitle .btn{margin-left:auto;padding:2px 10px;font-size:12px}
+table.spec-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+table.spec-tbl th{text-align:left;background:var(--accent-dark);color:#fff;padding:7px 10px;font-weight:600}
+table.spec-tbl td{padding:6px 10px;border-bottom:1px solid #eef1f4}
+table.spec-tbl tr:hover td{background:var(--accent-light)}
+table.spec-tbl td.num{font-family:var(--mono);text-align:right}
+table.spec-tbl td.dim{color:var(--muted)}
+table.spec-tbl td.tags{white-space:nowrap}
+table.spec-tbl td.tags .ftag{margin-right:4px}
+table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:4px;display:grid;place-items:center;overflow:hidden}
+table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
+table.spec-tbl .rm{color:var(--danger);cursor:pointer;font-size:11.5px}
+table.spec-tbl .numin{width:62px;font-size:13px;padding:1px 5px}
+table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
+/* ---------------- 战区资产页（U38） ---------------- */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:11px;padding:12px}
+.titem{display:flex;gap:11px;align-items:center;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:9px}
+.titem>img{width:60px;height:60px;flex:none;object-fit:contain}
+.titem .tbody{flex:1;min-width:0}
+.titem .tn{font-size:12.5px;font-weight:600;margin-bottom:2px}
+.titem .trow{display:flex;align-items:baseline;gap:6px;font-size:11px;color:var(--muted);
+  margin-top:3px;line-height:1.45;white-space:nowrap}
+.titem .xnum{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--accent-dark);
+  display:inline-flex;align-items:baseline;gap:2px}
+.titem .xnum .spin{font-size:14px;padding:0 7px;min-width:28px}
+.titem .xnum .numin{width:56px;font-size:14px;padding:0 4px}
+.titem .xnum .num.inf{color:var(--muted);font-size:13px;min-width:26px}
+.titem .xnum .sep{color:var(--muted);font-weight:400}
+.titem .twarn{font-size:10.5px;color:var(--danger);margin-top:4px;line-height:1.35;white-space:normal}
+/* ---------------- 战役页（U39） ---------------- */
+.cpos{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;
+  background:var(--accent-light);border:1px solid var(--border);border-radius:7px;font-size:12.5px}
+.cpos b{color:var(--accent-dark);font-weight:700}
+.cpos .sep{width:1px;height:15px;background:var(--border);flex:none}
+.cpos .mut{color:var(--muted);font-size:11.5px}
+.cpos .ro{font-size:10.5px;padding:0 6px;border-radius:3px;background:var(--surface);
+  border:1px solid var(--border);color:var(--muted);font-family:var(--mono)}
+.rlist{width:100%;border-collapse:collapse;font-size:12px}
+.rlist th{background:var(--surface-alt);font-weight:600;font-size:11px;color:var(--muted);
+  text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+.rlist td{padding:5px 8px;border-bottom:1px solid #f0f3f6}
+.rlist td.n{text-align:right;font-family:var(--mono)}
+
+/* ---------------- 卡牌页（U36） ---------------- */
+.cardgrid{display:flex;flex-wrap:wrap;gap:9px;padding:10px 12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;
+  width:106px;cursor:pointer}
+.card:hover{border-color:var(--accent);box-shadow:0 6px 16px rgba(20,40,60,.13)}
+.card .ci{width:88px;height:88px;margin:0 auto;background:var(--stage);
+  border:1px solid var(--stage-edge);border-radius:6px;display:grid;place-items:center;overflow:hidden}
+.card .ci img{max-width:100%;max-height:100%;object-fit:contain}
+.card .cn{font-size:12px;font-weight:600;margin-top:5px;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .cs{font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-top:2px;text-align:center}
+.card .cs.blk{background:transparent;color:var(--danger);font-family:inherit;font-size:10px;
+  line-height:1.3;margin-top:3px}
+.card.blocked{opacity:.42;filter:grayscale(.85);cursor:not-allowed}
+.card.blocked:hover{border-color:var(--border);box-shadow:none}
+.card.on{border-color:var(--accent);background:var(--accent-light);
+  box-shadow:0 0 0 2px rgba(36,91,143,.3)}
+.hcard{width:104px}
+.hcard .ci{width:104px;height:124px;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:7px;display:grid;place-items:center;overflow:hidden}
+.hcard .ci img{max-width:100%;max-height:100%;object-fit:contain}
+.hcard .cp{font-size:11px;color:var(--muted);text-align:center;margin-top:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hcard .cp b{font-family:var(--mono);color:var(--accent-dark)}
+.hcard .rm{width:100%;margin-top:5px;font-size:11px;padding:3px}
+.slotempty{width:104px;height:124px;border:1px dashed var(--border);border-radius:7px;
+  display:grid;place-items:center;color:var(--muted);font-size:11.5px;cursor:pointer;
+  background:var(--surface-alt)}
+.slotempty:hover{border-color:var(--accent);color:var(--accent)}
+.costs{display:flex;gap:9px;padding:9px 12px;font-size:11.5px;color:var(--muted);
+  border-top:1px solid var(--border);flex-wrap:wrap}
+.costs b{font-family:var(--mono);color:var(--accent-dark)}
+
 /* ---------------- 总部页（U35） ---------------- */
 .hqlist{padding:4px 0;max-height:430px;overflow:auto}
 .hqrow{display:flex;align-items:center;gap:9px;padding:8px 12px;
@@ -406,8 +490,8 @@ table.list td.k{color:var(--muted)}
     <b>界面层说明</b>：这一版是 <b>U26 技术路线</b>的落地 —— 界面 = HTML/CSS，
     Python 只起一个本地 <code>127.0.0.1</code> 服务（带随机 token），核心库
     <code>save_modifier_core</code> 负责读存档与校验。<br>
-    目前是<b>地基</b>：启动页 + 概览页接的是<b>真实数据</b>；其余 6 个功能页等
-    GUI 微调需求定稿后再做（《GUI设计规范.md》§7）。
+    <b>7 个页面都接的是真实数据</b>：概览 · 单位 · 总部 · 卡牌 · 商店 · 战区资产 · 战役。
+    改动先进「待应用」（右下角抽屉），点「应用更改」才写盘 —— 写前自动备份、可撤销。
   </div>
 </div>
 
@@ -692,6 +776,7 @@ function bindSpin(el, opts){
 /* 大数字：输入框，直接编辑 */
 function bindNumIn(el, opts){
   const base = opts.base;      /* 存档原值 */
+  let init = true;             /* 初始化时**不触发回调** */
   function apply(){
     const raw = String(el.value??"").trim();
     const v = Number(raw);
@@ -705,6 +790,9 @@ function bindNumIn(el, opts){
     el.title = bad || "";
     if(bad){ dropPendingKind(opts.kind, opts.key); return; }
     el.classList.toggle("dirty", v!==base);
+    /* ⚠️ 初始化**不**触发回调 —— 回调里往往会重绘页面，
+       初始化就回调 ⇒ 重绘 → 重新 bind → 再回调 ⇒ **无限递归**（U38 实测）。 */
+    if(init){ init = false; return; }
     opts.onChange(v);
   }
   el.addEventListener("input", apply);
@@ -1330,6 +1418,470 @@ function hqPoolRemove(id, index){
   show("hqs");
 }
 
+
+/* ===================================================================
+   卡牌页（U36）
+   =================================================================== */
+function cardInfo(type){
+  return (CATALOG && CATALOG.card_types[type]) || {};
+}
+function cardCn(type){ return cardInfo(type).cn || type || "?"; }
+function cardImg(type){
+  const i = cardInfo(type);
+  return i.image_resolved || (i.image ? i.image + ".png" : ("cards/" + type + ".png"));
+}
+
+/* 手牌 / 货架 —— 挂起的新增/移除先算上（界面马上能看到） */
+function projectedCards(list, kind){
+  const out = (list||[]).map(c=>Object.assign({}, c));
+  PENDING.forEach(p=>{
+    if(p.kind==="card_add" && kind==="hand")
+      out.push({card_type:p.params.card_type, position:p.params.position,
+                is_free:!!p.params.is_free, unit_id:null, used:false, _new:true});
+    if(p.kind==="card_remove" && kind==="hand"){
+      const i = out.findIndex(c=>c.position===p.params.position);
+      if(i>=0) out.splice(i,1);
+    }
+    if(p.kind==="card_store_add" && kind==="shelf")
+      out.push({card_type:p.params.card_type, position:p.params.position,
+                is_free:!!p.params.is_free, unit_id:null, used:false, _new:true});
+    if(p.kind==="card_store_remove" && kind==="shelf"){
+      const i = out.findIndex(c=>c.position===p.params.position);
+      if(i>=0) out.splice(i,1);
+    }
+  });
+  return out;
+}
+
+function cardTileHTML(c, kind){
+  const free = c.is_free;
+  return `<div class="hcard">
+    <div class="ci">${imgTag(cardImg(c.card_type), cardCn(c.card_type))}</div>
+    <div class="cp"><b>${esc(cardCn(c.card_type))}</b>${free?" · 免费":""}</div>
+    <div class="cp" style="margin-top:1px">${esc(cardInfo(c.card_type).subtitle||"")}</div>
+    <button class="btn rm" onclick="${kind==="hand"
+      ? ("cardRemove("+c.position+")") : ("cardStoreRemove("+c.position+")")}">
+      ${kind==="hand"?"从手牌移除":"下架"}</button>
+  </div>`;
+}
+
+function cardPickerHTML(target){
+  /* target = {kind:"hand"|"shelf"|"shelfset", position:n} */
+  const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
+  const types = Object.keys(CATALOG&&CATALOG.card_types ? CATALOG.card_types : {}).sort();
+  const cells = types.map(t=>{
+    const blocked = wl.blocked && wl.blocked[t];
+    const ok = !blocked;
+    const info = cardInfo(t);
+    return `<div class="card ${ok?'':'blocked'}" title="${esc(info.subtitle||"")}${
+      blocked?("："+esc(blocked)):""}" onclick="${ok ? (
+        target.kind==="hand" ? ("cardAdd("+esc(JSON.stringify(t))+")") :
+        target.kind==="shelf" ? ("cardStoreAdd("+target.position+","+esc(JSON.stringify(t))+")") :
+        ("cardStoreSet("+target.position+","+esc(JSON.stringify(t))+")")
+      ) : "void 0"}">
+      <div class="ci">${imgTag(cardImg(t), cardCn(t))}</div>
+      <div class="cn">${esc(cardCn(t))}</div>
+      <div class="cs">${info.cost!==undefined&&info.cost!==null?("CP "+info.cost):""}</div>
+      ${blocked?`<div class="cs blk">${esc(blocked)}</div>`:""}
+    </div>`;
+  }).join("");
+  const title = target.kind==="hand" ? "加一张到手牌"
+    : (target.kind==="shelf" ? ("上架到货架第 "+target.position+" 格") : ("换掉货架第 "+target.position+" 格的牌"));
+  return `<div class="spick" style="margin:10px 12px">
+    <div class="sphd"><span class="spt">${esc(title)}</span>
+      <span class="spc">游戏包共 ${types.length} 种卡 · 白名单 ${(wl.allowed||[]).length} 种</span>
+      <button class="btn" style="margin-left:auto;padding:2px 9px;font-size:12px"
+        onclick="closeCardPicker()">收起</button></div>
+    <div class="cardgrid">${cells}</div></div>`;
+}
+
+function openCardPicker(kind, position){ SEL.cardPicker = {kind:kind, position:position}; show("cards"); }
+function closeCardPicker(){ SEL.cardPicker = null; show("cards"); }
+
+function cardAdd(type){
+  const hand = projectedCards(VIEW.hand, "hand");
+  const used = new Set(hand.map(c=>c.position));
+  const limit = VIEW.hand_limit || 5;      /* ⚠️ 上限跟难度走（classic 只有 4 张） */
+  let pos = null;
+  for(let p=1;p<=limit;p++){ if(!used.has(p)){ pos=p; break; } }
+  if(pos===null){ SEL.cardErr = "手牌已满 —— 先删一张再添加"; show("cards"); return; }
+  setPending("card_add", `card_add:${pos}`,
+    {card_type:type, position:pos, is_free:false}, `手牌加 ${cardCn(type)}（槽位 ${pos}）`);
+  SEL.cardPicker = null;
+  show("cards");
+}
+function cardRemove(position){
+  const c = (VIEW.hand||[]).find(x=>x.position===position);
+  setPending("card_remove", `card_remove:${position}`,
+    {position}, `手牌移除 ${c?cardCn(c.card_type):("槽位 "+position)}`);
+  show("cards");
+}
+function cardStoreAdd(position, type){
+  setPending("card_store_add", `card_store_add:${position}`,
+    {position, card_type:type, is_free:false}, `上架 ${cardCn(type)}（槽位 ${position}）`);
+  SEL.cardPicker = null;
+  show("cards");
+}
+function cardStoreRemove(position){
+  const c = (VIEW.shelf||[]).find(x=>x.position===position);
+  setPending("card_store_remove", `card_store_remove:${position}`,
+    {position}, `下架 ${c?cardCn(c.card_type):("槽位 "+position)}`);
+  show("cards");
+}
+function cardStoreSet(position, type){
+  setPending("card_store_set", `card_store_set:${position}`,
+    {position, card_type:type}, `货架槽位 ${position} 换成 ${cardCn(type)}`);
+  SEL.cardPicker = null;
+  show("cards");
+}
+
+function pageCards(w){
+  const hand = projectedCards(VIEW.hand, "hand");
+  const shelf = projectedCards(VIEW.shelf, "shelf");
+  const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
+  const picker = SEL.cardPicker;
+  const handHTML = hand.length
+    ? hand.map(c=>cardTileHTML(c,"hand")).join("")
+    : `<div class="note" style="padding:14px">手牌是空的</div>`;
+  const shelfLimit = VIEW.shelf_limit || 5;
+  const shelfSlots = Array.from({length:shelfLimit}, (_,i)=>i+1).map(pos=>{
+    const c = shelf.find(x=>x.position===pos);
+    if(c) return cardTileHTML(c,"shelf");
+    return `<div class="slotempty" onclick="openCardPicker('shelf',${pos})">第 ${pos} 格 · 空</div>`;
+  }).join("");
+  w.innerHTML = `<div class="cols-half" style="display:grid;gap:14px">
+    <div class="panel"><h3>手牌 · ${hand.length} 张</h3>
+      <div class="pbody">
+        <div class="hand">${handHTML}</div>
+        <div class="costs">
+          <span>手牌上限 <b>${VIEW.hand_limit||5}</b> 张（难度 ${esc(VIEW.level||"—")}）</span>
+          <span>白名单可加的卡：<b>${(wl.allowed||[]).length}</b> 种</span>
+          <span>被屏蔽：<b>${Object.keys(wl.blocked||{}).length}</b> 种</span>
+          <span>当前会议：<b>${esc(wl.conference||"—")}</b></span>
+          <button class="btn" style="margin-left:auto;padding:3px 10px;font-size:12px"
+            onclick="openCardPicker('hand',0)">加一张到手牌</button>
+          <button class="btn" style="padding:3px 10px;font-size:12px"
+            onclick="restoreHand()">恢复上次会议牌局</button>
+        </div>
+        ${picker && picker.kind==="hand" ? cardPickerHTML(picker) : ""}
+        ${SEL.cardErr?`<div class="err">${esc(SEL.cardErr)}</div>`:""}
+        <div class="note">手牌是<b>你手里已经拿到的牌</b>；货架是<b>这一场会议可以买的牌</b>。
+          两者的 is_free 只是 tooltip 文案与卡背贴图，**没有玩法影响**（§7.5.2）。</div>
+      </div></div>
+    <div class="panel"><h3>卡牌商店货架 · ${shelf.length} / ${shelfLimit}</h3>
+      <div class="pbody">
+        <div class="hand">${shelfSlots}</div>
+        <div class="costs">
+          <span>货架只管<b>这一场会议</b> —— 进入新会议时游戏会按权重重掷</span>
+        </div>
+        ${picker && picker.kind==="shelf" ? cardPickerHTML(picker) : ""}
+        ${picker && picker.kind==="shelfset" ? cardPickerHTML(picker) : ""}
+      </div></div>
+  </div>`;
+}
+
+function restoreHand(){
+  setPending("hand_restore", "hand_restore", {}, "恢复上次会议的牌局");
+  show("cards");
+}
+
+
+/* ===================================================================
+   商店页（U37）
+   =================================================================== */
+function storeEntryCn(e){
+  if(e.spec) return specCn(e.spec);
+  if(e.equipment) return hqEquipCn(e.equipment);
+  return "?";
+}
+function storeKey(front, sub, index, field){
+  return `store_set:${front}:${sub}:${index}:${field}`;
+}
+function projectedStore(){
+  const out = [];
+  (VIEW.store||[]).forEach((e,i)=>out.push({e:Object.assign({}, e), index:i, _new:false}));
+  PENDING.forEach(p=>{
+    if(p.kind==="store_add"){
+      out.push({e:Object.assign({}, p.params.entry), index:out.length, _new:true});
+    }
+    if(p.kind==="store_remove"){
+      const i = out.findIndex(x=>x.e.front===p.params.front &&
+        x.e.sub===p.params.sub && x.index===p.params.index);
+      if(i>=0) out.splice(i,1);
+    }
+  });
+  return out;
+}
+
+function pageStore(w){
+  const rows = projectedStore();
+  const fronts = [];
+  rows.forEach(r=>{
+    if(!fronts.some(f=>f.front===r.e.front)) fronts.push({front:r.e.front, subs:[]});
+  });
+  fronts.forEach(f=>{
+    rows.forEach(r=>{ if(r.e.front===f.front && !f.subs.some(s=>s.sub===r.e.sub)) f.subs.push({sub:r.e.sub}); });
+  });
+  if(!fronts.length){
+    w.innerHTML = `<div class="panel"><h3>商店</h3><div class="placeholder">
+      <div class="big">这个存档没有商店数据</div>
+      商店（store.yml）只在战役存档里有。</div></div>`;
+    return;
+  }
+  if(!SEL.storeFront || !fronts.some(f=>f.front===SEL.storeFront)) SEL.storeFront = fronts[0].front;
+  const cur = fronts.find(f=>f.front===SEL.storeFront);
+  if(!SEL.storeSub || !cur.subs.some(s=>s.sub===SEL.storeSub)) SEL.storeSub = cur.subs[0].sub;
+
+  const tabs = fronts.map(f=>`<div class="tb ${f.front===SEL.storeFront?'on':''}"
+    onclick="pickStoreFront('${f.front}')">${esc(f.front)}</div>`).join("");
+  const subtabs = cur.subs.map(s=>`<div class="tb ${s.sub===SEL.storeSub?'on':''}"
+    onclick="pickStoreSub('${s.sub}')">${esc(s.sub==="elite_store"?"精英商店":"普通商店")}</div>`).join("");
+  const items = rows.filter(r=>r.e.front===SEL.storeFront && r.e.sub===SEL.storeSub);
+  const body = items.map(({e,index})=>{
+    const isSpec = !!e.spec;
+    const st = isSpec ? ((CATALOG&&CATALOG.spec_types[e.spec])||{}) : {};
+    const price = pendingVal("store_set", storeKey(e.front,e.sub,index,"price"), e.price||0);
+    const qty = pendingVal("store_set", storeKey(e.front,e.sub,index,"quantity"), e.quantity||0);
+    const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(f)}</span>`).join("") : "";
+    const tex = isSpec ? specTex(e.spec) : "steps/step.png";
+    return `<tr>
+      <td><div class="thumb">${imgTag(tex, storeEntryCn(e))}</div></td>
+      <td>${esc(storeEntryCn(e))}<div style="color:var(--muted);font-size:10.5px">${esc(e.spec||e.equipment||"")}</div></td>
+      <td class="dim">${esc(natCn(e.nationality))}</td>
+      <td class="dim">${isSpec?esc(st.attack??"—"):"—"} / ${isSpec?esc(st.defense??"—"):"—"} /
+        ${isSpec?esc(st.armor??"—"):"—"} / ${isSpec?esc(st.artillery??"—"):"—"}</td>
+      <td class="tags">${tags}</td>
+      <td class="num"><input class="numin" id="st_p_${e.front}_${e.sub}_${index}" type="text"
+        inputmode="numeric" autocomplete="off" value="${price}"></td>
+      <td class="num"><span class="spin" id="st_q_${e.front}_${e.sub}_${index}"></span></td>
+      <td><span class="rm" onclick="storeRemove('${e.front}','${e.sub}',${index})">下架</span></td>
+    </tr>`;
+  }).join("");
+
+  w.innerHTML = `<div class="panel"><h3>商店</h3><div class="pbody">
+    <div class="tabs">${tabs}</div>
+    <div class="tabs">${subtabs}</div>
+    <div class="storegrp">
+      <div class="storetitle">${esc(SEL.storeFront)} / ${esc(SEL.storeSub==="elite_store"?"精英商店":"普通商店")}
+        · ${items.length} 条
+        <button class="btn" onclick="toggleStorePicker()">${SEL.storePicker?"收起":"上架新商品"}</button></div>
+      ${SEL.storePicker?storePickerHTML() : ""}
+      <table class="spec-tbl">
+        <thead><tr><th>图</th><th>商品</th><th>国籍</th><th>攻 / 防 / 装 / 炮</th>
+          <th>特性</th><th style="text-align:right">价格</th>
+          <th style="text-align:right">库存</th><th></th></tr></thead>
+        <tbody>${body || `<tr><td colspan="8" class="dim">这个商店是空的</td></tr>`}</tbody>
+      </table>
+    </div>
+    <div class="note">同一个 <b>(战线, 子商店)</b> 里<b>任何重复条目都不许</b>
+      （价格库存不同也算重复）；要改已有条目就直接改那一行。<br>
+      <b>库存不能填 0</b> —— 游戏没有「售罄」标记，下架请用「下架」按钮删条目。</div>
+  </div></div>`;
+
+  items.forEach(({e,index})=>{
+    const pEl = document.getElementById("st_p_"+e.front+"_"+e.sub+"_"+index);
+    if(pEl) bindNumIn(pEl, {base:e.price||0, cur:pendingVal("store_set", storeKey(e.front,e.sub,index,"price"), e.price||0),
+      min:0, max:null, kind:"store_set", key:storeKey(e.front,e.sub,index,"price"),
+      params:{front:e.front, sub:e.sub, index, field:"price", value:pEl.value},
+      onChange(v){ queueEdit("store_set", storeKey(e.front,e.sub,index,"price"),
+        {front:e.front, sub:e.sub, index, field:"price", value:v}, e.price||0, v,
+        `商店 ${e.front}/${e.sub} 第 ${index+1} 条价格`); }});
+    const qEl = document.getElementById("st_q_"+e.front+"_"+e.sub+"_"+index);
+    if(qEl) bindSpin(qEl, {base:e.quantity||0, cur:pendingVal("store_set", storeKey(e.front,e.sub,index,"quantity"), e.quantity||0),
+      min:1, max:null, onChange(v){
+        queueEdit("store_set", storeKey(e.front,e.sub,index,"quantity"),
+          {front:e.front, sub:e.sub, index, field:"quantity", value:v}, e.quantity||0, v,
+          `商店 ${e.front}/${e.sub} 第 ${index+1} 条库存`);
+        show("store");
+      }});
+  });
+}
+
+function pickStoreFront(f){ SEL.storeFront = f; SEL.storeSub = null; show("store"); }
+function pickStoreSub(s){ SEL.storeSub = s; show("store"); }
+function toggleStorePicker(){ SEL.storePicker = !SEL.storePicker; show("store"); }
+
+function storePickerHTML(){
+  const pool = (PICK && PICK.campaign_pool) || [];
+  const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[], spec:[]};
+  const have = projectedStore().filter(r=>r.e.front===SEL.storeFront && r.e.sub===SEL.storeSub)
+    .map(r=>r.e.spec||("eq:"+r.e.equipment+":"+r.e.nationality));
+  const specs = pool.map(t=>{
+    const dup = have.includes(t);
+    const st = (CATALOG&&CATALOG.spec_types[t])||{};
+    return `<div class="pcell ${dup?'blocked':''}" title="${esc(specCn(t))} · ${esc(natCn(st.nationality))}${
+      dup?"（这个商店已经有了）":""}" onclick="${dup?'void 0':('storeAddSpec('+esc(JSON.stringify(t))+')')}">
+      ${imgTag(specTex(t), specCn(t))}</div>`;
+  }).join("");
+  const eqs = (uni.equipment||[]).flatMap(eq=>
+    (uni.nationality||[]).map(nat=>({eq, nat})));
+  const eqHTML = eqs.map(x=>{
+    const dup = have.includes("eq:"+x.eq+":"+x.nat);
+    return `<div class="pcell ${dup?'blocked':''}" title="${esc(hqEquipCn(x.eq))} · ${esc(natCn(x.nat))}${
+      dup?"（这个商店已经有了）":""}" onclick="${dup?'void 0':('storeAddEquip('+esc(JSON.stringify(x.eq))+','+esc(JSON.stringify(x.nat))+')')}">
+      ${imgTag("steps/step.png", hqEquipCn(x.eq))}</div>`;
+  }).join("");
+  return `<div class="spick" style="margin:8px 10px">
+    <div class="sphd"><span class="spt">上架新商品</span>
+      <span class="spc">特种兵 ${pool.length} 种 · 兵种 ${eqs.length} 种 ·
+        上架后价格默认 10、库存 1，可在下表直接改</span></div>
+    <div class="spgrid">${specs}</div>
+    ${eqHTML?`<div class="sphead" style="padding:6px 11px 0;font-size:11.5px;color:var(--muted)">兵种</div>
+    <div class="spgrid">${eqHTML}</div>`:""}
+  </div>`;
+}
+
+function storeAddSpec(t){
+  const st = (CATALOG&&CATALOG.spec_types[t])||{};
+  const entry = {spec:t, nationality:st.nationality||"", price:10, quantity:1};
+  setPending("store_add", `store_add:${SEL.storeFront}:${SEL.storeSub}:${t}`,
+    {front:SEL.storeFront, sub:SEL.storeSub, entry},
+    `上架 ${specCn(t)}（${SEL.storeFront}/${SEL.storeSub}）`);
+  show("store");
+}
+function storeAddEquip(eq, nat){
+  const entry = {equipment:eq, nationality:nat, price:10, quantity:1};
+  setPending("store_add", `store_add:${SEL.storeFront}:${SEL.storeSub}:${eq}:${nat}`,
+    {front:SEL.storeFront, sub:SEL.storeSub, entry},
+    `上架 ${hqEquipCn(eq)}（${SEL.storeFront}/${SEL.storeSub}）`);
+  show("store");
+}
+function storeRemove(front, sub, index){
+  const rows = projectedStore();
+  const r = rows.find(x=>x.e.front===front && x.e.sub===sub && x.index===index);
+  setPending("store_remove", `store_remove:${front}:${sub}:${index}`,
+    {front, sub, index}, `下架 ${r?storeEntryCn(r.e):("第 "+(index+1)+" 条")}`);
+  show("store");
+}
+
+/* ===================================================================
+   战区资产页（U38）
+   =================================================================== */
+function theaterCn(a){ return (VIEW.theater_cn||{})[a] || a; }
+function theaterKey(asset){ return `theater_asset:${asset}`; }
+function theaterCur(asset){
+  const a = (VIEW.theater_assets||[]).find(x=>x.asset===asset) || {};
+  const p = PENDING.find(x=>x.kind==="theater_asset" && x.key===theaterKey(asset));
+  const base = {to_use:a.to_use, uses_total:a.uses_total, uses_turn:a.uses_turn};
+  if(!p) return base;
+  return {to_use:p.params.to_use, uses_total:p.params.uses_total, uses_turn:p.params.uses_turn};
+}
+function theaterSet(asset, field, value){
+  const a = (VIEW.theater_assets||[]).find(x=>x.asset===asset) || {};
+  const cur = theaterCur(asset);
+  const params = {asset, to_use:cur.to_use, uses_total:cur.uses_total, uses_turn:cur.uses_turn};
+  params[field] = value;
+  const base = a[field];
+  queueEdit("theater_asset", theaterKey(asset), params, base, value,
+    `战区资产 ${theaterCn(asset)} ${theaterFieldCn(field)}`);
+  show("theater");
+}
+const theaterFieldCn = {to_use:"当前可用", uses_total:"本场景剩余", uses_turn:"每回合恢复"};
+
+function pageTheater(w){
+  const list = VIEW.theater_assets||[];
+  if(!list.length){
+    w.innerHTML = `<div class="panel"><h3>战区资产</h3><div class="placeholder">
+      <div class="big">当前没有进行中的战斗</div>
+      战区资产是**战斗中的**东西（存档里的 <code>games/&lt;场景&gt;/main.yml</code>）——
+      不在战斗里就没有这一页的内容。</div></div>`;
+    return;
+  }
+  const cards = list.map(a=>{
+    const cur = theaterCur(a.asset);
+    const tot = cur.uses_total;
+    return `<div class="titem">
+      ${imgTag(theaterTex(a.asset), theaterCn(a.asset))}
+      <div class="tbody">
+        <div class="tn">${esc(theaterCn(a.asset))}</div>
+        <div class="trow">当前可用
+          <span class="xnum"><span class="spin" id="th_tu_${a.asset}"></span></span></div>
+        <div class="trow">本场景剩余
+          <span class="xnum">${tot===null||tot===undefined
+            ? `<span class="num inf" id="th_tot_inf_${a.asset}">无限</span>`
+            : `<input class="numin" id="th_tot_${a.asset}" type="text" inputmode="numeric" autocomplete="off" value="${tot}">`}
+            <button class="btn" style="padding:0 6px;font-size:10.5px;margin-left:4px"
+              onclick="theaterToggleTotal('${a.asset}')">${tot===null||tot===undefined?"设成数字":"改成无限"}</button></span></div>
+        <div class="trow">每回合恢复
+          <span class="xnum"><span class="spin" id="th_ut_${a.asset}"></span></span></div>
+        ${(cur.uses_total!==null&&cur.uses_total!==undefined&&cur.to_use>cur.uses_total)
+          ? `<div class="twarn">当前可用 ${cur.to_use} 次 大于 本场景剩余 ${cur.uses_total} 次 ⇒ 游戏读档会失败</div>`:""}
+      </div></div>`;
+  }).join("");
+  w.innerHTML = `<div class="panel"><h3>战区资产 · 当前战斗的 ${list.length} 项</h3>
+    <div class="pbody"><div class="tgrid">${cards}</div>
+      <div class="note">战区资产是<b>唯一的 L3 写入例外</b>（写的是
+        <code>games/&lt;场景&gt;/main.yml</code>，不是 5 张 L1 表）——
+        所以这一页<b>只有进行中的战斗才有内容</b>。<br>
+        不变式：<b>当前可用 ≤ 本场景剩余</b>（游戏每用一次就让剩余减 1，减成负数存档会打不开）。
+        <b>本场景剩余 = 无限</b> 时，每回合恢复多少就永远有多少。</div>
+    </div></div>`;
+
+  list.forEach(a=>{
+    const cur = theaterCur(a.asset);
+    const tu = document.getElementById("th_tu_"+a.asset);
+    if(tu) bindSpin(tu, {base:a.to_use, cur:cur.to_use, min:0, max:null,
+      onChange(v){ theaterSet(a.asset, "to_use", v); }});
+    const ut = document.getElementById("th_ut_"+a.asset);
+    if(ut) bindSpin(ut, {base:a.uses_turn, cur:cur.uses_turn, min:1, max:null,
+      onChange(v){ theaterSet(a.asset, "uses_turn", v); }});
+    const tot = document.getElementById("th_tot_"+a.asset);
+    if(tot) bindNumIn(tot, {base:a.uses_total, cur:cur.uses_total, min:0, max:null,
+      kind:"theater_asset", key:theaterKey(a.asset),
+      params:{asset:a.asset, to_use:cur.to_use, uses_total:cur.uses_total, uses_turn:cur.uses_turn},
+      onChange(v){ theaterSet(a.asset, "uses_total", v); }});
+  });
+}
+
+function theaterToggleTotal(asset){
+  const cur = theaterCur(asset);
+  const v = (cur.uses_total===null||cur.uses_total===undefined) ? 1 : null;
+  theaterSet(asset, "uses_total", v);
+}
+
+/* ===================================================================
+   战役页（U39 · 只读）
+   =================================================================== */
+function pageCampaign(w){
+  const cp = VIEW.campaign_position || {};
+  const scenes = cp.available_scenes || [];
+  const pos = `<div class="cpos">
+    <b>${esc(cp.campaign_name||cp.campaign_id||"—")}</b>
+    <span class="sep"></span>
+    <span>${esc(cp.conference_text||cp.conference_id||"—")}</span>
+    ${cp.front?`<span class="sep"></span><span>战线 ${esc(cp.front_name||cp.front)}</span>`:""}
+    ${cp.scenario_id?`<span class="sep"></span><span>场景 ${esc(cp.scenario_name||cp.scenario_id)}</span>`:""}
+    <span class="sp" style="flex:1"></span>
+    <span class="mut">已激活战线：${(cp.active_fronts||[]).join(" / ")||"—"}</span>
+    ${cp.variant?`<span class="ro">${esc(cp.variant)}</span>`:""}
+  </div>`;
+  const sceneRows = scenes.map(s=>`<tr>
+      <td>${esc(s.name||s.id)}</td>
+      <td class="dim">${esc(s.id)}</td>
+      <td class="dim">${esc(s.variant||"base")}</td>
+    </tr>`).join("");
+  const hqs = (VIEW.hqs||[]).map(h=>`<tr>
+      <td>${esc(h.name_cn||h.name_brief||h.id)}</td>
+      <td class="n">${h.cp??"—"}/${h.max_cp??"—"}</td>
+      <td class="n">${h.xp??"—"}/${h.xp_target??"—"}</td>
+      <td class="n">${(h.force_pool||[]).length}</td>
+    </tr>`).join("");
+  w.innerHTML = `<div class="panel"><h3>战役位置</h3><div class="pbody">
+      ${pos}
+      <div class="cols-wide" style="display:grid;gap:14px;margin-top:12px">
+        <div class="storegrp"><div class="storetitle">这场会议的可选场景 · ${scenes.length} 个</div>
+          <table class="rlist"><thead><tr><th>名称</th><th>场景 id</th><th>变体</th></tr></thead>
+            <tbody>${sceneRows || `<tr><td colspan="3" class="dim">（没有索引到可选场景）</td></tr>`}</tbody>
+          </table></div>
+        <div class="storegrp"><div class="storetitle">总部 · ${(VIEW.hqs||[]).length} 个</div>
+          <table class="rlist"><thead><tr><th>名称</th><th>CP</th><th>经验</th><th>兵库</th></tr></thead>
+            <tbody>${hqs}</tbody></table></div>
+      </div>
+      <div class="note">这一页是<b>只读</b>的 —— 战役推进是游戏自己的逻辑，
+        修改器只告诉你「现在在哪儿、能打哪几场」（§7.8）。</div>
+  </div></div>`;
+}
+
 /* ---------- 应用 / 撤销 ---------- */
 async function doApply(){
   if(!PENDING.length) return;
@@ -1397,7 +1949,8 @@ async function openSave(sid){
   }
   document.getElementById("splash").style.display = "none";
   document.getElementById("app").style.display = "flex";
-  loadCatalog().catch(()=>{});
+  /* 目录是异步的 ⇒ 到位后**重绘一次**，否则中文名与卡牌贴图一开始全是 id / 404 */
+  loadCatalog().then(()=>{ if(VIEW) show(PAGE); }).catch(()=>{});
   document.getElementById("hTitle").textContent = VIEW.save.display || VIEW.save.name;
   document.getElementById("hCaps").innerHTML = (VIEW._features||[]).map(f =>
     `<span class="pill ${f.ok?'on':'off'}" title="${esc(f.reason)}">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</span>`
@@ -1439,8 +1992,8 @@ function show(p){
         <div class="note" style="margin-top:10px">
           <b>这一版能做什么</b>：读存档、列能力位、<b>改战役进度</b>（改完进「待应用」，
           点右上角「应用更改」才写盘，写前自动备份、可撤销）。<br>
-          <b>各页进度</b>：单位页 ✅（列表 / 详情 / 改名 / 兵力 / 经验 / 特种兵挂卸）；
-          总部 / 卡牌 / 商店 / 战区资产 / 战役 待做。
+          <b>各页进度</b>：单位 ✅ · 总部 ✅ · 卡牌 ✅ · 商店 ✅ · 战区资产 ✅ · 战役 ✅（只读）。
+          <b>战区资产</b>要存档正在战斗里才有内容（它是唯一的 L3 写入例外）。
         </div>
       </div></div>
       `;
@@ -1450,6 +2003,10 @@ function show(p){
   }
   if(p==="units"){ pageUnits(w); return; }
   if(p==="hqs"){ pageHqs(w); return; }
+  if(p==="cards"){ pageCards(w); return; }
+  if(p==="store"){ pageStore(w); return; }
+  if(p==="theater"){ pageTheater(w); return; }
+  if(p==="campaign"){ pageCampaign(w); return; }
   w.innerHTML = `<div class="panel"><h3>${PAGE_CN[p]||p}</h3>
     <div class="placeholder"><div class="big">这一页还没做</div>
     等 GUI 微调需求提完，按最终视觉稿一次性实现（避免返工）。</div></div>`;

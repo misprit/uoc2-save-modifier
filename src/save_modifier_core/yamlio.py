@@ -92,8 +92,14 @@ def _build_dumper():
             return self.represent_scalar('tag:yaml.org,2002:str', data)
 
         def float_representer(self, data):
-            """`str(float(data))` —— 与游戏一致（避免 `1.0e-05` 这类写法）。"""
-            return self.represent_float(str(float(data)))
+            """`str(float(data))` —— 与游戏一致（避免 `1.0e-05` 这类写法）。
+
+            ⚠️ **必须直接给 `represent_scalar`**，不能绕 `represent_float`：
+            PyYAML 的 `represent_float(data)` 内部是 `repr(data).lower()`，
+            传字符串进去 ⇒ `repr("80.0")` = `"'80.0'"`（**带引号**）
+            ⇒ 写出 `!!float '''80.0'''` ⇒ **游戏读这个文件会直接崩**（U38 实测）。
+            """
+            return self.represent_scalar('tag:yaml.org,2002:float', str(float(data)))
 
         def bool_representer(self, data):
             return self.represent_bool(data)

@@ -757,3 +757,323 @@ class TestHqWriteApi(WebGuiTestBase):
         self.assertIn("equipment_cn", v)
         for a, cn in (v.get("skills") or {}).items():
             self.assertTrue(cn, a)
+
+
+def _quote(path):
+    import urllib.parse
+    return urllib.parse.quote(path, safe="")
+
+
+class TestCardStoreWriteApi(WebGuiTestBase):
+    """U36：卡牌页的写操作（手牌 / 货架）。**只用副本**。"""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="webcard_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            p = str(info.path)
+            if "BACKUP" not in p and p.endswith(".usg"):
+                src = p
+                break
+        if src is None:
+            self.skipTest("本机没有存档")
+        self.copy = str(self.tmp / "copy.usg")
+        shutil.copyfile(src, self.copy)
+
+    def post(self, path, body):
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            self.url(path),
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Token": server._Handler.token},
+            method="POST")
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+
+    def _view(self):
+        import urllib.parse
+        return self.get_json("/api/view/" + urllib.parse.quote(self.copy))
+
+    def test_catalog_has_card_images(self):
+        """卡牌贴图要能解析出**真实存在**的相对路径（U36）。"""
+        cat = self.get_json("/api/catalog")
+        n = 0
+        for name, info in (cat.get("card_types") or {}).items():
+            rel = info.get("image_resolved") or ""
+            self.assertTrue(rel, name)
+            self.assertTrue(rel.endswith(".png"), name)
+            n += 1
+        self.assertGreater(n, 0)
+
+    def test_card_add_and_remove(self):
+        """加一张到手牌 → 再移除。"""
+        cat = self.get_json("/api/catalog")
+        wl = self.get_json("/api/pickers?save_id=" + _quote(self.copy))
+        allowed = wl.get("cards", {}).get("allowed") or []
+        if not allowed:
+            self.skipTest("这个存档没有可上架的卡")
+        ct = allowed[0]
+        v0 = self._view()
+        hand = v0.get("hand") or []
+        used = {c.get("position") for c in hand}
+        limit = v0.get("hand_limit") or 5
+        pos = next((p for p in range(1, limit + 1) if p not in used), None)
+        if pos is None:
+            self.skipTest("手牌满了")
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "card_add",
+                       "params": {"card_type": ct, "position": pos}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        h1 = v1.get("hand") or []
+        self.assertTrue(any(c.get("card_type") == ct for c in h1))
+
+        cm2 = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "card_remove", "params": {"position": pos}}]})
+        self.assertTrue(cm2["ok"], cm2.get("errors"))
+        v2 = self._view()
+        h2 = v2.get("hand") or []
+        self.assertFalse(any(c.get("position") == pos for c in h2))
+
+    def test_card_add_out_of_range_position_is_rejected(self):
+        """槽位超上限 ⇒ 必须拦（写了游戏也读不到，U25）。"""
+        v = self._view()
+        wl = self.get_json("/api/pickers?save_id=" + _quote(self.copy))
+        allowed = wl.get("cards", {}).get("allowed") or []
+        if not allowed:
+            self.skipTest("这个存档没有可上架的卡")
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "card_add",
+                       "params": {"card_type": allowed[0], "position": 99}}]})
+        self.assertFalse(cm["ok"])
+        self.assertTrue(cm["errors"])
+
+    def test_card_not_in_whitelist_is_rejected(self):
+        """不在白名单里的卡 ⇒ 不许上架。"""
+        cat = self.get_json("/api/catalog")
+        wl = self.get_json("/api/pickers?save_id=" + _quote(self.copy))
+        allowed = set(wl.get("cards", {}).get("allowed") or [])
+        blocked = [k for k in (cat.get("card_types") or {}) if k not in allowed]
+        if not blocked:
+            self.skipTest("没有被屏蔽的卡")
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "card_add",
+                       "params": {"card_type": blocked[0], "position": 1}}]})
+        self.assertFalse(cm["ok"])
+        self.assertTrue(cm["errors"])
+
+
+class TestStoreWriteApi(WebGuiTestBase):
+    """U37：商店页的写操作（价格 / 库存 / 下架）。**只用副本**。"""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="webstore_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            p = str(info.path)
+            if "BACKUP" not in p and p.endswith(".usg"):
+                src = p
+                break
+        if src is None:
+            self.skipTest("本机没有存档")
+        self.copy = str(self.tmp / "copy.usg")
+        shutil.copyfile(src, self.copy)
+
+    def post(self, path, body):
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            self.url(path),
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Token": server._Handler.token},
+            method="POST")
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+
+    def _view(self):
+        import urllib.parse
+        return self.get_json("/api/view/" + urllib.parse.quote(self.copy))
+
+    def test_store_price_and_quantity(self):
+        v = self._view()
+        store = v.get("store") or []
+        if not store:
+            self.skipTest("这个存档没有商店")
+        e = store[0]
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "store_set",
+                       "params": {"front": e["front"], "sub": e["sub"], "index": 0,
+                                  "field": "price", "value": 7}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        s1 = v1.get("store") or []
+        hit = [x for x in s1 if x["front"] == e["front"] and x["sub"] == e["sub"]]
+        self.assertEqual(hit[0].get("price"), 7)
+
+    def test_store_quantity_zero_is_rejected(self):
+        """库存 0 = 「售罄」，游戏没有这个标记 ⇒ 必须拦（下架要删条目）。"""
+        v = self._view()
+        store = v.get("store") or []
+        if not store:
+            self.skipTest("这个存档没有商店")
+        e = store[0]
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "store_set",
+                       "params": {"front": e["front"], "sub": e["sub"], "index": 0,
+                                  "field": "quantity", "value": 0}}]})
+        self.assertFalse(cm["ok"])
+        self.assertTrue(cm["errors"])
+
+    def test_store_negative_price_is_rejected(self):
+        v = self._view()
+        store = v.get("store") or []
+        if not store:
+            self.skipTest("这个存档没有商店")
+        e = store[0]
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "store_set",
+                       "params": {"front": e["front"], "sub": e["sub"], "index": 0,
+                                  "field": "price", "value": -1}}]})
+        self.assertFalse(cm["ok"])
+
+    def test_store_duplicate_is_rejected(self):
+        """同一个商店里重复条目 ⇒ 硬拦（U23 用户口径）。"""
+        v = self._view()
+        store = v.get("store") or []
+        if not store:
+            self.skipTest("这个存档没有商店")
+        e = store[0]
+        entry = {"spec": e.get("spec"), "equipment": e.get("equipment"),
+                 "nationality": e.get("nationality"),
+                 "price": 99, "quantity": 1}
+        entry = {k: v2 for k, v2 in entry.items() if v2 is not None}
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "store_add",
+                       "params": {"front": e["front"], "sub": e["sub"], "entry": entry}}]})
+        self.assertFalse(cm["ok"])
+        self.assertTrue(cm["errors"])
+
+
+class TestTheaterWriteApi(WebGuiTestBase):
+    """U38：战区资产（唯一的 L3 写入例外）。**只用副本**。"""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves, open_save
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="webtheater_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            if not info.is_primary:
+                continue
+            try:
+                with open_save(info.save_id) as s:
+                    bm = s.battle_main()
+                    if isinstance(bm, dict) and bm.get("theater_assets"):
+                        src = str(info.path)
+                        break
+            except Exception:
+                continue
+        if src is None:
+            self.skipTest("本机没有正在战斗的存档")
+        self.copy = str(self.tmp / "copy.usg")
+        shutil.copyfile(src, self.copy)
+
+    def post(self, path, body):
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            self.url(path),
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Token": server._Handler.token},
+            method="POST")
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+
+    def _view(self):
+        import urllib.parse
+        return self.get_json("/api/view/" + urllib.parse.quote(self.copy))
+
+    def test_theater_assets_present_with_names(self):
+        v = self._view()
+        ta = v.get("theater_assets") or []
+        self.assertTrue(ta)
+        cn = v.get("theater_cn") or {}
+        for a in ta:
+            self.assertIn(a["asset"], cn)
+            self.assertTrue(cn[a["asset"]])
+
+    def test_theater_to_use_edit(self):
+        """改「当前可用」→ 提交 → 撤销 → 复原。"""
+        v = self._view()
+        a = (v.get("theater_assets") or [])[0]
+        new = (a.get("to_use") or 0) + 1
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "theater_asset",
+                       "params": {"asset": a["asset"], "to_use": new,
+                                  "uses_total": a.get("uses_total"),
+                                  "uses_turn": a.get("uses_turn")}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        a1 = [x for x in v1["theater_assets"] if x["asset"] == a["asset"]][0]
+        self.assertEqual(a1.get("to_use"), new)
+        un = self.post("/api/undo", {"save_id": self.copy})
+        self.assertTrue(un["ok"], un.get("errors"))
+        v2 = self._view()
+        a2 = [x for x in v2["theater_assets"] if x["asset"] == a["asset"]][0]
+        self.assertEqual(a2.get("to_use"), a.get("to_use"))
+
+    def test_theater_invariant_is_enforced(self):
+        """当前可用 > 本场景剩余 ⇒ 必须拦（游戏每用一次就让剩余减 1）。"""
+        v = self._view()
+        for a in (v.get("theater_assets") or []):
+            tot = a.get("uses_total")
+            if isinstance(tot, int):
+                cm = self.post("/api/commit", {
+                    "save_id": self.copy,
+                    "edits": [{"kind": "theater_asset",
+                               "params": {"asset": a["asset"], "to_use": tot + 5,
+                                          "uses_total": tot,
+                                          "uses_turn": a.get("uses_turn")}}]})
+                self.assertFalse(cm["ok"])
+                self.assertTrue(cm["errors"])
+                return
+        self.skipTest("没有有限的 uses_total")
+
+    def test_theater_uses_turn_zero_is_rejected(self):
+        """每回合恢复 ≥ 1（游戏 schema 是 Range(min=1)）。"""
+        v = self._view()
+        a = (v.get("theater_assets") or [])[0]
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "theater_asset",
+                       "params": {"asset": a["asset"], "to_use": a.get("to_use"),
+                                  "uses_total": a.get("uses_total"),
+                                  "uses_turn": 0}}]})
+        self.assertFalse(cm["ok"])
+        self.assertTrue(cm["errors"])
