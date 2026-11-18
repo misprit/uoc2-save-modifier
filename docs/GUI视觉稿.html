@@ -93,7 +93,7 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text)}
 .sel{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 9px;font-size:13px}
 
-.cols{display:grid;grid-template-columns:minmax(430px,1.05fr) minmax(430px,1fr);gap:14px}
+.cols{display:grid;grid-template-columns:minmax(340px,0.62fr) minmax(560px,1.38fr);gap:14px}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .panel>h3{font-size:13px;margin:0;padding:9px 12px;background:var(--surface-alt);
   border-bottom:1px solid var(--border);color:var(--accent-dark)}
@@ -115,18 +115,30 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .pip{width:13px;height:9px;border-radius:2px;background:var(--surface-alt);border:1px solid var(--border)}
 .pip.on{background:var(--accent);border-color:var(--accent-dark)}
 .pip.sup{background:var(--stage-sup);border-color:#a9b7c7}
-.uv{font-family:var(--mono);font-size:13px;text-align:right;min-width:58px}
-.uv small{display:block;font-size:10.5px;color:var(--muted);font-family:var(--ui)}
+/* U11：血量文字「5 / 7」删掉（段格条已经说清）→ 右边换「特种兵兵牌 + 已挂 N 个」 */
+.ubadges{display:flex;align-items:center;gap:4px;flex:none}
+.ubadge{width:22px;height:22px;border-radius:5px;background:var(--stage);
+  border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;flex:none}
+.ubadge img{max-width:100%;max-height:100%;object-fit:contain}
+.ubadge.empty{border-style:dashed;background:var(--surface);color:var(--muted);font-size:10px}
+.ucount{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--accent-dark);
+  background:var(--accent-light);border:1px solid #b9d3ea;border-radius:9px;padding:0 6px}
+.ucount.zero{color:var(--muted);background:var(--surface-alt);border-color:var(--border);font-weight:400}
 
 /* 详情 */
 .detail{padding:14px}
-.dhead{display:flex;gap:14px;align-items:flex-start}
-.dhead .ava{width:88px;height:88px}
+/* U11：抬头行 = 头像 + 名称/改名 ‖ 兵力块 ‖ 经验块 —— 抬头下面整块留给特种兵 */
+.dhead{display:flex;gap:16px;align-items:stretch}
+.dhead .ava{width:76px;height:76px;flex:none}
+.dhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.dhead .vsep{width:1px;background:var(--border);flex:none}
+.dhead .stats{flex:none;width:432px}
+.dhead .stat{min-width:0}
 .dtitle{font-size:17px;font-weight:700;color:var(--accent-dark);display:flex;align-items:center;gap:8px}
 .dtitle .edit{font-size:12px;color:var(--muted);font-weight:400;border:1px dashed var(--border);
   border-radius:5px;padding:1px 7px}
 .dsub{font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stat{background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:9px 11px}
 .stat .lb{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between}
 .stat .lb .hintw{color:var(--accent);font-size:10.5px}
@@ -187,7 +199,25 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .slot.empty{border-style:dashed;background:var(--surface);color:var(--muted);cursor:default;padding:5px 24px}
 .slot.empty:hover{border-color:var(--border);background:var(--surface)}
 /* 备选池：只图标；悬停出名字 + 数值 */
-.specpool{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;max-height:176px;overflow:auto}
+.specpool{display:block;max-height:320px;overflow:auto}
+.poolflat{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px}
+/* U11：全量视图按国籍分一层（阵营分隔带 → 国籍组，组标题可折叠） */
+.facband{display:flex;align-items:center;gap:8px;padding:8px 12px 3px;font-size:11px;
+  color:var(--muted);letter-spacing:.06em;background:var(--surface)}
+.facband .fline{flex:1;height:1px;background:var(--border)}
+.grphead{display:flex;align-items:center;gap:7px;padding:4px 12px;background:var(--surface-alt);
+  border-top:1px solid var(--border);font-size:12px;font-weight:600;color:var(--accent-dark);
+  cursor:pointer;user-select:none}
+.grphead:hover{background:var(--accent-light)}
+.grphead .caret{font-size:10px;display:inline-block;transition:transform .12s}
+.grphead.closed .caret{transform:rotate(-90deg)}
+.grphead .gcount{font-weight:400;color:var(--muted);font-size:11.5px}
+.grphead .gcan{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--accent-dark);
+  background:var(--accent-light);border:1px solid #b9d3ea;border-radius:9px;padding:0 7px}
+.grpbody{display:flex;flex-wrap:wrap;gap:6px;padding:9px 12px}
+/* 置灰的过滤器 */
+.chk.dis{color:var(--muted);cursor:not-allowed}
+.chk.dis input{cursor:not-allowed}
 .pcell{width:42px;height:42px;border-radius:6px;background:var(--stage);
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;cursor:pointer}
 .pcell img{max-width:100%;max-height:100%;object-fit:contain}
@@ -402,7 +432,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
   <div class="comp"><h4>按钮</h4>
     <div class="row"><button class="btn pri">应用更改 <span class="badge-n">2</span></button></div>
-    <div class="row"><button class="btn">↶ 撤销</button><button class="btn">批量调整</button><button class="btn ghost">丢弃</button></div>
+    <div class="row"><button class="btn">↶ 撤销</button><button class="btn">刷新</button><button class="btn ghost">丢弃</button></div>
     <div class="row"><button class="btn danger">下架</button><button class="btn" disabled>战区资产</button></div>
   </div>
   <div class="comp"><h4>数值控件（滚轮可调）</h4>
@@ -448,7 +478,9 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 </div>
 
 <h2>2 · 主窗口 · 单位页</h2>
-<p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 6 个功能页（<b>特种兵已并入本页</b>），底部是常驻的待应用面板（展开时压矮工作区，永不遮挡详情区）。</p>
+<p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 6 个功能页（<b>特种兵已并入本页</b>），底部是常驻的待应用面板（展开时压矮工作区，永不遮挡详情区）。<br>
+<b>2026-11-18 · U11</b>：左边<b>名册列表收窄</b>（删掉血量文字「5 / 7」，换成「特种兵兵牌 + 已挂 N 个」小标记）⇒
+右边<b>单位详情加宽</b> ⇒ 抬头一行里<b>兵力 / 经验两块挤到改名右侧</b> ⇒ 抬头下面整块都归<b>特种兵</b>。</p>
 
 <div class="app">
   <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>
@@ -484,8 +516,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
         <label class="chk"><input type="checkbox" checked> 当前战斗激活的单位</label>
         <label class="chk"><input type="checkbox"> 有改动的单位</label>
         <span class="sp"></span>
-        <span style="font-size:12px;color:var(--muted)">已选 3 个</span>
-        <button class="btn">批量调整</button>
+        <span style="font-size:12px;color:var(--muted)">共 12 个 · 已选 1 个</span>
       </div>
 
       <div class="cols">
@@ -499,13 +530,12 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
           <div class="detail">
             <div class="dhead">
               <div class="ava"><img id="d-ava" alt=""></div>
-              <div>
+              <div class="idblk">
                 <div class="dtitle">第 1 装甲师 <span class="edit">✎ 改名</span></div>
                 <div class="dsub">us_arm_42 · 装甲 / 机械化 · 美军</div>
               </div>
-            </div>
-
-            <div class="stats" style="grid-template-columns:1fr 1fr">
+              <div class="vsep"></div>
+              <div class="stats">
               <div class="stat">
                 <div class="lb"><span>兵力</span>
                   <span class="hintw">血条滚轮调压制 · 数字滚轮调血量</span></div>
@@ -519,9 +549,9 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                   <div class="num" title="在这里滚轮 = 调当前血量">5 / 7</div>
                 </div>
                 <div class="legend">
-                  <span><i style="background:var(--accent)"></i>未被压制 4</span>
-                  <span><i style="background:var(--stage-sup)"></i>被压制 1</span>
-                  <span><i style="background:var(--surface-alt);border:1px solid var(--border)"></i>还差 2</span>
+                  <span><i style="background:var(--accent)"></i>未压 4</span>
+                  <span><i style="background:var(--stage-sup)"></i>压制 1</span>
+                  <span><i style="background:var(--surface-alt);border:1px solid var(--border)"></i>差 2</span>
                 </div>
               </div>
               <div class="stat">
@@ -530,6 +560,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                 <div class="legend">
                   <span style="color:var(--accent)">登陆单位补兵会掉一部分 XP</span>
                 </div>
+              </div>
               </div>
             </div>
 
@@ -545,7 +576,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                 <span class="sbm">备选 · <b id="pooln">9</b> 种（<span id="poolscope">西线战役默认</span>）</span>
                 <label class="chk"><input type="checkbox" id="allcb"> 显示全部 375 种</label>
                 <span class="sp"></span>
-                <span class="sbhint">默认只列本战役（1943–45 西方线）有的特种兵 · 悬停看细节</span>
+                <span class="sbhint">默认只列本战役（1943–45 西方线）有的特种兵 · 勾「显示全部」后按国籍分组 · 悬停看细节</span>
               </div>
               <div class="specpool" id="pool"></div>
             </div>
@@ -585,6 +616,33 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
+<div class="note warn">
+  <b>非战斗存档：「当前战斗激活的单位」过滤器置灰 + 说明原因</b>
+  <br>那份名单 = <code>games/&lt;场景&gt;/units.yml</code>，<b>只在战斗进行中才存在</b>
+  （实测 71 个存档里 15 个在战斗中）。不在战斗中就没有这份名单可对照 ⇒
+  勾上也是空的 ⇒ <b>置灰</b>，鼠标悬停能看到原因。
+  <br>实现上按<b>能力位</b> <code>in_battle</code> 判断（规范 §3.4.5），<b>不是</b>按当前状态分支。
+</div>
+
+<div class="app" style="margin-top:4px">
+  <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>
+    <span class="t">工具栏 · 非战斗存档（会议界面）</span></div>
+  <div class="body" style="min-height:0">
+    <div class="work" style="width:100%">
+      <div class="toolbar" style="margin-bottom:0">
+        <input class="inp" placeholder="搜索单位 / ID…" style="width:210px">
+        <span class="sel">阵营：全部 ▾</span>
+        <label class="chk dis"
+              data-tip="<span class='tn'>当前战斗激活的单位</span><span class='tr'>该存档不在战斗中，没有战斗名单可对照</span>">
+          <input type="checkbox" disabled> 当前战斗激活的单位</label>
+        <label class="chk"><input type="checkbox"> 有改动的单位</label>
+        <span class="sp"></span>
+        <span style="font-size:12px;color:var(--muted)">共 12 个 · 已选 1 个</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <h2>3 · 特种兵挂载规则（已并入单位页）</h2>
 <p class="lead"><b>特种兵页已取消</b> —— 挂载 / 卸下是「某个单位的事」，跟单位放在一起才对。
 这一段不再是功能页，只把<b>游戏自己的挂载规矩</b>写清楚（GUI 的备选区要照它过滤）。</p>
@@ -616,6 +674,21 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   加上场景集合后<b>漏 0 种</b>（<code>e163</code> 实测）。
   <br>⚠ <b>不能靠名字后缀判年代</b> —— DLC 战役用 <code>_dlcN</code> 命名（<code>ger_at_dlc10</code>），
   18~41 个条目根本没有年份。
+</div>
+
+<div class="note">
+  <b>「显示全部 375 种」之后：按国籍分一层</b>（2026-11-18 · U11）
+  <ol style="margin:8px 0 0;padding-left:20px">
+    <li><b>阵营分隔带</b>（同盟 / 苏联 / 轴心）—— <b>当前单位所属的阵营排最前</b>；</li>
+    <li>每个<b>国籍一组</b>：组头 = 国籍中文名 + 种数 + 「可挂 N」徽章，<b>点组头折叠 / 展开</b>；</li>
+    <li>组内按<b>中文名</b>排序；组之间按「可挂数 → 种数」排（可挂的排前面）；</li>
+    <li>默认视图（战役池）<b>不分组</b> —— 本来就只有 9 种。</li>
+  </ol>
+  <br>⚠ <b>同名国籍</b>：苏联 / 意大利 / 波兰 / 罗马尼亚 / 瑞士 / 南斯拉夫 各有<b>两个 id</b>
+  （本国阵营 + 参战国版本）⇒ 靠<b>阵营分隔带</b>区分，不另加括号后缀。
+  <br>⚠ 国籍中文名走 locale <code>id_&lt;nat&gt;_name_brief</code>；实测游戏自己的
+  <code>croatian</code> 键是错的（<code>id_croatian_brief</code> 在中文表里译成了「匈牙利」，
+  正确键是 <code>id_croatian_name_brief</code> → 克罗地亚）—— 375 种里没有克罗地亚的，但这个坑要知道。
 </div>
 
 <div class="app">
@@ -1096,38 +1169,484 @@ const UNITS = [
   {t:"uk_arm_div_late_dlc6", name:"英军装甲师", hq:"东部", st:6, sup:0, max:7, xp:260}
 ];
 
-/* 第 10 个字段 = 在不在【base/west 战役默认池】里（e163 实测）
-   池 = 该战役 商店 spec ∪ 场景 units.yml 里 specs[].type
-   ⇒ us_arm_42 的 23 个可挂项里，只有 9 个属于本战役；其余 14 个都是别的战役的货 */
+/* 全部 375 个特种兵类型 —— 真实数据（base 包 entity_types/specialists/*.yml）
+   字段： [type, 中文名, 攻, 防, 装甲, 火力, 国籍, 阵营, flags, 在 base/west 战役默认池] */
 const SPECIALISTS = [
-  ["us_armx_42","M4谢尔曼","9","5","2","0","us","allies","","1"],
-  ["us_armx_42_opt","DD谢尔曼","9","5","2","0","us","allies","lci","1"],
-  ["us_armx_dlc10","M4谢尔曼","8","7","3","0","us","allies","","0"],
-  ["us_armx_dlc6","M4谢尔曼","8","5","4","0","us","allies","","0"],
-  ["us_armx_dlc8","M4谢尔曼","8","7","3","0","us","allies","","0"],
-  ["us_arty_42","M7牧师","0","6","0","2","us","allies","arty","1"],
-  ["us_arty_dlc10","M7牧师","0","6","0","2","us","allies","arty","0"],
-  ["us_at_42","M10","4","7","3","0","us","allies","at","1"],
-  ["us_at_dlc10","M10","6","6","4","0","us","allies","at","0"],
-  ["us_at_dlc6","M10","4","5","4","0","us","allies","at","0"],
-  ["us_at_dlc8","M10","6","6","4","0","us","allies","at","0"],
-  ["us_eng_42","美国工兵","6","8","0","0","us","allies","engineers","1"],
-  ["us_eng_dlc10","美国工兵","6","8","0","0","us","allies","engineers","0"],
-  ["us_heavy_45_opt","M26重型坦克","12","9","4","0","us","allies","","1"],
-  ["us_heavy_dlc10","M26重型坦克","12","9","4","0","us","allies","","0"],
-  ["us_recon_42","M8灰狗","7","4","1","0","us","allies","recon","1"],
-  ["us_recon_dlc10","M8灰狗","7","4","1","0","us","allies","recon","0"],
-  ["us_spec_42","游骑兵","10","8","0","0","us","allies","special,lci","1"],
-  ["us_spec_dlc10_opt","游骑兵","9","8","0","0","us","allies","special,lci","0"],
-  ["us_spec_dlc8_opt","游骑兵","9","8","0","0","us","allies","special,lci","0"],
-  ["us_towed_arty_42","105毫米M2A1","0","6","0","3","us","allies","towed,arty","1"],
-  ["us_towed_arty_dlc10","105毫米M2A1","0","6","0","3","us","allies","towed,arty","0"],
-  ["us_towed_arty_dlc10_opt","155毫米“长腿汤姆”榴弹炮","0","8","0","4","us","allies","towed,arty","0"],
-  ["bel_arty_towed_40","155L Mod.1917","0","6","0","4","belgian","allies","towed,arty","0"],
-  ["bel_at_40","T-13","1","4","2","0","belgian","allies","at","0"],
-  ["nl_arty_towed_40","105毫米野战炮","0","5","0","2","dutch","allies","towed,arty","0"],
-  ["nl_recon_40","哈扎伦","3","2","0","0","dutch","allies","recon","0"]
+  ["bel_arty_towed_40","155L Mod.1917",0,6,0,4,"belgian","allies","towed,arty","0"],
+  ["bel_at_40","T-13",1,4,2,0,"belgian","allies","at","0"],
+  ["bul_s_armx_dlc9","迈巴赫",5,5,3,0,"bulgarian_s","soviet","","0"],
+  ["bul_s_recon_dlc9","M-222",3,4,1,0,"bulgarian_s","soviet","recon","0"],
+  ["bul_s_towed_arty_dlc9","D-30 Krup 150毫米牵引式火炮",0,4,0,3,"bulgarian_s","soviet","towed,arty","0"],
+  ["bul_s_towed_at_dlc9_opt","SHKODA 37 80毫米牵引式火炮",2,5,3,1,"bulgarian_s","soviet","towed,at","0"],
+  ["cz_s_armx_dlc9","LT vz. 38坦克",4,4,2,0,"czechoslovak_s","soviet","","0"],
+  ["cz_s_at_dlc9","KPÚV pás. 75毫米反坦克炮",2,4,4,0,"czechoslovak_s","soviet","at","0"],
+  ["cz_s_eng_dlc9","捷克工兵",6,6,0,0,"czechoslovak_s","soviet","engineers","0"],
+  ["cz_s_recon_dlc9","OA vz.30装甲汽车",4,3,1,0,"czechoslovak_s","soviet","recon","0"],
+  ["cz_s_towed_arty_dlc9","斯柯达VZ14/19型榴弹炮",0,5,0,2,"czechoslovak_s","soviet","towed,arty","0"],
+  ["cz_s_towed_at_dlc9","KPÚV vz. 37M 37毫米反坦克炮",1,4,2,0,"czechoslovak_s","soviet","towed,at","0"],
+  ["cz_s_towed_at_dlc9_opt","KPÚV vz. 40 75毫米反坦克炮",1,5,3,0,"czechoslovak_s","soviet","towed,at","0"],
+  ["ff_arty_towed_dlc6","75毫米野战炮",0,5,0,1,"free_french","allies","towed,arty","0"],
+  ["ff_at_towed_dlc6","25毫米哈奇开斯反坦克炮",1,4,3,0,"free_french","allies","towed,at","0"],
+  ["ff_eng_dlc6","工程兵",5,4,0,0,"free_french","allies","engineers","0"],
+  ["ff_recon_42","斯帕希骑兵团",7,4,1,0,"free_french","allies","recon","1"],
+  ["ff_recon_dlc6","斯帕希骑兵团",6,4,0,0,"free_french","allies","recon","0"],
+  ["ff_spec_42","摩洛哥轻步兵",5,4,0,0,"free_french","allies","special","1"],
+  ["ff_spec_42_opt","外籍军团",5,9,0,0,"free_french","allies","special,lci","1"],
+  ["ff_spec_dlc10","西班牙民族联盟",3,5,0,0,"free_french","allies","special","0"],
+  ["ff_spec_dlc8","摩洛哥轻步兵",5,4,0,0,"free_french","allies","special","0"],
+  ["ff_spec_gr_dlc6","圣军",8,5,0,0,"free_french","allies","special","0"],
+  ["fin_armx_dlc8","T-26轻型坦克",4,4,1,0,"finnish","axis","","0"],
+  ["fin_eng_41","先锋",5,7,0,0,"finnish","axis","engineers","0"],
+  ["fin_eng_dlc8","先锋",5,7,0,0,"finnish","axis","engineers","0"],
+  ["fin_recon_41","猎兵",5,4,0,0,"finnish","axis","recon","0"],
+  ["fin_recon_dlc8","猎兵",5,4,0,0,"finnish","axis","recon","0"],
+  ["fin_spec_41","轻骑兵",8,8,0,0,"finnish","axis","special","0"],
+  ["fin_spec_dlc8","轻骑兵",8,6,0,0,"finnish","axis","special","0"],
+  ["fin_towed_arty_41","122 H/10-40炮",0,4,0,2,"finnish","axis","towed,arty","0"],
+  ["fin_towed_arty_41_opt","203 H/17巨炮",0,6,0,4,"finnish","axis","towed,arty","0"],
+  ["fin_towed_arty_dlc8","122 H/10-40炮",0,5,0,2,"finnish","axis","towed,arty","0"],
+  ["fin_towed_arty_dlc8_opt","203 H/17巨炮",0,6,0,4,"finnish","axis","towed,arty","0"],
+  ["fin_towed_at_dlc8","75毫米K/40火炮",2,5,4,0,"finnish","axis","towed,at","0"],
+  ["fr_armx_40","R35",5,4,2,0,"french","allies","","0"],
+  ["fr_arty_towed_40","1913年式105毫米野战炮",0,6,0,4,"french","allies","towed,arty","0"],
+  ["fr_at_towed_40","47毫米APX反坦克炮",1,4,2,0,"french","allies","towed,at","0"],
+  ["fr_eng_40","工程兵",5,4,0,0,"french","allies","engineers","0"],
+  ["fr_recon_40","潘哈德178轮式战车",5,4,1,0,"french","allies","recon","0"],
+  ["ger_arty_40","s.I.G.33步兵炮",0,4,0,2,"german","axis","arty","0"],
+  ["ger_arty_dlc10","黄蜂",0,7,0,2,"german","axis","arty","0"],
+  ["ger_arty_dlc10_opt","野蜂式自行火炮",0,7,0,3,"german","axis","arty","0"],
+  ["ger_arty_dlc7","二号自行重步兵炮",3,6,0,2,"german","axis","arty","0"],
+  ["ger_arty_dlc8","野蜂式自行火炮",0,7,0,3,"german","axis","arty","0"],
+  ["ger_arty_dlc9_opt","野蜂式自行火炮",0,7,0,3,"german","axis","arty","0"],
+  ["ger_asg_40","三A突击炮",4,6,2,1,"german","axis","at,arty","0"],
+  ["ger_asg_41","StuG IIIB",4,6,2,1,"german","axis","at,arty","0"],
+  ["ger_asg_dlc10","三G突击炮",4,6,3,1,"german","axis","at,arty","0"],
+  ["ger_asg_dlc4","StuG IIIE",4,6,2,1,"german","axis","at,arty","0"],
+  ["ger_asg_dlc4_opt","StuG IIIF",4,6,5,1,"german","axis","at,arty","0"],
+  ["ger_asg_dlc7","三号突击炮",4,7,3,1,"german","axis","at,arty","0"],
+  ["ger_asg_dlc8","三G突击炮",4,6,3,1,"german","axis","at,arty","0"],
+  ["ger_asg_dlc8_opt","灰熊式突击炮",6,8,2,2,"german","axis","at,arty","0"],
+  ["ger_asg_dlc9","三G突击炮",4,6,3,1,"german","axis","at,arty","0"],
+  ["ger_asg_dlc9_opt","灰熊式突击炮",6,8,2,2,"german","axis","at,arty","0"],
+  ["ger_asg_ita_dlc8","105/25式自走炮",3,5,2,1,"german","axis","at,arty","0"],
+  ["ger_at_40","一号驱逐战车",1,4,3,0,"german","axis","at","0"],
+  ["ger_at_42","三G突击炮",7,8,3,0,"german","axis","at","1"],
+  ["ger_at_42_opt","猎豹式",7,9,4,0,"german","axis","at","1"],
+  ["ger_at_dlc10","追猎者坦克歼击车",3,5,3,0,"german","axis","at","0"],
+  ["ger_at_dlc10_opt","猎豹式驱逐战车",4,7,5,0,"german","axis","at","0"],
+  ["ger_at_dlc4","黃鼠狼II",3,4,4,0,"german","axis","at","0"],
+  ["ger_at_dlc6","黃鼠狼III",4,6,5,0,"german","axis","at","0"],
+  ["ger_at_dlc7","黃鼠狼III",3,6,5,0,"german","axis","at","0"],
+  ["ger_at_dlc8","黃鼠狼III",2,4,4,0,"german","axis","at","0"],
+  ["ger_at_dlc8_opt","费迪南自行反坦克炮",4,7,5,0,"german","axis","at","0"],
+  ["ger_at_dlc9","黃鼠狼III",2,4,4,0,"german","axis","at","0"],
+  ["ger_at_dlc9_opt","猎豹式驱逐战车",4,7,5,0,"german","axis","at","0"],
+  ["ger_eng_42","德国工兵",6,8,0,0,"german","axis","engineers","1"],
+  ["ger_eng_dlc10","德国工兵",6,8,0,0,"german","axis","engineers","0"],
+  ["ger_eng_dlc4","德国工兵",5,8,0,0,"german","axis","engineers","0"],
+  ["ger_eng_dlc4_opt","突击工兵",8,8,0,0,"german","axis","engineers","0"],
+  ["ger_eng_dlc8","德国工兵",6,8,0,0,"german","axis","engineers","0"],
+  ["ger_eng_dlc9","德国工兵",6,8,0,0,"german","axis","engineers","0"],
+  ["ger_heavy_pzx_42","虎I",10,8,3,0,"german","axis","","1"],
+  ["ger_heavy_pzx_44_opt","虎王坦克",11,10,4,0,"german","axis","","1"],
+  ["ger_heavy_pzx_dlc10","虎I坦克",8,10,4,0,"german","axis","","0"],
+  ["ger_heavy_pzx_dlc10_opt","虎王重型坦克",10,12,5,0,"german","axis","","0"],
+  ["ger_heavy_pzx_dlc4_opt","虎I坦克",8,10,5,0,"german","axis","","0"],
+  ["ger_heavy_pzx_dlc8_opt","虎I坦克",8,10,5,0,"german","axis","","0"],
+  ["ger_heavy_pzx_dlc9","虎I坦克",8,10,5,0,"german","axis","","0"],
+  ["ger_heavy_pzx_dlc9_opt","虎王坦克",10,12,5,0,"german","axis","","0"],
+  ["ger_pzx_40","二号坦克",5,4,2,0,"german","axis","","0"],
+  ["ger_pzx_40_opt","三号坦克",7,5,2,0,"german","axis","lci","0"],
+  ["ger_pzx_dlc10","三号坦克",6,6,3,0,"german","axis","","0"],
+  ["ger_pzx_dlc10_opt","豹式坦克",6,10,4,0,"german","axis","","0"],
+  ["ger_pzx_dlc6_opt","四号坦克F2型",8,6,4,0,"german","axis","","0"],
+  ["ger_pzx_dlc8","三号坦克",6,6,3,0,"german","axis","","0"],
+  ["ger_pzx_dlc8_opt","豹式坦克",6,10,4,0,"german","axis","","0"],
+  ["ger_pzx_dlc9","四号坦克（H型）",6,7,3,0,"german","axis","","0"],
+  ["ger_pzx_dlc9_opt","豹式坦克",6,10,4,0,"german","axis","","0"],
+  ["ger_pzx_ita_dlc8","M15/42坦克",5,4,1,0,"german","axis","","0"],
+  ["ger_pzx_spec_dlc7","装甲指挥侦察车",1,1,3,0,"german","axis","","0"],
+  ["ger_pzx_spec_dlc7_opt","俘获坦克KV",6,8,4,0,"german","axis","","0"],
+  ["ger_recon_39","Sd.Kfz.222",5,4,1,0,"german","axis","recon","0"],
+  ["ger_recon_41","Sd.Kfz.232装甲车",6,4,1,0,"german","axis","recon","0"],
+  ["ger_recon_42","Sd.Kfz.250",8,4,1,0,"german","axis","recon","1"],
+  ["ger_recon_dlc10","Sd.Kfz.250",6,4,1,0,"german","axis","recon","0"],
+  ["ger_recon_dlc7","摩托化步兵",4,3,0,0,"german","axis","recon","0"],
+  ["ger_recon_dlc7_opt","Sd.Kfz.232装甲车",6,4,1,0,"german","axis","recon","0"],
+  ["ger_recon_dlc8_opt","Sd.Kfz.232装甲车",6,4,1,0,"german","axis","recon","0"],
+  ["ger_recon_dlc9","Sd.Kfz.232装甲车",6,4,1,0,"german","axis","recon","0"],
+  ["ger_red_arty_dlc10","缴获型俄制ISU-152自行反坦克炮",0,10,4,3,"german","axis","arty,at","0"],
+  ["ger_red_asg_dlc10","第1000/1突击炮连",16,6,2,2,"german","axis","at,arty","0"],
+  ["ger_red_at_dlc10","第653重型坦克歼击营",10,11,6,0,"german","axis","at","0"],
+  ["ger_red_eng_dlc10","博格瓦德四号重型遥控爆破车",1,1,1,0,"german","axis","engineers,towed","0"],
+  ["ger_red_heavy_pzx_dlc10","鼠式超重型坦克",20,20,1,0,"german","axis","","0"],
+  ["ger_red_pzx_dlc10","M26重型坦克（缴获型）",11,10,4,0,"german","axis","","0"],
+  ["ger_red_recon_dlc10","第150装甲旅",4,3,1,0,"german","axis","recon,special","0"],
+  ["ger_red_spec_dlc10","施蒂劳部队",1,1,0,0,"german","axis","special","0"],
+  ["ger_red_towed_arty_dlc10","第766国民炮兵军（摩托化）",0,8,2,5,"german","axis","towed,arty,at","0"],
+  ["ger_spec_dlc7","勃兰登堡",8,6,0,0,"german","axis","special","0"],
+  ["ger_spec_dlc8","勃兰登堡",8,6,0,0,"german","axis","special","0"],
+  ["ger_spec_dlc9","勃兰登堡",8,6,0,0,"german","axis","special","0"],
+  ["ger_spec_ita_dlc8","意大利社会共和国伞兵",8,6,0,0,"german","axis","special","0"],
+  ["ger_towed_arty_41_opt","Mrs 18 210毫米炮",0,5,0,5,"german","axis","towed,arty","0"],
+  ["ger_towed_arty_42","leFH 18",0,6,0,3,"german","axis","towed,arty","1"],
+  ["ger_towed_arty_42_opt","41式150毫米式烟雾发射器",0,4,0,4,"german","axis","towed,arty","1"],
+  ["ger_towed_arty_dlc10","leFH 18",0,6,0,3,"german","axis","towed,arty","0"],
+  ["ger_towed_arty_dlc10_opt","42式210毫米烟雾发射器",0,2,0,4,"german","axis","towed,arty","0"],
+  ["ger_towed_arty_dlc7_opt","42式210毫米烟雾发射器",0,2,0,4,"german","axis","towed,arty","0"],
+  ["ger_towed_arty_dlc8","leFH 18",0,6,0,3,"german","axis","towed,arty","0"],
+  ["ger_towed_arty_dlc8_opt","42式210毫米烟雾发射器",0,2,0,4,"german","axis","towed,arty","0"],
+  ["ger_towed_arty_dlc9","leFH 18",0,6,0,3,"german","axis","towed,arty","0"],
+  ["ger_towed_arty_dlc9_opt","42式210毫米烟雾发射器",0,2,0,4,"german","axis","towed,arty","0"],
+  ["ger_towed_at_42","88毫米高射炮",2,8,4,0,"german","axis","towed,at","1"],
+  ["ger_towed_at_dlc10","Pak40型75毫米反坦克炮",2,5,4,0,"german","axis","towed,at","0"],
+  ["ger_towed_at_dlc10_opt","Pak43型88毫米反坦克炮",3,7,5,0,"german","axis","towed,at","0"],
+  ["ger_towed_at_dlc3","Pak38型50毫米反坦克炮",2,6,4,0,"german","axis","towed,at","0"],
+  ["ger_towed_at_dlc4_opt","88毫米41型高射炮",3,6,6,0,"german","axis","towed,at","0"],
+  ["ger_towed_at_dlc7_opt","88毫米41型高射炮",3,7,5,0,"german","axis","towed,at","0"],
+  ["ger_towed_at_dlc8","Pak40型75毫米反坦克炮",2,5,4,0,"german","axis","towed,at","0"],
+  ["ger_towed_at_dlc8_opt","Pak43型88毫米反坦克炮",3,7,5,0,"german","axis","towed,at","0"],
+  ["ger_towed_at_dlc9","Pak40型75毫米反坦克炮",2,5,4,0,"german","axis","towed,at","0"],
+  ["ger_towed_at_dlc9_opt","Pak43型88毫米反坦克炮",3,7,5,0,"german","axis","towed,at","0"],
+  ["ger_vs_dlc10","国民突击队",1,1,1,0,"german","axis","at","0"],
+  ["gr_arty_towed_39","105mm M.1927",0,4,0,2,"greek","allies","towed,arty","0"],
+  ["gr_eng_dlc6","部队工兵",4,6,0,0,"greek","allies","engineers","0"],
+  ["gr_recon_dlc6","部队侦察军团",4,3,0,0,"greek","allies","recon","0"],
+  ["hun_armx_dlc9","突朗2型中型坦克",3,4,2,0,"hungarian","axis","","0"],
+  ["hun_asg_dlc9","43M“兹里尼”II型突击炮",5,5,2,2,"hungarian","axis","at,arty","0"],
+  ["hun_at_dlc9","追猎者自行反坦克炮",3,5,4,0,"hungarian","axis","at","0"],
+  ["hun_at_opt_dlc9","44M“狼牙棒投掷器”",1,5,4,0,"hungarian","axis","towed,at","0"],
+  ["hun_eng_dlc4","匈牙利工兵",3,5,0,0,"hungarian","axis","engineers","0"],
+  ["hun_eng_dlc9","匈牙利工兵",5,7,0,0,"hungarian","axis","engineers","0"],
+  ["hun_recon_dlc9","39M查巴装甲车",4,3,1,0,"hungarian","axis","recon","0"],
+  ["hun_spec_dlc9","匈牙利伞兵",8,7,1,0,"hungarian","axis","special,lci,at","0"],
+  ["hun_towed_arty_41","14/31式149毫米炮",0,5,0,3,"hungarian","axis","towed,arty","0"],
+  ["hun_towed_arty_dlc9","14/31式149毫米炮",0,6,0,3,"hungarian","axis","towed,arty","0"],
+  ["ind_gur_42","廓尔喀步枪队",9,9,0,0,"indian","allies","special","1"],
+  ["ind_gur_dlc8","廓尔喀步枪队",9,9,0,0,"indian","allies","special","0"],
+  ["ita_a_recon_dlc8","神枪手步兵",5,4,0,0,"italian_a","allies","recon","0"],
+  ["ita_a_spec_dlc8","意大利山地部队",5,5,0,0,"italian_a","allies","special","0"],
+  ["ita_a_towed_arty_dlc8_opt","149/13型14式榴弹炮",0,6,0,2,"italian_a","allies","towed,arty","0"],
+  ["ita_a_towed_at_dlc8","35式47/32型炮",1,4,2,0,"italian_a","allies","at,towed","0"],
+  ["ita_armx_39","L3/35轻型坦克",3,2,2,0,"italian","axis","","0"],
+  ["ita_armx_dlc6","M13/40坦克",4,3,3,0,"italian","axis","","0"],
+  ["ita_armx_dlc7","L3/35轻型坦克",3,2,1,0,"italian","axis","","0"],
+  ["ita_armx_light_dlc6","L3/35轻型坦克",3,2,1,0,"italian","axis","","0"],
+  ["ita_arty_towed_39","149/13型14式榴弹炮",0,5,0,3,"italian","axis","towed,arty","0"],
+  ["ita_arty_towed_41","149/13型14式榴弹炮",0,5,0,3,"italian","axis","towed,arty","0"],
+  ["ita_arty_towed_dlc6","100/17型14式榴弹炮",0,4,0,2,"italian","axis","towed,arty","0"],
+  ["ita_arty_towed_dlc7_opt","149/13型14式榴弹炮",0,6,0,3,"italian","axis","towed,arty","0"],
+  ["ita_asg_dlc6","75/18式自走炮",4,5,2,1,"italian","axis","at,arty","0"],
+  ["ita_asg_dlc7","75/18式自走炮",4,5,3,1,"italian","axis","at,arty","0"],
+  ["ita_at_42","自走炮",4,6,1,0,"italian","axis","at","1"],
+  ["ita_at_dlc7","47/32式自走炮",3,4,3,0,"italian","axis","at","0"],
+  ["ita_at_dlc7_opt","90/53式自走炮",4,5,5,0,"italian","axis","at","0"],
+  ["ita_eng_39","达默斯",4,6,0,0,"italian","axis","engineers","0"],
+  ["ita_eng_dlc7","达默斯",5,7,0,0,"italian","axis","engineers","0"],
+  ["ita_recon_dlc4","神枪手步兵",5,4,0,0,"italian","axis","recon","0"],
+  ["ita_recon_dlc6_opt","41式装甲车",5,5,1,0,"italian","axis","recon","0"],
+  ["ita_recon_dlc7_opt","41式装甲车",5,4,1,0,"italian","axis","recon","0"],
+  ["ita_spec_41","黑衫军",2,2,0,0,"italian","axis","","0"],
+  ["ita_spec_42","黑衫军",2,2,0,0,"italian","axis","","1"],
+  ["ita_spec_42_opt","神枪手步兵",5,5,0,0,"italian","axis","special","1"],
+  ["ita_spec_dlc6","意大利山地部队",5,5,0,0,"italian","axis","special","0"],
+  ["ita_spec_dlc6_opt","圣马可军团",10,6,0,0,"italian","axis","lci,special","0"],
+  ["ita_towed_at_41","35式47/32型炮",1,4,3,0,"italian","axis","towed,at","0"],
+  ["nl_arty_towed_40","105毫米野战炮",0,5,0,2,"dutch","allies","towed,arty","0"],
+  ["nl_recon_40","哈扎伦",3,2,0,0,"dutch","allies","recon","0"],
+  ["nor_arty_towed_40","12cm m32",0,5,0,2,"norwegian","allies","towed,arty","0"],
+  ["nz_spec_42","毛利军团",9,9,0,0,"new_zealand","allies","special","1"],
+  ["nz_spec_dlc8","毛利军团",9,9,0,0,"new_zealand","allies","special","0"],
+  ["pol_armx_39","TKS小坦克",4,3,1,0,"polish","allies","","0"],
+  ["pol_arty_39","施耐德1917年式155毫米榴弹炮",0,6,0,2,"polish","allies","towed,arty","0"],
+  ["pol_eng_39","工程兵",6,8,0,0,"polish","allies","engineers","0"],
+  ["pol_s_armx_dlc9","T-34/85",8,6,3,0,"polish_s","soviet","","0"],
+  ["pol_s_eng_dlc9","波兰工兵",5,6,0,0,"polish_s","soviet","engineers","0"],
+  ["pol_s_heavy_tank_dlc9","IS-2重型坦克",10,8,4,1,"polish_s","soviet","","0"],
+  ["pol_s_recon_dlc9","波兰骑兵",5,4,0,0,"polish_s","soviet","recon","0"],
+  ["pol_s_towed_arty_dlc9","M1937（ML-20）152毫米榴弹炮",0,7,0,3,"polish_s","soviet","towed,arty","0"],
+  ["pol_s_towed_at_dlc9","M1943（ZiS-2）57毫米反坦克炮",2,7,5,0,"polish_s","soviet","towed,at","0"],
+  ["rom_armx_41","雷诺R35",4,3,1,0,"romanian","axis","","0"],
+  ["rom_armx_dlc9","T-4",4,5,3,0,"romanian","axis","","0"],
+  ["rom_asg_dlc9","TAs",3,5,3,1,"romanian","axis","at,arty","0"],
+  ["rom_at_dlc9","TACAM坦克歼击车",3,3,3,0,"romanian","axis","at","0"],
+  ["rom_eng_41","先驱者",5,7,0,0,"romanian","axis","engineers","0"],
+  ["rom_eng_dlc9","先驱者",5,7,0,0,"romanian","axis","engineers","0"],
+  ["rom_recon_dlc9","克勒拉希",3,3,0,0,"romanian","axis","recon","0"],
+  ["rom_recon_dlc9_opt","AB",5,3,1,0,"romanian","axis","recon","0"],
+  ["rom_s_armx_dlc9","T-4",4,5,3,0,"romanian_s","soviet","","0"],
+  ["rom_s_asg_dlc9","TAs",3,5,3,1,"romanian_s","soviet","at,arty","0"],
+  ["rom_s_at_dlc9","TACAM坦克歼击车",3,3,3,0,"romanian_s","soviet","at","0"],
+  ["rom_s_eng_dlc9","罗马尼亚山地突击工兵",5,2,0,0,"romanian_s","soviet","engineers","0"],
+  ["rom_s_recon_dlc9","克勒拉希",3,3,0,0,"romanian_s","soviet","recon","0"],
+  ["rom_s_spec_dlc9","莫蒂",2,5,2,0,"romanian_s","soviet","special,lci,at","0"],
+  ["rom_s_towed_arty_dlc9","施耐德36式105毫米炮",0,4,0,2,"romanian_s","soviet","towed,arty","0"],
+  ["rom_s_towed_arty_dlc9_opt","斯柯达34式150毫米炮",0,6,0,4,"romanian_s","soviet","towed,arty","0"],
+  ["rom_s_towed_at_dlc9","施耐德47毫米反坦克炮",1,3,1,0,"romanian_s","soviet","towed,at","0"],
+  ["rom_s_towed_gun_dlc9","75毫米Reşiţa反坦克炮",2,4,4,1,"romanian_s","soviet","towed,arty,at","0"],
+  ["rom_towed_arty_41","施耐德36式105毫米炮",0,5,0,3,"romanian","axis","towed,arty","0"],
+  ["rom_towed_arty_41_opt","斯柯达34式150毫米炮",0,6,0,4,"romanian","axis","towed,arty","0"],
+  ["rom_towed_arty_dlc9","施耐德36式105毫米炮",0,4,0,2,"romanian","axis","towed,arty","0"],
+  ["rom_towed_arty_dlc9_opt","斯柯达34式150毫米炮",0,6,0,4,"romanian","axis","towed,arty","0"],
+  ["rom_towed_at_dlc9","施耐德47毫米反坦克炮",1,3,1,0,"romanian","axis","towed,at","0"],
+  ["rom_towed_gun_dlc9","75毫米Reşiţa反坦克炮",2,4,4,1,"romanian","axis","towed,arty,at","0"],
+  ["rsi_armx_dlc10","P26/40型坦克",6,6,3,0,"rsi","axis","","0"],
+  ["rsi_arty_towed_dlc10","100/17型14式榴弹炮",0,4,0,2,"rsi","axis","towed,arty","0"],
+  ["rsi_asg_dlc10","M43 105/25型突击炮",5,5,2,1,"rsi","axis","at,arty","0"],
+  ["rsi_eng_dlc10","达默斯",5,7,0,0,"rsi","axis","engineers","0"],
+  ["rsi_recon_dlc10","神枪手步兵",6,4,0,0,"rsi","axis","recon","0"],
+  ["rsi_recon_dlc10_opt","AB43轮式装甲车",5,4,1,0,"rsi","axis","recon","0"],
+  ["rsi_spec_dlc10","国民共和国卫队",3,3,0,0,"rsi","axis","","0"],
+  ["rsi_spec_dlc10_opt","第10突击快艇支队",8,6,0,0,"rsi","axis","lci,special","0"],
+  ["rsi_towed_at_dlc10","35式47/32型炮",1,4,3,0,"rsi","axis","towed,at","0"],
+  ["sov_a_armx_dlc4_opt","T-34/76坦克",8,6,3,0,"soviet_a","allies","","0"],
+  ["sov_a_armx_dlc7_opt","T-34/76坦克",7,6,4,0,"soviet_a","allies","","0"],
+  ["sov_a_armx_lease_dlc4","M3c李氏租借坦克",6,5,2,0,"soviet_a","allies","","0"],
+  ["sov_a_armx_lease_dlc7","M3c李氏租借坦克",6,5,3,0,"soviet_a","allies","","0"],
+  ["sov_a_arty_dlc7","喀秋莎",0,3,0,3,"soviet_a","allies","arty","0"],
+  ["sov_a_eng_dlc7","工兵",4,6,0,0,"soviet_a","allies","engineers","0"],
+  ["sov_a_towed_arty_dlc4","31/37式122毫米榴弹炮",0,6,0,3,"soviet_a","allies","towed,arty","0"],
+  ["sov_a_towed_at_dlc4","42式45毫米反坦克炮",1,6,4,0,"soviet_a","allies","towed,at","0"],
+  ["sov_armx_41","T-26坦克",5,4,1,0,"soviet","soviet","","0"],
+  ["sov_armx_41_opt","T-34/76坦克",8,6,3,0,"soviet","soviet","","0"],
+  ["sov_armx_42","T-34",8,5,2,0,"soviet","soviet","","1"],
+  ["sov_armx_dlc4","T-60",5,4,1,0,"soviet","soviet","","0"],
+  ["sov_armx_dlc5","T-70坦克",6,5,1,0,"soviet","soviet","","0"],
+  ["sov_armx_dlc8","T-70坦克",6,5,1,0,"soviet","soviet","","0"],
+  ["sov_armx_dlc8_opt","T-34 1943年型",7,6,3,0,"soviet","soviet","","0"],
+  ["sov_armx_dlc9","T-34",3,3,2,0,"soviet","soviet","","0"],
+  ["sov_armx_dlc9_opt","T-34-85",5,3,3,0,"soviet","soviet","","0"],
+  ["sov_armx_lease_dlc4","M3c李氏租借坦克",6,5,2,0,"soviet","soviet","","0"],
+  ["sov_armx_lease_dlc8","M3c李氏租借坦克",6,5,2,0,"soviet","soviet","","0"],
+  ["sov_armx_lease_dlc9","M4A2谢尔曼坦克",4,3,2,0,"soviet","soviet","","0"],
+  ["sov_arty_42","喀秋莎",0,4,0,3,"soviet","soviet","arty","1"],
+  ["sov_arty_dlc8","喀秋莎",0,4,0,3,"soviet","soviet","arty","0"],
+  ["sov_arty_dlc9","喀秋莎",0,2,0,2,"soviet","soviet","arty","0"],
+  ["sov_asg_dlc4","SU-76",3,5,3,1,"soviet","soviet","at,arty","0"],
+  ["sov_asg_dlc8","SU-76",3,5,2,1,"soviet","soviet","at,arty","0"],
+  ["sov_asg_dlc8_opt","SU-152自行火炮",6,8,4,2,"soviet","soviet","at,arty","0"],
+  ["sov_asg_dlc9","SU-76",2,3,1,1,"soviet","soviet","at,arty","0"],
+  ["sov_asg_dlc9_opt","ISU-152自行反坦克炮",3,5,2,2,"soviet","soviet","at,arty","0"],
+  ["sov_at_44_opt","SU-100",4,10,4,0,"soviet","soviet","at","1"],
+  ["sov_at_dlc8_opt","SU-85坦克歼击车",4,6,4,0,"soviet","soviet","at","0"],
+  ["sov_at_dlc9","SU-85坦克歼击车",2,3,2,0,"soviet","soviet","at","0"],
+  ["sov_at_dlc9_opt","SU-100坦克歼击车",2,5,3,1,"soviet","soviet","at","0"],
+  ["sov_cz_dlc8","捷克斯洛伐克旅",4,6,1,0,"soviet","soviet","","0"],
+  ["sov_eng_41","工兵",4,6,0,0,"soviet","soviet","engineers","0"],
+  ["sov_eng_dlc8","工兵",4,6,0,0,"soviet","soviet","engineers","0"],
+  ["sov_eng_dlc8_opt","风暴工兵",7,7,0,0,"soviet","soviet","engineers","0"],
+  ["sov_eng_dlc9","工兵",2,3,0,0,"soviet","soviet","engineers","0"],
+  ["sov_heavy_tank_41_opt","KV-1坦克",8,7,4,0,"soviet","soviet","","0"],
+  ["sov_heavy_tank_44","IS-2",11,8,3,0,"soviet","soviet","","1"],
+  ["sov_heavy_tank_45","IS-3",14,11,6,0,"soviet","soviet","","1"],
+  ["sov_heavy_tank_dlc8_opt","KV-85",8,6,4,0,"soviet","soviet","","0"],
+  ["sov_heavy_tank_dlc9","KV-85",4,4,2,0,"soviet","soviet","","0"],
+  ["sov_heavy_tank_dlc9_opt","IS重型坦克",5,4,3,1,"soviet","soviet","","0"],
+  ["sov_nkvd_41","内务人民委员部",4,4,0,0,"soviet","soviet","","0"],
+  ["sov_recon_dlc8_opt","MTsP侦察车",7,4,2,0,"soviet","soviet","recon","0"],
+  ["sov_recon_dlc9_opt","MTsP侦察车",3,2,1,0,"soviet","soviet","recon","0"],
+  ["sov_ski_41","雪地兵",5,4,0,0,"soviet","soviet","ski","0"],
+  ["sov_spec_dlc8","海军步兵",4,3,0,0,"soviet","soviet","lci","0"],
+  ["sov_spec_dlc9","Ford-4",2,3,0,0,"soviet","soviet","lci","0"],
+  ["sov_spec_dlc9_opt","突击组",5,3,1,1,"soviet","soviet","","0"],
+  ["sov_stz_41","STZ-5“恐怖”坦克",2,3,1,0,"soviet","soviet","","0"],
+  ["sov_towed_arty_42","M1931/37式122毫米榴弹炮",0,6,0,3,"soviet","soviet","towed,arty","1"],
+  ["sov_towed_arty_42_opt","M1931式203毫米榴弹炮",0,6,0,5,"soviet","soviet","towed,arty","1"],
+  ["sov_towed_arty_dlc3","31/37式122毫米榴弹炮",0,6,0,3,"soviet","soviet","towed,arty","0"],
+  ["sov_towed_arty_dlc8","M1931/37式122毫米榴弹炮",0,6,0,3,"soviet","soviet","towed,arty","0"],
+  ["sov_towed_arty_dlc8_opt","M1931式203毫米榴弹炮",0,6,0,5,"soviet","soviet","towed,arty","0"],
+  ["sov_towed_arty_dlc9","M1938 122毫米榴弹炮",0,3,0,2,"soviet","soviet","towed,arty","0"],
+  ["sov_towed_arty_dlc9_opt","M1931式203毫米榴弹炮",0,3,0,3,"soviet","soviet","towed,arty","0"],
+  ["sov_towed_at_41","37式45毫米炮",1,6,3,0,"soviet","soviet","towed,at","0"],
+  ["sov_towed_at_42","M1942式76毫米野炮",6,6,3,0,"soviet","soviet","towed,at","1"],
+  ["sov_towed_at_dlc3","37式45毫米反坦克炮",1,6,4,0,"soviet","soviet","towed,at","0"],
+  ["sov_towed_at_dlc4","42式45毫米反坦克炮",1,6,4,0,"soviet","soviet","towed,at","0"],
+  ["sov_towed_at_dlc8","42式45毫米反坦克炮",1,6,3,0,"soviet","soviet","towed,at","0"],
+  ["sov_towed_at_dlc8_opt","IPTABr反坦克炮",2,8,5,0,"soviet","soviet","towed,at","0"],
+  ["sov_towed_at_dlc9","42式45毫米反坦克炮",1,3,1,0,"soviet","soviet","towed,at","0"],
+  ["sov_towed_at_dlc9_opt","ZIS-2型57毫米反坦克炮",1,4,3,0,"soviet","soviet","towed,at","0"],
+  ["sov_towed_gun_dlc3","36式76毫米火炮",0,5,2,2,"soviet","soviet","towed,arty,at","0"],
+  ["sov_towed_gun_dlc8","ZIS-3型76毫米加农炮",2,6,1,1,"soviet","soviet","towed,arty,at","0"],
+  ["sov_towed_gun_dlc9","ZIS-3型76毫米加农炮",1,3,1,1,"soviet","soviet","towed,arty,at","0"],
+  ["spa_ski_dlc10","军团",5,4,0,0,"spanish","axis","ski","0"],
+  ["spa_towed_arty_dlc10","施耐德1917年式155毫米榴弹炮",0,6,0,3,"spanish","axis","towed,arty","0"],
+  ["swe_arty_towed_40","m/40榴弹炮",0,6,0,2,"swedish","allies","towed,arty","0"],
+  ["sws_a_at_dlc10","近战自行火炮1型",3,5,3,0,"swiss_a","axis","at","0"],
+  ["sws_a_towed_arty_dlc10","105毫米Mod 36型榴弹炮",0,5,0,2,"swiss_a","axis","towed,arty","0"],
+  ["sws_a_towed_at_dlc10","47毫米Mod 31型榴弹炮",1,5,3,0,"swiss_a","axis","towed,at","0"],
+  ["sws_spec_40","外籍旅",2,3,0,0,"swiss","allies","","0"],
+  ["sws_towed_arty_40","105毫米Mod 36型榴弹炮",0,5,0,2,"swiss","allies","towed,arty","0"],
+  ["sws_towed_at_40","47毫米Mod 31型榴弹炮",1,5,3,0,"swiss","allies","towed,at","0"],
+  ["uk_armx_40","Mk.VI轻型坦克",3,3,1,0,"uk","allies","","0"],
+  ["uk_armx_42_opt","谢尔曼DD",8,5,2,0,"uk","allies","lci","0"],
+  ["uk_armx_44","克伦威尔坦克",8,5,2,0,"uk","allies","","1"],
+  ["uk_armx_dlc10","克伦威尔坦克",8,5,3,0,"uk","allies","","0"],
+  ["uk_armx_dlc6","瓦伦丁坦克三型",4,4,3,0,"uk","allies","","0"],
+  ["uk_arty_42","M7牧师",0,6,0,2,"uk","allies","arty","1"],
+  ["uk_arty_dlc10","M7牧师",0,6,0,2,"uk","allies","arty","0"],
+  ["uk_arty_dlc6","主教自行火炮",0,5,0,1,"uk","allies","arty","0"],
+  ["uk_at_44_opt","萤火虫坦克",4,8,4,0,"uk","allies","at","1"],
+  ["uk_at_dlc7","主祭",1,4,3,0,"uk","allies","at","0"],
+  ["uk_cz_dlc7","捷克斯洛伐克营",6,8,0,0,"uk","allies","","0"],
+  ["uk_eng_42","皇家工兵",6,8,0,0,"uk","allies","engineers","1"],
+  ["uk_eng_dlc10","皇家工兵",6,8,0,0,"uk","allies","engineers","0"],
+  ["uk_heavy_40","玛蒂尔达Mk.II步兵坦克",5,5,3,0,"uk","allies","","0"],
+  ["uk_heavy_43","邱吉尔坦克",8,8,3,0,"uk","allies","","1"],
+  ["uk_heavy_43_opt","霍巴特滑稽坦克",8,8,2,0,"uk","allies","lci,engineers","1"],
+  ["uk_heavy_dlc10","邱吉尔坦克",7,9,4,0,"uk","allies","","0"],
+  ["uk_heavy_dlc6","玛蒂尔达Mk.II步兵坦克",4,7,3,0,"uk","allies","","0"],
+  ["uk_heavy_dlc6_opt","邱吉尔坦克",6,9,5,0,"uk","allies","","0"],
+  ["uk_heavy_dlc8","邱吉尔坦克",7,9,4,0,"uk","allies","","0"],
+  ["uk_recon_42","戴姆勒",5,4,1,0,"uk","allies","recon","1"],
+  ["uk_recon_dlc10","戴姆勒",5,4,1,0,"uk","allies","recon","0"],
+  ["uk_recon_dlc6","马蒙-赫灵顿侦察车",5,4,1,0,"uk","allies","recon","0"],
+  ["uk_recon_dlc6_opt","长距离沙漠群",10,2,0,0,"uk","allies","recon","0"],
+  ["uk_spec_42","皇家海军",8,8,0,0,"uk","allies","lci,special","1"],
+  ["uk_spec_42_opt","突击队",10,8,0,0,"uk","allies","special","1"],
+  ["uk_spec_dlc10","皇家海军",9,8,0,0,"uk","allies","lci","0"],
+  ["uk_spec_dlc10_opt","突击队",11,6,0,0,"uk","allies","lci,special","0"],
+  ["uk_spec_dlc8","皇家海军",9,8,0,0,"uk","allies","lci","0"],
+  ["uk_spec_dlc8_opt","突击队",11,6,0,0,"uk","allies","lci,special","0"],
+  ["uk_towed_arty_42","QF 25磅炮",0,6,0,3,"uk","allies","towed,arty","1"],
+  ["uk_towed_arty_dlc10","QF 25磅炮",0,6,0,3,"uk","allies","towed,arty","0"],
+  ["uk_towed_at_42","QF 17磅炮",2,6,4,0,"uk","allies","towed,at","1"],
+  ["uk_towed_at_dlc10","QF 17磅炮",1,5,4,0,"uk","allies","towed,at","0"],
+  ["uk_towed_at_dlc6","QF 2磅炮",1,4,3,0,"uk","allies","towed,at","0"],
+  ["uk_towed_at_dlc6_opt","QF 6磅炮",2,6,4,0,"uk","allies","towed,at","0"],
+  ["uk_towed_at_dlc8","QF 17磅炮",1,5,4,0,"uk","allies","towed,at","0"],
+  ["us_armx_42","M4谢尔曼",9,5,2,0,"us","allies","","1"],
+  ["us_armx_42_opt","DD谢尔曼",9,5,2,0,"us","allies","lci","1"],
+  ["us_armx_dlc10","M4谢尔曼",8,7,3,0,"us","allies","","0"],
+  ["us_armx_dlc6","M4谢尔曼",8,5,4,0,"us","allies","","0"],
+  ["us_armx_dlc8","M4谢尔曼",8,7,3,0,"us","allies","","0"],
+  ["us_arty_42","M7牧师",0,6,0,2,"us","allies","arty","1"],
+  ["us_arty_dlc10","M7牧师",0,6,0,2,"us","allies","arty","0"],
+  ["us_at_42","M10",4,7,3,0,"us","allies","at","1"],
+  ["us_at_dlc10","M10",6,6,4,0,"us","allies","at","0"],
+  ["us_at_dlc6","M10",4,5,4,0,"us","allies","at","0"],
+  ["us_at_dlc8","M10",6,6,4,0,"us","allies","at","0"],
+  ["us_eng_42","美国工兵",6,8,0,0,"us","allies","engineers","1"],
+  ["us_eng_dlc10","美国工兵",6,8,0,0,"us","allies","engineers","0"],
+  ["us_heavy_45_opt","M26重型坦克",12,9,4,0,"us","allies","","1"],
+  ["us_heavy_dlc10","M26重型坦克",12,9,4,0,"us","allies","","0"],
+  ["us_recon_42","M8灰狗",7,4,1,0,"us","allies","recon","1"],
+  ["us_recon_dlc10","M8灰狗",7,4,1,0,"us","allies","recon","0"],
+  ["us_spec_42","游骑兵",10,8,0,0,"us","allies","special,lci","1"],
+  ["us_spec_dlc10_opt","游骑兵",9,8,0,0,"us","allies","special,lci","0"],
+  ["us_spec_dlc8_opt","游骑兵",9,8,0,0,"us","allies","special,lci","0"],
+  ["us_towed_arty_42","105毫米M2A1",0,6,0,3,"us","allies","towed,arty","1"],
+  ["us_towed_arty_dlc10","105毫米M2A1",0,6,0,3,"us","allies","towed,arty","0"],
+  ["us_towed_arty_dlc10_opt","155毫米“长腿汤姆”榴弹炮",0,8,0,4,"us","allies","towed,arty","0"],
+  ["vf_arty_towed_dlc6","75毫米野战炮",0,5,0,1,"vichy_french","axis","towed,arty","0"],
+  ["vf_at_towed_dlc7","25毫米哈奇开斯反坦克炮",1,4,3,0,"vichy_french","axis","towed,at","0"],
+  ["vf_eng_dlc6","工程兵",5,4,0,0,"vichy_french","axis","engineers","0"],
+  ["vf_recon_42","斯帕希骑兵团",4,3,0,0,"vichy_french","axis","recon","0"],
+  ["vf_spec_dlc6","外籍军团",5,7,0,0,"vichy_french","axis","special","0"],
+  ["yug_armx_41","雷诺R-35轻型坦克",3,2,2,0,"yugoslavian","allies","","0"],
+  ["yug_arty_towed_41","斯柯达M.15/26式105毫米榴弹炮",0,4,0,2,"yugoslavian","allies","towed,arty","0"],
+  ["yug_s_at_dlc9","南斯拉夫坦克猎手",1,1,2,0,"yugoslavian_s","soviet","at","0"],
+  ["yug_s_eng_dlc9","南斯拉夫游击队掷弹兵",3,2,0,1,"yugoslavian_s","soviet","engineers","0"],
+  ["yug_s_spec_dlc9","无产阶级步兵",5,2,0,0,"yugoslavian_s","soviet","lci","0"],
 ];
+
+/* 国籍中文名 —— locale 键 id_<nat>_name_brief
+   ⚠ 游戏自己有一个错键：croatian 的 name_brief 写的是 id_croatian_brief，
+     那个键在中文表里译成了「匈牙利」；正确的键是 id_croatian_name_brief → 克罗地亚 */
+const NAT_CN = {
+  "belgian":"比利时",
+  "bulgarian_s":"保加利亚",
+  "czechoslovak_s":"捷克斯洛伐克",
+  "dutch":"荷兰",
+  "finnish":"芬兰语",
+  "free_french":"自由法国",
+  "french":"法国",
+  "german":"德国",
+  "greek":"希腊",
+  "hungarian":"匈牙利",
+  "indian":"印度",
+  "italian":"意大利",
+  "italian_a":"意大利",
+  "new_zealand":"新西兰",
+  "norwegian":"挪威",
+  "polish":"波兰",
+  "polish_s":"波兰",
+  "romanian":"罗马尼亚",
+  "romanian_s":"罗马尼亚",
+  "rsi":"意大利社会共和国",
+  "soviet":"苏联",
+  "soviet_a":"苏联",
+  "spanish":"西班牙",
+  "swedish":"瑞典",
+  "swiss":"瑞士",
+  "swiss_a":"瑞士",
+  "uk":"英国",
+  "us":"美国",
+  "vichy_french":"维希法国",
+  "yugoslavian":"南斯拉夫",
+  "yugoslavian_s":"南斯拉夫",
+};
+
+/* 父国籍 —— 游戏判定：单位国籍的 parent_nationality == 特种兵国籍 ⇒ 也算同国籍 */
+const NAT_PARENT = {
+  "bulgarian_s":"soviet",
+  "czechoslovak_s":"soviet",
+  "free_french":"us",
+  "greek":"uk",
+  "hungarian":"german",
+  "indian":"uk",
+  "italian":"german",
+  "italian_a":"us",
+  "new_zealand":"uk",
+  "norwegian":"uk",
+  "polish":"uk",
+  "polish_s":"soviet",
+  "romanian":"german",
+  "romanian_s":"soviet",
+  "rsi":"german",
+  "spanish":"german",
+  "swiss_a":"german",
+  "vichy_french":"german",
+  "yugoslavian":"uk",
+  "yugoslavian_s":"soviet",
+};
+
+const FACTION_CN = {allies:"同盟", soviet:"苏联", axis:"轴心"};
+
+/* 各国籍的特种兵种数（375 种里）*/
+const NAT_COUNT = {
+  "german":97,
+  "soviet":61,
+  "uk":37,
+  "italian":24,
+  "us":23,
+  "romanian":14,
+  "finnish":12,
+  "free_french":10,
+  "hungarian":10,
+  "romanian_s":10,
+  "rsi":9,
+  "soviet_a":8,
+  "czechoslovak_s":7,
+  "polish_s":6,
+  "french":5,
+  "vichy_french":5,
+  "bulgarian_s":4,
+  "italian_a":4,
+  "greek":3,
+  "polish":3,
+  "swiss_a":3,
+  "swiss":3,
+  "yugoslavian_s":3,
+  "belgian":2,
+  "indian":2,
+  "dutch":2,
+  "new_zealand":2,
+  "spanish":2,
+  "yugoslavian":2,
+  "norwegian":1,
+  "swedish":1,
+};
+
 const THEATER = [
   ["air_attack","空袭"],["air_supply","空中补给"],["flying_artillery","飞行炮兵"],
   ["long_range_recon","远程侦察"],["naval_bombardment","舰炮轰击"],
@@ -1273,6 +1792,15 @@ UNITS.forEach((u,i)=>{
   for(let k=0;k<u.max;k++){
     pips += `<span class="pip ${k<act ? "on" : (k<u.st ? "sup" : "")}"></span>`;
   }
+  /* U11：血量文字（5 / 7）已删 —— 段格条已经说清了；
+     右边换成「特种兵兵牌 + 已挂 N 个」小标记 */
+  const specs=u.spec||[];
+  let badges=specs.map(t=>{
+    const s=SPECIALISTS.find(x=>x[0]===t);
+    return `<div class="ubadge" title="${s?s[1]:t}"><img alt=""></div>`;
+  }).join("");
+  if(!specs.length) badges=`<div class="ubadge empty">无</div>`;
+  const cnt=`<span class="ucount${specs.length?"":" zero"}">${specs.length}</span>`;
   row.innerHTML=`
     <div class="ava"><img alt=""></div>
     <div class="umin">
@@ -1280,8 +1808,11 @@ UNITS.forEach((u,i)=>{
       <div class="umeta">总部 ${u.hq} · XP ${u.xp}${u.sup?` · 被压制 ${u.sup}`:""}</div>
       <div class="pips">${pips}</div>
     </div>
-    <div class="uv">${u.st} / ${u.max}<small>兵力</small></div>`;
-  unitImg(row.querySelector("img"), u.t, u.name);
+    <div class="ubadges">${badges}${cnt}</div>`;
+  unitImg(row.querySelector(".ava img"), u.t, u.name);
+  row.querySelectorAll(".ubadge img").forEach((im,k)=>{
+    const t=specs[k]; if(t) img(im, SUR+"specialist/"+t+"/hq_action_icon.png", t);
+  });
   rows.appendChild(row);
 });
 
@@ -1293,9 +1824,21 @@ unitImg(document.getElementById("d-ava"), "us_arm_42", "us_arm_42");
 const FLAG_CN={at:"反坦克炮", arty:"火炮", towed:"牵引式", engineers:"工程兵",
                recon:"侦察", ski:"雪橇", lci:"两栖", special:"特种", aa:"防空炮"};
 const UNIT_NAT="us";                       /* 第 1 装甲师 = us_arm_42 ⇒ allies / us */
+const UNIT_FAC="allies";
 const MOUNTED=["us_recon_42","us_eng_42"]; /* 已挂的两种 */
 const CAP=3;                                /* max_spec = min(3, 类型表) */
-const canMount=s=>s[7]==="allies" && s[6]===UNIT_NAT;
+/* 挂载规则 = 游戏自己的判定（e162）：阵营相同 + 国籍相同或父国籍相同 */
+function canMount(s){
+  if(s[7]!==UNIT_FAC) return false;
+  if(s[6]===UNIT_NAT) return true;
+  return (NAT_PARENT[UNIT_NAT]||"")===s[6];
+}
+function blockReason(s){
+  if(s[7]!==UNIT_FAC) return `不可挂：阵营 ${FACTION_CN[s[7]]||s[7]} ≠ ${FACTION_CN[UNIT_FAC]}`;
+  if(s[6]!==UNIT_NAT && (NAT_PARENT[UNIT_NAT]||"")!==s[6])
+    return `不可挂：国籍 ${NAT_CN[s[6]]||s[6]} ≠ ${NAT_CN[UNIT_NAT]||UNIT_NAT}`;
+  return "";
+}
 
 /* 已挂槽位：图标 + 名字；点击 = 卸下 */
 const slots=document.getElementById("slots");
@@ -1319,28 +1862,80 @@ const allcb=document.getElementById("allcb");
 const inCampaign=s=>s[9]==="1";               /* 在 base/west 战役默认池内 */
 const mountable=SPECIALISTS.filter(canMount);
 const inPool=mountable.filter(inCampaign);     /* 默认显示的 */
-const blocked=SPECIALISTS.filter(s=>!canMount(s));
+const collapsed=new Set();                     /* 折叠起来的国籍组 */
+function cell(s){
+  const ok=canMount(s);
+  const c=document.createElement("div"); c.className="pcell"+(ok?"":" blocked");
+  c.innerHTML=`<img alt="">`;
+  img(c.querySelector("img"), SUR+"specialist/"+s[0]+"/hq_action_icon.png", s[1]);
+  const fl=s[8] ? s[8].split(",").map(f=>FLAG_CN[f]||f) : [];
+  const why=!ok ? blockReason(s)
+               : (inCampaign(s) ? "点击挂到这个单位"
+                                : "不在本战役默认池内 · 点击仍可挂");
+  c.dataset.tip=`<span class="tn">${s[1]}</span>`
+    +`<span class="tr">攻 ${s[2]} · 防 ${s[3]} · 装甲 ${s[4]} · 火力 ${s[5]}</span><br>`
+    +(fl.length ? fl.map(f=>`<span class="tag">${f}</span>`).join("")
+               : `<span class="tr">（无特殊类型）</span>`)
+    +`<br><span class="tr">${why}</span>`;
+  return c;
+}
 function renderPool(){
   pool.innerHTML="";
-  const list=allcb.checked ? mountable.concat(blocked) : inPool;
-  pooln.textContent=allcb.checked ? SPECIALISTS.length : inPool.length;
-  scope.textContent=allcb.checked ? "全部" : "西线战役默认";
-  list.forEach(s=>{
-    const ok=canMount(s);
-    const c=document.createElement("div"); c.className="pcell"+(ok?"":" blocked");
-    c.innerHTML=`<img alt="">`;
-    img(c.querySelector("img"), SUR+"specialist/"+s[0]+"/hq_action_icon.png", s[1]);
-    const fl=s[8] ? s[8].split(",").map(f=>FLAG_CN[f]||f) : [];
-    const why=!ok ? (s[7]!=="allies" ? `不可挂：阵营 ${s[7]} ≠ allies`
-                                      : `不可挂：国籍 ${s[6]} ≠ ${UNIT_NAT}`)
-                 : (inCampaign(s) ? "点击挂到这个单位"
-                                  : "不在本战役默认池内 · 点击仍可挂");
-    c.dataset.tip=`<span class="tn">${s[1]}</span>`
-      +`<span class="tr">攻 ${s[2]} · 防 ${s[3]} · 装甲 ${s[4]} · 火力 ${s[5]}</span><br>`
-      +(fl.length ? fl.map(f=>`<span class="tag">${f}</span>`).join("")
-                 : `<span class="tr">（无特殊类型）</span>`)
-      +`<br><span class="tr">${why}</span>`;
-    pool.appendChild(c);
+  if(!allcb.checked){
+    /* 默认视图：战役池 ∩ 可挂 —— 数量本来就少，不分组 */
+    pooln.textContent=inPool.length;
+    scope.textContent="西线战役默认";
+    const flat=document.createElement("div"); flat.className="poolflat";
+    inPool.forEach(s=>flat.appendChild(cell(s)));
+    pool.appendChild(flat);
+    return;
+  }
+  /* 全量视图：375 种 —— 按国籍分一层
+     （阵营分隔带 → 国籍组；组标题可折叠；组内按中文名排序） */
+  pooln.textContent=SPECIALISTS.length;
+  scope.textContent="全部";
+  const groups=new Map();
+  SPECIALISTS.forEach(s=>{
+    if(!groups.has(s[6])) groups.set(s[6],[]);
+    groups.get(s[6]).push(s);
+  });
+  const FAC_ORDER=[UNIT_FAC,"allies","soviet","axis"].filter((v,i,a)=>a.indexOf(v)===i);
+  const facs=[...new Set(SPECIALISTS.map(s=>s[7]))]
+    .sort((a,b)=>FAC_ORDER.indexOf(a)-FAC_ORDER.indexOf(b));
+  facs.forEach(fac=>{
+    const band=document.createElement("div"); band.className="facband";
+    band.innerHTML=`<span>${FACTION_CN[fac]||fac}</span><span class="fline"></span>`;
+    pool.appendChild(band);
+    const nats=[...groups.keys()].filter(n=>groups.get(n).some(s=>s[7]===fac));
+    nats.sort((a,b)=>{
+      const ca=groups.get(a).filter(canMount).length;
+      const cb2=groups.get(b).filter(canMount).length;
+      if(cb2!==ca) return cb2-ca;
+      return groups.get(b).length-groups.get(a).length;
+    });
+    nats.forEach(n=>{
+      const items=groups.get(n).slice();
+      items.sort((x,y)=>x[1].localeCompare(y[1],"zh"));
+      const can=items.filter(canMount).length;
+      const g=document.createElement("div"); g.className="natgrp";
+      const head=document.createElement("div"); head.className="grphead";
+      head.innerHTML=`<span class="caret">▼</span><span>${NAT_CN[n]||n}</span>`
+        +`<span class="gcount">· ${items.length} 种</span>`
+        +(can?`<span class="gcan">可挂 ${can}</span>`:"");
+      const body=document.createElement("div"); body.className="grpbody";
+      items.forEach(s=>body.appendChild(cell(s)));
+      g.appendChild(head); g.appendChild(body);
+      if(collapsed.has(n)){
+        g.classList.add("closed"); head.classList.add("closed"); body.style.display="none";
+      }
+      head.addEventListener("click",()=>{
+        const closed=g.classList.toggle("closed");
+        head.classList.toggle("closed",closed);
+        body.style.display=closed?"none":"flex";
+        if(closed) collapsed.add(n); else collapsed.delete(n);
+      });
+      pool.appendChild(g);
+    });
   });
 }
 renderPool();
