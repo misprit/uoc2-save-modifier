@@ -312,7 +312,7 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .card .cs.ok{background:transparent;color:var(--ok);font-family:inherit;font-size:10px}
 
 /* 战区资产 —— U20：左侧大图标保留；三个字段都是 X/X 形式的可调数字 */
-.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(262px,1fr));gap:11px;padding:12px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(276px,1fr));gap:11px;padding:12px}
 .titem{display:flex;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--border);
   border-radius:8px;padding:9px}
 .titem>img{width:60px;height:60px;flex:none}
@@ -1285,10 +1285,12 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 <p class="lead"><b>U20</b>：左侧图标<b>保留</b>（游戏原贴图 <code>theater/&lt;资产&gt;_neutral.png</code>），
 下面那排<b>重复的四态小图标</b>（<code>_neutral</code> / <code>_hover</code> / <code>_down</code> / <code>_disabled</code>）<b>删掉</b> ——
 那是给设计师看四态用的，玩家界面里没意义。<br>
-三个数都是 <b>X/X</b> 形式（跟<b>总部 CP 卡</b>同一套做法），<b>都能滚轮调</b>：
-<b>可用</b>（<code>to_use</code>）/ <b>每回合恢复</b>（<code>uses_turn</code>）是主 X/X，
-<b>本场景剩余</b>（<code>uses_total</code>，<code>∞</code> = 无限）是第三个字段。<br>
-数据来自<b>真实存档</b> <code>Stalingrad.usg</code>（战斗中 <code>games/road_to_stalingrad</code>）；
+<b>U21</b>：主 X/X 改成 <b>可用</b>（<code>to_use</code>）/ <b>本场景剩余</b>（<code>uses_total</code>，<code>∞</code> = 无限）——
+这正是<b>游戏自己显示的那两个数</b>（<code>idp_super_tooltip_theater_uses_turn</code> + <code>_uses_total</code>）；
+<b>每回合恢复</b>（<code>uses_turn</code>）单起一行，<b>同样可调</b>
+（游戏自己的卡牌、礼包、场景编辑器都能改它）。<br>
+三个数都是 <b>X/X</b> 形式（跟<b>总部 CP 卡</b>同一套做法），<b>都能滚轮调</b>；
+数据来自<b>真实存档</b> <code>Stalingrad.usg</code>（战斗中 <code>games/road_to_stalingrad</code>），
 中文名全部取自 locale 键 <code>id_tooltip_theater_&lt;资产&gt;</code>。</p>
 <div class="app">
   <div class="body" style="min-height:0">
@@ -1985,7 +1987,8 @@ const NAT_COUNT = {
      to_use      当前剩余可用次数（≥ 0）
      uses_total  本场景剩余总次数（≥ 0，null = 无限）
      uses_turn   每回合恢复次数（≥ 1）
-   中文名全部取自 locale 键 id_tooltip_theater_<资产> —— 不自己翻译。 */
+   中文名全部取自 locale 键 id_tooltip_theater_<资产> —— 不自己翻译。
+   U21：主 X/X = to_use / uses_total（游戏原生口径）；uses_turn 放第三行，仍可调。 */
 const THEATER = [
   ["air_supply",       "空中补给", 1,    2,    1],
   ["air_attack",       "空袭",     1,    null, 1],
@@ -2703,8 +2706,8 @@ THEATER.forEach(([a,n,toUse,usesTotal,usesTurn])=>{
   t.innerHTML=`<img alt="" class="ticon"><div class="tbody">
     <div class="tn">${n}</div>
     <div class="trow">可用 <span class="xnum"><span class="num" data-f="to_use"></span></span>
-      <span class="sep">/</span> 每回合 <span class="xnum"><span class="num" data-f="uses_turn"></span></span></div>
-    <div class="trow">本场景剩余 <span class="xnum"><span class="num" data-f="uses_total"></span></span></div>
+      <span class="sep">/</span> 本场景剩余 <span class="xnum"><span class="num" data-f="uses_total"></span></span></div>
+    <div class="trow">每回合恢复 <span class="xnum"><span class="num" data-f="uses_turn"></span></span></div>
     <div class="twarn"></div></div>`;
   img(t.querySelector(".ticon"), SUR+"theater/"+a+"_neutral.png");
   const nums=t.querySelectorAll(".num");
@@ -2715,10 +2718,13 @@ THEATER.forEach(([a,n,toUse,usesTotal,usesTurn])=>{
       if(f==="uses_total" && v===null){ el.textContent="∞"; el.classList.add("inf"); }
       else { el.textContent=String(v); el.classList.remove("inf"); }
     });
-    if(st.uses_total===null && st.to_use>st.uses_turn)
-      warn.textContent="当前可用 "+st.to_use+" 次 大于 每回合恢复 "+st.uses_turn+" 次 —— 回合开始游戏会重置为 "+st.uses_turn+" 次";
-    else if(st.uses_total!==null && st.uses_turn>st.uses_total)
+    /* 回合开始后的有效可用次数（Game.theater_assets_start_turn）：
+       uses_total 为 null -> to_use = uses_turn；否则 -> to_use = min(uses_turn, uses_total) */
+    const eff=(st.uses_total===null) ? st.uses_turn : Math.min(st.uses_turn, st.uses_total);
+    if(st.uses_total!==null && st.uses_turn>st.uses_total)
       warn.textContent="每回合恢复 "+st.uses_turn+" 次 大于 本场景剩余 "+st.uses_total+" 次 —— 实际每回合只能用 "+st.uses_total+" 次";
+    else if(st.to_use>eff)
+      warn.textContent="当前可用 "+st.to_use+" 次 大于 回合开始后的有效值 "+eff+" 次 —— 回合开始会重置为 "+eff+" 次";
     else warn.textContent="";
   }
   nums.forEach(function(el){

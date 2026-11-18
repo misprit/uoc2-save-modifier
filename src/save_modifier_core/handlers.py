@@ -1451,15 +1451,20 @@ def _theater_asset(w, e: Edit) -> Outcome:
         "、".join("%s %s → %s" % (THEATER_FIELD_CN[f], _theater_val(f, o),
                                 _theater_val(f, n))
                   for f, o, n in changed))
+    # 回合开始后的**有效可用次数**（`Game.theater_assets_start_turn`）：
+    #   uses_total 为 None -> to_use = uses_turn
+    #   否则              -> to_use = min(uses_turn, uses_total)
+    eff = (after["uses_turn"] if total is None
+           else min(after["uses_turn"], total))
     if total is not None and after["uses_turn"] > total:
         oc.warnings.append(
             f"每回合恢复 {after['uses_turn']} 次 大于 本场景剩余 {total} 次："
             "回合开始时游戏按 min(每回合恢复, 本场景剩余) 恢复，"
             f"实际每回合只能用 {total} 次")
-    if total is None and after["to_use"] > after["uses_turn"]:
+    if after["to_use"] > eff:
         oc.warnings.append(
-            f"当前可用 {after['to_use']} 次 大于 每回合恢复 {after['uses_turn']} 次："
-            "回合开始时游戏会把当前可用次数重置为每回合恢复次数")
+            f"当前可用 {after['to_use']} 次 大于 回合开始后的有效值 {eff} 次："
+            f"回合开始时游戏会把当前可用次数重置为 {eff} 次")
     oc.warnings.append(
         "战区资产**无法通过游戏内的『重置会议』撤销** —— 需要用修改器自己的撤销（§6.4）")
     return oc

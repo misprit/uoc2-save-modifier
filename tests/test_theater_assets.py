@@ -272,6 +272,23 @@ class TestTheaterAssetThreeFields(TheaterAssetTestBase):
         self.assertTrue(plan.ok)
         self.assertTrue(any("大于" in w for w in plan.warnings), plan.warnings)
 
+    def test_to_use_over_effective_value_warns_when_total_is_finite(self):
+        """`uses_total` 有限时，`to_use > min(uses_turn, uses_total)` 也要提示。
+
+        回合开始游戏会执行 `to_use = min(uses_turn, uses_total)`
+        ⇒ 当前可用次数会被压回去（U21 补上的漏网情形）。
+        """
+        plan = self.plan(self.save_path, [Edit.theater_asset(
+            "long_range_recon", to_use=2, uses_total=5, uses_turn=1)])
+        self.assertTrue(plan.ok)
+        self.assertTrue(any("有效值" in w for w in plan.warnings), plan.warnings)
+
+    def test_no_warning_when_to_use_is_within_effective_value(self):
+        plan = self.plan(self.save_path, [Edit.theater_asset(
+            "long_range_recon", to_use=2, uses_total=5, uses_turn=2)])
+        self.assertTrue(plan.ok)
+        self.assertFalse(any("有效值" in w for w in plan.warnings), plan.warnings)
+
     # ---------------------------------------------------------- phase 分组
 
     def test_phase_selects_the_right_group(self):

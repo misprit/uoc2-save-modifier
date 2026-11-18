@@ -1788,7 +1788,12 @@ campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, .
 > **【2026-11-18 · U20 用户拍板】** 原话：
 > 「战区资产里面，每个卡左侧的图标**保留**，下面几个**重复图标没意义**，
 > 我们只需要**可用几次**和**每回合可用几次**，这个就**借用你刚刚做的总部 cp 卡那种 X/X 形式**吧。」
-> 补一条：「战区资产如果有三个字段，**要保证三个都可以调整**。或者说你先搞清楚三个字段的意义。」
+> 追加一条：「战区资产如果有三个字段，**要保证三个都可以调整**。或者说你先搞清楚三个字段的意义。」
+
+> **【2026-11-18 · U21 用户拍板】** 原话：
+> 「游戏显示的方式呈现最好，你改成 to_use / uses_total 吧。」
+> 「我们要不要允许玩家改每回合恢复数据？还是说这个值最好不改」
+> ⇒ **保留可调** —— **三个字段都能滚轮调**。
 
 **【实证 · 2026-11-18 · 字节码取证】** 战区资产在存档里的**三个字段**
 （`lib/uoc2/state/game/game.pyc` + `state/scenario/scenario_data_validation.py`
@@ -1806,14 +1811,15 @@ campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, .
 * `idp_super_tooltip_theater_uses_turn` = 「战区资产：本回合中还剩{}个」→ 取 `to_use`；
 * `idp_super_tooltip_theater_uses_total` = 「，本场景中还剩{}个。」→ 取 `uses_total`（`None` 显示 `.`）。
 
-⇒ **X/X 形式本来就是游戏原生口径**，不是我们自创的。
+⇒ **X/X 形式本来就是游戏原生口径**，不是我们自创的 ⇒ **U21 主 X/X 就取这两个**
+（`to_use` / `uses_total`），和游戏界面上看到的**一模一样**。
 
 ```
 +-- 战区资产（当前战斗中）-------------------------------------------------+
-| [icon] 空中补给        可用 [1] / 每回合 [1]                                |
-|                       本场景剩余 [2]                                       |
-| [icon] 空袭            可用 [1] / 每回合 [1]                                |
-|                       本场景剩余 [inf]        (inf = 无限)                   |
+| [icon] 空中补给        可用 [1] / 本场景剩余 [2]                            |
+|                       每回合恢复 [1]                                       |
+| [icon] 空袭            可用 [1] / 本场景剩余 [inf]        (inf = 无限)       |
+|                       每回合恢复 [1]                                       |
 +---------------------------------------------------------------------------+
 ```
 
@@ -1823,31 +1829,50 @@ campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, .
 * **下面那排重复的四态小图标删掉** —— `neutral / hover / down / disabled`
   并排展示是给设计师看四态用的，玩家界面里没意义（§5.5 的四态仍用于**状态切换**）；
 * **三个数都是 X/X 形式**（与 §7.4.1a 的总部 CP 卡同一套做法：虚线框 + 滚轮可调）：
-  * 主 X/X = **可用**（`to_use`）/ **每回合恢复**（`uses_turn`）；
-  * 第三个字段 **本场景剩余**（`uses_total`）单起一行，同样可调，`∞` = 无限。
+  * 主 X/X = **可用**（`to_use`）/ **本场景剩余**（`uses_total`，`∞` = 无限）—— **游戏原生口径**；
+  * **每回合恢复**（`uses_turn`）单起一行，**同样可调**。
+
+**为什么 `uses_turn` 也给玩家调**（U21 拍板依据）：
+
+| 事实 | 结论 | 依据 |
+|---|---|---|
+| **卡牌**能改它 | `PlayCard.apply` → `add_theater_asset_num(in_total=False)` ⇒ `uses_turn += num` | `state/game/actions/card.pyc` |
+| **礼包**能改它 | `add_restart_scenario_goodie_bag` 也调 `add_theater_asset_num` | `state/game/game.pyc` |
+| **官方场景编辑器**能改它 | 有 `__uses_turn__N` 输入控件 | `scenario_editor/edit_ctrl.pyc` |
+| 正常存档里它**不变** | `west/unthinkable` 存档值与场景包默认值**完全一致** | 实测 |
+| ⇒ 结论 | 它**本来就是玩家能影响的变量**（只是平时不变）⇒ 给入口不越界 | —— |
+
+⚠️ 但它与另外两个**不是一类东西**：
+`to_use` / `uses_total` 是**剩余次数**（消耗品余量），`uses_turn` 是**每回合回复速率**（场景强度）
+⇒ 所以它**单起一行**，不跟主 X/X 挤在一起。
 
 **滚轮规则**（与核心库 `handlers.py` 的硬范围完全一致）：
 
 | 字段 | 向下滚 | 向上滚 | 取值范围 |
 |---|---|---|---|
 | `to_use` | −1 | +1 | `0` – `uses_total`（有限时）/ `0 – 99`（无限时） |
-| `uses_turn` | −1 | +1 | `1` – `99` |
 | `uses_total` | −1（`∞` → 99） | +1（99 → `∞`） | `0 – 99` 或 `∞`（**∞ 是最大值**） |
+| `uses_turn` | −1 | +1 | `1` – `99` |
 
 **跨字段联动**（GUI 与核心库同一套口径）：
 
 * `to_use > uses_total`（`uses_total` 有限时）⇒ **自动夹取** `to_use`。
   ⚠️ 这不是 UI 小讲究：游戏每用一次资产就让 `uses_total` 减 1
   （`Game.spend_theater_asset`），减成负数会让存档校验失败 ⇒ **存档打不开**；
-* `uses_turn > uses_total`（有限时）⇒ 只**提示**（游戏按 `min(uses_turn, uses_total)` 恢复）；
-* `to_use > uses_turn`（`uses_total` 无限时）⇒ 只**提示**（回合开始游戏会重置 `to_use`）。
+* **回合开始后的有效可用次数** =
+  `uses_turn`（`uses_total` 为 `None` 时）或 `min(uses_turn, uses_total)`；
+  当前 `to_use` 超过它 ⇒ **提示**（回合开始游戏会把 `to_use` 重置回去）；
+* `uses_turn > uses_total`（有限时）⇒ **提示**（游戏按 `min()` 恢复，实际每回合只有 `uses_total` 次）。
 
 **其它**：
 
 * 只在**当前进行中的战斗**里可改（`can_edit_theater_assets`）—— 战斗外改会被场景重算覆盖，
   这正是"改了却像没改"；
 * `theater_assets` 在存档里**按 phase 分组**（`[[phase0], [phase1], …]`）⇒
-  只改**当前 phase 那一组**（读战斗 `main.yml` 的 `phase` 字段），不是永远改第 0 组；
+  只改**当前 phase 那一组**（读战斗 `main.yml` 的 `phase` 字段），不是永远改第 0 组。
+  ⚠️ 实测：场景包 `dlc3/moscow.usc/rostov_offensive` 的默认就是 `[[], [air_attack]]`
+  （第 0 组为空），存档与场景包**完全一致** ⇒ 按 `phase` 定位与游戏的
+  `Game.theater_assets[self.phase]` 语义吻合；
 * 不在战斗里时，这一页显示说明卡 + 存档体检信息。
 
 ### 7.8 战役页（**只读** · U18 新增）
@@ -3059,6 +3084,35 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 | 7 | **CP 卡与经验卡对齐** —— 改用经验卡**同一套结构**（`.stat .lb` + `.stat .v`），虚线框改用 `outline`（**不占布局高度**）⇒ 数字基线一致 | §7.4.1a / 视觉稿 |
 | 8 | `to_use_not_used` 是**游戏内部结转池**，玩家不可见 ⇒ **不暴露**（§5.7.1 同理：不暴露玩家看不见的内部状态） | §7.7 |
 
+**U21 追加拍板**（同一批次的追加）
+
+| # | 决定 | 落点 |
+|---|---|---|
+| 9 | 主 X/X 改成 **可用 `to_use` / 本场景剩余 `uses_total`** —— 就是**游戏自己显示的那两个数** | §7.7 |
+| 10 | **每回合恢复 `uses_turn` 保留可调**（三个都能滚轮调），**单起一行**（它是「速率」，另两个是「余量」） | §7.7 |
+
+**U21 取证补充**
+
+| 事实 | 结论 | 依据 |
+|---|---|---|
+| **卡牌**能改 `uses_turn` | `PlayCard.apply` → `add_theater_asset_num(in_total=False)` ⇒ `uses_turn += num` | `state/game/actions/card.pyc` |
+| **礼包**能改 `uses_turn` | `add_restart_scenario_goodie_bag` 也调 `add_theater_asset_num` | `state/game/game.pyc` |
+| **官方场景编辑器**能改它 | 有 `__uses_turn__N` 输入控件 | `scenario_editor/edit_ctrl.pyc` |
+| 正常存档里 `uses_turn` **不变** | `west/unthinkable` 存档值 = 场景包默认值 | 实测 |
+| ⇒ 结论 | `uses_turn` **本来就是玩家能影响的变量**（只是平时不变）⇒ 给入口不越界 | —— |
+| `theater_assets` 的分组 | **按 phase 分组**（`Game.theater_assets[self.phase]`）；场景包 `dlc3/moscow.usc/rostov_offensive` 默认就是 `[[], [air_attack]]`（第 0 组空），存档与场景包**完全一致** | 字节码 + 实测 |
+
+**U21 顺带修掉的一处口径不一致**：核心库原来的两条警告只覆盖了部分情形，
+漏掉「`uses_total` 有限且 `to_use > min(uses_turn, uses_total)`」
+（回合开始 `to_use` 同样会被压回去）⇒ 改成**统一公式**：
+
+```
+eff = uses_turn                (uses_total 为 None 时)
+    = min(uses_turn, uses_total)   (uses_total 有限时)
+```
+
+`to_use > eff` ⇒ 提示（回合开始会被重置为 `eff`）。GUI 与核心库从此用同一条公式。
+
 **U20 顺带修掉的两个核心库真问题**
 
 | 问题 | 后果 | 修法 |
@@ -3137,6 +3191,16 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 | `to_use_not_used` 给不给玩家改？ | **不给** —— 游戏内部结转池，玩家看不见；由游戏自己维护 |
 | 战区资产按哪个组改？ | 按战斗 `main.yml` 的 `phase` 定位（`theater_assets` 是按 phase 分组的） |
 
+#### U21 新增（批次十四 · 追加）
+
+| 问题 | 结论 |
+|---|---|
+| 主 X/X 用哪两个数？ | **`to_use` / `uses_total`** —— 游戏自己显示的就是这两个（U21 用户拍板） |
+| `uses_turn` 给不给玩家调？ | **给** —— 卡牌 / 礼包 / 官方场景编辑器都能改它（U21 用户拍板） |
+| `uses_turn` 放哪？ | **单起一行** —— 它是「速率」，另两个是「余量」，混在一起会看错 |
+| 「回合开始会被压回去」怎么判？ | 统一公式 `eff = uses_turn`（`uses_total` 为 `None`）或 `min(uses_turn, uses_total)`；`to_use > eff` ⇒ 提示 |
+| `theater_assets` 的分组按什么？ | **按 `phase`**（`Game.theater_assets[self.phase]`）⇒ 核心库读战斗 `main.yml` 的 `phase` 定位 |
+
 ### 13.4 已由数据 / 实证回答，不再问
 
 | 问题 | 答案 | 出处 |
@@ -3165,6 +3229,8 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 | 存档怎么定位战役包？ | 根 `main.yml` 的 `campaign_id`（`base/west` / `dlc4/stalingrad` …）⇒ `SaveInfo.campaign_id` 已有 | 实测 |
 | 战区资产三个字段是什么？ | `to_use` = **当前剩余可用次数**（0–∞）；`uses_total` = **本场景剩余总次数**（0–∞ 或 `None` = 无限）；`uses_turn` = **每回合恢复次数**（1–∞） | U20 字节码取证 |
 | 战区资产要不要显示四态图？ | **不要并排展示**（U20）—— 四态仍用于悬停/按下/禁用的**状态切换** | U20 用户拍板 |
+| 战区资产主 X/X 显示哪两个数？ | **`to_use` / `uses_total`** —— 就是游戏自己显示的那两个（`idp_super_tooltip_theater_uses_turn` + `_uses_total`） | U21 用户拍板 + 字节码 |
+| `uses_turn` 能不能给玩家改？ | **能** —— 卡牌（`PlayCard.apply`）、礼包（`add_restart_scenario_goodie_bag`）、官方场景编辑器都能改它 | U21 字节码取证 |
 | 特种兵分几个国籍？ | **31 个**（375 种里） | `e164` ② |
 | 国籍中文名会撞车吗？ | **会，6 组**（苏联 / 意大利 / 波兰 / 罗马尼亚 / 瑞士 / 南斯拉夫）—— 每组两个 id 分属不同阵营 | `e164` ① ② |
 | 国籍表在哪？ | `entity_types/nationalities.yml`（40 个）+ `nationalities_2.yml`（空模板 `{}`）—— **是文件不是目录** | `e164` ① |
