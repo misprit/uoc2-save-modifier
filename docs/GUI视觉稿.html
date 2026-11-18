@@ -202,11 +202,16 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .slot .slotname{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .slot .slotflags{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 .slot .slotflags .none{font-size:10.5px;color:var(--muted)}
-.slot .slotstats{flex:none;display:flex;flex-direction:column;gap:1px;align-items:flex-end;
-  padding-left:4px;border-left:1px solid var(--border)}
-.slot .slotstats .st{display:flex;gap:7px;align-items:baseline;justify-content:flex-end;
+/* U17：数值列固定宽 —— 标签列左对齐、数值列右对齐，
+   1 位数（8）与 2 位数（10）共用同一条基线，不再漂。 */
+.slot .slotstats{flex:none;display:grid;grid-template-columns:auto 2.1em;gap:1px 7px;
+  align-items:baseline;justify-content:end;
+  padding-left:6px;border-left:1px solid var(--border);
   font-size:10.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
-.slot .slotstats .st b{color:var(--accent-dark);font-weight:700;font-size:11.5px}
+.slot .slotstats .st{display:contents}
+.slot .slotstats .st i{font-style:normal;text-align:right}
+.slot .slotstats .st b{color:var(--accent-dark);font-weight:700;font-size:11.5px;
+  text-align:right;font-variant-numeric:tabular-nums}
 /* 特性小标签（浅色版；深色版是 .tip .tag） */
 .ftag{display:inline-block;font-size:10px;padding:0 5px;border-radius:3px;background:var(--surface);
   border:1px solid var(--border);color:var(--muted);font-family:var(--mono);white-space:nowrap}
@@ -938,44 +943,46 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                       <th>存量</th><th style="width:64px"></th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr>
+                  <tbody>                    <tr>
                       <td><div class="thumb"><img alt=""></div></td>
-                      <td class="l name">第 1 装甲师</td>
+                      <td class="l name">德国步兵（3）</td>
                       <td class="dim">—</td><td class="dim">—</td><td class="dim">—</td><td class="dim">—</td>
                       <td class="l dim">—</td>
-                      <td>2</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                      <td>3</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
                       <td><div class="thumb"><img alt=""></div></td>
-                      <td class="l name">摩托化步兵</td>
+                      <td class="l name">德国装甲兵（1）</td>
                       <td class="dim">—</td><td class="dim">—</td><td class="dim">—</td><td class="dim">—</td>
                       <td class="l dim">—</td>
-                      <td>0</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
-                    <tr>
-                      <td><div class="thumb"><img alt=""></div></td>
-                      <td class="l name">特种兵 · 工兵</td>
-                      <td>4</td><td>3</td><td>1</td><td>0</td>
-                      <td class="l tags"><span class="ftag">工程兵</span></td>
                       <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
                       <td><div class="thumb"><img alt=""></div></td>
-                      <td class="l name">特种兵 · M10 反坦克炮</td>
-                      <td>4</td><td>7</td><td>3</td><td>0</td>
+                      <td class="l name">leFH 18</td>
+                      <td>0</td><td>6</td><td>0</td><td>3</td>
+                      <td class="l tags"><span class="ftag">牵引式</span><span class="ftag">火炮</span></td>
+                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt=""></div></td>
+                      <td class="l name">三G突击炮</td>
+                      <td>7</td><td>8</td><td>3</td><td>0</td>
                       <td class="l tags"><span class="ftag">反坦克炮</span></td>
-                      <td>0</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                      <td>2</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                   </tbody>
                 </table>
                 <div class="fprow" style="justify-content:flex-end;gap:8px;border-bottom:none">
                   <button class="btn" style="font-size:11.5px">＋ 添加条目</button>
                   <button class="btn danger" style="font-size:11.5px">－ 移除条目</button></div>
-              </div>
-              <div class="note">兵库条目 = <code>{delay, nationality, quantity, spec|equipment}</code>，
-                可<b>加 / 删 / 改存量</b>；名字里的「第 N 号」是游戏的阶梯命名，<b>原样显示</b>。<br>
+              </div>              <div class="note">兵库条目 = <code>{delay, nationality, quantity, spec|equipment}</code>，
+                可<b>加 / 删 / 改存量</b>。<br>
                 ⓘ 表头的<b>攻击 / 防御 / 装甲 / 炮术 / 特性</b>只有<b>特种兵条目</b>（<code>spec</code>）有 ——
                 数值与特性都在游戏包 <code>entity_types/specialists/*.yml</code>，
-                核心库 <code>Catalog.spec_type()</code> 直接给（存档里只有类型引用）。<br>
+                核心库 <code>Catalog.spec_type()</code> 直接给（存档里只有类型引用），
+                名字取 locale <code>id_&lt;type&gt;_brief</code>（游戏自带的<b>官方中文译名</b>）。<br>
                 ⓘ <b>装备条目</b>（<code>equipment</code>）存档里只有 <code>infantry</code> / <code>armor</code>
-                这个<b>类别</b>、没有数值 ⇒ 那些格子一律显示「—」。</div>
+                这个<b>类别</b>、没有数值 ⇒ 那些格子一律显示「—」。<br>
+                ⓘ 装备条目的<b>名字是游戏生成的</b>：按 locale <code>id_equipment_infantry</code>
+                = 「<code>{}步兵（{}）</code>」拼出国籍 + 类别 + 存量
+                （<code>{}</code> = 国籍名，<code>{}</code> = 存量）—— 本工具照这个口径显示。</div>
             </div>
           </div>
         </div>
@@ -1081,22 +1088,20 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
         <span style="font-size:12px;color:var(--muted)">价格 / 库存：滚轮可调</span>
         <button class="btn pri">＋ 上架</button>
       </div>
-      <div class="panel">
-        <h3>普通商店 · 13 条</h3>
+      <div class="panel">        <h3>普通商店 · 13 条<span style="font-weight:400;color:var(--muted);font-size:11.5px;margin-left:8px">（示例展示前 4 条）</span></h3>
         <table class="spec-tbl">
           <tr><th style="width:46px"></th><th>商品</th><th>国籍</th><th style="text-align:right">价格</th>
-              <th style="text-align:right">库存</th><th style="text-align:right">操作</th></tr>
-          <tr><td><div class="thumb"><img id="s1" alt=""></div></td><td>步兵</td><td>德</td>
-              <td class="num">10</td><td class="num">19</td>
+              <th style="text-align:right">库存</th><th style="text-align:right">操作</th></tr>          <tr><td><div class="thumb"><img id="s1" alt=""></div></td><td>德国步兵</td><td>德</td>
+              <td class="num">5</td><td class="num">30</td>
               <td class="num"><button class="btn danger">下架</button></td></tr>
-          <tr><td><div class="thumb"><img id="s2" alt=""></div></td><td>装甲</td><td>德</td>
-              <td class="num">10</td><td class="num">6</td>
+          <tr><td><div class="thumb"><img id="s2" alt=""></div></td><td>德国装甲兵</td><td>德</td>
+              <td class="num">5</td><td class="num">20</td>
               <td class="num"><button class="btn danger">下架</button></td></tr>
-          <tr><td><div class="thumb"><img id="s3" alt=""></div></td><td>特种兵 · 拖曳炮</td><td>德</td>
-              <td class="num">40</td><td class="num">2</td>
+          <tr><td><div class="thumb"><img id="s3" alt=""></div></td><td>leFH 18</td><td>德</td>
+              <td class="num">20</td><td class="num">5</td>
               <td class="num"><button class="btn danger">下架</button></td></tr>
-          <tr><td><div class="thumb"><img id="s4" alt=""></div></td><td>特种兵 · 拖曳炮</td><td>德</td>
-              <td class="num">25</td><td class="num">4</td>
+          <tr><td><div class="thumb"><img id="s4" alt=""></div></td><td>88毫米高射炮</td><td>德</td>
+              <td class="num">15</td><td class="num">2</td>
               <td class="num"><button class="btn danger">下架</button></td></tr>
         </table>
         <div class="note">
@@ -2102,11 +2107,13 @@ document.addEventListener("mousemove",e=>{
   tip.style.top=Math.max(8, e.pageY-h-12)+"px";
 });
 
-/* 商店缩略（真实商店条目：步兵/装甲/拖曳炮…） */
-img(document.getElementById("s1"), SUR+"unit/ger_jag_dlc4/sheet_L.png");
-img(document.getElementById("s2"), SUR+"unit/us_arm_42/sheet_L.png");
-img(document.getElementById("s3"), SUR+"specialist/ger_towed_arty_42/hq_action_icon.png");
-img(document.getElementById("s4"), SUR+"specialist/ger_towed_at_dlc3/hq_action_icon.png");
+/* 商店缩略 —— U17：贴图与商品名一一对应（原来 s1/s2 贴的是别的单位的图）。
+   装备条目没有自己的图标，游戏用「单位贴图 + 国籍旗」拼 ⇒ 这里用同国籍的单位贴图；
+   特种兵条目用 specialist/<type>/hq_action_icon.png。 */
+img(document.getElementById("s1"), SUR+"unit/ger_mot_42/sheet_L.png");     // 德国步兵
+img(document.getElementById("s2"), SUR+"unit/ger_pz_dlc7/sheet_L.png");     // 德国装甲兵
+img(document.getElementById("s3"), SUR+"specialist/ger_towed_arty_42/hq_action_icon.png");  // leFH 18
+img(document.getElementById("s4"), SUR+"specialist/ger_towed_at_42/hq_action_icon.png");    // 88毫米高射炮
 
 /* ---------- 总部页 · 技能矩阵 ----------
    数据 = 真实存档 campaigns/Blitzkrieg-ahistorical-Conference4-alter.usg
@@ -2248,10 +2255,15 @@ HQS.forEach(([t,n,g,nat,cp,mcp,sup,xp,xpt,lv,fp],i)=>{
     <div class="lv">${xp}/${xpt}</div>`;
   hql.appendChild(r);
 });
-/* 总部兵库缩略 */
-document.querySelectorAll(".fpool .fprow .thumb img").forEach((im,i)=>{
-  const srcs=[SUR+"unit/us_arm_42/sheet_L.png", SUR+"unit/ger_jag_dlc4/sheet_L.png",
-              SUR+"specialist/cz_s_eng_dlc9/hq_action_icon.png"];
+/* 总部兵库缩略 —— U17 修：U16 把行改成了 <table> 的 <tr>，
+   原来的 ".fpool .fprow .thumb img" 匹配不到任何元素（图标全丢）⇒ 直接选 .thumb img。
+   贴图按行序给真实文件（单位类型用 unit/<type>/sheet_L.png，特种兵用
+   specialist/<type>/hq_action_icon.png，都是游戏包里的原件）。 */
+document.querySelectorAll(".fpool .thumb img").forEach((im,i)=>{
+  const srcs=[SUR+"unit/ger_pz_dlc7/sheet_L.png",      // 装备条目（德军装甲，单位贴图）
+              SUR+"unit/ger_mot_42/sheet_L.png",      // 装备条目（德军摩托化步兵）
+              SUR+"specialist/ger_towed_arty_42/hq_action_icon.png",  // leFH 18
+              SUR+"specialist/ger_at_42/hq_action_icon.png"];         // 三G突击炮
   if(srcs[i]) img(im, srcs[i]);
 });
 
