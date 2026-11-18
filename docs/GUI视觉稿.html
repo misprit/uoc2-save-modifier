@@ -129,7 +129,8 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .detail{padding:14px}
 /* U11：抬头行 = 头像 + 名称/改名 ‖ 兵力块 ‖ 经验块 —— 抬头下面整块留给特种兵 */
 .dhead{display:flex;gap:16px;align-items:stretch}
-.dhead .ava{width:76px;height:76px;flex:none}
+/* U15：头像与名称块整体垂直居中于右侧「兵力 / 经验」两块 */
+.dhead .ava{width:76px;height:76px;flex:none;align-self:center}
 .dhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
 .dhead .vsep{width:1px;background:var(--border);flex:none}
 .dhead .stats{flex:none;width:432px}
@@ -359,11 +360,13 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .expbar{height:9px;border-radius:5px;background:var(--surface-alt);border:1px solid var(--border);
   overflow:hidden;margin-top:6px}
 .expbar i{display:block;height:100%;background:var(--accent)}
-/* U14：总部详情抬头 —— 经验块与「改名」并列，不再单独占一整行 */
-.hqhead{display:flex;gap:16px;align-items:stretch}
-.hqhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+/* U15：总部详情抬头 —— 左栏「改名块 + 切换按钮」‖ 右栏「经验卡」，两栏下侧对齐 */
+.hqhead{display:flex;gap:16px;align-items:stretch;min-height:78px;margin-bottom:12px}
+.hqhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+/* 改名块贴上沿、切换按钮贴下沿 —— 下沿与右侧经验卡的下沿齐平 */
 .hqhead .vsep{width:1px;background:var(--border);flex:none}
 .hqhead .xpblk{flex:none;width:240px}
+.hqhead .hqtabs{margin:0}
 .branches{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
 .brow{display:flex;align-items:center;gap:9px;padding:6px 11px;border-bottom:1px solid #f0f3f6;font-size:12.5px}
 .brow:last-child{border-bottom:none}
@@ -562,10 +565,11 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 <h2>2 · 主窗口 · 单位页</h2>
 <p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 6 个功能页（<b>特种兵已并入本页</b>），底部是常驻的待应用面板（展开时压矮工作区，永不遮挡详情区）。<br>
 <b>2026-11-18 · U11</b>：左边<b>名册列表收窄</b>（删掉血量文字「5 / 7」，换成「特种兵兵牌 + 已挂 N 个」小标记）⇒   右边<b>单位详情加宽</b> ⇒ 抬头一行里<b>兵力 / 经验两块挤到改名右侧</b> ⇒
-   抬头下面整块都归<b>特种兵</b>。<br>
-   <b>2026-11-18 · U14</b>：特种兵区改成<b>左「已挂槽位」竖排 ‖ 右「备选池」</b>，
+   抬头下面整块都归<b>特种兵</b>。<br>   <b>2026-11-18 · U14</b>：特种兵区改成<b>左「已挂槽位」竖排 ‖ 右「备选池」</b>，
    「备选 · 9 种（西线战役默认）」并进<b>标题行</b> ⇒ 省掉一整行，池子也宽多了；
-   槽位顺带显示<b>攻/防/装甲/火力 + 特性</b>。</p>
+   槽位顺带显示<b>攻/防/装甲/火力 + 特性</b>。<br>
+   <b>2026-11-18 · U15</b>：抬头里的<b>单位图标与名称块整体垂直居中</b>于右侧「兵力 / 经验」
+   两块（原来头像贴顶、名称居中 ⇒ 两样东西各在各的线上，审美别扭）。</p>
 
 <div class="app">
   <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>
@@ -841,7 +845,9 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 <b>U13 追加</b>：顶部加<b>补给卡车链</b>（5 个卡车图标，点哪里激活到几辆、<b>不扣声望</b>）、
 删掉最右的「升级价」列、每行加回<b>「压制 N」</b>（被压制的等级数）。<br>
 <b>U14 追加</b>：<b>总部经验并入抬头</b>（和改名并列，不再自己占一行）、
-兵库里的<b>特种兵条目显示攻/防/装甲/火力 + 特性</b>。</p>
+兵库里的<b>特种兵条目显示攻/防/装甲/火力 + 特性</b>。<br>
+<b>U15 追加</b>：抬头改成<b>左栏「改名块 + 切换按钮」‖ 右栏「经验卡」</b>，
+两栏<b>下侧对齐</b> —— 切换按钮不再自己占一行，下面的矩阵 / 兵库接得更顺。</p>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -870,6 +876,10 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
               <div class="idblk">
                 <div class="dtitle">A集团军群 <span class="edit">✎ 改名</span></div>
                 <div class="dsub">格尔德·冯·伦德施泰特 · CP 8/8 · 补给 3</div>
+                <div class="hqtabs" id="hqtabs">
+                  <span class="tb on" data-tab="mx">升级矩阵</span>
+                  <span class="tb" data-tab="fp">兵库 <span class="n">4</span></span>
+                </div>
               </div>
               <div class="vsep"></div>
               <div class="stat xpblk">
@@ -877,11 +887,6 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                 <div class="v">87 <small>/ 220 升到下一级</small></div>
                 <div class="expbar"><i style="width:40%"></i></div>
               </div>
-            </div>
-
-            <div class="hqtabs" id="hqtabs">
-              <span class="tb on" data-tab="mx">升级矩阵</span>
-              <span class="tb" data-tab="fp">兵库 <span class="n">4</span></span>
             </div>
 
             <div id="tab-mx">
