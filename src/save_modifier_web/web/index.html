@@ -97,15 +97,19 @@ table.list td.k{color:var(--muted)}
 .note{border:1px solid var(--border);border-radius:7px;background:var(--surface-alt);
   padding:10px 12px;font-size:11.5px;color:var(--muted);line-height:1.6}
 .note b{color:var(--text)}
-/* 可调数字（滚轮） */
+/* 数值控件（U32：大数字=输入框；滚轮统一用 Alt 键） */
 .tun{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--surface-alt)}
 .tun:last-child{border-bottom:none}
 .tun .k{width:56px;color:var(--muted)}
-.tun .num{min-width:46px;text-align:center;padding:3px 8px;border:1px dashed var(--border);
-  border-radius:6px;background:var(--surface);cursor:ns-resize;font-family:var(--mono);
-  font-weight:700;font-size:17px;color:var(--accent-dark);font-variant-numeric:tabular-nums}
-.tun .num:hover{border-color:var(--accent);background:var(--accent-light)}
+/* U32：数值控件 —— 大数字给输入框；小数字只给 Alt+滚轮 */
+.tun .num{width:88px;text-align:center;padding:3px 8px;border:1px dashed var(--border);
+  border-radius:6px;background:var(--surface);font-family:var(--mono);
+  font-weight:700;font-size:17px;color:var(--accent-dark);font-variant-numeric:tabular-nums;
+  outline:none}
+.tun .num:hover{border-color:var(--accent)}
+.tun .num:focus{border-color:var(--accent);background:var(--accent-light)}
 .tun .num.dirty{border-color:var(--accent);background:var(--accent-light)}
+.tun .num.bad{border-color:var(--danger);background:var(--danger-light);color:var(--danger)}
 .tun .hint{font-size:11px;color:var(--muted)}
 .tun .old{font-size:11px;color:var(--muted);font-family:var(--mono)}
 /* 待应用清单 */
@@ -182,6 +186,16 @@ const FEATURE_CN = {units:"单位", hqs:"总部", hand:"手牌", shelf:"货架",
 const PAGE_CN = {overview:"概览", units:"单位", hqs:"总部", cards:"卡牌",
   store:"商店", theater:"战区资产", campaign:"战役"};
 
+/* U32：禁掉 Edge 的 **Ctrl+滚轮缩放** —— 浏览器默认行为，页面可以阻止。
+   实测（2026-11-18 · 本机 Edge 157）：
+     · Ctrl+滚轮 ⇒ 页面缩放（devicePixelRatio 变化）⇒ **全局禁掉**；
+     · Alt+滚轮  ⇒ **不缩放**（devicePixelRatio 全程 = 1）且事件照常到达页面
+                    ⇒ 用它来调数值；
+     · 普通滚轮 ⇒ 页面滚动，不改数值（防手滑改值）。 */
+document.addEventListener("wheel", function(e){
+  if(e.ctrlKey) e.preventDefault();
+}, {passive:false, capture:true});
+
 /* 全局错误显示 —— 静默失败最难查 */
 window.onerror = function(msg, src, line){
   const r = document.getElementById("rows");
@@ -233,19 +247,60 @@ function paintPending(){
 }
 function dropPending(i){ PENDING.splice(i,1); paintPending(); }
 
-/* ---------- 滚轮可调数字 ---------- */
+/* ---------- 数值控件（U32） ----------
+   大数字（三位以上：声望/分数/经验）= 可直接编辑的输入框（+ Alt+滚轮 ±1）
+   小数字（一般个位数：CP/卡车数/延迟/库存/战力步数）= 只给 Alt+滚轮 ±1
+   —— 滚轮键位统一用 Alt：Ctrl+滚轮 是 Edge 的页面缩放（全局已禁掉），
+      Alt+滚轮 实测不缩放且事件照常到达页面。 */
+const TUN_RANGE = {prestige:[0, null], score:[0, null]};   /* null = 无上限 */
+
+/* Alt+滚轮 ±1（U32）
+   —— 普通滚轮**不改值**（照常滚页面，避免手滑误改）；
+   —— Alt+滚轮 才调值，并阻止页面跟着滚。 */
+function altWheel(el, fn){
+  el.addEventListener("wheel", function(ev){
+    if(!ev.altKey) return;
+    ev.preventDefault();
+    fn(ev.deltaY>0 ? -1 : 1);
+  }, {passive:false});
+}
+
 function bindTun(){
   document.querySelectorAll(".tun .num").forEach(el=>{
     const f = el.dataset.f;
     const base = f==="prestige" ? (VIEW.prestige||0) : (VIEW.score||0);
-    el.textContent = base;
+    el.value = base;
     document.getElementById("o_"+f).textContent = "原值 " + base;
-    el.addEventListener("wheel", ev=>{
-      ev.preventDefault();
-      const step = (ev.ctrlKey ? 5 : 1) * (ev.deltaY>0 ? -1 : 1);
-      const cur = parseInt(el.textContent,10)||0;
-      const v = Math.max(0, cur + step);
-      el.textContent = v;
+
+    /* Alt+滚轮 ±1（带范围夹取）；普通滚轮不改值 */
+    altWheel(el, function(d){
+      const [lo, hi] = TUN_RANGE[f] || [0, null];
+      const cur = parseInt(el.value, 10);
+      let v = (isFinite(cur) ? cur : 0) + d;
+      if(lo!==null && v < lo) v = lo;
+      if(hi!==null && v > hi) v = hi;
+      el.value = v;
+      apply();
+    });
+
+    function apply(){
+      const raw = String(el.value??"").trim();
+      const v = Number(raw);
+      const [lo, hi] = TUN_RANGE[f] || [0, null];
+      let bad = null;
+      if(raw==="") bad = "不能为空";
+      else if(!/^-?\d+$/.test(raw)) bad = "必须是整数";
+      else if(!Number.isSafeInteger(v)) bad = "数字太大了";
+      else if(v < lo) bad = "不能小于 " + lo;
+      else if(hi!==null && v > hi) bad = "不能大于 " + hi;
+      el.classList.toggle("bad", !!bad);
+      el.title = bad || "";
+      if(bad){                              /* 非法值 ⇒ 不入待应用 */
+        const i = PENDING.findIndex(x => x.kind==="progress" && x.params.field===f);
+        if(i>=0) PENDING.splice(i,1);
+        paintPending();
+        return;
+      }
       el.classList.toggle("dirty", v !== base);
       const params = {field: f, value: v};
       if(v === base){
@@ -256,7 +311,10 @@ function bindTun(){
         setPending("progress", params, `${f==="prestige"?"声望":"分数"} ${base} → ${v}`);
       }
       paintPending();
-    }, {passive:false});
+    }
+    el.addEventListener("input", apply);
+    el.addEventListener("change", apply);
+    el.addEventListener("keydown", ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); apply(); el.blur(); } });
   });
 }
 
@@ -349,16 +407,18 @@ function show(p){
       </div>`).join("");
     w.innerHTML = `<div class="panel"><h3>概览 · 能力位体检</h3>
       <div class="pbody"><div class="capgrid">${caps}</div></div></div>
-      <div class="panel"><h3>战役进度（滚轮可调）</h3>
+      <div class="panel"><h3>战役进度（可直接输入 · Alt+滚轮 ±1）</h3>
       <div class="pbody">
         <div class="tun"><span class="k">声望</span>
-          <span class="num" id="n_prestige" data-f="prestige"></span>
+          <input class="num" id="n_prestige" data-f="prestige" type="text"
+                 inputmode="numeric" autocomplete="off">
           <span class="old" id="o_prestige"></span>
-          <span class="hint">滚轮 ±1 · Ctrl+滚轮 ±5</span></div>
+          <span class="hint">可直接输入 · Alt+滚轮 ±1</span></div>
         <div class="tun"><span class="k">分数</span>
-          <span class="num" id="n_score" data-f="score"></span>
+          <input class="num" id="n_score" data-f="score" type="text"
+                 inputmode="numeric" autocomplete="off">
           <span class="old" id="o_score"></span>
-          <span class="hint">滚轮 ±1 · Ctrl+滚轮 ±5</span></div>
+          <span class="hint">可直接输入 · Alt+滚轮 ±1</span></div>
         <div class="note" style="margin-top:10px">
           <b>这一版能做什么</b>：读存档、列能力位、<b>改战役进度</b>（改完进「待应用」，
           点右上角「应用更改」才写盘，写前自动备份、可撤销）。<br>

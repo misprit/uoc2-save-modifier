@@ -5,6 +5,7 @@
 （它开了个 HTTP 端口）⇒ 令牌校验与**目录穿越**必须有测试守着。
 """
 
+import io
 import json
 import os
 import sys
@@ -352,3 +353,46 @@ class TestPathEncoding(WebGuiTestBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNumericControls(unittest.TestCase):
+    """U32：数值控件的交互规则 —— **按大小分两类 + 滚轮统一用 Alt 键**。
+
+    用户四轮拍板：
+    ① Ctrl+滚轮在 Edge 里会让窗口比例乱缩放 ⇒ 禁掉；
+    ② 分数/声望直接允许输入；
+    ③ 「滚动调整还要，你要换个键」⇒ 换 Alt；
+    ④ 大数字可编辑，小数字（个位数）滚轮更方便。
+
+    这些是**界面层**的规则，核心库不变 ⇒ 用「读前端源码」的方式锁死。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "src", "save_modifier_web", "web", "index.html")
+        cls.html = io.open(p, encoding="utf-8").read()
+
+    def test_ctrl_wheel_zoom_is_blocked(self):
+        """Ctrl+滚轮 = Edge 页面缩放 ⇒ 必须全局 preventDefault。"""
+        self.assertIn("if(e.ctrlKey) e.preventDefault();", self.html)
+
+    def test_wheel_requires_alt_key(self):
+        """调值必须按住 Alt —— 普通滚轮不改值（防手滑）。"""
+        self.assertIn("if(!ev.altKey) return;", self.html)
+        self.assertIn("function altWheel(el, fn)", self.html)
+
+    def test_big_numbers_are_editable_inputs(self):
+        """大数字（声望/分数）= 可直接编辑的输入框。"""
+        self.assertIn('class="num"', self.html)
+        self.assertIn('inputmode="numeric"', self.html)
+        self.assertIn("el.value = base;", self.html)
+
+    def test_hint_text_mentions_alt_wheel(self):
+        self.assertIn("Alt+滚轮 ±1", self.html)
+        self.assertNotIn("回车或点别处生效", self.html)
+
+    def test_no_bare_wheel_wording_left(self):
+        """不允许残留「滚轮可调」这类已被覆盖的旧表述。"""
+        self.assertNotIn("滚轮可调", self.html)
+        self.assertNotIn("Ctrl+滚轮 ±", self.html)
