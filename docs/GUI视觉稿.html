@@ -346,6 +346,10 @@ table.spec-tbl th{text-align:left;background:var(--accent-dark);color:#fff;paddi
 table.spec-tbl td{padding:7px 10px;border-bottom:1px solid #eef1f4}
 table.spec-tbl tr:hover td{background:var(--accent-light)}
 table.spec-tbl td.num{font-family:var(--mono);text-align:right}
+/* U19：商店页也显示特种兵的数值与特性（与兵库同一口径） */
+table.spec-tbl td.dim{color:var(--muted)}
+table.spec-tbl td.tags{white-space:nowrap}
+table.spec-tbl td.tags .ftag{margin-right:4px}
 table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border:1px solid var(--stage-edge);
   border-radius:4px;display:grid;place-items:center;overflow:hidden}
 table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
@@ -377,7 +381,24 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .hqhead .vsep{width:1px;background:var(--border);flex:none}
 .hqhead .xpblk{flex:none;width:240px}
 /* U16：CP / 补给 / 将军名这行标注搬到「改名」右边 */
+/* U19：这行只剩将领名 —— CP / 补给挪到「总部 CP」卡 */
 .hqhead .hqmeta{font-size:12px;color:var(--muted);font-family:var(--mono);font-weight:400}
+/* U19：经验卡旁加「总部 CP」卡 —— 两卡并排 */
+.hqhead .hqcards{flex:none;display:flex;gap:10px;align-items:stretch}
+.hqhead .xpblk{width:216px}
+.hqhead .cpblk{width:168px}
+/* CP 两个数字各自可滚轮调 —— 分清「当前」与「上限」 */
+.hqhead .cpv{display:flex;align-items:baseline;gap:3px;margin-top:2px;
+  font-family:var(--mono);font-size:19px;font-weight:700;color:var(--accent-dark)}
+.hqhead .cpc{min-width:22px;text-align:center;border-radius:5px;padding:0 4px;
+  border:1px dashed var(--border);background:var(--surface);cursor:ns-resize;
+  font-variant-numeric:tabular-nums;transition:background .12s}
+.hqhead .cpc:hover{background:var(--accent-light);border-color:var(--accent)}
+.hqhead .cpc.cur{color:var(--accent-dark)}
+.hqhead .cpc.max{color:var(--muted);font-size:15px}
+.hqhead .cps{font-size:14px;color:var(--muted);font-weight:400}
+.hqhead .cphint{font-size:10.5px;color:var(--muted);margin-top:5px;line-height:1.35}
+.hqhead .cphint b{font-family:var(--mono);color:var(--text);font-weight:600}
 .hqhead .hqtabs{margin:0}
 .branches{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
 .brow{display:flex;align-items:center;gap:9px;padding:6px 11px;border-bottom:1px solid #f0f3f6;font-size:12.5px}
@@ -936,17 +957,28 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
           <h3>总部详情</h3>
           <div class="detail">            <div class="hqhead">
               <div class="idblk">                <div class="dtitle">A集团军群 <span class="edit">✎ 改名</span>
-                  <span class="hqmeta">格尔德·冯·伦德施泰特 · CP 8/8 · 补给 3</span></div>
+                  <span class="hqmeta">格尔德·冯·伦德施泰特</span></div>
                 <div class="hqtabs" id="hqtabs">
                   <span class="tb on" data-tab="mx">升级矩阵</span>
-                  <span class="tb" data-tab="fp">兵库 <span class="n">4</span></span>
+                  <span class="tb" data-tab="fp">兵库 <span class="n">12</span></span>
                 </div>
               </div>
               <div class="vsep"></div>
-              <div class="stat xpblk">
-                <div class="lb"><span>总部经验</span><span class="hintw">滚轮调 xp</span></div>
-                <div class="v">87 <small>/ 220 升到下一级</small></div>
-                <div class="expbar"><i style="width:40%"></i></div>
+              <div class="hqcards">
+                <div class="stat xpblk">
+                  <div class="lb"><span>总部经验</span><span class="hintw">滚轮调 xp</span></div>
+                  <div class="v">333 <small>/ 460 升到下一级</small></div>
+                  <div class="expbar"><i style="width:72%"></i></div>
+                </div>
+                <div class="stat cpblk">
+                  <div class="lb"><span>总部 CP</span><span class="hintw">滚轮调 CP</span></div>
+                  <div class="cpv">
+                    <span class="cpc cur" title="当前 CP —— 滚轮调节">0</span>
+                    <span class="cps">/</span>
+                    <span class="cpc max" title="CP 上限 —— 滚轮调节（3–9）">8</span>
+                  </div>
+                  <div class="cphint">上限 <b>3–9</b> · 当前 <b>0–9</b></div>
+                </div>
               </div>
             </div>
 
@@ -969,7 +1001,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
             </div>
 
             <div id="tab-fp" style="display:none">              <div class="fpool" style="margin-top:0">
-                <div class="fptitle">总部兵库 · 4 条</div>
+                <div class="fptitle">总部兵库 · 12 条<span style="font-weight:400;color:var(--muted);font-size:11.5px;margin-left:8px">（示例展示 9 行 · 前后顺序不变）</span></div>
                 <table class="fptab">
                   <thead>
                     <tr>
@@ -981,30 +1013,59 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                     </tr>
                   </thead>
                   <tbody>                    <tr>
-                      <td><div class="thumb"><img alt=""></div></td>
-                      <td class="l name">德国步兵（3）</td>
-                      <td class="dim">—</td><td class="dim">—</td><td class="dim">—</td><td class="dim">—</td>
-                      <td class="l dim">—</td>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
+                      <td class="l name">德国步兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
+                      <td>5</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
+                      <td class="l name">德国步兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
+                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_arm_42/sheet_L.png"></div></td>
+                      <td class="l name">德国装甲兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
+                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
+                      <td class="l name">德国步兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
+                      <td>9</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_arm_42/sheet_L.png"></div></td>
+                      <td class="l name">德国装甲兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
                       <td>3</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
-                      <td><div class="thumb"><img alt=""></div></td>
-                      <td class="l name">德国装甲兵（1）</td>
-                      <td class="dim">—</td><td class="dim">—</td><td class="dim">—</td><td class="dim">—</td>
-                      <td class="l dim">—</td>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
+                      <td class="l name">德国步兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
                       <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
-                      <td><div class="thumb"><img alt=""></div></td>
-                      <td class="l name">leFH 18</td>
-                      <td>0</td><td>6</td><td>0</td><td>3</td>
-                      <td class="l tags"><span class="ftag">牵引式</span><span class="ftag">火炮</span></td>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_recon_39/hq_action_icon.png"></div></td>
+                      <td class="l name">Sd.Kfz.222</td>
+                      <td>5</td><td>4</td><td>1</td><td>0</td>
+                      <td class="l tags"><span class="ftag">侦察</span></td>
                       <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
-                      <td><div class="thumb"><img alt=""></div></td>
-                      <td class="l name">三G突击炮</td>
-                      <td>7</td><td>8</td><td>3</td><td>0</td>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_at_40/hq_action_icon.png"></div></td>
+                      <td class="l name">一号驱逐战车</td>
+                      <td>1</td><td>4</td><td>3</td><td>0</td>
                       <td class="l tags"><span class="ftag">反坦克炮</span></td>
-                      <td>2</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
-                  </tbody>
+                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_towed_at_42/hq_action_icon.png"></div></td>
+                      <td class="l name">88毫米高射炮</td>
+                      <td>2</td><td>8</td><td>4</td><td>0</td>
+                      <td class="l tags"><span class="ftag">牵引式</span><span class="ftag">反坦克炮</span></td>
+                      <td>2</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr></tbody>
                 </table>
                 <div class="fprow" style="justify-content:flex-end;gap:8px;border-bottom:none">
                   <button class="btn" style="font-size:11.5px">＋ 添加条目</button>
@@ -1127,23 +1188,40 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
       </div>
       <div class="panel">        <h3>普通商店 · 13 条<span style="font-weight:400;color:var(--muted);font-size:11.5px;margin-left:8px">（示例展示前 4 条）</span></h3>
         <table class="spec-tbl">
-          <tr><th style="width:46px"></th><th>商品</th><th>国籍</th><th style="text-align:right">价格</th>
-              <th style="text-align:right">库存</th><th style="text-align:right">操作</th></tr>          <tr><td><div class="thumb"><img id="s1" alt=""></div></td><td>德国步兵</td><td>德</td>
+          <tr><th style="width:46px"></th><th>商品</th><th>国籍</th>
+              <th style="text-align:right">攻击</th><th style="text-align:right">防御</th>
+              <th style="text-align:right">装甲</th><th style="text-align:right">炮术</th>
+              <th style="text-align:left">特性</th>
+              <th style="text-align:right">价格</th>
+              <th style="text-align:right">库存</th><th style="text-align:right">操作</th></tr>
+          <tr><td><div class="thumb"><img id="s1" alt=""></div></td><td>德国步兵</td><td>德</td>
+              <td class="num dim">—</td><td class="num dim">—</td><td class="num dim">—</td><td class="num dim">—</td>
+              <td class="dim">—</td>
               <td class="num">5</td><td class="num">30</td>
               <td class="num"><button class="btn danger">下架</button></td></tr>
           <tr><td><div class="thumb"><img id="s2" alt=""></div></td><td>德国装甲兵</td><td>德</td>
+              <td class="num dim">—</td><td class="num dim">—</td><td class="num dim">—</td><td class="num dim">—</td>
+              <td class="dim">—</td>
               <td class="num">5</td><td class="num">20</td>
               <td class="num"><button class="btn danger">下架</button></td></tr>
           <tr><td><div class="thumb"><img id="s3" alt=""></div></td><td>leFH 18</td><td>德</td>
+              <td class="num">0</td><td class="num">6</td><td class="num">0</td><td class="num">3</td>
+              <td class="tags"><span class="ftag">牵引式</span><span class="ftag">火炮</span></td>
               <td class="num">20</td><td class="num">5</td>
               <td class="num"><button class="btn danger">下架</button></td></tr>
           <tr><td><div class="thumb"><img id="s4" alt=""></div></td><td>88毫米高射炮</td><td>德</td>
+              <td class="num">2</td><td class="num">8</td><td class="num">4</td><td class="num">0</td>
+              <td class="tags"><span class="ftag">牵引式</span><span class="ftag">反坦克炮</span></td>
               <td class="num">15</td><td class="num">2</td>
               <td class="num"><button class="btn danger">下架</button></td></tr>
         </table>
         <div class="note">
           「下架」= <b>删条目</b>（<code>Edit.store_remove</code>），<b>不是</b>把库存设成 0 ——
           游戏里没有售罄标记，设 0 会被 schema 拒绝。<br>
+          ⓘ <b>攻击 / 防御 / 装甲 / 炮术 / 特性</b>和<b>总部兵库同一口径</b>：
+          <b>特种兵条目</b>有（数值与旗标在游戏包 <code>entity_types/specialists/*.yml</code>，
+          核心库 <code>Catalog.spec_type()</code> 直接给），
+          <b>装备条目</b>（<code>infantry</code>/<code>armor</code>）只有类别、无数值 ⇒ 一律显示「—」。<br>
           实测（战线 南部 / 会议 c_42_07）：会议默认 19 条，存档 13 条 ——
           少的 6 条是游戏自动下架的，<b>价格零差异</b>，3 条库存递减（20→19 / 10→6 / 3→1）。
         </div>
@@ -1887,14 +1965,14 @@ const THEATER = [
 
 /* 总部：字段结构来自真实 hqs.yml（xp/xp_target/branch_levels/force_pool…） */
 const HQS = [
-  ["ger_hq_dlc1_hg","A集团军群","格尔德·冯·伦德施泰特","德",8,8,3,87,220,"Lv1/Lv0/Lv2/Lv2/Lv1",4],
-  ["ger_hq_dlc4_4","西部集团军","伦茨 · 冯 · 曼陀菲尔","德",8,8,2,140,220,"Lv2/Lv1/Lv2/Lv2/Lv1",6],
-  ["ger_hq_dlc4_9","东部集团军","约德尔 · 冯 · 克莱因希特","德",4,8,4,60,220,"Lv1/Lv1/Lv1/Lv1/Lv3",3],
-  ["sws_hq_dlc4_3","苏军北方方面军","朱可夫","苏",7,9,5,196,220,"Lv3/Lv2/Lv2/Lv3/Lv2",5],
-  ["sws_hq_dlc4_11","苏军南方方面军","瓦图金","苏",5,9,3,124,220,"Lv2/Lv1/Lv2/Lv2/Lv2",4],
-  ["uk_hq_dlc4_2","英军中央司令部","蒙哥马利","英",6,10,4,158,220,"Lv3/Lv2/Lv1/Lv3/Lv1",7],
-  ["ita_hq_dlc4_6","意大利军集群","梅塞特","意",3,7,2,44,220,"Lv1/Lv1/Lv1/Lv2/Lv1",2],
-  ["rom_hq_dlc4_1","罗马尼亚军集群","安东内斯库","罗",2,6,1,31,220,"Lv1/Lv1/Lv1/Lv1/Lv1",1]
+  ["ger_hq_dlc1_pom", "波莫日", "罗恩 · 冯 · 曼陀菲尔", "德", 6, 6, 3, 0, 400, "Lv1/Lv1/Lv1/Lv1/Lv1", 0],
+  ["ger_hq_dlc4_1", "B集团军群", "伦茨 · 冯 · 曼陀菲尔", "德", 0, 6, 3, 3, 130, "Lv1/Lv0/Lv2/Lv2/Lv1", 9],
+  ["ger_hq_dlc1_hg", "A集团军群", "格尔德·冯·伦德施泰特", "德", 0, 8, 3, 333, 460, "Lv1/Lv0/Lv2/Lv2/Lv1", 12],
+  ["ger_hq_dlc4_2", "克莱斯特装甲集群", "约德尔 · 冯 · 克莱因希特", "德", 0, 8, 3, 79, 85, "Lv1/Lv1/Lv2/Lv2/Lv2", 6],
+  ["ger_hq_dlc4_schweizer", "瑞士军队", "希拉姆 · 希尔布莱斯", "德", 6, 8, 3, 0, 400, "Lv2/Lv2/Lv2/Lv2/Lv3", 1],
+  ["uk_hq_dlc4_2", "英国远征军", "蒙哥马利", "英", 8, 8, 3, 0, 400, "Lv1/Lv1/Lv1/Lv1/Lv1", 0],
+  ["ger_hq_dlc4_olz", "OLZ", "伦茨 · 冯 · 曼陀菲尔", "德", 9, 9, 3, 0, 400, "Lv2/Lv1/Lv2/Lv2/Lv2", 3],
+  ["ger_hq_dlc4_swe", "瑞典武装部队最高司令", "隆纳尔 · 埃德斯特纳姆", "瑞典", 8, 8, 3, 0, 0, "Lv1/Lv1/Lv1/Lv1/Lv1", 0],
 ];
 
 /* 卡牌：**全部 39 种**，数据直接取自游戏包 ——
@@ -2423,6 +2501,39 @@ CSTORE.slice(0,8).forEach(e=>{
   else im.style.display="none";
 });
 
+/* ---------- 总部页 · CP 卡滚轮（U19） ----------
+   当前 CP：0–9，且**不得超过该总部的 CP 上限**（游戏读档按上限截断）
+   CP 上限：3–9（游戏硬范围 —— constants.hq_max_cp=9 / hq_min_max_cp=3）
+   两个数字各自独立可滚：鼠标停在哪个数字上就调哪个。 */
+const CP_CUR_MIN=0, CP_CUR_MAX=9, CP_CAP_MIN=3, CP_CAP_MAX=9;
+(function(){
+  const blk=document.querySelector(".hqhead .cpblk"); if(!blk) return;
+  const cur=blk.querySelector(".cpc.cur"), cap=blk.querySelector(".cpc.max");
+  const hint=blk.querySelector(".cphint");
+  function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi,v)); }
+  function read(el){ return parseInt(el.textContent,10)||0; }
+  function paint(){
+    const c=read(cur), m=read(cap);
+    cur.textContent=c; cap.textContent=m;
+    cur.style.color = (c>m) ? "var(--danger)" : "var(--accent-dark)";
+    if(c>m) hint.innerHTML='<b style="color:var(--danger)">当前 '+c+' 超过上限 '+m+'</b> · 游戏读档按上限截断';
+    else hint.innerHTML='上限 <b>3–9</b> · 当前 <b>0–9</b>';
+  }
+  function bind(el,lo,hi,isCur){
+    el.addEventListener("wheel", function(e){
+      e.preventDefault();
+      const step = e.deltaY>0 ? -1 : 1;
+      let v = clamp(read(el)+step, lo, hi);
+      if(isCur){ const m=read(cap); if(v>m) v=m; }   /* 当前 CP 不能超上限 */
+      else { const c=read(cur); if(v<c) v=c; }        /* 上限不能低于当前 CP */
+      el.textContent=v; paint();
+    }, {passive:false});
+  }
+  bind(cur, CP_CUR_MIN, CP_CUR_MAX, true);
+  bind(cap, CP_CAP_MIN, CP_CAP_MAX, false);
+  paint();
+})();
+
 /* ---------- 总部页 ---------- */
 const hql=document.getElementById("hqlist");
 HQS.forEach(([t,n,g,nat,cp,mcp,sup,xp,xpt,lv,fp],i)=>{
@@ -2431,6 +2542,11 @@ HQS.forEach(([t,n,g,nat,cp,mcp,sup,xp,xpt,lv,fp],i)=>{
     <div class="lv">${xp}/${xpt}</div>`;
   hql.appendChild(r);
 });
+/* 总部兵库缩略 —— U19：按 data-tex 给真实贴图（特种兵用 hq_action_icon） */
+document.querySelectorAll(".fpool .thumb img[data-tex]").forEach(im=>{
+  img(im, SUR+im.dataset.tex);
+});
+
 /* 总部兵库缩略 —— U17 修：U16 把行改成了 <table> 的 <tr>，
    原来的 ".fpool .fprow .thumb img" 匹配不到任何元素（图标全丢）⇒ 直接选 .thumb img。
    贴图按行序给真实文件（单位类型用 unit/<type>/sheet_L.png，特种兵用

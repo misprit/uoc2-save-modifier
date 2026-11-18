@@ -66,9 +66,49 @@ class TestHqField(HqTestBase):
         self.assertEqual(self.hq()["cp"], 9)
 
     def test_cp_above_max_is_warned(self):
-        plan, _ = self.commit([Edit.hq_field(5, "cp", 99)])
+        """CP 在 0–9 内但超过该总部的 max_cp ⇒ 只是警告（游戏读档按上限截断）。"""
+        plan, _ = self.commit([Edit.hq_field(5, "cp", 9)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(any("上限" in w for w in plan.warnings), plan.warnings)
+
+    # ---- U19：CP 的合法范围是游戏的硬范围（超了存档打不开）----
+
+    def test_cp_over_nine_is_blocked(self):
+        """cp > 9 ⇒ 硬拦（游戏 schema Range(min=0, max=hq_max_cp=9)）。"""
+        plan, _ = self.commit([Edit.hq_field(5, "cp", 10)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("cp 必须在 0–9" in e for e in plan.errors), plan.errors)
+
+    def test_cp_nine_is_allowed(self):
+        """cp = 9 是上界本身 ⇒ 放行。"""
+        plan, res = self.commit([Edit.hq_field(5, "cp", 9)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self.hq()["cp"], 9)
+
+    def test_max_cp_over_nine_is_blocked(self):
+        """max_cp > 9 ⇒ 硬拦（游戏 schema Range(min=hq_min_max_cp, max=hq_max_cp)）。"""
+        plan, _ = self.commit([Edit.hq_field(5, "max_cp", 10)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("max_cp 必须在 3–9" in e for e in plan.errors), plan.errors)
+
+    def test_max_cp_under_three_is_blocked(self):
+        """max_cp < 3 ⇒ 硬拦（游戏 hq_min_max_cp = 3）。"""
+        plan, _ = self.commit([Edit.hq_field(5, "max_cp", 2)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("max_cp 必须在 3–9" in e for e in plan.errors), plan.errors)
+
+    def test_max_cp_in_range_is_allowed(self):
+        plan, res = self.commit([Edit.hq_field(5, "max_cp", 7)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self.hq()["max_cp"], 7)
+
+    def test_lowering_max_cp_below_cp_warns(self):
+        """上限降到低于当前 CP ⇒ 警告（游戏读档按上限截断）。"""
+        plan, _ = self.commit([Edit.hq_field(5, "max_cp", 3)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(any("截断" in w for w in plan.warnings), plan.warnings)
 
     def test_disallowed_field_is_blocked(self):
         plan, _ = self.commit([Edit.hq_field(5, "branch_levels", {})])

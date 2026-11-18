@@ -71,6 +71,27 @@ HQ_FIELD_ALLOWED = {
 #: 总部的五个分支（§7.4）
 HQ_BRANCHES = ("engineering", "force_pool", "intel", "logistics", "operations")
 
+#: **CP 的合法区间**（游戏字节码坐实，U19 取证）
+#:
+#: `state/constants.pyc` 里两个模块级常量：
+#:
+#: ```python
+#: hq_max_cp     = 9
+#: hq_min_max_cp = 3
+#: ```
+#:
+#: `state/entities/data_validation/hq.pyc` 的 voluptuous schema：
+#:
+#: | 字段 | schema | 合法范围 |
+#: |---|---|---|
+#: | `max_cp` | `All(int, Range(min=hq_min_max_cp, max=hq_max_cp))` | **3 – 9** |
+#: | `cp`    | `All(int, Range(min=0,            max=hq_max_cp))`     | **0 – 9** |
+#:
+#: ⇒ **超出范围游戏读存档会直接报错**（voluptuous 校验失败），
+#: 不是「显示异常」而是**存档打不开** ⇒ 必须硬拦。
+HQ_CP_MIN, HQ_CP_MAX = 0, 9
+HQ_MAX_CP_MIN, HQ_MAX_CP_MAX = 3, 9
+
 #: 分支等级的**上限**（游戏 `BRANCH_MAX = 3`；`can_add_branch_level` 里
 #: `current_level = level + suppressed`，`== 3` 就不许再加）
 HQ_BRANCH_MAX = 3
@@ -352,6 +373,16 @@ def _hq_field(w, e: Edit) -> Outcome:
         oc.errors.append(f"{field} 必须是非负整数，收到 {value!r}")
         return oc
 
+    # ⚠️ CP 的合法区间比「非负整数」严 —— 游戏 schema 是硬范围（U19 字节码取证）
+    if field == "max_cp" and not (HQ_MAX_CP_MIN <= value <= HQ_MAX_CP_MAX):
+        oc.errors.append(
+            f"max_cp 必须在 {HQ_MAX_CP_MIN}–{HQ_MAX_CP_MAX} 之间（游戏的硬范围），收到 {value}")
+        return oc
+    if field == "cp" and not (HQ_CP_MIN <= value <= HQ_CP_MAX):
+        oc.errors.append(
+            f"cp 必须在 {HQ_CP_MIN}–{HQ_CP_MAX} 之间（游戏的硬范围），收到 {value}")
+        return oc
+
     hqs = w.table("hqs.yml", [])
     hq = _find_by_id(hqs, hq_id)
     if hq is None:
@@ -365,7 +396,11 @@ def _hq_field(w, e: Edit) -> Outcome:
 
     if field == "cp" and isinstance(hq.get("max_cp"), int) and value > hq["max_cp"]:
         oc.warnings.append(
-            f"CP {value} 超过上限 {hq['max_cp']} —— 游戏可能读不出这个值")
+            f"CP {value} 超过该总部的上限 {hq['max_cp']} —— 游戏读档时按上限截断，"
+            f"多出来的 CP 会白给")
+    if field == "max_cp" and isinstance(hq.get("cp"), int) and hq["cp"] > value:
+        oc.warnings.append(
+            f"CP 上限降到 {value}，但当前 CP 是 {hq['cp']} —— 游戏读档时按上限截断")
     if field == "xp" and isinstance(old, int) and value < old:
         oc.warnings.append(
             "降低总部经验会让下属单位掉经验（游戏按『总部经验 - 单位经验』算欠账）")
