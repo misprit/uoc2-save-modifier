@@ -389,6 +389,11 @@ table.spec-tbl th{text-align:left;background:var(--accent-dark);color:#fff;paddi
 table.spec-tbl td{padding:7px 10px;border-bottom:1px solid #eef1f4}
 table.spec-tbl tr:hover td{background:var(--accent-light)}
 table.spec-tbl td.num{font-family:var(--mono);text-align:right}
+/* U24：兵库「延迟」列 + 按延迟分组的分隔带（游戏是**分批上线**的） */
+.fptab td.dl{font-family:var(--mono);text-align:right;color:var(--accent-dark);font-weight:600}
+.fptab .fdelay{background:var(--surface-alt);font-size:11px;color:var(--accent-dark);
+  font-weight:400;padding:5px 10px;border-bottom:1px solid var(--border);border-top:1px solid var(--border)}
+.fptab .fdelay b{font-family:var(--mono);font-weight:700;font-size:12px}
 /* U19：商店页也显示特种兵的数值与特性（与兵库同一口径） */
 table.spec-tbl td.dim{color:var(--muted)}
 table.spec-tbl td.tags{white-space:nowrap}
@@ -1050,7 +1055,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
             </div>
 
             <div id="tab-fp" style="display:none">              <div class="fpool" style="margin-top:0">
-                <div class="fptitle">总部兵库 · 12 条<span style="font-weight:400;color:var(--muted);font-size:11.5px;margin-left:8px">（示例展示 9 行 · 前后顺序不变）</span></div>
+                <div class="fptitle">总部兵库 · 11 条<span style="font-weight:400;color:var(--muted);font-size:11.5px;margin-left:8px">（真实存档 <code>Stalingrad-Conference1.usg</code> · A集团军群 · <b>按延迟分批上线</b>）</span></div>
                 <table class="fptab">
                   <thead>
                     <tr>
@@ -1058,63 +1063,92 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                       <th class="l">条目</th>
                       <th>攻击</th><th>防御</th><th>装甲</th><th>炮术</th>
                       <th class="l">特性</th>
+                      <th>延迟</th>
                       <th>存量</th><th style="width:64px"></th>
                     </tr>
                   </thead>
-                  <tbody>                    <tr>
-                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
-                      <td class="l name">德国步兵</td>
-                      <td>—</td><td>—</td><td>—</td><td>—</td>
-                      <td class="l tags">—</td>
-                      <td>5</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                  <tbody>
+                    <tr><td colspan="10" class="fdelay">延迟 <b>1</b> 回合 · 8 条 —— 这一批要等 1 个回合才能部署</td></tr>
                     <tr>
                       <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
                       <td class="l name">德国步兵</td>
                       <td>—</td><td>—</td><td>—</td><td>—</td>
                       <td class="l tags">—</td>
-                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                      <td class="dl">1</td>
+                      <td>10</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
-                      <td><div class="thumb"><img alt="" data-tex="unit/ger_arm_42/sheet_L.png"></div></td>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_pz_42/sheet_L.png"></div></td>
                       <td class="l name">德国装甲兵</td>
                       <td>—</td><td>—</td><td>—</td><td>—</td>
                       <td class="l tags">—</td>
-                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                      <td class="dl">1</td>
+                      <td>4</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
-                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
-                      <td class="l name">德国步兵</td>
-                      <td>—</td><td>—</td><td>—</td><td>—</td>
-                      <td class="l tags">—</td>
-                      <td>9</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
-                    <tr>
-                      <td><div class="thumb"><img alt="" data-tex="unit/ger_arm_42/sheet_L.png"></div></td>
-                      <td class="l name">德国装甲兵</td>
-                      <td>—</td><td>—</td><td>—</td><td>—</td>
-                      <td class="l tags">—</td>
-                      <td>3</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
-                    <tr>
-                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
-                      <td class="l name">德国步兵</td>
-                      <td>—</td><td>—</td><td>—</td><td>—</td>
-                      <td class="l tags">—</td>
-                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
-                    <tr>
-                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_recon_39/hq_action_icon.png"></div></td>
-                      <td class="l name">Sd.Kfz.222</td>
-                      <td>5</td><td>4</td><td>1</td><td>0</td>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_recon_41/hq_action_icon.png"></div></td>
+                      <td class="l name">Sd.Kfz.232装甲车</td>
+                      <td>6</td><td>4</td><td>1</td><td>0</td>
                       <td class="l tags"><span class="ftag">侦察</span></td>
+                      <td class="dl">1</td>
                       <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
-                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_at_40/hq_action_icon.png"></div></td>
-                      <td class="l name">一号驱逐战车</td>
-                      <td>1</td><td>4</td><td>3</td><td>0</td>
-                      <td class="l tags"><span class="ftag">反坦克炮</span></td>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/rom_towed_arty_41/hq_action_icon.png"></div></td>
+                      <td class="l name">施耐德36式105毫米炮</td>
+                      <td>0</td><td>5</td><td>0</td><td>3</td>
+                      <td class="l tags"><span class="ftag">牵引式</span><span class="ftag">火炮</span></td>
+                      <td class="dl">1</td>
                       <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
                     <tr>
-                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_towed_at_42/hq_action_icon.png"></div></td>
-                      <td class="l name">88毫米高射炮</td>
-                      <td>2</td><td>8</td><td>4</td><td>0</td>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_towed_arty_42/hq_action_icon.png"></div></td>
+                      <td class="l name">leFH 18</td>
+                      <td>0</td><td>6</td><td>0</td><td>3</td>
+                      <td class="l tags"><span class="ftag">牵引式</span><span class="ftag">火炮</span></td>
+                      <td class="dl">1</td>
+                      <td>2</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_eng_dlc4/hq_action_icon.png"></div></td>
+                      <td class="l name">德国工兵</td>
+                      <td>5</td><td>8</td><td>0</td><td>0</td>
+                      <td class="l tags"><span class="ftag">工兵</span></td>
+                      <td class="dl">1</td>
+                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_towed_at_dlc3/hq_action_icon.png"></div></td>
+                      <td class="l name">Pak38型50毫米反坦克炮</td>
+                      <td>2</td><td>6</td><td>4</td><td>0</td>
                       <td class="l tags"><span class="ftag">牵引式</span><span class="ftag">反坦克炮</span></td>
-                      <td>2</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr></tbody>
+                      <td class="dl">1</td>
+                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="specialist/ger_asg_dlc4_opt/hq_action_icon.png"></div></td>
+                      <td class="l name">StuG IIIF</td>
+                      <td>4</td><td>6</td><td>5</td><td>1</td>
+                      <td class="l tags"><span class="ftag">反坦克炮</span><span class="ftag">火炮</span></td>
+                      <td class="dl">1</td>
+                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr><td colspan="10" class="fdelay">延迟 <b>2</b> 回合 · 2 条 —— 这一批要等 2 个回合才能部署</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
+                      <td class="l name">德国步兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
+                      <td class="dl">2</td>
+                      <td>4</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_pz_42/sheet_L.png"></div></td>
+                      <td class="l name">德国装甲兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
+                      <td class="dl">2</td>
+                      <td>2</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                    <tr><td colspan="10" class="fdelay">延迟 <b>10</b> 回合 · 1 条 —— 这一批要等 10 个回合才能部署</td></tr>
+                    <tr>
+                      <td><div class="thumb"><img alt="" data-tex="unit/ger_inf_42/sheet_L.png"></div></td>
+                      <td class="l name">德国步兵</td>
+                      <td>—</td><td>—</td><td>—</td><td>—</td>
+                      <td class="l tags">—</td>
+                      <td class="dl">10</td>
+                      <td>1</td><td style="font-family:var(--mono);color:var(--muted)">◀ ▶</td></tr>
+                  </tbody>
                 </table>
                 <div class="fprow" style="justify-content:flex-end;gap:8px;border-bottom:none">
                   <button class="btn" style="font-size:11.5px">＋ 添加条目</button>
@@ -2688,17 +2722,10 @@ document.querySelectorAll(".fpool .thumb img[data-tex]").forEach(im=>{
   img(im, SUR+im.dataset.tex);
 });
 
-/* 总部兵库缩略 —— U17 修：U16 把行改成了 <table> 的 <tr>，
-   原来的 ".fpool .fprow .thumb img" 匹配不到任何元素（图标全丢）⇒ 直接选 .thumb img。
-   贴图按行序给真实文件（单位类型用 unit/<type>/sheet_L.png，特种兵用
-   specialist/<type>/hq_action_icon.png，都是游戏包里的原件）。 */
-document.querySelectorAll(".fpool .thumb img").forEach((im,i)=>{
-  const srcs=[SUR+"unit/ger_pz_dlc7/sheet_L.png",      // 装备条目（德军装甲，单位贴图）
-              SUR+"unit/ger_mot_42/sheet_L.png",      // 装备条目（德军摩托化步兵）
-              SUR+"specialist/ger_towed_arty_42/hq_action_icon.png",  // leFH 18
-              SUR+"specialist/ger_at_42/hq_action_icon.png"];         // 三G突击炮
-  if(srcs[i]) img(im, srcs[i]);
-});
+/* U24：上面那段「按行序硬编码贴图」的旧写法**删掉了** ——
+   ① 它会覆盖 U19 引入的 data-tex 机制（行数一变就错位）；
+   ② 里面的贴图列表还留着 U19 已纠正的**编造数据**（「三G突击炮」游戏里根本没有）。
+   现在兵库缩略图**只有 data-tex 一条路**（HTML 里逐行写真实文件路径）。 */
 
 
 const CARD_WL = {

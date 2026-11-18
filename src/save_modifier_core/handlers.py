@@ -796,12 +796,14 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
     #   判重范围**只限这一个总部** —— 每个总部的兵库独立。
     ident = _entry_identity(new)
     delay = new.get("delay", 0)
+    others = []
     for i, e in enumerate(pool):
         if not isinstance(e, dict):
             continue
         if _entry_identity(e) != ident:
             continue
         if e.get("delay", 0) != delay:
+            others.append((i + 1, e.get("delay", 0), e.get("quantity")))
             continue
         oc.errors.append(
             f"总部 {hq_id} 的兵库已经有「{_entry_label(new)}」了"
@@ -809,6 +811,15 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
             f"**同一个总部里不能有两条延迟同为 {delay} 的同样条目**；"
             "延迟不同的可以共存")
         return oc
+    if others:
+        # 游戏自己的合并键 = (delay, nationality, spec|equipment)
+        # （`ForcePool.add` 延迟模式：命中同键就把 quantity 加到已有那条上，不新建）
+        # ⇒ 延迟不同 ⇒ 键不同 ⇒ 两条独立条目，**分批上线**。
+        where = "、".join(f"第 {i} 条（延迟 {d} 回合，数量 {q}）" for i, d, q in others)
+        oc.warnings.append(
+            f"本总部已有同样的「{_entry_label(new)}」：{where} —— "
+            f"**延迟不同可以共存**（游戏按延迟分批上线："
+            f"延迟 {delay} 的这批要等 {delay} 个回合才能部署）")
 
     pool.insert(index, new)
     hq["force_pool"] = pool

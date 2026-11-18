@@ -262,6 +262,13 @@ class TestForcePoolDuplicate(SpecPoolTestBase):
         self.assertTrue(res.ok, res.errors)
         self.assertEqual(self._pool()[-1]["nationality"], "us")
 
+    def test_same_spec_different_delay_warns_about_staggering(self):
+        """同身份、延迟不同 ⇒ 允许，但要提示「分批上线」的语义。"""
+        plan, res = self.commit([Edit.hq_force_pool_add(
+            5, {"quantity": 2, "spec": "ger_arty_40", "delay": 2})])
+        self.assertTrue(res.ok, res.errors)
+        self.assertTrue(any("分批上线" in w for w in plan.warnings), plan.warnings)
+
     def test_duplicate_equipment_is_rejected_too(self):
         """装备条目同样按身份判重（身份 = 类别 + 国籍）。"""
         plan = self.plan([Edit.hq_force_pool_add(
