@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>统一指挥 2 存档修改器</title>
+<style>
+:root{
+  --window:#f4f6f8; --surface:#f7f8fa; --surface-alt:#eef1f4;
+  --border:#d4dbe3; --text:#1f2933; --muted:#5c6b7a;
+  --accent:#245b8f; --accent-dark:#17456f; --accent-light:#dceaf7; --selection:#cfe3f5;
+  --ok:#1e6b3a; --ok-light:#e6f2ea; --warn:#8a5a00; --warn-light:#faf1e2;
+  --danger:#a42d2c; --danger-light:#fbe9ea; --stage:#e4eaf1;
+  --mono:"Cascadia Mono",Consolas,"SF Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--window);color:var(--text);
+  font:13px/1.5 "Microsoft YaHei UI","Segoe UI",system-ui,sans-serif}
+button,input{font:inherit}
+
+/* ---------------- 启动页 ---------------- */
+#splash{min-height:100%;display:flex;flex-direction:column;align-items:center;
+  padding:56px 32px 32px}
+#splash h1{font-size:30px;font-weight:800;color:var(--accent-dark);margin:0 0 4px}
+#splash .sub{color:var(--muted);margin-bottom:22px}
+.picker{width:min(1180px,100%);background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;overflow:hidden}
+.picker .bar{display:flex;gap:10px;align-items:center;padding:12px 14px;
+  border-bottom:1px solid var(--border);background:var(--surface-alt)}
+.picker .bar input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
+  background:var(--surface);outline:none}
+.picker .bar input:focus{border-color:var(--accent)}
+.picker .bar button{padding:7px 14px;border:1px solid var(--border);border-radius:6px;
+  background:var(--surface);cursor:pointer}
+.picker .bar button:hover{border-color:var(--accent);color:var(--accent)}
+table.list{width:100%;border-collapse:collapse}
+table.list th{background:var(--accent-dark);color:#fff;text-align:left;padding:8px 12px;
+  font-size:12px;font-weight:600;position:sticky;top:0}
+table.list td{padding:7px 12px;border-bottom:1px solid var(--surface-alt);font-size:12.5px}
+table.list tbody tr:hover{background:var(--accent-light)}
+table.list tbody tr{cursor:pointer}
+table.list td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
+table.list td.k{color:var(--muted)}
+#splash .empty{padding:26px;text-align:center;color:var(--muted)}
+
+/* ---------------- 主界面 ---------------- */
+#app{display:none;height:100vh;flex-direction:column}
+.hdr{display:flex;align-items:center;gap:10px;padding:9px 14px;
+  background:var(--surface);border-bottom:1px solid var(--border)}
+.hdr .logo{width:24px;height:24px;border-radius:6px;background:var(--accent);
+  color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px}
+.hdr .title{font-weight:700;color:var(--accent-dark)}
+.hdr .caps{font-size:11.5px;color:var(--muted);display:flex;gap:9px;align-items:center;
+  flex-wrap:wrap;margin-left:6px}
+.hdr .caps b{font-weight:700}
+.hdr .sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:1px 7px;
+  border-radius:9px;border:1px solid var(--border);background:var(--surface-alt);color:var(--muted)}
+.pill.on{background:var(--ok-light);border-color:#a8d5bb;color:var(--ok)}
+.pill.off{background:var(--danger-light);border-color:#e8b3b2;color:var(--danger)}
+.btn{padding:6px 13px;border:1px solid var(--border);border-radius:6px;background:var(--surface);
+  cursor:pointer}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.btn.pri:hover{background:var(--accent-dark);color:#fff}
+
+.body{flex:1;display:flex;min-height:0}
+.rail{width:168px;flex:none;background:var(--surface);border-right:1px solid var(--border);
+  padding:8px 0}
+.rail .grp{font-size:10.5px;color:var(--muted);letter-spacing:.08em;padding:10px 14px 4px}
+.rail .nav{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12.5px}
+.rail .nav:hover{background:var(--accent-light)}
+.rail .nav.on{background:var(--selection);color:var(--accent-dark);font-weight:600}
+.rail .nav .ic{width:16px;text-align:center;color:var(--muted)}
+.rail .nav.on .ic{color:var(--accent)}
+.work{flex:1;min-width:0;display:flex;flex-direction:column}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  margin:14px;overflow:hidden}
+.panel>h3{margin:0;padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--accent-dark);
+  border-bottom:1px solid var(--border);background:var(--surface-alt)}
+.pbody{padding:14px}
+.placeholder{padding:34px;text-align:center;color:var(--muted)}
+.placeholder .big{font-size:15px;color:var(--text);margin-bottom:6px}
+.capgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.capcard{border:1px solid var(--border);border-radius:7px;padding:10px 12px;background:var(--surface)}
+.capcard .h{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:4px}
+.capcard .r{font-size:11.5px;color:var(--danger)}
+.capcard.ok .h{color:var(--ok)}
+.capcard.off{border-color:#e8b3b2;background:var(--danger-light)}
+.capcard.off .h{color:var(--danger)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12.5px}
+.kv .k{color:var(--muted)}
+.kv .v{font-family:var(--mono)}
+.status{display:flex;align-items:center;gap:14px;padding:6px 14px;
+  background:var(--surface);border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.status .ok{color:var(--ok)} .status .no{color:var(--danger)}
+.note{border:1px solid var(--border);border-radius:7px;background:var(--surface-alt);
+  padding:10px 12px;font-size:11.5px;color:var(--muted);line-height:1.6}
+.note b{color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- ============ 启动页 ============ -->
+<div id="splash">
+  <h1>统一指挥 2 存档修改器</h1>
+  <div class="sub">选一个存档开始</div>
+  <div class="picker">
+    <div class="bar">
+      <input id="q" placeholder="搜索存档…">
+      <span style="font-size:11.5px;color:var(--muted)" id="cnt"></span>
+      <button onclick="reload()">刷新</button>
+    </div>
+    <table class="list">
+      <thead><tr><th>存档</th><th>类型</th><th>状态</th><th>最后修改</th><th style="text-align:right">大小</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" style="display:none">没有匹配的存档</div>
+  </div>
+  <div class="note" style="width:min(1180px,100%);margin-top:14px">
+    <b>界面层说明</b>：这一版是 <b>U26 技术路线</b>的落地 —— 界面 = HTML/CSS，
+    Python 只起一个本地 <code>127.0.0.1</code> 服务（带随机 token），核心库
+    <code>save_modifier_core</code> 负责读存档与校验。<br>
+    目前是<b>地基</b>：启动页 + 概览页接的是<b>真实数据</b>；其余 6 个功能页等
+    GUI 微调需求定稿后再做（《GUI设计规范.md》§7）。
+  </div>
+</div>
+
+<!-- ============ 主界面 ============ -->
+<div id="app">
+  <div class="hdr">
+    <span class="logo">U2</span>
+    <span class="title" id="hTitle">存档修改器</span>
+    <span class="caps" id="hCaps"></span>
+    <span class="sp"></span>
+    <button class="btn">↶ 撤销</button>
+    <button class="btn pri">应用更改 <span id="hPending">0</span></button>
+  </div>
+  <div class="body">
+    <div class="rail">
+      <div class="grp">功能</div>
+      <div class="nav on" data-p="overview"><span class="ic">▤</span>概览</div>
+      <div class="nav" data-p="units"><span class="ic">▥</span>单位</div>
+      <div class="nav" data-p="hqs"><span class="ic">▧</span>总部</div>
+      <div class="nav" data-p="cards"><span class="ic">▨</span>卡牌</div>
+      <div class="nav" data-p="store"><span class="ic">▩</span>商店</div>
+      <div class="nav" data-p="theater"><span class="ic">▪</span>战区资产</div>
+      <div class="nav" data-p="campaign"><span class="ic">◈</span>战役</div>
+    </div>
+    <div class="work" id="work"></div>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+let SAVES = [], VIEW = null, PAGE = "overview";
+
+const FEATURE_CN = {units:"单位", hqs:"总部", hand:"手牌", shelf:"货架",
+  store:"商店", theater_assets:"战区资产", restore_hand:"恢复上次会议牌局"};
+const PAGE_CN = {overview:"概览", units:"单位", hqs:"总部", cards:"卡牌",
+  store:"商店", theater:"战区资产", campaign:"战役"};
+
+async function api(path){
+  const r = await fetch(path, {headers:{"X-Token":TOKEN}});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+/* ---------------- 启动页 ---------------- */
+async function reload(){
+  const d = await api("/api/saves");
+  SAVES = d.saves || [];
+  paint();
+}
+function paint(){
+  const q = (document.getElementById("q").value||"").trim().toLowerCase();
+  const list = SAVES.filter(s => !q ||
+    (s.name+" "+s.display+" "+s.campaign).toLowerCase().includes(q));
+  document.getElementById("cnt").textContent = list.length + " 个存档";
+  document.getElementById("empty").style.display = list.length ? "none":"block";
+  document.getElementById("rows").innerHTML = list.map(s => `
+    <tr onclick="openSave('${encodeURIComponent(s.save_id)}')">
+      <td>${esc(s.name)}<div style="color:var(--muted);font-size:11.5px">${esc(s.display)}</div></td>
+      <td class="k">${esc(s.kind)}</td>
+      <td class="k">${esc(s.scenario||"—")}</td>
+      <td class="num">${esc(s.mtime)}</td>
+      <td class="num">${esc(s.size)}</td>
+    </tr>`).join("");
+}
+document.getElementById("q").addEventListener("input", paint);
+
+function esc(s){ return String(s??"").replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function openSave(sid){
+  VIEW = await api("/api/view/" + sid);
+  document.getElementById("splash").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("hTitle").textContent = VIEW.save.display || VIEW.save.name;
+  document.getElementById("hCaps").innerHTML = (VIEW._features||[]).map(f =>
+    `<span class="pill ${f.ok?'on':'off'}" title="${esc(f.reason)}">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</span>`
+  ).join("");
+  document.getElementById("status").innerHTML =
+    `能力位：${(VIEW._features||[]).filter(f=>f.ok).length}/${(VIEW._features||[]).length} 可用` +
+    ` · 声望 <b class="ok">${VIEW.prestige??"—"}</b> · 分数 <b>${VIEW.score??"—"}</b>` +
+    ` · 单位 <b>${(VIEW.units||[]).length}</b> · 总部 <b>${(VIEW.hqs||[]).length}</b>`;
+  show(PAGE);
+}
+
+document.querySelectorAll(".rail .nav").forEach(n =>
+  n.addEventListener("click", ()=>{ PAGE=n.dataset.p;
+    document.querySelectorAll(".rail .nav").forEach(x=>x.classList.toggle("on", x===n));
+    show(PAGE); }));
+
+function show(p){
+  const w = document.getElementById("work");
+  if(p==="overview"){
+    const caps = (VIEW._features||[]).map(f=>`
+      <div class="capcard ${f.ok?'ok':'off'}">
+        <div class="h">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</div>
+        ${f.ok?"":`<div class="r">${esc(f.reason)}</div>`}
+      </div>`).join("");
+    w.innerHTML = `<div class="panel"><h3>概览 · 能力位体检</h3>
+      <div class="pbody"><div class="capgrid">${caps}</div>
+      <div class="note" style="margin-top:12px">
+        <b>这一版能做什么</b>：读存档、列能力位。<br>
+        <b>还不能做什么</b>：改数据 —— 写操作等 GUI 微调需求定稿后接上
+        （核心库的 <code>plan_edit</code> / <code>commit</code> / <code>undo</code> 早就有）。
+      </div></div></div>`;
+    return;
+  }
+  w.innerHTML = `<div class="panel"><h3>${PAGE_CN[p]||p}</h3>
+    <div class="placeholder"><div class="big">这一页还没做</div>
+    等 GUI 微调需求提完，按最终视觉稿一次性实现（避免返工）。</div></div>`;
+}
+
+reload().catch(e => {
+  document.getElementById("rows").innerHTML =
+    `<tr><td colspan="5" style="color:var(--danger)">加载失败：${esc(e.message)}</td></tr>`;
+});
+</script>
+</body>
+</html>

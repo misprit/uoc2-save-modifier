@@ -56,15 +56,17 @@ OUT = OUT_DIR / f"{PKG_NAME}-v{VERSION}.zip"
 INCLUDE_DIRS = ("python", "lib", "src", "tests", "docs")
 
 #: 单个文件打进去
-INCLUDE_FILES = ("run.bat", "run_gui.bat", "run_tests.bat", "使用说明.txt")
+INCLUDE_FILES = ("run.bat", "run_gui.bat", "run_web.bat", "run_tests.bat", "使用说明.txt")
 
 #: 目录名黑名单（任意层级）
 #:
 #: ⚠️ **`data` 只在仓库根层级跳过** —— `src/save_modifier_core/data/`
 #:    装的是**内置索引**（campaign_index.json，U18 起），
 #:    漏掉它 ⇒ 战役只读页在别的机器上降级成「没有会议→场景列表」。
+#: ⚠️ `_edge_profile` 是 **U26 Web GUI 的运行时 profile**（Edge 自己的
+#:    独立用户目录）—— 它是**缓存**，不进包。
 SKIP_DIRS = {"__pycache__", ".git", ".gitignore", "dist",
-             ".pytest_cache", ".idea", ".vscode"}
+             ".pytest_cache", ".idea", ".vscode", "_edge_profile"}
 
 #: 只在**仓库根层级**跳过的目录名
 SKIP_DIRS_ROOT = {"data"}
@@ -148,6 +150,10 @@ def main() -> int:
     must = [
         f"{PKG_NAME}/run.bat",
         f"{PKG_NAME}/run_gui.bat",
+        f"{PKG_NAME}/run_web.bat",                           # U26 Web GUI 入口
+        f"{PKG_NAME}/src/save_modifier_web/__init__.py",
+        f"{PKG_NAME}/src/save_modifier_web/server.py",
+        f"{PKG_NAME}/src/save_modifier_web/web/index.html",  # U26 界面层（HTML/CSS）
         f"{PKG_NAME}/src/save_modifier_core/__init__.py",
         f"{PKG_NAME}/src/save_modifier_core/locale.py",
         f"{PKG_NAME}/src/save_modifier_core/campaigns.py",            # U18 战役只读

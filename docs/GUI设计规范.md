@@ -2636,6 +2636,29 @@ PNG 文件
   机器上实在没有 Edge 时至少能看能查；
 * `tests/test_gui_smoke.py` 的**接口约定**（Rail 顺序、能力位判定、占位框规则）继续有效。
 
+#### 10.10.1 U27 落地状态（地基已就位）
+
+| 件 | 位置 | 说明 |
+|---|---|---|
+| HTTP 桥 | `src/save_modifier_web/server.py` | 本地 `127.0.0.1` 服务 + **随机 token** + 静态文件 |
+| 界面 | `src/save_modifier_web/web/index.html` | 单文件（HTML + CSS + JS），配色取自视觉稿 PALETTE |
+| 入口 | `run_web.bat` | 跟 `run_gui.bat` 并存（后者是降级简版） |
+| 只读接口 | `GET /api/saves`、`GET /api/view/<save_id>` | 前者给存档列表，后者给完整 View + 能力位体检 |
+| Edge profile | `%LOCALAPPDATA%\.uoc2\edge_profile` | **不进源码树**（几百 MB 浏览器缓存） |
+
+**⚠️ 只读接口的可用性判定**：`Capabilities.unavailable_reason()` 是**原因文案表**
+（永远返回字符串），**不能**拿它判「能不能用」——
+可用性一律看 `can_edit_units` / `can_edit_hqs` / `can_edit_hand` /
+`can_edit_shelf` / `can_edit_store` / `can_edit_theater_assets` /
+`can_restore_hand`。U27 踩过这个坑（一度所有能力位都显示为不可用）。
+
+**写操作（`plan_edit` / `commit` / `undo`）暂未接** ——
+等 GUI 微调需求定稿、交互方式定下来再定接口形状（核心库那边早就有这三个）。
+
+**安全边界**（`tests/test_web_gui.py` 守着）：
+`/api/*` 必须带 token（403）；静态文件**目录穿越**被挡（`/../server.py` 读不到源码）；
+只监听 `127.0.0.1`。
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
@@ -3618,6 +3641,29 @@ eff = uses_turn                (uses_total 为 None 时)
 
 ⇒ 详见 §10.10。
 
+### 13.2q 批次二十 · U27（2026-11-18 · U26 路线落地）
+
+> 承接 U26：用户同意技术路线，并说「**我对 gui 的微调需求还没提完**」。
+
+**U27 做了什么**：把 U26 的路线**落地成能跑的东西**，同时**避开返工**：
+
+| 做 | 不做（等 GUI 需求定稿） |
+|---|---|
+| HTTP 桥 + JSON API + Edge `--app` 窗口管理 | 7 个功能页的**界面实现** |
+| 前端框架 + **真实数据**接入（68 个存档 / 能力位体检） | 各页交互细节（滚轮 / 悬停 / 二次确认） |
+| 「存档选择页 + 概览页」按视觉稿做成**真·可运行** | 视觉稿的最终定稿 |
+
+⇒ **地基不会因为后续的 UI 微调返工**；而页面实现推迟到最后，可以**照最终稿一次画对**。
+
+**实测**：随包 Python 起服务 ⇒ `http://127.0.0.1:<port>/?t=<token>`
+⇒ Edge `--app` **独立窗口**（无地址栏、无标签页）⇒ 68 个存档的真实列表 ✓（已截图）。
+
+**踩到的坑**：`Capabilities.unavailable_reason()` 是**原因文案表**（永远返回字符串），
+拿它判可用性 ⇒ 能力位**全显示不可用**。正确做法：可用性看 `can_edit_*` 属性。
+
+**新增**：`tests/test_web_gui.py`（7 项）—— 只读接口 + **token 校验** +
+**目录穿越防护**（界面层是唯一能被本机其它进程碰到的一层）。
+
 ### 13.3 我自己定的技术细节（只报备，不占你时间）
 
 #### U19 新增（批次十三）
@@ -3751,6 +3797,15 @@ eff = uses_turn                (uses_total 为 None 时)
 | WebView2 的代价？ | 要随包分发 `WebView2Loader.dll` + 写 COM 绑定（embeddable Python 装 `pythonnet` 很麻烦） |
 | 核心库要改吗？ | **不改** —— 读写存档 / 校验 / 备份 / 撤销全在 `save_modifier_core` |
 | tkinter 那套要删吗？ | **不删** —— 降级为「没有 Edge 时的备用简版」，`test_gui_smoke.py` 的接口约定继续有效 |
+
+#### U27 新增（批次二十）
+
+| 问题 | 结论 |
+|---|---|
+| 地基先做还是页面先做？ | **地基先做** —— 地基不受 UI 微调影响；页面照最终稿一次画对，避免返工 |
+| 能力位怎么判可用？ | 用 `can_edit_*` 属性；`unavailable_reason()` 只是**原因文案表**（永远返回字符串） |
+| 界面层要测什么？ | **令牌校验** + **目录穿越防护**（它是唯一开了端口的一层） |
+| Edge profile 放哪？ | `%LOCALAPPDATA%\.uoc2\edge_profile` —— 几百 MB 缓存**不进源码树** |
 
 ### 13.4 已由数据 / 实证回答，不再问
 

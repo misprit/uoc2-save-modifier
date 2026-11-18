@@ -23,6 +23,9 @@ config.yml
 # ---- 存档样本与备份（含游戏自身约定的 <存档名>_BACKUP.usg）----
 *.usg
 
+# ---- U26 Web GUI 的 Edge 运行时 profile（几百 MB 缓存）----
+_edge_profile/
+
 # ---- Python 缓存 / 虚拟环境 ----
 # 注意：不要忽略 *.pyd —— python/Lib/site-packages/yaml/_yaml*.pyd 是必需的 C 扩展
 __pycache__/
