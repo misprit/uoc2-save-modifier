@@ -159,6 +159,46 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
   background:var(--danger);color:#fff;font-size:10px;display:grid;place-items:center}
 .specwrap{position:relative}
 
+/* ---------- 特种兵区（2026-11-18 并入单位页） ---------- */
+.specbox{margin-top:14px;border:1px solid var(--border);border-radius:8px;
+  background:var(--surface);overflow:hidden}
+.sbhead{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--surface-alt);
+  border-bottom:1px solid var(--border)}
+.sbhead .sbt{font-size:13px;font-weight:700;color:var(--accent-dark)}
+.sbhead .sbm{font-size:12px;color:var(--muted)}
+.sbhead .sbm b{font-family:var(--mono);color:var(--accent-dark);font-size:13px}
+.sbhead .sbhint{font-size:11px;color:var(--muted)}
+.sbhead .sp{flex:1}
+/* 已挂槽位：图标 + 名字（点击 = 卸下） */
+.specslots{display:flex;gap:9px;padding:11px 12px;align-items:center;flex-wrap:wrap}
+.slot{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;border:1px solid var(--border);
+  border-radius:7px;background:var(--surface-alt);cursor:pointer}
+.slot:hover{border-color:var(--danger);background:var(--danger-light)}
+.slot:hover .slotname{color:var(--danger)}
+.slot .sq{width:34px;height:34px;border-radius:5px;background:var(--stage);border:1px solid var(--stage-edge);
+  display:grid;place-items:center;overflow:hidden;flex:none}
+.slot .sq img{max-width:100%;max-height:100%;object-fit:contain}
+.slot .slotname{font-size:12.5px;font-weight:600}
+.slot.empty{border-style:dashed;background:var(--surface);color:var(--muted);cursor:default;padding:5px 24px}
+.slot.empty:hover{border-color:var(--border);background:var(--surface)}
+/* 备选池：只图标；悬停出名字 + 数值 */
+.specpool{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;max-height:176px;overflow:auto}
+.pcell{width:42px;height:42px;border-radius:6px;background:var(--stage);
+  border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;cursor:pointer}
+.pcell img{max-width:100%;max-height:100%;object-fit:contain}
+.pcell:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(36,91,143,.2)}
+.pcell.blocked{opacity:.32;filter:grayscale(.92);cursor:not-allowed}
+.pcell.blocked:hover{border-color:var(--stage-edge);box-shadow:none}
+/* 悬停提示（深色浮层） */
+.tip{position:absolute;z-index:99;background:#1b2430;color:#fff;border-radius:6px;padding:7px 10px;
+  font-size:11.5px;line-height:1.55;white-space:nowrap;pointer-events:none;opacity:0;
+  transition:opacity .12s;box-shadow:0 8px 22px rgba(10,20,30,.32)}
+.tip.show{opacity:1}
+.tip .tn{font-weight:700;font-size:12.5px;display:block;margin-bottom:1px}
+.tip .tr{color:#a9bacb}
+.tip .tag{display:inline-block;background:#2c3a4a;border-radius:3px;padding:0 5px;margin:3px 3px 0 0;
+  font-size:10.5px}
+
 /* 抽屉 */
 /* 待应用清单 = **底部面板**，不是浮层 —— 展开时把工作区压矮，永不遮挡内容 */
 .drawer{position:relative;right:auto;bottom:auto;width:auto;margin-top:12px;
@@ -403,7 +443,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 </div>
 
 <h2>2 · 主窗口 · 单位页</h2>
-<p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 7 个功能页，底部是常驻的待应用面板（展开时压矮工作区，永不遮挡详情区）。</p>
+<p class="lead">核心操作 3 步：<b>选存档</b> → <b>悬停滚轮</b> → <b>应用更改</b>。左侧 Rail 走 6 个功能页（<b>特种兵已并入本页</b>），底部是常驻的待应用面板（展开时压矮工作区，永不遮挡详情区）。</p>
 
 <div class="app">
   <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>
@@ -423,7 +463,6 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
       <div class="grp">功能</div>
       <div class="nav"><span class="ic">▤</span>概览</div>
       <div class="nav on"><span class="ic">▥</span>单位<span class="ct">3</span></div>
-      <div class="nav"><span class="ic">▦</span>特种兵</div>
       <div class="nav"><span class="ic">▧</span>总部</div>
       <div class="nav"><span class="ic">▨</span>卡牌</div>
       <div class="nav"><span class="ic">▩</span>商店</div>
@@ -436,10 +475,9 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
     <div class="work has-drawer">
       <div class="toolbar">
         <input class="inp" placeholder="搜索单位 / ID…" style="width:210px">
-        <span class="sel">按总部 ▾</span>
-        <label class="chk"><input type="checkbox"> 只看未满战力</label>
-        <label class="chk"><input type="checkbox"> 只看被压制的</label>
-        <label class="chk"><input type="checkbox"> 只看有改动的</label>
+        <span class="sel">阵营：全部 ▾</span>
+        <label class="chk"><input type="checkbox" checked> 当前战斗激活的单位</label>
+        <label class="chk"><input type="checkbox"> 有改动的单位</label>
         <span class="sp"></span>
         <span style="font-size:12px;color:var(--muted)">已选 3 个</span>
         <button class="btn">批量调整</button>
@@ -459,19 +497,13 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
               <div>
                 <div class="dtitle">第 1 装甲师 <span class="edit">✎ 改名</span></div>
                 <div class="dsub">us_arm_42 · 装甲 / 机械化 · 美军</div>
-                <div class="pips" style="margin-top:8px">
-                  <span class="pip on"></span><span class="pip on"></span><span class="pip on"></span>
-                  <span class="pip on"></span><span class="pip sup"></span>
-                  <span class="pip"></span><span class="pip"></span>
-                </div>
-                <div class="umeta">兵力 <b style="font-family:var(--mono);color:var(--accent-dark)">5 / 7</b> · 未被压制 4 · 被压制 1 · 经验 120</div>
               </div>
             </div>
 
             <div class="stats" style="grid-template-columns:1fr 1fr">
-              <div class="stat" style="grid-column:1 / -1">
+              <div class="stat">
                 <div class="lb"><span>兵力</span>
-                  <span class="hintw">战斗外改会被重算 · 战斗中立即生效</span></div>
+                  <span class="hintw">血条滚轮调压制 · 数字滚轮调血量</span></div>
                 <div class="blood">
                   <div class="bar" title="在这里滚轮 = 调被压制的量">
                     <span class="pip on"></span><span class="pip on"></span>
@@ -485,22 +517,33 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                   <span><i style="background:var(--accent)"></i>未被压制 4</span>
                   <span><i style="background:var(--stage-sup)"></i>被压制 1</span>
                   <span><i style="background:var(--surface-alt);border:1px solid var(--border)"></i>还差 2</span>
-                  <span style="margin-left:auto;color:var(--accent)">血条滚轮调压制 · 数字滚轮调血量</span>
                 </div>
               </div>
               <div class="stat">
                 <div class="lb"><span>经验 XP</span><span class="hintw">Ctrl+滚轮 ±10</span></div>
-                <div class="v">120</div>
-                <div class="stepic"><span>满级 400</span></div>
-              </div>
-              <div class="stat">
-                <div class="lb"><span>战力阶梯</span><span class="hintw">升满还差 2 步</span></div>
-                <div class="stepic"><img id="stepimg" alt=""><span>升满战力还差 2 步</span></div>
+                <div class="v">120 <small>/ 400</small></div>
+                <div class="legend">
+                  <span style="color:var(--accent)">登陆单位补兵会掉一部分 XP</span>
+                </div>
               </div>
             </div>
 
-            <h3 style="padding:0;background:none;border:none;margin-top:14px">特种兵挂载 <span style="font-weight:400;color:var(--muted);font-size:11.5px">最多 min(3, max_spec)</span></h3>
-            <div class="specs" id="specs"></div>
+            <div class="specbox">
+              <div class="sbhead">
+                <span class="sbt">特种兵</span>
+                <span class="sbm">可挂 <b>3</b> · 已挂 <b>2</b></span>
+                <span class="sp"></span>
+                <span class="sbhint">点下方图标 = 挂到第一个空槽位 · 点已挂的图标 = 卸下</span>
+              </div>
+              <div class="specslots" id="slots"></div>
+              <div class="sbhead" style="border-top:1px solid var(--border)">
+                <span class="sbm">备选 · <b id="pooln">23</b> 种（当前单位可挂）</span>
+                <label class="chk"><input type="checkbox" id="allcb"> 显示全部 375 种</label>
+                <span class="sp"></span>
+                <span class="sbhint">悬停看 攻 / 防 / 装甲 / 火力 + 特殊类型</span>
+              </div>
+              <div class="specpool" id="pool"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -530,65 +573,76 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 
   <div class="status">
-    <span>能力位：<span class="ok">单位✓</span> <span class="ok">特种兵✓</span> <span class="ok">总部✓</span>
+    <span>能力位：<span class="ok">单位✓</span> <span class="ok">总部✓</span>
       <span class="ok">卡牌✓</span> <span class="ok">商店✓</span> <span class="no">战区资产✗（不在战斗中）</span></span>
     <span style="flex:1"></span>
     <span>就绪 · 未改动磁盘</span>
   </div>
 </div>
 
-<h2>3 · 特种兵页（图鉴只读 + 挂载可改）</h2>
-<p class="lead"><b>数值在游戏包里，存档里没有</b> —— <code>entity_types/specialists/*.yml</code> 定义攻/防/装/火，
-存档 <code>units.yml</code> 的 <code>specs</code> 只有 <code>{active, captured, idx, type}</code>。
-所以这一页是<b>图鉴（只读）+ 挂载（可改）</b>，不是编辑器。</p>
+<h2>3 · 特种兵挂载规则（已并入单位页）</h2>
+<p class="lead"><b>特种兵页已取消</b> —— 挂载 / 卸下是「某个单位的事」，跟单位放在一起才对。
+这一段不再是功能页，只把<b>游戏自己的挂载规矩</b>写清楚（GUI 的备选区要照它过滤）。</p>
+
+<div class="note">
+  <b>游戏的判定</b>（字节码 <code>unit.pyc::UnitState._can_add_specialist_no_len</code>）：
+  <ol style="margin:8px 0 0;padding-left:20px">
+    <li><b>阵营必须相同</b> —— 单位的 <code>type.faction</code> = 特种兵的 <code>faction</code>；</li>
+    <li><b>国籍必须相同</b>；或者单位的国籍有「父国籍」且父国籍 = 特种兵的国籍
+        （例：<code>italian.parent_nationality = german</code> ⇒ 德军单位可挂意大利特种兵）；</li>
+    <li><code>captured=True</code>（被俘获的牌）跳过上面两条。</li>
+  </ol>
+  容量另算：<code>len(specs) &lt; max_spec</code>，
+  而 <code>max_spec = min(3, 类型表的 max_spec)</code>（实测分布：1×233 / 2×314 / 3×80）。
+</div>
+
 <div class="app">
   <div class="body" style="min-height:0">
-    <div class="rail" style="width:150px">
-      <div class="grp">功能</div>
-      <div class="nav"><span class="ic">▤</span>概览</div>
-      <div class="nav"><span class="ic">▥</span>单位</div>
-      <div class="nav on"><span class="ic">▦</span>特种兵</div>
-      <div class="nav"><span class="ic">▧</span>总部</div>
-      <div class="nav"><span class="ic">▨</span>卡牌</div>
-      <div class="nav"><span class="ic">▩</span>商店</div>
-    </div>
-    <div class="work">
-      <div class="toolbar">
-        <input class="inp" placeholder="搜索特种兵…" style="width:190px">
-        <span class="sel">按国籍 ▾</span><span class="sel">按阵营 ▾</span>
-        <label class="chk"><input type="checkbox"> 只看已挂载</label>
-        <span class="sp"></span>
-        <span style="font-size:12px;color:var(--muted)">375 种 · 数值只读</span>
-      </div>
-      <div class="cols cols-wide">
-        <div class="panel">
-          <h3>特种兵图鉴 · 375 种 <span class="ro">数值来自游戏包，只读</span></h3>
-          <div class="grid" id="specgrid"></div>
-        </div>
-        <div class="panel">
-          <h3>挂载</h3>
-          <div class="detail">
-            <div class="toolbar" style="margin-bottom:10px">
-              <span class="sel">单位：第 1 装甲师 ▾</span>
-            </div>
-            <div class="umeta" style="margin-bottom:8px">可挂 <b style="font-family:var(--mono);color:var(--accent-dark)">2</b>
-              · 已挂 <b style="font-family:var(--mono);color:var(--accent-dark)">1</b></div>
-            <div class="specs" id="specs2"></div>
-            <div class="note" style="border-radius:7px;border:1px solid var(--border);border-top:1px solid var(--border);margin-top:14px">
-              点左侧图鉴卡片 = <span class="w">挂到当前单位</span>。<br>
-              数值（攻/防/装/火）写在游戏包里，改它要改 mod，<b>不在本工具范围内</b>。
-            </div>
-            <div style="margin-top:12px">
-              <div class="grp" style="font-size:11px;color:var(--muted);padding:0 0 6px">全存档占用</div>
-              <div class="costs" style="border:1px solid var(--border);border-radius:7px;padding:8px 10px">
-                反坦克手 <b>×3</b> · 工兵 <b>×1</b> · 拖曳炮 <b>×1</b>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="panel" style="flex:1">
+      <h3>过滤后，每个单位能挂多少种（实测真实存档 + 游戏包）</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tr style="background:var(--surface-alt)">
+          <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">单位类型</td>
+          <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">阵营 / 国籍</td>
+          <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">可挂种数</td>
+          <td style="padding:7px 12px;border-bottom:1px solid var(--border);font-weight:600">备选区默认显示</td>
+        </tr>
+        <tr><td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">us_arm_42</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6">allies / us</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">23</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--muted)">23 种</td></tr>
+        <tr><td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">ger_inf_40</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6">axis / german</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">97</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--muted)">97 种</td></tr>
+        <tr><td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">sov_inf_41</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6">soviet / soviet</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;font-family:var(--mono)">61</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f0f3f6;color:var(--muted)">61 种</td></tr>
+      </table>
     </div>
   </div>
+</div>
+
+<div class="note">
+  <b>特殊类型（<code>flags</code>）的中文名游戏自带</b> —— locale 键 <code>id_sheet_spec_flag_*</code>：
+  <span class="tag" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:0 6px;margin:3px 3px 0 0;display:inline-block">at 反坦克炮</span>
+  <span class="tag" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:0 6px;margin:3px 3px 0 0;display:inline-block">arty 火炮</span>
+  <span class="tag" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:0 6px;margin:3px 3px 0 0;display:inline-block">towed 牵引式</span>
+  <span class="tag" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:0 6px;margin:3px 3px 0 0;display:inline-block">engineers 工程兵</span>
+  <span class="tag" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:0 6px;margin:3px 3px 0 0;display:inline-block">recon 侦察</span>
+  <span class="tag" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:0 6px;margin:3px 3px 0 0;display:inline-block">ski 雪橇</span>
+  <span class="tag" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:0 6px;margin:3px 3px 0 0;display:inline-block">lci 两栖</span>
+  <span class="tag" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);
+    border-radius:3px;padding:0 6px;margin:3px 3px 0 0;display:inline-block">special 特种</span>
+  <br>⇒ 悬停提示直接显示这些中文名，不用自己翻译。
 </div>
 
 <h2>4 · 总部页（经验 / 升级 / 兵库）</h2>
@@ -601,7 +655,6 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
       <div class="grp">功能</div>
       <div class="nav"><span class="ic">▤</span>概览</div>
       <div class="nav"><span class="ic">▥</span>单位</div>
-      <div class="nav"><span class="ic">▦</span>特种兵</div>
       <div class="nav on"><span class="ic">▧</span>总部<span class="ct">23</span></div>
       <div class="nav"><span class="ic">▨</span>卡牌</div>
       <div class="nav"><span class="ic">▩</span>商店</div>
@@ -686,7 +739,6 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
       <div class="grp">功能</div>
       <div class="nav"><span class="ic">▤</span>概览</div>
       <div class="nav"><span class="ic">▥</span>单位</div>
-      <div class="nav"><span class="ic">▦</span>特种兵</div>
       <div class="nav"><span class="ic">▧</span>总部</div>
       <div class="nav on"><span class="ic">▨</span>卡牌<span class="ct">4</span></div>
       <div class="nav"><span class="ic">▩</span>商店</div>
@@ -774,7 +826,6 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
       <div class="grp">功能</div>
       <div class="nav"><span class="ic">▤</span>概览</div>
       <div class="nav"><span class="ic">▥</span>单位</div>
-      <div class="nav"><span class="ic">▦</span>特种兵</div>
       <div class="nav"><span class="ic">▧</span>总部</div>
       <div class="nav"><span class="ic">▨</span>卡牌</div>
       <div class="nav on"><span class="ic">▩</span>商店</div>
@@ -1006,7 +1057,7 @@ const PALETTE = [
 ];
 
 const UNITS = [
-  {t:"us_arm_42",     name:"第 1 装甲师",      hq:"北部", st:5, sup:1, max:7, xp:120, spec:["bel_at_40","cz_s_eng_dlc9"]},
+  {t:"us_arm_42",     name:"第 1 装甲师",      hq:"北部", st:5, sup:1, max:7, xp:120, ms:3, spec:["us_recon_42","us_eng_42"]},
   {t:"us_inf_42",     name:"第 2 摩托化步兵",  hq:"北部", st:7, sup:0, max:7, xp:340},
   {t:"ger_inf_40",    name:"苏军近卫步兵",     hq:"南部", st:3, sup:2, max:7, xp:40,  spec:["bel_arty_towed_40"]},
   {t:"bel_cav_40",    name:"侦察骑兵",         hq:"北部", st:7, sup:0, max:7, xp:210, spec:["cz_s_recon_dlc9"]},
@@ -1015,14 +1066,34 @@ const UNITS = [
 ];
 
 const SPECIALISTS = [
-  ["bel_at_40","反坦克手",3,2,1],["cz_s_eng_dlc9","工兵",1,4,0],
-  ["bel_arty_towed_40","拖曳炮",0,6,4],["cz_s_recon_dlc9","侦察兵",3,4,0],
-  ["bul_s_armx_dlc9","装甲兵",5,5,3],["ff_arty_towed_dlc6","自行火炮",2,3,5],
-  ["cz_s_at_dlc9","突击兵",4,3,0],["bul_s_recon_dlc9","侦察兵",3,4,0],
-  ["cz_s_towed_arty_dlc9","牵引炮兵",0,4,3],["cz_s_armx_dlc9","装甲突击兵",5,5,3],
-  ["bul_s_towed_at_dlc9_opt","反坦克炮",1,4,2],["cz_s_towed_at_dlc9","反坦克炮",1,4,2]
+  ["us_armx_42","M4谢尔曼","9","5","2","0","us","allies",""],
+  ["us_armx_42_opt","DD谢尔曼","9","5","2","0","us","allies","lci"],
+  ["us_armx_dlc10","M4谢尔曼","8","7","3","0","us","allies",""],
+  ["us_armx_dlc6","M4谢尔曼","8","5","4","0","us","allies",""],
+  ["us_armx_dlc8","M4谢尔曼","8","7","3","0","us","allies",""],
+  ["us_arty_42","M7牧师","0","6","0","2","us","allies","arty"],
+  ["us_arty_dlc10","M7牧师","0","6","0","2","us","allies","arty"],
+  ["us_at_42","M10","4","7","3","0","us","allies","at"],
+  ["us_at_dlc10","M10","6","6","4","0","us","allies","at"],
+  ["us_at_dlc6","M10","4","5","4","0","us","allies","at"],
+  ["us_at_dlc8","M10","6","6","4","0","us","allies","at"],
+  ["us_eng_42","美国工兵","6","8","0","0","us","allies","engineers"],
+  ["us_eng_dlc10","美国工兵","6","8","0","0","us","allies","engineers"],
+  ["us_heavy_45_opt","M26重型坦克","12","9","4","0","us","allies",""],
+  ["us_heavy_dlc10","M26重型坦克","12","9","4","0","us","allies",""],
+  ["us_recon_42","M8灰狗","7","4","1","0","us","allies","recon"],
+  ["us_recon_dlc10","M8灰狗","7","4","1","0","us","allies","recon"],
+  ["us_spec_42","游骑兵","10","8","0","0","us","allies","special,lci"],
+  ["us_spec_dlc10_opt","游骑兵","9","8","0","0","us","allies","special,lci"],
+  ["us_spec_dlc8_opt","游骑兵","9","8","0","0","us","allies","special,lci"],
+  ["us_towed_arty_42","105毫米M2A1","0","6","0","3","us","allies","towed,arty"],
+  ["us_towed_arty_dlc10","105毫米M2A1","0","6","0","3","us","allies","towed,arty"],
+  ["us_towed_arty_dlc10_opt","155毫米“长腿汤姆”榴弹炮","0","8","0","4","us","allies","towed,arty"],
+  ["bel_arty_towed_40","155L Mod.1917","0","6","0","4","belgian","allies","towed,arty"],
+  ["bel_at_40","T-13","1","4","2","0","belgian","allies","at"],
+  ["nl_arty_towed_40","105毫米野战炮","0","5","0","2","dutch","allies","towed,arty"],
+  ["nl_recon_40","哈扎伦","3","2","0","0","dutch","allies","recon"]
 ];
-
 const THEATER = [
   ["air_attack","空袭"],["air_supply","空中补给"],["flying_artillery","飞行炮兵"],
   ["long_range_recon","远程侦察"],["naval_bombardment","舰炮轰击"],
@@ -1182,28 +1253,69 @@ UNITS.forEach((u,i)=>{
 
 /* 详情页：第 1 装甲师 = us_arm_42 ⇒ armor/2 ⇒ step_armor_2.png */
 unitImg(document.getElementById("d-ava"), "us_arm_42", "us_arm_42");
-img(document.getElementById("stepimg"), SUR+"steps/step_armor_2.png", "step");
 
-const sp = document.getElementById("specs");
-["bel_at_40","cz_s_eng_dlc9"].forEach(s=>{
-  const w=document.createElement("div"); w.className="specwrap";
-  w.innerHTML=`<div class="spec"><img alt=""></div><div class="spec">✕</div>`;
-  const imgs=w.querySelectorAll("img");
-  img(imgs[0], SUR+"specialist/"+s+"/hq_action_icon.png", s);
-  w.querySelectorAll(".spec")[1].style.cssText="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--danger);color:#fff;font-size:10px;display:grid;place-items:center";
-  sp.appendChild(w);
+/* ---------- 特种兵（并入单位页） ---------- */
+/* flags 的中文名游戏自带：locale 键 id_sheet_spec_flag_<flag> */
+const FLAG_CN={at:"反坦克炮", arty:"火炮", towed:"牵引式", engineers:"工程兵",
+               recon:"侦察", ski:"雪橇", lci:"两栖", special:"特种", aa:"防空炮"};
+const UNIT_NAT="us";                       /* 第 1 装甲师 = us_arm_42 ⇒ allies / us */
+const MOUNTED=["us_recon_42","us_eng_42"]; /* 已挂的两种 */
+const CAP=3;                                /* max_spec = min(3, 类型表) */
+const canMount=s=>s[7]==="allies" && s[6]===UNIT_NAT;
+
+/* 已挂槽位：图标 + 名字；点击 = 卸下 */
+const slots=document.getElementById("slots");
+MOUNTED.forEach(t=>{
+  const s=SPECIALISTS.find(x=>x[0]===t); if(!s) return;
+  const d=document.createElement("div"); d.className="slot";
+  d.innerHTML=`<div class="sq"><img alt=""></div><div class="slotname">${s[1]}</div>`;
+  img(d.querySelector("img"), SUR+"specialist/"+t+"/hq_action_icon.png", s[1]);
+  d.title="点击卸下这个特种兵";
+  slots.appendChild(d);
 });
-const add=document.createElement("div"); add.className="spec add"; add.textContent="＋";
-sp.appendChild(add);
+for(let i=MOUNTED.length;i<CAP;i++){
+  const e=document.createElement("div"); e.className="slot empty"; e.textContent="空位";
+  slots.appendChild(e);
+}
 
-/* 图鉴 */
-const sg=document.getElementById("specgrid");
-SPECIALISTS.forEach(([t,n,a,d,f])=>{
-  const c=document.createElement("div"); c.className="card";
-  c.innerHTML=`<div class="ci"><img alt=""></div><div class="cn">${n}</div>
-    <div class="cs">攻${a} 防${d} 装${f}</div><div class="used">已被 2 个单位使用</div>`;
-  img(c.querySelector("img"), SUR+"specialist/"+t+"/hq_action_icon.png", n);
-  sg.appendChild(c);
+/* 备选池：只显示图标；默认只显示「当前单位可挂的」 */
+const pool=document.getElementById("pool"), pooln=document.getElementById("pooln");
+const allcb=document.getElementById("allcb");
+const mountable=SPECIALISTS.filter(canMount);
+const blocked=SPECIALISTS.filter(s=>!canMount(s));
+function renderPool(){
+  pool.innerHTML="";
+  const list=allcb.checked ? mountable.concat(blocked) : mountable;
+  pooln.textContent=allcb.checked ? SPECIALISTS.length : mountable.length;
+  list.forEach(s=>{
+    const ok=canMount(s);
+    const c=document.createElement("div"); c.className="pcell"+(ok?"":" blocked");
+    c.innerHTML=`<img alt="">`;
+    img(c.querySelector("img"), SUR+"specialist/"+s[0]+"/hq_action_icon.png", s[1]);
+    const fl=s[8] ? s[8].split(",").map(f=>FLAG_CN[f]||f) : [];
+    const why=ok ? "点击挂到这个单位"
+                 : (s[7]!=="allies" ? `不可挂：阵营 ${s[7]} ≠ allies`
+                                    : `不可挂：国籍 ${s[6]} ≠ ${UNIT_NAT}`);
+    c.dataset.tip=`<span class="tn">${s[1]}</span>`
+      +`<span class="tr">攻 ${s[2]} · 防 ${s[3]} · 装甲 ${s[4]} · 火力 ${s[5]}</span><br>`
+      +(fl.length ? fl.map(f=>`<span class="tag">${f}</span>`).join("")
+                 : `<span class="tr">（无特殊类型）</span>`)
+      +`<br><span class="tr">${why}</span>`;
+    pool.appendChild(c);
+  });
+}
+renderPool();
+allcb.addEventListener("change", renderPool);
+
+/* 悬停提示（深色浮层） */
+const tip=document.createElement("div"); tip.className="tip"; document.body.appendChild(tip);
+document.addEventListener("mousemove",e=>{
+  const t=e.target.closest ? e.target.closest("[data-tip]") : null;
+  if(!t){ tip.classList.remove("show"); return; }
+  tip.innerHTML=t.dataset.tip; tip.classList.add("show");
+  const w=tip.offsetWidth, h=tip.offsetHeight;
+  tip.style.left=Math.min(e.pageX+14, document.documentElement.scrollWidth-w-8)+"px";
+  tip.style.top=Math.max(8, e.pageY-h-12)+"px";
 });
 
 /* 商店缩略（真实商店条目：步兵/装甲/拖曳炮…） */
@@ -1227,19 +1339,6 @@ document.querySelectorAll(".fpool .fprow .thumb img").forEach((im,i)=>{
   if(srcs[i]) img(im, srcs[i]);
 });
 
-/* ---------- 特种兵页 · 挂载面板 ---------- */
-const sp2=document.getElementById("specs2");
-if(sp2){
-  ["bel_at_40","cz_s_eng_dlc9"].forEach(s=>{
-    const w=document.createElement("div"); w.className="specwrap";
-    w.innerHTML=`<div class="spec"><img alt=""></div><div class="spec">✕</div>`;
-    img(w.querySelectorAll("img")[0], SUR+"specialist/"+s+"/hq_action_icon.png", s);
-    w.querySelectorAll(".spec")[1].style.cssText="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--danger);color:#fff;font-size:10px;display:grid;place-items:center";
-    sp2.appendChild(w);
-  });
-  const a2=document.createElement("div"); a2.className="spec add"; a2.textContent="＋";
-  sp2.appendChild(a2);
-}
 
 const CARD_WL = {
   playerFaction: 'axis',
