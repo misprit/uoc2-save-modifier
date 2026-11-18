@@ -87,10 +87,21 @@ def read_root_main(path: Path) -> dict:
 
 
 def _is_backup_name(stem: str) -> bool:
-    """备份 / 副本类文件名 —— 游戏或玩家自己造的，不算"当前存档"。"""
+    """备份 / 副本类文件名 —— 游戏或玩家自己造的，不算"当前存档"。
+
+    ⚠️ **必须认得备份链**（U28 修）：`make_backup` 的命名是
+    `<名字>_BACKUP.usg` / `_BACKUP_2.usg` / `_BACKUP_3.usg` …（数字递增）。
+    只认 `_backup` 结尾的话，**第 2 个以后的备份会被当成正常存档列进列表**
+    —— 实测用户的存档列表里混进过 `_BACKUP_2.usg`。
+    """
     low = stem.lower()
     if low.endswith("_backup") or low.endswith("_quick"):
         return True
+    # 备份链：`<名字>_backup_<数字>`
+    if "_backup_" in low:
+        tail = low.rsplit("_backup_", 1)[-1]
+        if tail.isdigit():
+            return True
     return "副本" in stem or "copy" in low
 
 

@@ -154,6 +154,91 @@ def api_view(save_id: str) -> dict:
         return data
 
 
+def _summary_of(obj) -> str:
+    """`summary` 在不同结果类上**有的方法是属性** —— 两种都要认。"""
+    v = getattr(obj, "summary", "")
+    if callable(v):
+        try:
+            v = v()
+        except Exception:
+            v = ""
+    return str(v or "")
+
+
+def _edits_from(payload):
+    """把前端传来的 `[{kind, params}]` 转成核心库的 `Edit` 列表。
+
+    ⚠️ `Edit.__post_init__` 会校验 `kind` 必须在 `EDIT_KINDS` 里 —— 非法 kind 直接抛。
+    """
+    from save_modifier_core.edits import Edit
+
+    out = []
+    for item in (payload or {}).get("edits") or []:
+        if not isinstance(item, dict):
+            raise ValueError("每条编辑必须是 {kind, params} 字典")
+        kind = item.get("kind")
+        params = item.get("params") or {}
+        if not isinstance(params, dict):
+            raise ValueError("params 必须是字典")
+        out.append(Edit(kind, params))
+    return out
+
+
+def api_plan(payload) -> dict:
+    """规划一批编辑（**不碰磁盘**）。"""
+    from save_modifier_core import Catalog, CorePaths, open_save
+
+    save_id = (payload or {}).get("save_id") or ""
+    catalog = Catalog(CorePaths.discover())
+    with open_save(save_id) as save:
+        plan = save.plan_edit(_edits_from(payload), catalog=catalog)
+        return {
+            "ok": plan.ok,
+            "errors": list(plan.errors),
+            "warnings": list(plan.warnings),
+            "notes": list(plan.notes),
+            "changes": [{"entry": c.entry, "notes": list(c.notes),
+                         "diff": c.diff, "layer": c.layer,
+                         "is_l3_exception": c.is_l3_exception}
+                        for c in plan.changes],
+        }
+
+
+def api_commit(payload) -> dict:
+    """提交一批编辑（备份 → 写回 → 压撤销栈）。"""
+    from save_modifier_core import Catalog, CorePaths, open_save
+
+    save_id = (payload or {}).get("save_id") or ""
+    catalog = Catalog(CorePaths.discover())
+    with open_save(save_id) as save:
+        plan = save.plan_edit(_edits_from(payload), catalog=catalog)
+        if not plan.ok:
+            return {"ok": False, "errors": list(plan.errors),
+                    "warnings": list(plan.warnings), "changes": []}
+        res = save.commit(plan)
+        return {"ok": res.ok or res.nothing_to_do,
+                "nothing_to_do": bool(res.nothing_to_do),
+                "errors": list(res.errors),
+                "warnings": list(res.warnings),
+                "changed": list(res.changed),
+                "backup": str(res.backup) if res.backup else "",
+                "summary": _summary_of(res)}
+
+
+def api_undo(payload) -> dict:
+    """撤销上一次提交（核心库自己的撤销栈）。"""
+    from save_modifier_core import open_save
+
+    save_id = (payload or {}).get("save_id") or ""
+    with open_save(save_id) as save:
+        if not save.undo_available():
+            return {"ok": False, "errors": ["没有可撤销的改动"], "summary": ""}
+        r = save.undo()
+        return {"ok": bool(getattr(r, "ok", True)),
+                "errors": list(getattr(r, "errors", []) or []),
+                "summary": _summary_of(r)}
+
+
 # ---------------------------------------------------------------- HTTP
 
 
@@ -231,7 +316,34 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(200, target.read_bytes(), ctype)
 
     def do_POST(self):
-        self._send(405, b"read-only for now", "text/plain; charset=utf-8")
+        u = urlparse(self.path)
+        path = unquote(u.path)
+        if not path.startswith("/api/"):
+            self._send(404, b"not found", "text/plain; charset=utf-8")
+            return
+        if not self._check_token():
+            return
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(n) if n else b"{}"
+            payload = json.loads(raw.decode("utf-8") or "{}")
+        except Exception as exc:
+            self._json({"ok": False, "errors": ["请求体不是合法 JSON：%s" % exc]}, 400)
+            return
+        try:
+            if path == "/api/plan":
+                self._json(_jsonable(api_plan(payload)))
+            elif path == "/api/commit":
+                self._json(_jsonable(api_commit(payload)))
+            elif path == "/api/undo":
+                self._json(_jsonable(api_undo(payload)))
+            else:
+                self._json({"ok": False, "errors": ["未知接口"]}, 404)
+        except ValueError as exc:
+            # 请求体不合法（非法 kind / params 不是字典 …）⇒ 400，不是 500
+            self._json({"ok": False, "errors": [str(exc)]}, 400)
+        except Exception as exc:
+            self._json({"ok": False, "errors": ["%s: %s" % (type(exc).__name__, exc)]}, 500)
 
 
 # ---------------------------------------------------------------- 启动
@@ -241,7 +353,7 @@ def _serve_forever(httpd):
     httpd.serve_forever(poll_interval=0.3)
 
 
-def run(serve_only: bool = False) -> int:
+def run(serve_only: bool = False, no_window: bool = False) -> int:
     """起服务 + 拉起 Edge 独立窗口；窗口关掉 ⇒ 服务一起退。"""
     token = secrets.token_urlsafe(16)
     _Handler.token = token
@@ -251,6 +363,15 @@ def run(serve_only: bool = False) -> int:
     threading.Thread(target=_serve_forever, args=(httpd,), daemon=True).start()
     url = "http://127.0.0.1:%d/?t=%s" % (port, token)
     print("[OK ] GUI 服务已启动：%s" % url)
+
+    if no_window:
+        print("（--no-window：只起服务，不拉窗口）")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            httpd.shutdown()
+        return 0
 
     if serve_only:
         print("（--serve：自己开浏览器）")
@@ -294,7 +415,7 @@ def run(serve_only: bool = False) -> int:
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    return run(serve_only="--serve" in argv)
+    return run(serve_only="--serve" in argv, no_window="--no-window" in argv)
 
 
 if __name__ == "__main__":

@@ -203,5 +203,36 @@ class TestView(unittest.TestCase):
             self.skipTest("本机没有独立场景存档")
 
 
+class TestBackupNameDetection(unittest.TestCase):
+    """U28：备份**链**必须被认出来（`_BACKUP` / `_BACKUP_2` / `_BACKUP_3` …）。
+
+    ⚠️ 修之前的 bug：`make_backup` 产生的 `_BACKUP_2.usg` 会被当成**正常存档**
+    列进存档列表（用户会看到自己的一堆备份）。
+    """
+
+    def test_plain_backup_suffix(self):
+        from save_modifier_core.discovery import _is_backup_name
+        self.assertTrue(_is_backup_name("west-Conference3-1_BACKUP"))
+        self.assertTrue(_is_backup_name("west-Conference3-1_quick"))
+
+    def test_backup_chain_with_number(self):
+        from save_modifier_core.discovery import _is_backup_name
+        for n in ("2", "3", "12", "100"):
+            self.assertTrue(
+                _is_backup_name("Blitzkrieg-ahistorical-Conference4-alter_BACKUP_" + n),
+                n)
+
+    def test_normal_names_are_not_backups(self):
+        from save_modifier_core.discovery import _is_backup_name
+        for stem in ("Stalingrad", "west-Husky", "Moscow-Conference1-2",
+                     "Blitzkrieg-ahistorical-Conference4-alter"):
+            self.assertFalse(_is_backup_name(stem), stem)
+
+    def test_copies_are_still_detected(self):
+        from save_modifier_core.discovery import _is_backup_name
+        self.assertTrue(_is_backup_name("Stalingrad - 副本 (2)"))
+        self.assertTrue(_is_backup_name("west-Husky copy"))
+
+
 if __name__ == "__main__":
     unittest.main()

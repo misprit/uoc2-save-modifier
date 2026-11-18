@@ -106,5 +106,112 @@ class TestSecurity(WebGuiTestBase):
         self.assertIn("存档修改器".encode("utf-8"), body)
 
 
+class TestWriteApi(WebGuiTestBase):
+    """写操作：plan / commit / undo。
+
+    ⚠️ **只用副本** —— `open_save()` 接受绝对路径，
+    所以这里传的是**副本的绝对路径**，绝不碰用户的真存档。
+    """
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="webwrite_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            p = str(info.path)
+            if "BACKUP" not in p and p.endswith(".usg"):
+                src = p
+                break
+        if src is None:
+            self.skipTest("本机没有存档")
+        self.copy = str(self.tmp / "copy.usg")
+        shutil.copyfile(src, self.copy)
+
+    def post(self, path, body):
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            self.url(path),
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Token": server._Handler.token},
+            method="POST")
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+
+    def test_plan_commit_undo_roundtrip(self):
+        """改声望 → 提交 → 撤销 → 复原。"""
+        view = self.get_json("/api/view/" + urllib.request.quote(self.copy))
+        old = view.get("prestige") or 0
+        new = old + 7
+
+        plan = self.post("/api/plan", {
+            "save_id": self.copy,
+            "edits": [{"kind": "progress",
+                        "params": {"field": "prestige", "value": new}}]})
+        self.assertTrue(plan["ok"], plan.get("errors"))
+        self.assertTrue(plan["changes"], plan)
+        self.assertTrue(any("prestige" in n for n in plan["notes"]), plan["notes"])
+
+        # plan **不碰磁盘**
+        v1 = self.get_json("/api/view/" + urllib.request.quote(self.copy))
+        self.assertEqual(v1.get("prestige"), old, "plan 阶段不该改存档")
+
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "progress",
+                        "params": {"field": "prestige", "value": new}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        self.assertIn("main.yml", cm["changed"])
+        self.assertIsInstance(cm["summary"], str)      # 必须是字符串，不是方法对象
+
+        v2 = self.get_json("/api/view/" + urllib.request.quote(self.copy))
+        self.assertEqual(v2.get("prestige"), new)
+
+        un = self.post("/api/undo", {"save_id": self.copy})
+        self.assertTrue(un["ok"], un.get("errors"))
+        v3 = self.get_json("/api/view/" + urllib.request.quote(self.copy))
+        self.assertEqual(v3.get("prestige"), old, "撤销后应复原")
+
+    def test_illegal_edit_is_rejected_with_error(self):
+        """越界值 ⇒ errors（不进磁盘）。"""
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "hq_field",
+                        "params": {"hq_id": 5, "field": "cp", "value": 999}}]})
+        self.assertFalse(cm["ok"])
+        self.assertTrue(cm["errors"])
+
+    def test_unknown_kind_is_rejected(self):
+        """非法编辑类型 ⇒ 400 + 结构化错误（不能是 500）。"""
+        import json
+        import urllib.error
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self.post("/api/commit", {
+                "save_id": self.copy,
+                "edits": [{"kind": "rm_rf", "params": {}}]})
+        self.assertEqual(cm.exception.code, 400)
+        body = json.loads(cm.exception.read().decode("utf-8"))
+        self.assertFalse(body["ok"])
+        self.assertTrue(body["errors"])
+
+    def test_post_requires_token(self):
+        import json
+        import urllib.error
+        import urllib.request
+        req = urllib.request.Request(
+            self.url("/api/plan"),
+            data=json.dumps({"save_id": self.copy, "edits": []}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST")
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            urllib.request.urlopen(req, timeout=30)
+        self.assertEqual(cm.exception.code, 403)
+
+
 if __name__ == "__main__":
     unittest.main()
