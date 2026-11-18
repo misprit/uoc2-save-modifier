@@ -311,15 +311,27 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
   font-size:10px;line-height:1.3;margin-top:3px}
 .card .cs.ok{background:transparent;color:var(--ok);font-family:inherit;font-size:10px}
 
-/* 战区资产 */
-.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px;padding:12px}
+/* 战区资产 —— U20：左侧大图标保留；三个字段都是 X/X 形式的可调数字 */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(262px,1fr));gap:11px;padding:12px}
 .titem{display:flex;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--border);
   border-radius:8px;padding:9px}
-.titem img{width:60px;height:60px;flex:none}
-.titem .tn{font-size:12.5px;font-weight:600}
-.titem .tv{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
-.states{display:flex;gap:7px;margin-top:6px}
-.states img{width:34px;height:34px;border:1px solid var(--border);border-radius:5px;background:var(--surface-alt)}
+.titem>img{width:60px;height:60px;flex:none}
+.titem .tbody{flex:1;min-width:0}
+.titem .tn{font-size:12.5px;font-weight:600;margin-bottom:2px}
+.titem .trow{display:flex;align-items:baseline;gap:4px;font-size:11px;color:var(--muted);
+  margin-top:3px;line-height:1.45;white-space:nowrap}
+/* X/X 数字 —— 与总部 CP 卡同一套做法（虚线框 + 滚轮可调） */
+.titem .xnum{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--accent-dark);
+  display:inline-flex;align-items:baseline;gap:2px}
+.titem .xnum .num{min-width:22px;text-align:center;border-radius:5px;padding:0 4px;
+  outline:1px dashed var(--border);outline-offset:0;background:var(--surface);cursor:ns-resize;
+  font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;
+  transition:background .12s,outline-color .12s}
+.titem .xnum .num:hover{background:var(--accent-light);outline-color:var(--accent)}
+.titem .xnum .num.inf{color:var(--muted);font-size:13px;min-width:26px}
+.titem .xnum .sep{color:var(--muted);font-weight:400}
+.titem .twarn{font-size:10.5px;color:var(--danger);margin-top:4px;line-height:1.35;
+  white-space:normal}
 
 /* tooltip */
 .tip{position:relative;display:inline-block}
@@ -386,18 +398,23 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 /* U19：经验卡旁加「总部 CP」卡 —— 两卡并排 */
 .hqhead .hqcards{flex:none;display:flex;gap:10px;align-items:stretch}
 .hqhead .xpblk{width:216px}
-.hqhead .cpblk{width:168px}
-/* CP 两个数字各自可滚轮调 —— 分清「当前」与「上限」 */
+.hqhead .cpblk{width:196px}
+/* U20：CP 卡与经验卡**完全同一套结构**（.stat .lb + .stat .v）
+   —— 两个数字同字号（19px），第二行盒高也和经验卡一致 ⇒ 数字基线对齐 */
 .hqhead .cpv{display:flex;align-items:baseline;gap:3px;margin-top:2px;
   font-family:var(--mono);font-size:19px;font-weight:700;color:var(--accent-dark)}
+/* 虚线框用 outline（**不占布局高度**）⇒ 不撑高行，与经验卡的 .v 齐平 */
 .hqhead .cpc{min-width:22px;text-align:center;border-radius:5px;padding:0 4px;
-  border:1px dashed var(--border);background:var(--surface);cursor:ns-resize;
-  font-variant-numeric:tabular-nums;transition:background .12s}
-.hqhead .cpc:hover{background:var(--accent-light);border-color:var(--accent)}
+  outline:1px dashed var(--border);outline-offset:0;background:var(--surface);cursor:ns-resize;
+  font-variant-numeric:tabular-nums;transition:background .12s,outline-color .12s;
+  font-size:19px;font-weight:700}
+.hqhead .cpc:hover{background:var(--accent-light);outline-color:var(--accent)}
 .hqhead .cpc.cur{color:var(--accent-dark)}
-.hqhead .cpc.max{color:var(--muted);font-size:15px}
-.hqhead .cps{font-size:14px;color:var(--muted);font-weight:400}
-.hqhead .cphint{font-size:10.5px;color:var(--muted);margin-top:5px;line-height:1.35}
+/* 上限与当前**同字号**（U20 修：原来 15px vs 19px，两个数字大小不一） */
+.hqhead .cpc.max{color:var(--muted)}
+.hqhead .cps{font-size:19px;color:var(--muted);font-weight:400}
+.hqhead .cphint{font-size:10.5px;color:var(--muted);margin-top:5px;line-height:1.35;
+  min-height:14px}
 .hqhead .cphint b{font-family:var(--mono);color:var(--text);font-weight:600}
 .hqhead .hqtabs{margin:0}
 .branches{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
@@ -972,7 +989,8 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
                 </div>
                 <div class="stat cpblk">
                   <div class="lb"><span>总部 CP</span><span class="hintw">滚轮调 CP</span></div>
-                  <div class="cpv">
+                  <!-- U20：与经验卡同一套结构（.stat .v）⇒ 两个数字字号一致、内容行对齐 -->
+                  <div class="v cpv">
                     <span class="cpc cur" title="当前 CP —— 滚轮调节">0</span>
                     <span class="cps">/</span>
                     <span class="cpc max" title="CP 上限 —— 滚轮调节（3–9）">8</span>
@@ -1263,8 +1281,15 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>7 · 战区资产页（四态图标直接复用游戏贴图）</h2>
-<p class="lead">11 个资产，各 4 态：<code>_neutral</code> / <code>_hover</code> / <code>_down</code> / <code>_disabled</code>。游戏已经画好了，我们只管换文件名。</p>
+<h2>7 · 战区资产页（三个字段都可调）</h2>
+<p class="lead"><b>U20</b>：左侧图标<b>保留</b>（游戏原贴图 <code>theater/&lt;资产&gt;_neutral.png</code>），
+下面那排<b>重复的四态小图标</b>（<code>_neutral</code> / <code>_hover</code> / <code>_down</code> / <code>_disabled</code>）<b>删掉</b> ——
+那是给设计师看四态用的，玩家界面里没意义。<br>
+三个数都是 <b>X/X</b> 形式（跟<b>总部 CP 卡</b>同一套做法），<b>都能滚轮调</b>：
+<b>可用</b>（<code>to_use</code>）/ <b>每回合恢复</b>（<code>uses_turn</code>）是主 X/X，
+<b>本场景剩余</b>（<code>uses_total</code>，<code>∞</code> = 无限）是第三个字段。<br>
+数据来自<b>真实存档</b> <code>Stalingrad.usg</code>（战斗中 <code>games/road_to_stalingrad</code>）；
+中文名全部取自 locale 键 <code>id_tooltip_theater_&lt;资产&gt;</code>。</p>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -1955,10 +1980,17 @@ const NAT_COUNT = {
   "swedish":1,
 };
 
+/* 战区资产 —— U20：真实存档 Stalingrad.usg（战斗中 games/road_to_stalingrad）
+   三个字段（游戏字节码取证 —— lib/uoc2/state/game/game.pyc）：
+     to_use      当前剩余可用次数（≥ 0）
+     uses_total  本场景剩余总次数（≥ 0，null = 无限）
+     uses_turn   每回合恢复次数（≥ 1）
+   中文名全部取自 locale 键 id_tooltip_theater_<资产> —— 不自己翻译。 */
 const THEATER = [
-  ["air_attack","空袭"],["air_supply","空中补给"],["flying_artillery","飞行炮兵"],
-  ["long_range_recon","远程侦察"],["naval_bombardment","舰炮轰击"],
-  ["precision_bombing","精确轰炸"],["saturation_strike","饱和攻击"]
+  ["air_supply",       "空中补给", 1,    2,    1],
+  ["air_attack",       "空袭",     1,    null, 1],
+  ["long_range_recon", "空中侦察", 2,    2,    2],
+  ["flying_artillery", "空中炮击", 1,    2,    1],
 ];
 
 /* ---------------- 新增数据（全部取自真实存档 / 游戏包） ---------------- */
@@ -2657,18 +2689,56 @@ if(pg){
   });
 }
 
-/* 战区资产 */
+/* 战区资产 —— U20：三个字段都是 X/X 形式的可调数字（借用总部 CP 卡的做法）
+   联动与核心库完全一致：
+     · to_use ≤ uses_total（uses_total 有限时）—— 越界**自动夹取**（否则存档打不开）
+     · uses_turn > uses_total（有限时）—— 只提示（游戏按 min() 恢复）
+     · to_use > uses_turn（无限时）—— 只提示（回合开始会重置）
+   uses_total 的 ∞ 是「最大值」：往上滚过上限就变 ∞，从 ∞ 往下滚回到上限值。 */
+const T_MAX=99;
 const tg=document.getElementById("theater");
-THEATER.forEach(([a,n])=>{
+THEATER.forEach(([a,n,toUse,usesTotal,usesTurn])=>{
+  const st={to_use:toUse, uses_total:usesTotal, uses_turn:usesTurn};
   const t=document.createElement("div"); t.className="titem";
-  t.innerHTML=`<img alt=""><div><div class="tn">${n}</div>
-    <div class="tv">可用 3 次 · 每回合 1</div>
-    <div class="states">
-      <img title="neutral"><img title="hover"><img title="down"><img title="disabled">
-    </div></div>`;
-  const all=t.querySelectorAll("img");
-  img(all[0], SUR+"theater/"+a+"_neutral.png");
-  ["hover","down","disabled"].forEach((s,i)=>img(all[i+1], SUR+"theater/"+a+"_"+s+".png"));
+  t.innerHTML=`<img alt="" class="ticon"><div class="tbody">
+    <div class="tn">${n}</div>
+    <div class="trow">可用 <span class="xnum"><span class="num" data-f="to_use"></span></span>
+      <span class="sep">/</span> 每回合 <span class="xnum"><span class="num" data-f="uses_turn"></span></span></div>
+    <div class="trow">本场景剩余 <span class="xnum"><span class="num" data-f="uses_total"></span></span></div>
+    <div class="twarn"></div></div>`;
+  img(t.querySelector(".ticon"), SUR+"theater/"+a+"_neutral.png");
+  const nums=t.querySelectorAll(".num");
+  const warn=t.querySelector(".twarn");
+  function paint(){
+    nums.forEach(function(el){
+      const f=el.dataset.f, v=st[f];
+      if(f==="uses_total" && v===null){ el.textContent="∞"; el.classList.add("inf"); }
+      else { el.textContent=String(v); el.classList.remove("inf"); }
+    });
+    if(st.uses_total===null && st.to_use>st.uses_turn)
+      warn.textContent="当前可用 "+st.to_use+" 次 大于 每回合恢复 "+st.uses_turn+" 次 —— 回合开始游戏会重置为 "+st.uses_turn+" 次";
+    else if(st.uses_total!==null && st.uses_turn>st.uses_total)
+      warn.textContent="每回合恢复 "+st.uses_turn+" 次 大于 本场景剩余 "+st.uses_total+" 次 —— 实际每回合只能用 "+st.uses_total+" 次";
+    else warn.textContent="";
+  }
+  nums.forEach(function(el){
+    el.addEventListener("wheel", function(ev){
+      ev.preventDefault();
+      const f=el.dataset.f, d=ev.deltaY>0 ? -1 : 1;
+      if(f==="uses_total"){
+        if(st.uses_total===null){ if(d<0) st.uses_total=T_MAX; }
+        else { let v=st.uses_total+d; if(v>T_MAX) v=null; else if(v<0) v=0; st.uses_total=v; }
+      } else if(f==="to_use"){
+        const cap=(st.uses_total===null) ? T_MAX : st.uses_total;
+        let v=st.to_use+d; if(v>cap) v=cap; if(v<0) v=0; st.to_use=v;
+      } else {
+        let v=st.uses_turn+d; if(v>T_MAX) v=T_MAX; if(v<1) v=1; st.uses_turn=v;
+      }
+      if(st.uses_total!==null && st.to_use>st.uses_total) st.to_use=st.uses_total;
+      paint();
+    }, {passive:false});
+  });
+  paint();
   tg.appendChild(t);
 });
 </script>

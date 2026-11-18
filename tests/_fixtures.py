@@ -21,11 +21,15 @@ def dump(obj) -> bytes:
 
 
 def make_save(path: Path, *, main_overrides: dict | None = None,
+              battle_overrides: dict | None = None,
               extra_entries: dict | None = None) -> Path:
     """造一个"像游戏"的 .usg。
 
     默认包含：根 5 张 L1 表、`last_conference/`、`last_game/`、
     以及一个进行中的战斗 `games/avalanche/`（含 theater_assets）。
+
+    `battle_overrides` 用来覆盖**战斗** `games/avalanche/main.yml` 的内容
+    （比如换 `phase`、换 theater_assets 分组）—— 根 `main.yml` 用 `main_overrides`。
     """
     main = {
         "campaign_id": "west",
@@ -206,12 +210,16 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
         "last_game/cards.yml": dump(cards),
         "last_game/store.yml": dump(store),
         "games/avalanche/main.yml": dump({
-            "ar_ord": 190, "turn": 3, "turn_len": 1,
+            "ar_ord": 190, "turn": 3, "turn_len": 1, "phase": 0,
+            # 三个字段都取**游戏里的合法值**（U20 字节码取证）：
+            #   to_use ≥ 0 / uses_total ≥ 0 或 None / uses_turn ≥ 1
             "theater_assets": [[
                 {"asset": "air_attack", "to_use": 1,
-                 "to_use_not_used": None, "uses_total": 2, "uses_turn": 1},
+                 "to_use_not_used": None, "uses_total": None, "uses_turn": 1},
                 {"asset": "naval_bombardment", "to_use": 0,
-                 "to_use_not_used": None, "uses_total": None, "uses_turn": 0},
+                 "to_use_not_used": None, "uses_total": None, "uses_turn": 1},
+                {"asset": "long_range_recon", "to_use": 1,
+                 "to_use_not_used": 0, "uses_total": 2, "uses_turn": 1},
             ], []],
             "scores": {"casualties": 0},
         }),
@@ -227,6 +235,10 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
         ]),
         "document/main.yml": dump(document_main),
     }
+    if battle_overrides:
+        _bm = yaml.safe_load(entries["games/avalanche/main.yml"])
+        _bm.update(battle_overrides)
+        entries["games/avalanche/main.yml"] = dump(_bm)
     if extra_entries:
         entries.update(extra_entries)
 

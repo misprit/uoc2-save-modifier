@@ -108,7 +108,7 @@
 | 3 | 总部 | 总部条目、兵库存量、CP | `can_edit_hqs` | |
 | 4 | 卡牌 | **手牌**（`cards.yml`）+ **货架**（`main.yml.card_store`）+ 图鉴 | `can_edit_hand` / `can_edit_shelf` | 货架只在会议阶段存在 |
 | 5 | 商店 | 按战线分组的商品、价格、数量 | `can_edit_store` | |
-| 6 | 战区资产 | 11 类资产的可用次数 | `can_edit_theater_assets` | 只在战斗中 |
+| 6 | 战区资产 | 每个资产的**三个次数**（当前可用 / 每回合恢复 / 本场景剩余） | `can_edit_theater_assets` | 只在战斗中 |
 | 7 | **战役** | **路线图 / 场景名册 / 商店全览 / 当前位置** | **恒只读** | U18 新增 |
 
 > **【2026-11-18 用户拍板 · U9】原第 3 行「特种兵」整页取消** ——
@@ -395,6 +395,10 @@ cat.step_icon("us_arm_42")   # "step_armor_2"
 能力位不足时切 `_disabled`。
 **这就是"好看"最省力的一招** —— 四态图游戏已经画好了，我们只管换文件名。
 
+> **【2026-11-18 · U20 补充】** 四态**仍然按状态切换**（默认 `_neutral`、悬停 `_hover`、
+> 按下 `_down`、不可用 `_disabled`），但**不再把四态并排全展示** ——
+> 那是给设计师看四态用的，玩家界面里没意义（见 §7.7）。
+
 ### 5.6 图标缺失怎么办
 
 | 情况 | 表现 |
@@ -601,7 +605,7 @@ Edit.unit_field(uid, "sup_st", new_sup)
 | 单位列表行 | 行底色转 `accent_light`；右侧滑出**快速条**（战力 −/+、XP −/+） |
 | 单位头像 | 浮出**大图 tooltip**（原图等比缩到 240 px 宽） |
 | 特种兵图标 | 浮出名称 + 攻防 / 装甲 / 火力 四项数值 |
-| 战区资产图标 | 浮出资产名 + 当前可用次数 |
+| 战区资产图标 | 浮出资产名 + **三个次数**（当前可用 / 每回合恢复 / 本场景剩余） |
 | 任何禁用控件 | 浮出**禁用原因**（来自 `caps.unavailable_reason(...)`） |
 | 数值控件 | 浮出"滚轮可调"提示 + 当前值 + 上下限 |
 
@@ -1781,17 +1785,69 @@ campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, .
 
 ### 7.7 战区资产页
 
+> **【2026-11-18 · U20 用户拍板】** 原话：
+> 「战区资产里面，每个卡左侧的图标**保留**，下面几个**重复图标没意义**，
+> 我们只需要**可用几次**和**每回合可用几次**，这个就**借用你刚刚做的总部 cp 卡那种 X/X 形式**吧。」
+> 补一条：「战区资产如果有三个字段，**要保证三个都可以调整**。或者说你先搞清楚三个字段的意义。」
+
+**【实证 · 2026-11-18 · 字节码取证】** 战区资产在存档里的**三个字段**
+（`lib/uoc2/state/game/game.pyc` + `state/scenario/scenario_data_validation.py`
++ `state/game/game_data_validation.py` + `tools/data_validation.py`）：
+
+| 字段 | 游戏里的含义 | 游戏的 voluptuous schema | 合法范围 |
+|---|---|---|---|
+| `to_use` | **当前剩余可用次数** | `All(int, Range(min=0))` | **0 – ∞** |
+| `uses_total` | **本场景剩余总次数**（`None` = 无限） | `Or(None, All(int, Range(min=0)))` | **0 – ∞ 或 `None`** |
+| `uses_turn` | **每回合恢复次数** | `All(int, Range(min=1))` | **1 – ∞** |
+| `to_use_not_used` | 上回合没用掉的结转池（**内部字段，玩家不可见**） | `Or(None, All(int, Range(min=0)))` | **不暴露给玩家** |
+
+**游戏自己的显示口径**（`game_world/theater_ctrl.py` 的 `_uses_node`）也是**两个数**：
+
+* `idp_super_tooltip_theater_uses_turn` = 「战区资产：本回合中还剩{}个」→ 取 `to_use`；
+* `idp_super_tooltip_theater_uses_total` = 「，本场景中还剩{}个。」→ 取 `uses_total`（`None` 显示 `.`）。
+
+⇒ **X/X 形式本来就是游戏原生口径**，不是我们自创的。
+
 ```
-┌── 战区资产（当前战斗中）────────────────────────────────────────────────┐
-│  [air_attack_neutral]  空袭      可用 3 次   每回合 1   [◀▶] 可用次数     │
-│  [naval_bombardment…]   naval…   可用 1 次   每回合 0   [◀▶]            │
-│  ...                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
++-- 战区资产（当前战斗中）-------------------------------------------------+
+| [icon] 空中补给        可用 [1] / 每回合 [1]                                |
+|                       本场景剩余 [2]                                       |
+| [icon] 空袭            可用 [1] / 每回合 [1]                                |
+|                       本场景剩余 [inf]        (inf = 无限)                   |
++---------------------------------------------------------------------------+
 ```
 
-* 11 个资产，图标用 `theater/<资产>_<态>.png`（§5.5），**四态直接复用**；
-* 只在**当前进行中的战斗**里可改（`in_battle`）—— 战斗外改会被场景重算覆盖，
+**卡片结构**（每一张）：
+
+* **左侧大图标保留** —— 游戏原贴图 `theater/<资产>_neutral.png`（60×60）；
+* **下面那排重复的四态小图标删掉** —— `neutral / hover / down / disabled`
+  并排展示是给设计师看四态用的，玩家界面里没意义（§5.5 的四态仍用于**状态切换**）；
+* **三个数都是 X/X 形式**（与 §7.4.1a 的总部 CP 卡同一套做法：虚线框 + 滚轮可调）：
+  * 主 X/X = **可用**（`to_use`）/ **每回合恢复**（`uses_turn`）；
+  * 第三个字段 **本场景剩余**（`uses_total`）单起一行，同样可调，`∞` = 无限。
+
+**滚轮规则**（与核心库 `handlers.py` 的硬范围完全一致）：
+
+| 字段 | 向下滚 | 向上滚 | 取值范围 |
+|---|---|---|---|
+| `to_use` | −1 | +1 | `0` – `uses_total`（有限时）/ `0 – 99`（无限时） |
+| `uses_turn` | −1 | +1 | `1` – `99` |
+| `uses_total` | −1（`∞` → 99） | +1（99 → `∞`） | `0 – 99` 或 `∞`（**∞ 是最大值**） |
+
+**跨字段联动**（GUI 与核心库同一套口径）：
+
+* `to_use > uses_total`（`uses_total` 有限时）⇒ **自动夹取** `to_use`。
+  ⚠️ 这不是 UI 小讲究：游戏每用一次资产就让 `uses_total` 减 1
+  （`Game.spend_theater_asset`），减成负数会让存档校验失败 ⇒ **存档打不开**；
+* `uses_turn > uses_total`（有限时）⇒ 只**提示**（游戏按 `min(uses_turn, uses_total)` 恢复）；
+* `to_use > uses_turn`（`uses_total` 无限时）⇒ 只**提示**（回合开始游戏会重置 `to_use`）。
+
+**其它**：
+
+* 只在**当前进行中的战斗**里可改（`can_edit_theater_assets`）—— 战斗外改会被场景重算覆盖，
   这正是"改了却像没改"；
+* `theater_assets` 在存档里**按 phase 分组**（`[[phase0], [phase1], …]`）⇒
+  只改**当前 phase 那一组**（读战斗 `main.yml` 的 `phase` 字段），不是永远改第 0 组；
 * 不在战斗里时，这一页显示说明卡 + 存档体检信息。
 
 ### 7.8 战役页（**只读** · U18 新增）
@@ -2964,6 +3020,54 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 
 ⇒ **U19 有核心库改动**（CP 硬校验），自动化测试 333 → **336**。
 
+### 13.2k 批次十四 · U20（2026-11-18 用户拍板）
+
+> 用户三条：
+> ① 战区资产里，**每个卡左侧的图标保留**，**下面几个重复图标没意义** ——
+>    我们只需要**可用几次**和**每回合可用几次**，**借用总部 CP 卡那种 X/X 形式**；
+> ② **总部 CP 卡两个数字大小不一**（原来当前 19 px / 上限 15 px）；
+> ③ **CP 卡内容和旁边的经验卡没对齐** —— 同时修正。
+>
+> 追加一条：「战区资产如果有三个字段，**要保证三个都可以调整**。
+> 或者说你**先搞清楚三个字段的意义**。」
+
+**U20 取证：三个字段到底是什么（游戏字节码坐实，不是推断）**
+
+| 事实 | 结论 | 依据 |
+|---|---|---|
+| `theater_asset_dict`（场景态） | `asset` + `uses_total`（`Or(None, 非负)`）+ `uses_turn`（`positive_int`） | `state/scenario/scenario_data_validation.pyc` |
+| `game_theater_asset_dict`（战斗态） | `to_use`（非负，default 0）+ `to_use_not_used`（`Or(None, 非负)`），并 `update(theater_asset_dict)` | `state/game/game_data_validation.pyc` |
+| 整数 schema | `nonnegative_int_schema = All(int, Range(min=0))`；`positive_int_schema = All(int, Range(min=1))`；**都没有上限** | `tools/data_validation.pyc` |
+| ⇒ 合法范围 | `to_use` **0 – ∞**；`uses_total` **0 – ∞ 或 `None`（无限）**；`uses_turn` **1 – ∞** | 同上 |
+| 回合开始怎么恢复 | `to_use = min(uses_turn, uses_total)`（`uses_total` 为 `None` 时 `to_use = uses_turn`）；`to_use_not_used = uses_turn − to_use` | `state/game/game.pyc::theater_assets_start_turn` |
+| 用掉一次怎么扣 | `to_use −= 1`；`uses_total` 非 `None` 时 `uses_total −= 1` | `state/game/game.pyc::spend_theater_asset` |
+| 游戏自己的显示 | 两个数：`to_use`（「本回合中还剩 N 个」）+ `uses_total`（「本场景中还剩 N 个」，`None` 显示 `.`） | `game_world/theater_ctrl.pyc::_uses_node` + locale `idp_super_tooltip_theater_uses_*` |
+| 资产中文名 | locale 键 `id_tooltip_theater_<资产>`（`long_range_recon` = **「空中侦察」**，不是「远程侦察」） | `_packages/base/localization/chi/strings.yml` |
+| 存档里的真实值 | `Stalingrad.usg`（战斗中 `games/road_to_stalingrad`）4 个资产：air_supply `1/2/1` · air_attack `1/None/1` · long_range_recon `2/2/2` · flying_artillery `1/2/1` | 真实存档实测 |
+| ⇒ **关键性质** | `to_use > uses_total` ⇒ 用一次后 `uses_total` 变负 ⇒ **voluptuous 校验失败 ⇒ 存档打不开** ⇒ 必须**硬拦** | 同上 |
+
+**U20 拍板结果**
+
+| # | 决定 | 落点 |
+|---|---|---|
+| 1 | 战区资产卡**保留左侧大图标**，**删掉并排的四态小图标** | §7.7 / §5.5 |
+| 2 | 三个字段**全部可调**，主 X/X = **可用 `to_use` / 每回合恢复 `uses_turn`**，第三个字段 **本场景剩余 `uses_total`** 单起一行 | §7.7 |
+| 3 | `uses_total` 的 `∞`（无限）是**最大值**：往上滚过上限变 `∞`，从 `∞` 往下滚回上限值 | §7.7 |
+| 4 | 合法范围**硬编码进核心库**（`to_use` ≥ 0、`uses_turn` ≥ 1、`uses_total` ≥ 0 或 `None`），**不是猜的** | 核心库 `handlers.py` |
+| 5 | 跨字段联动：`to_use ≤ uses_total`（有限时）**硬拦**；`uses_turn > uses_total` 与 `to_use > uses_turn` 只**警告** | 核心库 + §7.7 |
+| 6 | **CP 卡两个数字字号统一为 19 px**（原来上限 15 px / 当前 19 px） | §7.4.1a / 视觉稿 |
+| 7 | **CP 卡与经验卡对齐** —— 改用经验卡**同一套结构**（`.stat .lb` + `.stat .v`），虚线框改用 `outline`（**不占布局高度**）⇒ 数字基线一致 | §7.4.1a / 视觉稿 |
+| 8 | `to_use_not_used` 是**游戏内部结转池**，玩家不可见 ⇒ **不暴露**（§5.7.1 同理：不暴露玩家看不见的内部状态） | §7.7 |
+
+**U20 顺带修掉的两个核心库真问题**
+
+| 问题 | 后果 | 修法 |
+|---|---|---|
+| `uses_turn` 写 `0` 时被 `if uses_turn else …` 当成 falsy **静默忽略**，且从不校验 | 写进去的 `uses_turn=0` 会被游戏 schema `Range(min=1)` 拒绝 ⇒ **存档打不开** | 硬校验 `uses_turn ≥ 1`；三字段都改成「不传就不改」（`UNSET` 哨兵） |
+| `_theater_asset` **永远改 `theater_assets[0]`** | 存档里 `theater_assets` **按 phase 分组**（`[[phase0], [phase1], …]`）⇒ phase ≠ 0 时改错组 | 按战斗 `main.yml` 的 `phase` 定位组 |
+
+⇒ **U20 有核心库改动**，自动化测试 339 → **355**。
+
 ### 13.3 我自己定的技术细节（只报备，不占你时间）
 
 #### U19 新增（批次十三）
@@ -3020,6 +3124,19 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 | 战役页缺数据时 | **降级不崩**：索引缺 ⇒ 没有场景列表；游戏包缺 ⇒ 只剩名字 | U18 ① |
 | 路线版本怎么显示 | 标成**版本化的静态规划投影**，不说是玩家实际路线 | 隔壁项目的口径 |
 
+#### U20 新增（批次十四）
+
+| 问题 | 结论 |
+|---|---|
+| 战区资产三个字段怎么排？ | 主 X/X = **可用 / 每回合恢复**；**本场景剩余**单起一行 —— 三个**都能滚轮调** |
+| `uses_total` 的「无限」怎么调？ | `∞` 就是**最大值**：往上滚过上限变 `∞`，从 `∞` 往下滚回上限值（99） |
+| `to_use` 的上限取多少？ | `uses_total` 有限时取 `uses_total`（**硬不变式**）；无限时取 99（防手滑） |
+| 战区资产的行高怎么对齐？ | 虚线框改用 `outline`（**不占布局高度**）⇒ 与经验卡 `.stat .v` 基线一致 |
+| CP 卡两个数字为什么大小不一？ | `.cpc.max` 单独写了 `font-size:15px` ⇒ 去掉，两数统一 19 px（与 `.stat .v` 同） |
+| CP 卡为什么和经验卡没对齐？ | 两卡**结构不同**（经验卡 `.stat .v` 是 block，CP 卡 `.cpv` 是 flex）⇒ CP 卡**改用经验卡同一套结构** |
+| `to_use_not_used` 给不给玩家改？ | **不给** —— 游戏内部结转池，玩家看不见；由游戏自己维护 |
+| 战区资产按哪个组改？ | 按战斗 `main.yml` 的 `phase` 定位（`theater_assets` 是按 phase 分组的） |
+
 ### 13.4 已由数据 / 实证回答，不再问
 
 | 问题 | 答案 | 出处 |
@@ -3046,6 +3163,8 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 | 战役默认池能把候选压到多少？ | `us_arm_42` 23→**9** / `ger_inf_40` 97→**18** / `sov_inf_41` 61→**19** | `e163` ③ |
 | 挂错会崩吗？ | **不会** —— 375 个类型全部有贴图，商店条目 100% 查得到类型 ⇒ 风险只是出戏 / 属性失衡 | `e163` ④ |
 | 存档怎么定位战役包？ | 根 `main.yml` 的 `campaign_id`（`base/west` / `dlc4/stalingrad` …）⇒ `SaveInfo.campaign_id` 已有 | 实测 |
+| 战区资产三个字段是什么？ | `to_use` = **当前剩余可用次数**（0–∞）；`uses_total` = **本场景剩余总次数**（0–∞ 或 `None` = 无限）；`uses_turn` = **每回合恢复次数**（1–∞） | U20 字节码取证 |
+| 战区资产要不要显示四态图？ | **不要并排展示**（U20）—— 四态仍用于悬停/按下/禁用的**状态切换** | U20 用户拍板 |
 | 特种兵分几个国籍？ | **31 个**（375 种里） | `e164` ② |
 | 国籍中文名会撞车吗？ | **会，6 组**（苏联 / 意大利 / 波兰 / 罗马尼亚 / 瑞士 / 南斯拉夫）—— 每组两个 id 分属不同阵营 | `e164` ① ② |
 | 国籍表在哪？ | `entity_types/nationalities.yml`（40 个）+ `nationalities_2.yml`（空模板 `{}`）—— **是文件不是目录** | `e164` ① |

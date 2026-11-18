@@ -129,7 +129,7 @@ class TestPackageSurface(unittest.TestCase):
         "CardView", "CardWhitelist", "Catalog", "CommitResult", "Conference",
         "CorePaths", "Edit", "FileChange", "HqView", "Plan", "Save",
         "SaveInfo", "Scenario", "ScenarioRoster", "StoreEntryView",
-        "StoreListing", "TranslationStore", "UndoRecord", "UndoResult",
+        "StoreListing", "TranslationStore", "UNSET", "UndoRecord", "UndoResult",
         "UnitType", "UnitView", "ValidationResult", "View",
         "campaigns", "catalog", "commit", "list_saves", "locale",
         "make_backup", "open_save", "plan_edit", "resolve_save_id",

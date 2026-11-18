@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
-__all__ = ["Edit", "EDIT_KINDS"]
+__all__ = ["Edit", "EDIT_KINDS", "UNSET"]
 
 
 #: 全部合法的 kind —— 写错会直接报错，不会静默忽略
@@ -47,6 +47,32 @@ EDIT_KINDS = (
 
 #: 商店的两个子商店（`store.yml` = `{战线: {store: [...], elite_store: [...]}}`）
 STORE_SUBS = ("store", "elite_store")
+
+
+class _Unset:
+    """「这个字段这次不改」的哨兵。
+
+    必须和 `None` 区分开：`None` 在战区资产里是一个**有意义的值**
+    （`uses_total=None` = 「本场景剩余总次数无限」），不能拿来表示「不改」。
+    """
+
+    __slots__ = ()
+    _inst = None
+
+    def __new__(cls):
+        if cls._inst is None:
+            cls._inst = super().__new__(cls)
+        return cls._inst
+
+    def __repr__(self) -> str:
+        return "<不改>"
+
+    def __bool__(self) -> bool:
+        return False
+
+
+#: 「该字段这次不改」—— 默认值用这个，而不是 `None`
+UNSET = _Unset()
 
 
 @dataclass(frozen=True)
@@ -255,10 +281,20 @@ class Edit:
         return Edit("hand_restore", {})
 
     @staticmethod
-    def theater_asset(asset: str, *, to_use: int,
-                      uses_total: int | None = None,
-                      uses_turn: int = 0) -> "Edit":
-        """改战区资产（**只在当前进行中的战斗里有效**，L3 唯一白名单）。"""
+    def theater_asset(asset: str, *, to_use: Any = UNSET,
+                      uses_total: Any = UNSET,
+                      uses_turn: Any = UNSET) -> "Edit":
+        """改战区资产（**只在当前进行中的战斗里有效**，L3 唯一白名单）。
+
+        **三个字段都能单独改**，也能都不改（默认全是 `UNSET` = 不改）：
+
+        * `to_use` —— **当前剩余可用次数**（≥ 0）
+        * `uses_total` —— **本场景剩余总次数**（≥ 0，或 `None` = 无限）
+        * `uses_turn` —— **每回合恢复次数**（≥ 1）
+
+        ⚠️ `uses_total=None` 表示「改成无限」，**不是**「不改」——
+        不改要传 `UNSET`（或者干脆不传这个参数）。
+        """
         return Edit("theater_asset", {
             "asset": asset, "to_use": to_use,
             "uses_total": uses_total, "uses_turn": uses_turn,
@@ -326,6 +362,15 @@ class Edit:
         if k == "hand_restore":
             return "恢复上次会议的牌局"
         if k == "theater_asset":
-            return (f"战区资产 {p.get('asset')}："
-                    f"可用 {p.get('to_use')} 次")
+            bits = []
+            for fname, cn in (("to_use", "当前可用"),
+                              ("uses_total", "本场景剩余"),
+                              ("uses_turn", "每回合恢复")):
+                v = p.get(fname, UNSET)
+                if v is UNSET:
+                    continue
+                if fname == "uses_total" and v is None:
+                    v = "无限"
+                bits.append(f"{cn} → {v}")
+            return f"战区资产 {p.get('asset')}：" + "、".join(bits)
         return k

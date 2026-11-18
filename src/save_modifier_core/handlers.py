@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .edits import Edit
+from .edits import UNSET, Edit
 
 __all__ = ["Outcome", "apply_edit"]
 
@@ -91,6 +91,30 @@ HQ_BRANCHES = ("engineering", "force_pool", "intel", "logistics", "operations")
 #: 不是「显示异常」而是**存档打不开** ⇒ 必须硬拦。
 HQ_CP_MIN, HQ_CP_MAX = 0, 9
 HQ_MAX_CP_MIN, HQ_MAX_CP_MAX = 3, 9
+
+#: 战区资产三个字段的**合法范围**（U20 字节码取证 —— `lib/uoc2/` 反汇编）：
+#:
+#: | 字段 | 游戏里的含义 | 游戏的 voluptuous schema | 合法范围 |
+#: |---|---|---|---|
+#: | `to_use` | 当前剩余可用次数 | `All(int, Range(min=0))` | **0 – ∞** |
+#: | `uses_total` | 本场景剩余总次数（`None` = 无限） | `Or(None, All(int, Range(min=0)))` | **0 – ∞ 或 None** |
+#: | `uses_turn` | 每回合恢复次数 | `All(int, Range(min=1))` | **1 – ∞** |
+#:
+#: 依据：`state/scenario/scenario_data_validation.py`（`theater_asset_dict`）、
+#: `state/game/game_data_validation.py`（`game_theater_asset_dict`）、
+#: `tools/data_validation.py`（`nonnegative_int_schema` / `positive_int_schema`）。
+#:
+#: ⇒ 超范围不是「显示异常」，而是 **voluptuous 校验失败 ⇒ 存档直接打不开**。
+THEATER_TO_USE_MIN = 0
+THEATER_USES_TOTAL_MIN = 0
+THEATER_USES_TURN_MIN = 1
+
+#: 战区资产三个字段的中文名（变更清单 / GUI 用）
+THEATER_FIELD_CN = {
+    "to_use": "当前可用",
+    "uses_total": "本场景剩余",
+    "uses_turn": "每回合恢复",
+}
 
 #: 分支等级的**上限**（游戏 `BRANCH_MAX = 3`；`can_add_branch_level` 里
 #: `current_level = level + suppressed`，`== 3` 就不许再加）
@@ -1331,12 +1355,23 @@ def _hand_restore(w, e: Edit) -> Outcome:
 
 
 def _theater_asset(w, e: Edit) -> Outcome:
-    """战区资产（唯一的 L3 写入白名单）。"""
+    """战区资产（唯一的 L3 写入白名单）。
+
+    **三个字段都能单独改**（U20 字节码取证，见 `THEATER_*` 常量的注释）：
+
+    | 字段 | 游戏里的含义 | 合法范围 |
+    |---|---|---|
+    | `to_use` | 当前剩余可用次数 | 0 – ∞ |
+    | `uses_total` | 本场景剩余总次数（`None` = 无限） | 0 – ∞ 或 `None` |
+    | `uses_turn` | 每回合恢复次数 | 1 – ∞ |
+
+    **跨字段不变式**：`to_use ≤ uses_total`（`uses_total` 有限时）。
+    游戏每用一次资产就让 `uses_total` 减 1（`Game.spend_theater_asset`），
+    减到负数会让存档校验失败 ⇒ 硬拦。
+    """
     oc = Outcome()
     asset = e.params.get("asset")
-    to_use = e.params.get("to_use")
-    uses_total = e.params.get("uses_total")
-    uses_turn = e.params.get("uses_turn")
+    want = {f: e.params.get(f) for f in ("to_use", "uses_total", "uses_turn")}
     if not w.require(w.caps.can_edit_theater_assets, "theater_assets", "games/<场景>/main.yml"):
         return oc
     battle_dir = w.save.battle_dir()
@@ -1352,7 +1387,15 @@ def _theater_asset(w, e: Edit) -> Outcome:
     if not isinstance(theater, list) or not theater or not isinstance(theater[0], list):
         oc.errors.append(f"{entry} 里没有 theater_assets")
         return oc
-    items = theater[0]
+    # `theater_assets` 是**按 phase 分组**的（存档里形如 [[phase0], [phase1], …]），
+    # 必须改**当前 phase 那一组**，不是永远改第 0 组（U20 真实存档实测）。
+    phase = data.get("phase")
+    idx = (phase if isinstance(phase, int) and not isinstance(phase, bool)
+           and 0 <= phase < len(theater) else 0)
+    items = theater[idx]
+    if not isinstance(items, list):
+        oc.errors.append(f"{entry} 里 theater_assets 第 {idx} 组不是列表")
+        return oc
     target = next((it for it in items
                    if isinstance(it, dict) and it.get("asset") == asset), None)
     if target is None:
@@ -1361,19 +1404,72 @@ def _theater_asset(w, e: Edit) -> Outcome:
             f"该场景没有战区资产 {asset!r}；本场景有：{avail or '（空）'}。"
             "修改器**不会凭空新增**资产条目（§6.2b）")
         return oc
-    if not isinstance(to_use, int) or isinstance(to_use, bool) or to_use < 0:
-        oc.errors.append(f"to_use={to_use!r} 必须是非负整数")
+
+    def _is_int(v):
+        return isinstance(v, int) and not isinstance(v, bool)
+
+    # 改后值：没传的字段（UNSET）沿用存档里的原值
+    after = {f: (target.get(f) if want[f] is UNSET else want[f])
+             for f in ("to_use", "uses_total", "uses_turn")}
+
+    if not _is_int(after["to_use"]) or after["to_use"] < THEATER_TO_USE_MIN:
+        oc.errors.append(
+            f"to_use={after['to_use']!r} 必须是不小于 {THEATER_TO_USE_MIN} 的整数")
         return oc
-    old = target.get("to_use")
-    target["to_use"] = to_use
-    if uses_total is not None:
-        target["uses_total"] = uses_total
-    target["uses_turn"] = uses_turn if uses_turn else target.get("uses_turn", 0)
+    total = after["uses_total"]
+    if total is not None and (not _is_int(total) or total < THEATER_USES_TOTAL_MIN):
+        oc.errors.append(
+            f"uses_total={total!r} 必须是不小于 {THEATER_USES_TOTAL_MIN} 的整数"
+            "，或 None（无限）")
+        return oc
+    if not _is_int(after["uses_turn"]) or after["uses_turn"] < THEATER_USES_TURN_MIN:
+        oc.errors.append(
+            f"uses_turn={after['uses_turn']!r} 必须是不小于 {THEATER_USES_TURN_MIN} 的整数")
+        return oc
+    # 不变式：当前可用次数不得超过本场景剩余总次数
+    if total is not None and after["to_use"] > total:
+        oc.errors.append(
+            f"to_use={after['to_use']} 不能大于 uses_total={total}："
+            "游戏每用一次资产就让 uses_total 减 1，减成负数会让存档校验失败（打不开）")
+        return oc
+
+    changed = []
+    for f in ("to_use", "uses_total", "uses_turn"):
+        if want[f] is UNSET:
+            continue
+        old = target.get(f)
+        if old == want[f]:
+            continue
+        target[f] = want[f]
+        changed.append((f, old, want[f]))
+    if not changed:
+        oc.summary = f"战区资产 {asset}：没有需要改的字段"
+        return oc
     w.touch(entry)
-    oc.summary = f"战区资产 {asset}：可用 {old} → {to_use} 次"
+    oc.summary = "战区资产 %s：%s" % (
+        asset,
+        "、".join("%s %s → %s" % (THEATER_FIELD_CN[f], _theater_val(f, o),
+                                _theater_val(f, n))
+                  for f, o, n in changed))
+    if total is not None and after["uses_turn"] > total:
+        oc.warnings.append(
+            f"每回合恢复 {after['uses_turn']} 次 大于 本场景剩余 {total} 次："
+            "回合开始时游戏按 min(每回合恢复, 本场景剩余) 恢复，"
+            f"实际每回合只能用 {total} 次")
+    if total is None and after["to_use"] > after["uses_turn"]:
+        oc.warnings.append(
+            f"当前可用 {after['to_use']} 次 大于 每回合恢复 {after['uses_turn']} 次："
+            "回合开始时游戏会把当前可用次数重置为每回合恢复次数")
     oc.warnings.append(
         "战区资产**无法通过游戏内的『重置会议』撤销** —— 需要用修改器自己的撤销（§6.4）")
     return oc
+
+
+def _theater_val(field: str, value) -> str:
+    """战区资产字段的中文展示值（`uses_total=None` = 无限）。"""
+    if field == "uses_total" and value is None:
+        return "无限"
+    return str(value)
 
 
 # ---------------------------------------------------------------- 分发表

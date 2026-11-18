@@ -40,7 +40,7 @@ from .commit import CommitResult, commit, make_backup
 from .container import (CardView, HqView, Save, StoreEntryView, UnitView,
                         View)
 from .discovery import SaveInfo, list_saves, resolve_save_id
-from .edits import Edit
+from .edits import UNSET, Edit
 from .locale import TranslationStore
 from .paths import CorePaths
 from .plan import FileChange, Plan, ValidationResult, plan_edit, validate
@@ -68,6 +68,7 @@ __all__ = [
     "StoreEntryView",
     "StoreListing",
     "TranslationStore",
+    "UNSET",
     "UndoRecord",
     "UndoResult",
     "UnitType",

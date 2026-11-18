@@ -155,5 +155,156 @@ class TestArchiveNeverWritten(TheaterAssetTestBase):
                           zf.namelist())
 
 
+class TestTheaterAssetThreeFields(TheaterAssetTestBase):
+    """U20：三个字段（**当前可用 / 本场景剩余 / 每回合恢复**）都能单独改。
+
+    **合法范围**（游戏字节码取证 —— `lib/uoc2/` 反汇编）：
+
+    | 字段 | 游戏里的含义 | 游戏的 voluptuous schema | 合法范围 |
+    |---|---|---|---|
+    | `to_use` | 当前剩余可用次数 | `All(int, Range(min=0))` | 0 – ∞ |
+    | `uses_total` | 本场景剩余总次数（`None` = 无限） | `Or(None, All(int, Range(min=0)))` | 0 – ∞ 或 None |
+    | `uses_turn` | 每回合恢复次数 | `All(int, Range(min=1))` | 1 – ∞ |
+
+    **跨字段不变式**：`to_use ≤ uses_total`（`uses_total` 有限时）——
+    游戏每用一次资产就让 `uses_total` 减 1（`Game.spend_theater_asset`），
+    减成负数会让存档校验失败 ⇒ 必须硬拦。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.save_path = self.make()
+
+    def assets(self, path=None):
+        with zipfile.ZipFile(path or self.save_path) as zf:
+            data = yaml.safe_load(zf.read("games/avalanche/main.yml"))
+        return {it["asset"]: it for grp in data["theater_assets"] for it in grp}
+
+    # ---------------------------------------------------------- 单独改每个字段
+
+    def test_only_to_use_changes(self):
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset("long_range_recon", to_use=2)])
+        self.assertTrue(res.ok, res.errors)
+        a = self.assets()["long_range_recon"]
+        self.assertEqual(a["to_use"], 2)
+        self.assertEqual(a["uses_total"], 2)   # 没传 ⇒ 不动
+        self.assertEqual(a["uses_turn"], 1)
+
+    def test_only_uses_turn_changes(self):
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset("long_range_recon", uses_turn=3)])
+        self.assertTrue(res.ok, res.errors)
+        a = self.assets()["long_range_recon"]
+        self.assertEqual(a["uses_turn"], 3)
+        self.assertEqual(a["to_use"], 1)
+        self.assertEqual(a["uses_total"], 2)
+
+    def test_only_uses_total_changes(self):
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset("long_range_recon", uses_total=5)])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self.assets()["long_range_recon"]["uses_total"], 5)
+
+    def test_uses_total_can_be_set_back_to_infinite(self):
+        """`uses_total=None` = 无限 —— 改器必须能把有限值改回无限。"""
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset("long_range_recon", uses_total=None)])
+        self.assertTrue(res.ok, res.errors)
+        self.assertIsNone(self.assets()["long_range_recon"]["uses_total"])
+
+    def test_all_three_at_once(self):
+        plan, res = self.commit(self.save_path, [Edit.theater_asset(
+            "long_range_recon", to_use=2, uses_total=6, uses_turn=3)])
+        self.assertTrue(res.ok, res.errors)
+        a = self.assets()["long_range_recon"]
+        self.assertEqual((a["to_use"], a["uses_total"], a["uses_turn"]), (2, 6, 3))
+
+    # ---------------------------------------------------------------- 硬范围
+
+    def test_to_use_zero_is_allowed(self):
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset("long_range_recon", to_use=0)])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self.assets()["long_range_recon"]["to_use"], 0)
+
+    def test_negative_to_use_is_rejected(self):
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset("long_range_recon", to_use=-1)])
+        self.assertFalse(plan.ok)
+
+    def test_uses_turn_zero_is_rejected(self):
+        """`uses_turn` 的 schema 是 `Range(min=1)` ⇒ 写 0 存档直接打不开。"""
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset("long_range_recon", uses_turn=0)])
+        self.assertFalse(plan.ok)
+        self.assertIn("uses_turn", plan.errors[0])
+
+    def test_negative_uses_total_is_rejected(self):
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset("long_range_recon", uses_total=-1)])
+        self.assertFalse(plan.ok)
+        self.assertIn("uses_total", plan.errors[0])
+
+    # -------------------------------------------------------- 跨字段不变式
+
+    def test_to_use_over_uses_total_is_rejected(self):
+        """`to_use > uses_total` ⇒ 用一次后 `uses_total` 变负 ⇒ 存档打不开。"""
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset("long_range_recon", to_use=3)])
+        self.assertFalse(plan.ok)
+        self.assertIn("不能大于", plan.errors[0])
+
+    def test_lowering_uses_total_below_to_use_is_rejected(self):
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset("long_range_recon", uses_total=0)])
+        self.assertFalse(plan.ok)
+
+    def test_uses_turn_over_uses_total_warns(self):
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset("long_range_recon", uses_turn=9)])
+        self.assertTrue(plan.ok)
+        self.assertTrue(any("大于" in w for w in plan.warnings), plan.warnings)
+
+    def test_to_use_over_uses_turn_warns_when_infinite(self):
+        plan = self.plan(self.save_path, [Edit.theater_asset(
+            "air_attack", to_use=9, uses_total=None, uses_turn=2)])
+        self.assertTrue(plan.ok)
+        self.assertTrue(any("大于" in w for w in plan.warnings), plan.warnings)
+
+    # ---------------------------------------------------------- phase 分组
+
+    def test_phase_selects_the_right_group(self):
+        """`theater_assets` 按 **phase 分组** ⇒ 必须改当前 phase 那一组。"""
+        p = self.make("phase.usg", battle_overrides={
+            "phase": 1,
+            "theater_assets": [[], [
+                {"asset": "air_attack", "to_use": 1, "to_use_not_used": None,
+                 "uses_total": None, "uses_turn": 1},
+            ]],
+        })
+        plan, res = self.commit(p, [Edit.theater_asset("air_attack", to_use=4)])
+        self.assertTrue(res.ok, res.errors)
+        with zipfile.ZipFile(p) as zf:
+            data = yaml.safe_load(zf.read("games/avalanche/main.yml"))
+        self.assertEqual(data["theater_assets"][0], [])           # 第 0 组没动
+        self.assertEqual(data["theater_assets"][1][0]["to_use"], 4)
+
+    # ---------------------------------------------------------------- 其它
+
+    def test_no_change_touches_nothing(self):
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset("long_range_recon", to_use=1)])
+        self.assertEqual(plan.changes, [])
+
+    def test_describe_lists_every_changed_field(self):
+        d = Edit.theater_asset("long_range_recon", to_use=2, uses_turn=3).describe()
+        self.assertIn("当前可用 → 2", d)
+        self.assertIn("每回合恢复 → 3", d)
+        self.assertNotIn("本场景剩余", d)
+        d2 = Edit.theater_asset("long_range_recon", uses_total=None).describe()
+        self.assertIn("本场景剩余 → 无限", d2)
+
+
 if __name__ == "__main__":
     unittest.main()
