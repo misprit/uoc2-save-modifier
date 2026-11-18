@@ -11,20 +11,30 @@
 | 技能树存在哪？ | 存档 `hqs.yml` 每个总部的 **`branches`** 字段（不只是 `branch_levels`！） | ① |
 | 一条技能长什么样？ | `{action, cost, level, sp_avail, sp_used}` —— 五个字段一个不少 | ① |
 | `level` 是什么？ | 该动作在分支树里的**级别（tier）** = 游戏 UI 矩阵的**列**（1/2/3） | ① ② |
-| `sp_used` 是什么？ | **已专精次数 = 技能等级**（0..sp_avail） | ② ③ |
-| `sp_avail` 是什么？ | 还能专精几次的上限；默认 **`min(2, cost - 1)`** ⇒ 每个技能最多专精 **2** 次 | ③ |
-| 专精有什么效果？ | 该动作发动时的 **CP 消耗 −1**（`a.cost = max(0, a.cost - 1)`） | ④ |
-| 谁没有技能点？ | `force_pool` 分支的四个动作 + `motor_pool` ⇒ `sp_avail/sp_used = null` | ③ |
-| 第一次专精免费吗？ | **免费**（`free_specialization`，条件 `sp_used == 0`，`prestige_cost = 0`） | ⑤ |
-| 再专精要花钱吗？ | 要花**声望**（`paid_specialization`，`prestige_cost = 常量 + sp_used`） | ⑤ |
-| 升分支等级花什么？ | **声望**，价格 = `hq_branch_upgrades[分支][当前等级]` | ⑤ ⑥ |
+| `sp_used` 是什么？ | **已专精次数 = 技能等级**（0..sp_avail） | ① ② |
+| `sp_avail` 是什么？ | 还能专精几次的上限；默认 **`min(2, cost - 1)`** ⇒ 每个技能最多专精 **2** 次 | ① ② |
+| 专精有什么效果？ | 该动作发动时的 **CP 消耗 −1**（`a.cost = max(0, a.cost - 1)`） | ② |
+| 谁没有技能点？ | `force_pool` 分支的四个动作 + `motor_pool` ⇒ `sp_avail/sp_used = null` | ① ② |
+| 第一次专精免费吗？ | **免费**（`free_specialization`，条件 `sp_used == 0`，`prestige_cost = 0`） | ② |
+| 再专精要花钱吗？ | 要花**声望**（`paid_specialization`，`prestige_cost = 常量 + sp_used`） | ② ③ |
+| 升分支等级花什么？ | **声望**，价格 = `hq_branch_upgrades[分支][当前等级]` | ② ③ ⑤ |
 | 一个分支同一级最多几个技能？ | **3 个**（超过就 `ValueInvalid`） | ② |
 | 同一动作能出现在两个分支吗？ | **不能**（游戏自己校验报错） | ② |
-| 怎么解锁？ | 分支等级 ≥ 动作的 tier ⇒ 该动作可用；降级会把它重新锁上 | ⑦ |
-| 分支升级价？ | **`hq_branch_upgrades[分支][当前等级]`**（声望）—— 与游戏内面板右侧的 ¢ 按钮一一对应 | ⑤ ⑥ ⑧ |
-| 情报分支有技能吗？ | **没有** —— 455 个总部的 `branches.intel` **恒为空列表**；游戏数据 `hq_types/*.yml` 里也没有 `intel:` 技能段 | ① ⑨ |
-| 图标上的**小圆点**是什么？ | **`sp_avail` 个槽位**（最多 2 个）；**金色实心 = 已专精 `sp_used`**，深色空心 = 还可再专精 | ⑧ |
-| 图标右下角的**数字**是什么？ | 该技能**当前**的 CP 消耗（已扣掉专精减免） | ⑧ |
+| 怎么解锁？ | 分支等级 ≥ 动作的 tier ⇒ 该动作可用；降级会把它重新锁上 | ① ⑤ |
+| 分支升级价？ | **`hq_branch_upgrades[分支][当前等级]`**（声望）—— 与游戏内面板右侧的 ¢ 按钮一一对应 | ③ ⑤ |
+| 情报分支有技能吗？ | **没有** —— 455 个总部的 `branches.intel` **恒为空列表**；游戏数据 `hq_types/*.yml` 里也没有 `intel:` 技能段 | ① |
+| 图标上的**小圆点**是什么？ | **`sp_avail` 个槽位**（最多 2 个）；**金色实心 = 已专精 `sp_used`**，深色空心 = 还可再专精 | ⑤ |
+| 图标右下角的**数字**是什么？ | 该技能**当前**的 CP 消耗（已扣掉专精减免） | ① ⑤ |
+
+**出处编号 = 脚本分节**
+
+| 编号 | 分节 | 内容 |
+|---|---|---|
+| ① | 存档结构 | `hqs.yml` 的 `branches` 字段形状 + 全库统计（249 总部 / 4818 条） |
+| ② | 字节码 | `check_sps` / `check_branch_data` / `reduce_action_cost` / `next_hq_upgrade` / `AddBranchLevel` |
+| ③ | 游戏常量 | `_packages/base/config/game.yml` 的 `hq_branch_upgrades` 等 |
+| ④ | locale | 中文名键链（`id_<action>` / `id_<action>_level_<N>`） |
+| ⑤ | 游戏内 UI 面板对照 | 与**游戏内截图**逐格核对（技能位置 / CP 数字 / 小圆点 / ¢ 价格） |
 
 **跑法（仓库根目录）**：
     .\\python\\python.exe docs\\证据脚本\\e165_hq_branches.py
