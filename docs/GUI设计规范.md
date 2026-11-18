@@ -106,7 +106,7 @@
 | 2 | 单位 | 名册、战力、XP、特种兵挂载、改名 | `can_edit_units` | **主战场** |
 | 3 | 特种兵 | 图鉴（378 种）、批量分配 | `can_edit_units` | |
 | 4 | 总部 | 总部条目、兵库存量、CP | `can_edit_hqs` | |
-| 5 | 卡牌 | 卡牌库存、会议手牌 | `can_edit_cards` / `can_edit_hand` | |
+| 5 | 卡牌 | **手牌**（`cards.yml`）+ **货架**（`main.yml.card_store`）+ 图鉴 | `can_edit_hand` / `can_edit_shelf` | 货架只在会议阶段存在 |
 | 6 | 商店 | 按战线分组的商品、价格、数量 | `can_edit_store` | |
 | 7 | 战区资产 | 11 类资产的可用次数 | `can_edit_theater_assets` | 只在战斗中 |
 
@@ -1071,8 +1071,12 @@ campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, .
 * 「下架」是破坏性操作 ⇒ 危险色 + 二次确认；
 * **上架对话框里的候选**来自游戏包：特种兵类型（375）× 国籍（34 种实测）、
   兵种（`infantry` / `armor`）× 国籍 —— 都在 `catalog` 里查，**不写死**；
-* 上架 = **新增 `Edit`（本轮新增）**：核心库现在只有 `store_set` / `store_remove`，
-  见 §8.1。
+* 上架 = `Edit.store_add(front, sub, entry)`（**核心库已实现**，见 §8.1）——
+  ⚠️ `sub` 是**子商店**（`store` 普通 / `elite_store` 精英），
+  `store.yml` 是两层结构；本会议没启用精英商店时（`elite_store: null`）
+  只能上架到普通商店，核心库会**硬拦**并说明原因；
+* **改价 / 改量 / 下架**同理要带 `sub`：
+  `Edit.store_set(front, sub, index, field, value)` / `Edit.store_remove(front, sub, index)`。
 
 ### 7.7 战区资产页
 
@@ -1102,33 +1106,38 @@ campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, .
 
 ## 8. GUI ↔ 核心库调用时序
 
-### 8.1 核心库还缺的 4 个能力（本轮实证暴露）
+### 8.1 核心库能力补齐（2026-11-18 已完成）
 
-> 2026-11-18 的存档取证把总部/卡牌/商店三页的真实字段挖出来后，
-> 发现现有 `EDIT_KINDS`（12 种）**盖不住**新页面要的 4 个操作。
-> 这 4 个都是**新增 L1 条目/字段**，不改已有语义，向后兼容。
+> 这一节原本是"还缺什么"的清单。`e153`–`e160` 的存档级实证把缺口全部暴露出来后，
+> 核心库已按下面的清单**补齐并实测通过**（241 项自动化测试全绿）。
+> 保留这张表，是为了让 GUI 侧知道**每个能力位背后到底是什么**。
 
-| 缺的 | 为什么需要 | 落点 | 备注 |
+#### 8.1.1 新增的 9 个 Edit
+
+| Edit | 做什么 | 落点 | 关键约束 |
 |---|---|---|---|
-| `Edit.hq_field(hq_id, field, value)` | 总部经验 `xp` / `xp_target`、CP、补给、卡车、俘虏 | `hqs.yml` | 白名单字段：`xp` / `xp_target` / `cp` / `max_cp` / `supply` / `trucks` / `prisoners` / `loss_count` / `intels_revealed` |
-| `Edit.hq_branch_level(hq_id, branch, level, suppressed?)` | 总部"升级"= 五个分支的等级 | `hqs.yml` | 分支枚举：`engineering` / `force_pool` / `intel` / `logistics` / `operations`；**降级要二次确认** |
-| `Edit.hq_force_pool_add/remove(hq_id, ...)` | 总部兵库**条目**的增删（现在只能改存量） | `hqs.yml` | 条目 = `{delay, nationality, quantity, spec? \| equipment?}` |
-| `Edit.store_add(front, sub, entry)` | **上架**新商品 | `store.yml` | `sub` = `store` / `elite_store`；条目须过 schema（`spec` XOR `equipment`、正整数库存、非负价格） |
-| `Edit.card_store_set(position, card_type?, is_free?)` | **改卡牌商店货架**：换牌 / 改成免费 | `main.yml` → `card_store` | `card_type` **必须在白名单里**（§7.5.1），不能只查"39 种里存在" |
+| `Edit.hq_field(hq_id, field, value)` | 总部经验 / CP / 补给 / 卡车 / 俘虏 … | `hqs.yml` | 白名单字段：`xp` / `xp_target` / `cp` / `max_cp` / `supply` / `trucks` / `prisoners` / `loss_count` / `intels_revealed` |
+| `Edit.hq_branch_level(hq_id, branch, level, suppressed?)` | 总部"升级"= 五个分支的等级 | `hqs.yml` | 分支枚举：`engineering` / `force_pool` / `intel` / `logistics` / `operations`；**降级会带提醒**（GUI 要二次确认） |
+| `Edit.hq_force_pool_add(hq_id, entry, index?)` | 总部兵库**加一条** | `hqs.yml` | 条目 = `{delay, nationality, quantity, spec? \| equipment?}`；`spec` 与 `equipment` 二选一 |
+| `Edit.hq_force_pool_remove(hq_id, index)` | 总部兵库**删一条** | `hqs.yml` | |
+| `Edit.store_add(front, sub, entry)` | **上架**新商品 | `store.yml` | `sub` = `store` / `elite_store`；条目须过 schema（`spec` XOR `equipment`、正整数库存、非负价格）+ 枚举校验（商品必须是游戏定义过的） |
+| `Edit.card_store_set(position, card_type?, is_free?)` | **改货架上的卡**：换牌 / 改成免费 | `main.yml` → `card_store` | `card_type` **必须在白名单里**（§7.5.1）；换成会召唤单位的卡时 `unit_id` 自动跟成预留 id |
 | `Edit.card_store_remove(position)` | **下架**一张卡 | `main.yml` → `card_store` | |
 | `Edit.card_store_add(position, card_type, is_free?)` | **上架**一张卡 | `main.yml` → `card_store` | `position` ≤ `card_store_limit[level]`（恒为 5）；`card_type` 同样要在白名单里 |
-| `Edit.card_set(position, field, value)` | **改手牌某个字段**（现在只能加卡 / 删卡） | `cards.yml` | 目前只用于 `is_free`；白名单字段：`is_free` |
+| `Edit.card_set(position, field, value)` | **改手牌某个字段** | `cards.yml` | 目前只用于 `is_free`；白名单字段：`is_free` |
 
-**另外两处要复活 / 新增的能力**（不是 Edit，是读能力）：
+#### 8.1.2 新增的两个读能力
 
-| 缺的 | 为什么需要 | 落点 | 备注 |
+| 能力 | 为什么需要 | 落点 | 备注 |
 |---|---|---|---|
-| `TranslationStore`（locale 查询） | 所有中文显示名都在 `localization/chi/strings.yml`，核心库现在**一个都不解析** | 游戏包 | 见 §5.7；**旧 REPL 的 `src/save_modifier/translations.py` 里已经有一份可用实现**（S11 重构时当冗余删了）⇒ 搬进 `save_modifier_core/locale.py`，别重写；找不到文件时 `get()` 返回空串 |
+| `locale.*` / `TranslationStore`（locale 查询） | 所有中文显示名都在 `localization/chi/strings.yml`，核心库原来**一个都不解析** | 游戏包 | 见 §5.7；**旧 REPL 的 `src/save_modifier/translations.py` 里已经有一份可用实现**（S11 重构时当冗余删了）⇒ 已搬进 `save_modifier_core/locale.py`，**没重写**；找不到文件时 `get()` 返回空串 |
 | `Catalog.card_whitelist(save)` | 算出「本存档本会议商店能自然生成哪几张卡」+ 每张被屏蔽卡的**原因** | 存档 + 游戏包 | 见 §7.5.1；逐条复刻 `Campaign.get_cards_probabilities`（`e160` 已用两个存档验证：真实货架每张都在候选集内）。**每次开卡牌页重算，别缓存** |
 
-**⚠️ 核心库现有的 `card_add` 校验要改**（`handlers.py::_card_add`）：
+#### 8.1.3 两处判定逻辑的纠正
 
-现在是这样：
+**① `card_add` 的 `unit_id` 校验语义原来是错的**
+
+原来是这样：
 
 ```python
 if info.get("has_unit") and unit_id is None:
@@ -1143,13 +1152,14 @@ if unit_id is not None and unit_id not in w.save.roster_ids():
 而 718 **此刻还不在存档的 `units.yml` 里**（还没被召唤过）——
 所以"在名册里"这条只是碰巧成立，语义是错的。
 
-**改成**：
+**已改成**：
 
 ```python
 if info.get("has_unit"):
-    必须能从 document/main.yml.card_type_units[card_type].unit_id 取出 id
+    预留 id = document/main.yml.card_type_units[card_type].unit_id
     → 取不到 ⇒ 报错「本战役没有这张卡可召唤的单位」
     → 传进来的 unit_id 必须与它一致 ⇒ 否则报错
+    → 都没传 ⇒ 自动补上预留 id
 else:
     unit_id 必须是 None
 ```
@@ -1157,16 +1167,43 @@ else:
 理由见 §7.5.1：`unit_id` 给错 ⇒ 召唤出**错误的单位**；
 给 None ⇒ 牌进手牌但没有单位 ⇒ 用卡时崩。
 
-**另外两处要改判定逻辑的**（不是新增，是修正）：
+**② `store_set` / `store_remove` 的 `index` 语义原来错了**
 
-1. `store_set` / `store_remove` 的 `index` 现在是**战线下的第几条**——
-   真实结构是 `{战线: {store: [...], elite_store: [...]}}`，
-   ⇒ `index` 必须**带子商店**（`store` 还是 `elite_store`），否则改的是错的列表。
-2. `store_remove` 现在只删 `store[front]['store']` 的条目 ——
-   要能删 `elite_store` 里的。
+真实结构是 `{战线: {store: [...], elite_store: [...]}}`（两层），
+⇒ `index` 必须**带子商店**。
+
+```python
+# 原来（错）
+Edit.store_set(front, index, field, value)
+Edit.store_remove(front, index)
+
+# 现在（对）
+Edit.store_set(front, sub, index, field, value)   # sub: "store" | "elite_store"
+Edit.store_remove(front, sub, index)
+Edit.store_add(front, sub, entry)                 # 新增：上架
+```
+
+⚠️ 这是**破坏性 API 变更**（核心库还是 0.1.0，GUI 尚未开工 ⇒ 改在前面最划算）。
+`sub` 传错值会**硬拦**；`elite_store` 是 `null`（本会议没启用）时也会**硬拦**并说明原因。
+
+#### 8.1.4 ⚠️ 本轮还揪出的两个真 bug（核心库原先的）
+
+| bug | 现象 | 根因 | 已改成 |
+|---|---|---|---|
+| **手牌与货架命名反了** | `view.hand` 装的是**货架**，`view.cards` 装的是**手牌** | `container.py` 把 `cards.yml`（手牌）和 `main.yml.card_store`（货架）搞混 | `view.hand` = **手牌**（`cards.yml`）、`view.shelf` = **货架**（`card_store`）；`view.cards` 保留为 `hand` 的旧名 |
+| **`view.store` 恒为空** | 商店页**一条商品都显示不出来** | `store.yml` 是两层 dict，代码却按 list 遍历 | 按 `{战线: {sub: [...]}}` 两层遍历；`StoreEntryView` 加 `sub` 字段 |
+
+旁证（`e157`/`e160` 实证）：手牌张数上限 = `card_deck_limit`（classic = 4），
+货架格数 = `card_store_limit`（恒为 5）—— 实测存档手牌正好 4 张、货架正好 5 张。
+游戏侧 `BuyCard.do` 是 `card_store.pop(position)` → `campaign.add_card(...)`
+⇒ `card_store` 是**买的地方**，`cards.yml` 是**放牌的地方**。
+
+能力位同步改了：`can_edit_hand` 现在指**手牌**（`cards.yml`），
+新增 `can_edit_shelf` 指**货架**（`card_store`）。
 
 **卡牌商店的"会议阶段"限制**：`main.yml.card_store` 只在 `in_state.conference` 有值时存在。
 不在会议阶段时，卡牌页的货架区显示说明卡，**相关 Edit 一律报错**（不要静默改一个游戏不读的地方）。
+
 
 ### 8.2 8 个函数的用法
 
@@ -1430,9 +1467,12 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 
 ### 12.9 商店结构修正（2026-11-18 · 实证）
 
-真实结构是 `{战线: {store: [...], elite_store: [...]}}` ——
-**两档商店**，不是一张列表。核心库现有 `store_set` / `store_remove`
-的 `index` 语义要跟着改（见 §8.1）。
+真实结构是 `{战线: {store: [...], elite_store: [...]}}` —— 
+**两档商店**，不是一张列表。核心库的 `store_set` / `store_remove` / `store_add`
+已改成**带子商店**的 `index` 语义（见 §8.1.3②）。
+
+⚠️ 这个结构原先还让核心库的 `view.store` **恒为空**（一条商品都显示不出来）——
+已修（§8.1.4）。
 
 ### 12.10 卡牌商店：一次被纠正的错误结论（2026-11-18 · 用户纠正）
 

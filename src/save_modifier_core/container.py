@@ -118,9 +118,14 @@ class CardView:
 
 @dataclass(frozen=True)
 class StoreEntryView:
-    """商店条目（`store.yml` 的一条）。"""
+    """商店条目（`store.yml` 的一条）。
+
+    ⚠️ `store.yml` 是**两层**的：`{战线: {store: [...], elite_store: [...]}}`
+    —— 普通商店 + 精英商店（`e154` 实证）。所以条目要知道自己在哪个子商店里。
+    """
 
     front: str
+    sub: str = "store"
     equipment: str | None = None
     spec: str | None = None
     nationality: str | None = None
@@ -131,10 +136,27 @@ class StoreEntryView:
     def what(self) -> str:
         return self.spec or self.equipment or "?"
 
+    @property
+    def is_elite(self) -> bool:
+        """是不是精英商店的条目。"""
+        return self.sub == "elite_store"
+
 
 @dataclass
 class View:
-    """给 GUI 用的只读投影（规范 §0.2 的 `save.view()`）。"""
+    """给 GUI 用的只读投影（规范 §0.2 的 `save.view()`）。
+
+    ⚠️ **两个卡牌集合别搞反**（`e157`/`e160` 实证）：
+
+    | 字段 | 来源 | 是什么 |
+    |---|---|---|
+    | `hand` | 根 `cards.yml` | **手牌** —— 你手里已经拿到的牌 |
+    | `shelf` | 根 `main.yml.card_store` | **货架** —— 会议里可以买的牌 |
+
+    旁证：手牌张数上限 = `card_deck_limit`（classic = 4），
+    货架格数 = `card_store_limit`（恒为 5）——
+    实测存档手牌正好 4 张、货架正好 5 张。
+    """
 
     save: SaveInfo
     capabilities: Capabilities
@@ -143,11 +165,18 @@ class View:
     score: int | None = None
     units: list[UnitView] = field(default_factory=list)
     hqs: list[HqView] = field(default_factory=list)
-    cards: list[CardView] = field(default_factory=list)
+    #: 手牌（根 `cards.yml`）
     hand: list[CardView] = field(default_factory=list)
+    #: 货架（根 `main.yml.card_store`）—— 只在会议阶段存在
+    shelf: list[CardView] = field(default_factory=list)
     store: list[StoreEntryView] = field(default_factory=list)
     battle_turn: int | None = None
     warnings: list[str] = field(default_factory=list)
+
+    @property
+    def cards(self) -> list[CardView]:
+        """手牌的旧名（`hand`）—— 保留是为了不打断已有调用方。"""
+        return self.hand
 
 
 # ---------------------------------------------------------------- 容器
@@ -438,37 +467,39 @@ class Save:
             if isinstance(h.get("id"), int)
         ]
 
-        cards = [CardView(
-            card_type=c.get("card_type"),
-            is_free=bool(c.get("is_free")),
-            position=c.get("position"),
-            unit_id=c.get("unit_id"),
-            used=bool(c.get("used")),
-        ) for c in self.root_cards()]
+        def _cards(rows) -> list[CardView]:
+            return [CardView(
+                card_type=c.get("card_type"),
+                is_free=bool(c.get("is_free")),
+                position=c.get("position"),
+                unit_id=c.get("unit_id"),
+                used=bool(c.get("used")),
+            ) for c in rows if isinstance(c, dict)]
 
-        hand = [CardView(
-            card_type=c.get("card_type"),
-            is_free=bool(c.get("is_free")),
-            position=c.get("position"),
-            unit_id=c.get("unit_id"),
-            used=bool(c.get("used")),
-        ) for c in (self.card_store() or []) if isinstance(c, dict)]
+        # 手牌 = 根 cards.yml；货架 = 根 main.yml.card_store（别搞反，见 View 的说明）
+        hand = _cards(self.root_cards())
+        shelf = _cards(self.card_store() or [])
 
         store: list[StoreEntryView] = []
-        for front, entries in self.root_store().items():
-            if not isinstance(entries, list):
+        for front, blob in self.root_store().items():
+            # store.yml 是两层：{战线: {store: [...], elite_store: [...]}}
+            if not isinstance(blob, dict):
                 continue
-            for e in entries:
-                if not isinstance(e, dict):
+            for sub, entries in blob.items():
+                if not isinstance(entries, list):
                     continue
-                store.append(StoreEntryView(
-                    front=front,
-                    equipment=e.get("equipment"),
-                    spec=e.get("spec"),
-                    nationality=e.get("nationality"),
-                    price=e.get("price") if isinstance(e.get("price"), int) else 0,
-                    quantity=e.get("quantity") if isinstance(e.get("quantity"), int) else 0,
-                ))
+                for e in entries:
+                    if not isinstance(e, dict):
+                        continue
+                    store.append(StoreEntryView(
+                        front=front,
+                        sub=sub,
+                        equipment=e.get("equipment"),
+                        spec=e.get("spec"),
+                        nationality=e.get("nationality"),
+                        price=e.get("price") if isinstance(e.get("price"), int) else 0,
+                        quantity=e.get("quantity") if isinstance(e.get("quantity"), int) else 0,
+                    ))
 
         warnings: list[str] = []
         if not caps.has_root_units:
@@ -488,8 +519,8 @@ class Save:
             score=main.get("score"),
             units=units,
             hqs=hqs,
-            cards=cards,
             hand=hand,
+            shelf=shelf,
             store=store,
             battle_turn=self.battle_turn(),
             warnings=warnings,

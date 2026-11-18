@@ -102,12 +102,13 @@ class TestPackageSurface(unittest.TestCase):
     """核心包的公开名单 —— 新增公开 API 必须先改这里。"""
 
     EXPECTED = {
-        "Capabilities", "CardView", "Catalog", "CommitResult", "CorePaths",
-        "Edit", "FileChange", "HqView", "Plan", "Save", "SaveInfo",
-        "StoreEntryView", "UndoRecord", "UndoResult", "UnitType", "UnitView",
-        "ValidationResult", "View", "catalog", "commit", "list_saves",
-        "make_backup", "open_save", "plan_edit", "resolve_save_id",
-        "stack_path_for", "validate",
+        "Capabilities", "CardView", "CardWhitelist", "Catalog", "CommitResult",
+        "CorePaths", "Edit", "FileChange", "HqView", "Plan", "Save",
+        "SaveInfo", "StoreEntryView", "TranslationStore", "UndoRecord",
+        "UndoResult", "UnitType", "UnitView", "ValidationResult", "View",
+        "catalog", "commit", "list_saves", "locale", "make_backup",
+        "open_save", "plan_edit", "resolve_save_id", "stack_path_for",
+        "validate",
     }
 
     def test_all_is_frozen(self):
@@ -120,12 +121,18 @@ class TestPackageSurface(unittest.TestCase):
 
 
 class TestEditKinds(unittest.TestCase):
-    """11 种编辑类型 —— GUI 的下拉框与参数表按这个来。"""
+    """编辑类型 —— GUI 的下拉框与参数表按这个来。
+
+    ⚠️ 2026-11-18 扩到 20 种（`e153`–`e160` 实证暴露出来的缺口）：
+    总部 4 种 + 商店 1 种 + 卡牌货架 3 种 + 手牌字段 1 种。
+    """
 
     EXPECTED = {
         "progress", "unit_field", "unit_spec_add", "unit_spec_remove",
-        "hq_force_pool", "card_add", "card_remove", "store_set",
-        "store_remove", "hand_restore", "theater_asset",
+        "hq_force_pool", "hq_field", "hq_branch_level", "hq_force_pool_add",
+        "hq_force_pool_remove", "card_add", "card_remove", "card_set",
+        "store_set", "store_remove", "store_add", "card_store_set",
+        "card_store_remove", "card_store_add", "hand_restore", "theater_asset",
     }
 
     def test_kinds_are_frozen(self):
@@ -138,10 +145,20 @@ class TestEditKinds(unittest.TestCase):
 
     def test_factories_exist(self):
         for name in ("progress", "unit_field", "unit_spec_add",
-                     "unit_spec_remove", "hq_force_pool", "card_add",
-                     "card_remove", "store_set", "store_remove",
+                     "unit_spec_remove", "hq_force_pool", "hq_field",
+                     "hq_branch_level", "hq_force_pool_add",
+                     "hq_force_pool_remove", "card_add", "card_remove",
+                     "card_set", "store_set", "store_remove", "store_add",
+                     "card_store_set", "card_store_remove", "card_store_add",
                      "hand_restore", "theater_asset"):
             self.assertTrue(callable(getattr(Edit, name)), name)
+
+    def test_store_edits_take_sub_store(self):
+        """`store.yml` 是两层结构 ⇒ `store_set` / `store_remove` 必须带 `sub`。"""
+        self.assertEqual(sig(Edit.store_set),
+                         "(front, sub, index, field, value)")
+        self.assertEqual(sig(Edit.store_remove), "(front, sub, index)")
+        self.assertEqual(sig(Edit.store_add), "(front, sub, entry)")
 
 
 class TestReturnShapes(unittest.TestCase):
@@ -157,9 +174,22 @@ class TestReturnShapes(unittest.TestCase):
             v = save.view()
         self.assertIsInstance(v, View)
         for attr in ("save", "capabilities", "stage", "prestige", "score",
-                     "units", "hqs", "cards", "hand", "store", "battle_turn",
-                     "warnings"):
+                     "units", "hqs", "cards", "hand", "shelf", "store",
+                     "battle_turn", "warnings"):
             self.assertTrue(hasattr(v, attr), attr)
+
+    def test_hand_and_shelf_are_not_the_same_thing(self):
+        """⚠️ 手牌 = `cards.yml`；货架 = `main.yml.card_store`（别搞反）。
+
+        `e157`/`e160` 实证：手牌张数上限 = `card_deck_limit`，
+        货架格数 = `card_store_limit` —— 实测存档手牌 4 张、货架 5 张。
+        """
+        with open_save(str(self.save_path)) as save:
+            v = save.view()
+        self.assertEqual([c.card_type for c in v.hand], ["air_attack_allies"])
+        self.assertEqual(v.shelf, [])
+        # `cards` 是 `hand` 的旧名
+        self.assertEqual(v.cards, v.hand)
 
     def test_plan_attributes(self):
         with open_save(str(self.save_path)) as save:
@@ -229,8 +259,9 @@ class TestAuxiliaryApi(unittest.TestCase):
             caps = save.capabilities()
         for attr in ("can_edit_progress", "can_edit_units", "can_edit_hqs",
                      "can_edit_force_pool", "can_edit_cards",
-                     "can_edit_store", "can_edit_hand", "can_restore_hand",
-                     "can_edit_theater_assets", "can_undo_in_game"):
+                     "can_edit_store", "can_edit_hand", "can_edit_shelf",
+                     "can_restore_hand", "can_edit_theater_assets",
+                     "can_undo_in_game"):
             self.assertTrue(hasattr(caps, attr), attr)
         self.assertEqual(sig(type(caps).unavailable_reason), "(self, feature)")
 

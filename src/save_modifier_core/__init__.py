@@ -30,13 +30,15 @@ L2 检查点 / L3 战斗实时层 / L4 回合历史 / L5 战役文档 一律只�
 from __future__ import annotations
 
 from . import catalog
+from . import locale
 from .capabilities import Capabilities
-from .catalog import Catalog, UnitType
+from .catalog import CardWhitelist, Catalog, UnitType
 from .commit import CommitResult, commit, make_backup
 from .container import (CardView, HqView, Save, StoreEntryView, UnitView,
                         View)
 from .discovery import SaveInfo, list_saves, resolve_save_id
 from .edits import Edit
+from .locale import TranslationStore
 from .paths import CorePaths
 from .plan import FileChange, Plan, ValidationResult, plan_edit, validate
 from .undo import UndoRecord, UndoResult, stack_path_for
@@ -44,6 +46,7 @@ from .undo import UndoRecord, UndoResult, stack_path_for
 __all__ = [
     "Capabilities",
     "CardView",
+    "CardWhitelist",
     "Catalog",
     "CommitResult",
     "CorePaths",
@@ -54,6 +57,7 @@ __all__ = [
     "Save",
     "SaveInfo",
     "StoreEntryView",
+    "TranslationStore",
     "UndoRecord",
     "UndoResult",
     "UnitType",
@@ -63,6 +67,7 @@ __all__ = [
     "catalog",
     "commit",
     "list_saves",
+    "locale",
     "make_backup",
     "open_save",
     "plan_edit",

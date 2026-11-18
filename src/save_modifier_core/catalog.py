@@ -33,13 +33,14 @@ GUI 要**照样显示**存档里的未知 type，只提示不拦截。
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Mapping
 
 from . import yamlio
 from .paths import CorePaths
 
-__all__ = ["Catalog", "UnitType", "TypeKind"]
+__all__ = ["Catalog", "UnitType", "CardWhitelist", "TypeKind"]
 
 #: 类型表的种类 → `entity_types/` 下的子目录名
 TypeKind = str
@@ -51,6 +52,23 @@ ENTITY_DIRS = {
     "hq_types": "hq_types",
     "generals": "generals",
 }
+
+#: 抽卡的基础权重表（`card_types.pyc::card_meta_types_base_probabilities`，`e158` 实证）
+#:
+#: 15 分 = 常见；6 分 = 中等；3 分 = 稀有。
+#: ⚠️ 这张表**不在游戏包的数据文件里**（在字节码常量里），所以只能写死一份，
+#: 但它有字节码依据 —— 会议覆盖 / 前线缩放都是在这张表**之上**做的（`e158`）。
+BASE_CARD_WEIGHTS: dict[str, float] = {
+    "truck": 15, "air_attack": 15, "long_range_recon": 15,
+    "air_supply": 6, "naval_bombardment": 6, "saturation_strike": 6,
+    "espionage": 6, "flying_artillery": 6,
+    "tactical_naval_assault": 3, "tactical_para": 3, "divisional_para": 3,
+    "sabotage": 3, "store": 3, "precision_bombing": 3, "air_fleet": 3,
+    "power_hq": 3, "arty_prep": 3, "air_hq": 3,
+}
+
+#: 商店的两个子商店（`store.yml` = `{战线: {store: [...], elite_store: [...]}}`）
+STORE_SUBS = ("store", "elite_store")
 
 
 @dataclass(frozen=True)
@@ -102,6 +120,47 @@ class UnitType:
 
 def _as_int(v) -> int | None:
     return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+@dataclass(frozen=True)
+class CardWhitelist:
+    """「本存档本会议，卡牌商店本来就能生成哪几张卡」。
+
+    由 `Catalog.card_whitelist(save)` 算出 —— 逐条复刻游戏自己的
+    `Campaign.get_cards_probabilities`（`e160` 实证）。
+
+    **这是"当前存档 + 当前会议"的状态** —— 换战役、换会议、玩到下一场，
+    白名单都会变 ⇒ **每次开卡牌页重算，不要缓存**（规范 §7.5.1）。
+    """
+
+    #: 可上架的卡牌类型名
+    allowed: frozenset[str] = frozenset()
+    #: 被屏蔽的卡牌 → **屏蔽原因**（中文，直接显示给玩家）
+    blocked: Mapping[str, str] = field(default_factory=dict)
+    #: 玩家阵营（存档 `document/main.yml`）
+    player_faction: str | None = None
+    #: 当前会议 id
+    conference: str | None = None
+    #: 当前战役 id
+    campaign_id: str | None = None
+    #: 本次会议的 meta_type 概率表（基础表 + 会议覆盖 + 前线缩放）
+    probabilities: Mapping[str, float] = field(default_factory=dict)
+
+    def is_allowed(self, card_type: str) -> bool:
+        """这张卡能不能上架。"""
+        return card_type in self.allowed
+
+    def reason(self, card_type: str) -> str | None:
+        """这张卡为什么被屏蔽；没被屏蔽返回 None。"""
+        return self.blocked.get(card_type)
+
+    def allowed_types(self) -> list[str]:
+        """可上架的卡牌名（排序）。"""
+        return sorted(self.allowed)
+
+    def blocked_types(self) -> list[str]:
+        """被屏蔽的卡牌名（排序）。"""
+        return sorted(self.blocked)
 
 
 class Catalog:
@@ -306,6 +365,183 @@ class Catalog:
         store = data.get("store")
         return [e for e in store if isinstance(e, dict)] if isinstance(store, list) else []
 
+    def store_sub_lists(self, campaign_id: str, front: str,
+                        conference: str) -> dict[str, list[dict]]:
+        """战役包默认商店的**两个子商店**（`store` / `elite_store`）。"""
+        cdir = self.campaign_dir(campaign_id)
+        if cdir is None:
+            return {sub: [] for sub in STORE_SUBS}
+        p = cdir / "fronts" / front / "conferences" / f"{conference}.yml"
+        out: dict[str, list[dict]] = {sub: [] for sub in STORE_SUBS}
+        if not p.is_file():
+            return out
+        try:
+            data = yamlio.load(p.read_bytes())
+        except Exception:
+            return out
+        if not isinstance(data, dict):
+            return out
+        for sub in STORE_SUBS:
+            items = data.get(sub)
+            if isinstance(items, list):
+                out[sub] = [e for e in items if isinstance(e, dict)]
+        return out
+
+    def store_item_universe(self, campaign_id: str | None,
+                            conference: str | None) -> dict[str, set[str]]:
+        """这个战役/会议里，游戏自己会卖哪些**兵种 / 国籍 / 特种兵**。
+
+        来源 = 战役包该会议**所有战线**的默认商店清单（`e154` 实证：
+        489 条默认条目，`equipment` 只有 `infantry` / `armor`）。
+
+        ⚠️ 这是**新上架商品**的校验依据 —— 游戏 schema 是枚举校验，
+        填了游戏没有的东西会被游戏拒收（规范 §7.6）。
+        特种兵另外用 `spec_type_names()` 兜底（375 个）。
+        """
+        equipments: set[str] = set()
+        nationalities: set[str] = set()
+        if campaign_id and conference:
+            for front in self.fronts(campaign_id):
+                for sub in STORE_SUBS:
+                    for e in self.store_sub_lists(campaign_id, front, conference)[sub]:
+                        if e.get("equipment"):
+                            equipments.add(str(e["equipment"]))
+                        if e.get("nationality"):
+                            nationalities.add(str(e["nationality"]))
+        specs = set(self.spec_type_names())
+        return {"equipment": equipments, "nationality": nationalities,
+                "spec": specs}
+
+    # ---- 卡牌商店白名单 ----
+
+    def card_probabilities(self, save, conference: str | None = None,
+                           campaign_id: str | None = None) -> dict[str, float]:
+        """本会议的 meta_type 概率表。
+
+        权重链（`e158` 字节码实证）：
+
+        1. **基础表** —— `BASE_CARD_WEIGHTS`（15 / 6 / 3 三档）；
+        2. **会议覆盖** —— `document/conferences/<会议>.yml` 的 `card_probabilities`；
+        3. **前线缩放** —— `document/fronts/<战线>/conferences/<会议>.yml`
+           的 `card_probability_scales`（空 dict = 不覆盖）。
+
+        ⚠️ **权威源是存档的 L5 文档**（游戏把 campaign_doc 从存档里加载），
+        存档里没有才退回游戏包。
+        """
+        prob = dict(BASE_CARD_WEIGHTS)
+        if not conference:
+            return prob
+
+        over: dict = {}
+        scales: dict = {}
+        for n in save.list_names():
+            if not n.endswith(".yml"):
+                continue
+            if n == f"document/conferences/{conference}.yml":
+                d = save.read_yaml(n, None)
+                if isinstance(d, dict):
+                    over = d.get("card_probabilities") or {}
+            elif n.endswith(f"/conferences/{conference}.yml"):
+                d = save.read_yaml(n, None)
+                if isinstance(d, dict):
+                    for c, v in (d.get("card_probability_scales") or {}).items():
+                        scales.setdefault(c, v)
+        if not over and not scales and campaign_id:
+            cdir = self.campaign_dir(campaign_id)
+            if cdir is not None and cdir.is_dir():
+                for f in sorted(cdir.rglob(f"conferences/{conference}.yml")):
+                    try:
+                        d = yamlio.load(f.read_bytes())
+                    except Exception:
+                        continue
+                    if not isinstance(d, dict):
+                        continue
+                    rel = f.relative_to(cdir).as_posix()
+                    if rel == f"conferences/{conference}.yml":
+                        over = d.get("card_probabilities") or {}
+                    elif rel.endswith(f"/conferences/{conference}.yml"):
+                        for c, v in (d.get("card_probability_scales") or {}).items():
+                            scales.setdefault(c, v)
+        prob.update(over)
+        for c, v in scales.items():
+            prob[c] = prob.get(c, 0) * v
+        return prob
+
+    def card_whitelist(self, save) -> CardWhitelist:
+        """算出「本存档本会议，卡牌商店本来就能自然生成哪几张卡」。
+
+        逐条复刻 `Campaign.get_cards_probabilities`（`e160` 实证）：
+
+        ```
+        可上架 = { ct : ∃ meta_type, p(meta_type) > 0,
+                     ct.faction == 玩家阵营,
+                     ct.meta_type == meta_type,
+                     (¬ct.has_unit)                        ← 不召唤单位 ⇒ 无条件可上架
+                     OR ( ct ∈ card_type_units            ← 本战役登记过 ⇒ 有单位可召唤
+                          ∧ ct ∉ used_card_types_with_unit
+                          ∧ ct ∉ 当前手牌
+                          ∧ (预留单位不存在 OR 未阵亡) ) }
+        ```
+
+        ⚠️ **每次调用都重算** —— 白名单是"当前存档 + 当前会议"的状态（规范 §7.5.1）。
+        """
+        doc = save.read_yaml("document/main.yml", None)
+        doc = doc if isinstance(doc, dict) else {}
+        main_ = save.root_main()
+        in_state = main_.get("in_state") or {}
+
+        player_faction = doc.get("player_faction")
+        ct_units = {}
+        for e in (doc.get("card_type_units") or []):
+            if isinstance(e, dict) and e.get("card_type"):
+                ct_units[e["card_type"]] = e
+        used = main_.get("used_card_types_with_unit") or {}
+        campaign_id = main_.get("campaign_id")
+        conference = in_state.get("conference")
+
+        prob = self.card_probabilities(save, conference, campaign_id)
+
+        hand_types = {c.get("card_type") for c in save.root_cards()}
+        save_units = {u.get("id"): u for u in save.root_units()
+                      if isinstance(u, dict)}
+
+        allowed: set[str] = set()
+        blocked: dict[str, str] = {}
+        for name in self.card_type_names():
+            d = self.card_type(name) or {}
+            mt = d.get("meta_type")
+            fac = d.get("faction")
+            reasons: list[str] = []
+            if fac != player_faction:
+                reasons.append(f"阵营 {fac} ≠ 玩家 {player_faction}")
+            elif prob.get(mt, 0) <= 0:
+                reasons.append(f"本次会议抽不到（{mt} 概率 ≤ 0）")
+            elif d.get("has_unit"):
+                if name in used:
+                    reasons.append("已召唤过（used_card_types_with_unit）")
+                elif name in hand_types:
+                    reasons.append("手牌里已有同类型")
+                elif name not in ct_units:
+                    reasons.append("本战役没有这张卡可召唤的单位")
+                else:
+                    unit_id = ct_units[name].get("unit_id")
+                    unit = save_units.get(unit_id)
+                    if unit is not None and unit.get("kia"):
+                        reasons.append(f"预留单位 {unit_id} 已阵亡，名额用掉")
+            if reasons:
+                blocked[name] = "；".join(reasons)
+            else:
+                allowed.add(name)
+
+        return CardWhitelist(
+            allowed=frozenset(allowed),
+            blocked=blocked,
+            player_faction=player_faction,
+            conference=conference,
+            campaign_id=campaign_id,
+            probabilities=prob,
+        )
+
     # ---- 批量预热 ----
 
     def warm(self, kind: TypeKind, names) -> int:
@@ -364,3 +600,11 @@ def fronts(campaign_id: str) -> list[str]:
 def store_defaults(campaign_id: str, front: str, conference: str) -> list[dict]:
     """战役包默认商店清单（**仅供参考**，不要拿它纠正存档）。"""
     return default().store_defaults(campaign_id, front, conference)
+
+
+def card_whitelist(save) -> CardWhitelist:
+    """卡牌商店白名单（见 `Catalog.card_whitelist`）。
+
+    ⚠️ **每次调用都重算** —— 白名单是"当前存档 + 当前会议"的状态。
+    """
+    return default().card_whitelist(save)

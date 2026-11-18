@@ -181,7 +181,7 @@ class TestValidate(EditingTestBase):
         """`quantity: 0` 是非法值 —— 独立复核也要拦下来。"""
         with self.open() as save:
             plan = save.plan_edit(
-                [Edit.store_set("south", 0, "quantity", 0)], catalog=self.catalog)
+                [Edit.store_set("south", "store", 0, "quantity", 0)], catalog=self.catalog)
         # 规划阶段就该拦住
         self.assertFalse(plan.ok)
 

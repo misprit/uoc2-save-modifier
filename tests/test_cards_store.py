@@ -1,6 +1,6 @@
-"""S8：卡牌（cards.yml）与商店（store.yml）。
+"""S8：手牌（cards.yml）、卡牌商店货架（main.yml.card_store）与商店（store.yml）。
 
-**验收口径**（规范 §6.3、§4.6、§4.6.1、§10 第 9/12/15/34/37/48 条）：
+**验收口径**（规范 §6.3、§4.6、§4.6.1、§7.5、§7.6、§10 第 9/12/15/34/37/48 条）：
 
 * `price: 0` = **免费商品**，不是下架；
 * `quantity: 0` = **非法值**，必须被拦 —— 游戏没有「售罄」标记，
@@ -8,8 +8,12 @@
 * 商店的顶层键**只能用存档已有的战线键**（存档的键是游戏包 `fronts/` 的子集
   = 当前已激活战线），**不要凭空新建**；
 * `nationality` 是**国籍 id**，不是阵营；
+* `store.yml` 是**两层**的：`{战线: {store: [...], elite_store: [...]}}`
+  ⇒ 改商品必须带 `sub`（普通 / 精英）；
+* 手牌 = 根 `cards.yml`；货架 = 根 `main.yml.card_store` —— **别搞反**；
 * 卡牌类型必须在游戏包的 39 个里；带单位的卡（`has_unit: true`）
-  必须填 `unit_id`，且该 id 要在战役名册里。
+  的 `unit_id` 必须等于本战役为它登记的**预留 id**，
+  不是"名册里任意一个单位"（§8.1）。
 """
 
 import shutil
@@ -50,65 +54,132 @@ class CardStoreTestBase(unittest.TestCase):
 
 class TestStorePriceAndQuantity(CardStoreTestBase):
     def test_set_price(self):
-        plan, res = self.commit([Edit.store_set("south", 0, "price", 3)])
+        plan, res = self.commit([Edit.store_set("south", "store", 0, "price", 3)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
         store = self.read("store.yml")
-        self.assertEqual(store["south"][0]["price"], 3)
-        self.assertEqual(store["south"][0]["quantity"], 20)   # 其余不动
+        self.assertEqual(store["south"]["store"][0]["price"], 3)
+        self.assertEqual(store["south"]["store"][0]["quantity"], 20)   # 其余不动
 
     def test_price_zero_means_free_not_sold_out(self):
-        plan, res = self.commit([Edit.store_set("south", 0, "price", 0)])
+        plan, res = self.commit([Edit.store_set("south", "store", 0, "price", 0)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
         store = self.read("store.yml")
-        self.assertEqual(store["south"][0]["price"], 0)
+        self.assertEqual(store["south"]["store"][0]["price"], 0)
         self.assertTrue(any("免费" in w for w in plan.warnings), plan.warnings)
 
     def test_quantity_zero_is_blocked(self):
         """`quantity: 0` 是游戏从不产生的非法状态。"""
-        plan, _ = self.commit([Edit.store_set("south", 0, "quantity", 0)])
+        plan, _ = self.commit([Edit.store_set("south", "store", 0, "quantity", 0)])
         self.assertFalse(plan.ok)
         self.assertIn("删除该条目", plan.errors[0])
 
     def test_negative_quantity_blocked(self):
-        plan, _ = self.commit([Edit.store_set("south", 0, "quantity", -5)])
+        plan, _ = self.commit([Edit.store_set("south", "store", 0, "quantity", -5)])
         self.assertFalse(plan.ok)
 
     def test_set_quantity_upwards(self):
-        plan, res = self.commit([Edit.store_set("south", 0, "quantity", 99)])
+        plan, res = self.commit([Edit.store_set("south", "store", 0, "quantity", 99)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
-        self.assertEqual(self.read("store.yml")["south"][0]["quantity"], 99)
+        self.assertEqual(self.read("store.yml")["south"]["store"][0]["quantity"], 99)
 
     def test_cannot_create_new_front(self):
         """存档的键是游戏包 fronts/ 的子集 —— 不要凭空新建战线键。"""
-        plan, _ = self.commit([Edit.store_set("north", 0, "price", 1)])
+        plan, _ = self.commit([Edit.store_set("north", "store", 0, "price", 1)])
         self.assertFalse(plan.ok)
         self.assertIn("战线", plan.errors[0])
 
+    def test_unknown_sub_store_is_blocked(self):
+        """`store.yml` 是两层结构 —— 子商店只能是 store / elite_store。"""
+        plan, _ = self.commit([Edit.store_set("south", "vip", 0, "price", 1)])
+        self.assertFalse(plan.ok)
+        self.assertIn("子商店", plan.errors[0])
+
+    def test_elite_store_null_is_reported_not_crashed(self):
+        """精英商店没启用时（`elite_store: null`）要报错，不是崩。"""
+        plan, _ = self.commit([Edit.store_set("south", "elite_store", 0, "price", 1)])
+        self.assertFalse(plan.ok)
+        self.assertIn("精英商店", plan.errors[0])
+
     def test_nationality_faction_hint(self):
-        plan, _ = self.commit([Edit.store_set("south", 0, "price", 1)])
+        plan, _ = self.commit([Edit.store_set("south", "store", 0, "price", 1)])
         self.assertTrue(plan.ok, plan.errors)
 
     def test_only_store_yml_changes(self):
-        plan, res = self.commit([Edit.store_set("south", 0, "price", 3)])
+        plan, res = self.commit([Edit.store_set("south", "store", 0, "price", 3)])
         self.assertEqual(res.changed, ["store.yml"])
 
 
 class TestStoreRemove(CardStoreTestBase):
     def test_remove_entry_is_the_way_to_delist(self):
         """下架商品 = 删条目。"""
-        plan, res = self.commit([Edit.store_remove("south", 0)])
+        plan, res = self.commit([Edit.store_remove("south", "store", 0)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
         store = self.read("store.yml")
-        self.assertEqual(len(store["south"]), 1)
-        self.assertEqual(store["south"][0]["spec"], "ger_arty_40")
+        self.assertEqual(len(store["south"]["store"]), 1)
+        self.assertEqual(store["south"]["store"][0]["spec"], "ger_arty_40")
 
     def test_remove_bad_index(self):
-        plan, _ = self.commit([Edit.store_remove("south", 99)])
+        plan, _ = self.commit([Edit.store_remove("south", "store", 99)])
         self.assertFalse(plan.ok)
+
+
+class TestStoreAdd(CardStoreTestBase):
+    """上架新商品（`e154`：价格/数量在存档里，改了就是改了）。"""
+
+    def test_add_entry(self):
+        plan, res = self.commit([Edit.store_add("south", "store", {
+            "equipment": "armor", "nationality": "german",
+            "price": 30, "quantity": 5})])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        entries = self.read("store.yml")["south"]["store"]
+        self.assertEqual(len(entries), 3)
+        self.assertEqual(entries[2]["equipment"], "armor")
+        self.assertEqual(entries[2]["price"], 30)
+
+    def test_spec_and_equipment_are_exclusive(self):
+        plan, _ = self.commit([Edit.store_add("south", "store", {
+            "spec": "ger_arty_40", "equipment": "armor",
+            "nationality": "german", "price": 30, "quantity": 5})])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("二选一" in e for e in plan.errors), plan.errors)
+
+    def test_one_of_spec_or_equipment_required(self):
+        plan, _ = self.commit([Edit.store_add("south", "store", {
+            "nationality": "german", "price": 30, "quantity": 5})])
+        self.assertFalse(plan.ok)
+
+    def test_quantity_must_be_positive(self):
+        plan, _ = self.commit([Edit.store_add("south", "store", {
+            "equipment": "armor", "nationality": "german",
+            "price": 30, "quantity": 0})])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("正整数" in e for e in plan.errors), plan.errors)
+
+    def test_price_must_be_non_negative(self):
+        plan, _ = self.commit([Edit.store_add("south", "store", {
+            "equipment": "armor", "nationality": "german",
+            "price": -1, "quantity": 3})])
+        self.assertFalse(plan.ok)
+
+    def test_unknown_spec_is_blocked(self):
+        """游戏里没有的特种兵不能凭空新增（schema 是枚举校验）。"""
+        plan, _ = self.commit([Edit.store_add("south", "store", {
+            "spec": "not_a_real_spec", "nationality": "german",
+            "price": 30, "quantity": 5})])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("游戏里没有" in e for e in plan.errors), plan.errors)
+
+    def test_elite_store_not_enabled_cannot_add(self):
+        plan, _ = self.commit([Edit.store_add("south", "elite_store", {
+            "equipment": "armor", "nationality": "german",
+            "price": 30, "quantity": 5})])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("精英商店" in e for e in plan.errors), plan.errors)
 
 
 class TestCards(CardStoreTestBase):
@@ -143,29 +214,38 @@ class TestCards(CardStoreTestBase):
         self.assertFalse(plan.ok)
         self.assertIn("不存在", plan.errors[0])
 
-    def test_card_with_unit_requires_unit_id(self):
-        """带单位的卡必须指定 unit_id。"""
+    def test_card_with_unit_takes_reserved_unit_id(self):
+        """⚠️ `unit_id` 的真实语义 = 本战役为这张卡登记的**预留 id**。
+
+        夹具里 `document/main.yml.card_type_units` 登记了
+        `tactical_para_german → 718` ⇒ 不传 unit_id 也能加（自动补上）。
+        """
+        if not self.catalog.has_card_type("tactical_para_german"):
+            self.skipTest("本机没有这个卡牌类型")
+        plan, res = self.commit([Edit.card_add("tactical_para_german")])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        cards = self.read("cards.yml")
+        self.assertEqual(cards[1]["unit_id"], 718)
+
+    def test_card_with_unit_rejects_wrong_unit_id(self):
+        """填错 ⇒ 召唤出**错误的单位** —— 必须拦。"""
+        if not self.catalog.has_card_type("tactical_para_german"):
+            self.skipTest("本机没有这个卡牌类型")
+        plan, _ = self.commit([Edit.card_add("tactical_para_german", unit_id=1)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("预留的单位是 718" in e for e in plan.errors), plan.errors)
+
+    def test_card_with_unit_not_registered_in_campaign_is_blocked(self):
+        """本战役没为它登记单位 ⇒ 硬写进去用卡时游戏会崩。"""
         if not self.catalog.has_card_type("tactical_naval_assault_us"):
             self.skipTest("本机没有这个卡牌类型")
         plan, _ = self.commit([Edit.card_add("tactical_naval_assault_us")])
         self.assertFalse(plan.ok)
-        self.assertIn("unit_id", plan.errors[0])
+        self.assertTrue(any("登记" in e for e in plan.errors), plan.errors)
 
-    def test_card_with_unit_accepts_roster_unit(self):
-        if not self.catalog.has_card_type("tactical_naval_assault_us"):
-            self.skipTest("本机没有这个卡牌类型")
-        plan, res = self.commit(
-            [Edit.card_add("tactical_naval_assault_us", unit_id=1)])
-        self.assertTrue(plan.ok, plan.errors)
-        self.assertTrue(res.ok, res.errors)
-        cards = self.read("cards.yml")
-        self.assertEqual(cards[1]["unit_id"], 1)
-
-    def test_card_with_unknown_unit_is_blocked(self):
-        if not self.catalog.has_card_type("tactical_naval_assault_us"):
-            self.skipTest("本机没有这个卡牌类型")
-        plan, _ = self.commit(
-            [Edit.card_add("tactical_naval_assault_us", unit_id=9999)])
+    def test_card_without_unit_rejects_unit_id(self):
+        plan, _ = self.commit([Edit.card_add("air_attack_allies", unit_id=1)])
         self.assertFalse(plan.ok)
 
     def test_remove_card(self):
@@ -183,9 +263,42 @@ class TestCards(CardStoreTestBase):
         self.assertEqual(res.changed, ["cards.yml"])
 
 
+class TestCardSet(CardStoreTestBase):
+    """改手牌某个字段（`is_free`）—— §7.5.2。"""
+
+    def test_set_is_free(self):
+        plan, res = self.commit([Edit.card_set(1, "is_free", False)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        cards = self.read("cards.yml")
+        self.assertFalse(cards[0]["is_free"])
+        self.assertEqual(cards[0]["card_type"], "air_attack_allies")  # 其余不动
+
+    def test_only_is_free_is_allowed(self):
+        plan, _ = self.commit([Edit.card_set(1, "card_type", "x")])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("不允许改手牌字段" in e for e in plan.errors), plan.errors)
+
+    def test_value_must_be_bool(self):
+        plan, _ = self.commit([Edit.card_set(1, "is_free", "yes")])
+        self.assertFalse(plan.ok)
+
+    def test_missing_position(self):
+        plan, _ = self.commit([Edit.card_set(99, "is_free", False)])
+        self.assertFalse(plan.ok)
+
+    def test_only_cards_yml_changes(self):
+        plan, res = self.commit([Edit.card_set(1, "is_free", False)])
+        self.assertEqual(res.changed, ["cards.yml"])
+
+
 class TestRestoreHand(CardStoreTestBase):
     def test_restore_hand_from_checkpoint(self):
-        """恢复上次会议的牌局：读 L2 的 card_store → 写 L1（§6.3）。"""
+        """恢复上次会议的牌局：读 L2 的 card_store → 写 L1（§6.3）。
+
+        ⚠️ 恢复的是**货架**（`main.yml.card_store`）——
+        实测 L2 的 `cards.yml` 与根一致，而 `card_store` 是上次会议的货架快照。
+        """
         plan, res = self.commit([Edit.hand_restore()])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)

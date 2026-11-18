@@ -109,12 +109,24 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
         {"card_type": "air_attack_allies", "is_free": True, "position": 1,
          "unit_id": None, "used": False},
     ]
+    # ⚠️ store.yml 是**两层**的：`{战线: {store: [...], elite_store: [...]}}`
+    # （`e154` 实证：全部 68 个存档都是这个结构，`elite_store` 恒为 null）
     store = {
-        "south": [
-            {"equipment": "infantry", "nationality": "us", "price": 5,
-             "quantity": 20},
-            {"spec": "ger_arty_40", "nationality": "german", "price": 8,
-             "quantity": 4},
+        "south": {
+            "store": [
+                {"equipment": "infantry", "nationality": "us", "price": 5,
+                 "quantity": 20},
+                {"spec": "ger_arty_40", "nationality": "german", "price": 8,
+                 "quantity": 4},
+            ],
+            "elite_store": None,
+        },
+    }
+    # 战役文档（L5，只读）—— 白名单要靠它知道玩家阵营与卡→单位登记表
+    document_main = {
+        "player_faction": "axis",
+        "card_type_units": [
+            {"card_type": "tactical_para_german", "unit_id": 718},
         ],
     }
     entries = {
@@ -150,7 +162,10 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
              "name_full": None},
             {"id": 2, "type": "ger_inf_39", "name_brief": "我的警卫队",
              "name_full": None},
+            {"id": 718, "type": "ger_fsjg_40", "name_brief": "id_ger_fsjg_40_brief",
+             "name_full": None},
         ]),
+        "document/main.yml": dump(document_main),
     }
     if extra_entries:
         entries.update(extra_entries)

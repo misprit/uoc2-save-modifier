@@ -53,6 +53,37 @@ UNIT_FIELD_RANGE = {
     "sup_st": (0, None),
 }
 
+#: 手牌张数上限（`card_deck_limit`，按难度；`e158` 字节码实证）
+CARD_DECK_LIMIT = {"easy": 5, "normal": 5, "classic": 4, "hard": 3}
+
+#: 货架格数（`card_store_limit`，四个难度恒为 5；`e158` 实证）
+CARD_STORE_LIMIT = {"easy": 5, "normal": 5, "classic": 5, "hard": 5}
+
+#: 手牌里**允许改**的字段（§7.5.2）
+CARD_FIELD_ALLOWED = {"is_free"}
+
+#: 总部**允许改**的字段（§7.4）
+HQ_FIELD_ALLOWED = {
+    "xp", "xp_target", "cp", "max_cp", "supply",
+    "trucks", "prisoners", "loss_count", "intels_revealed",
+}
+
+#: 总部的五个分支（§7.4）
+HQ_BRANCHES = ("engineering", "force_pool", "intel", "logistics", "operations")
+
+#: 商店的两个子商店（`store.yml` 是两层结构，`e154` 实证）
+STORE_SUBS = ("store", "elite_store")
+
+
+def _level_of(w) -> str:
+    """存档难度（`main.yml.level`）；取不到就返回空串。"""
+    main = w.table("main.yml", {})
+    if isinstance(main, dict):
+        lv = main.get("level")
+        if isinstance(lv, str):
+            return lv
+    return ""
+
 
 def _find_by_id(rows, obj_id):
     if not isinstance(rows, list):
@@ -60,6 +91,39 @@ def _find_by_id(rows, obj_id):
     for r in rows:
         if isinstance(r, dict) and r.get("id") == obj_id:
             return r
+    return None
+
+
+# ---------------------------------------------------------------- 卡牌单位
+
+def _reserved_unit_id(w, card_type: str) -> int | None:
+    """这张卡在本战役登记的**可召唤单位 id**；没登记就是 None。
+
+    来源：存档 `document/main.yml` 的 `card_type_units`（L5，只读）。
+
+    ⚠️ 这才是 `unit_id` 的真实语义 —— **不是**"名册里任意一个单位"。
+    实测 blitzkrieg 的 `tactical_para_german` → 718（名册里的 `ger_fsjg_40`），
+    而 718 此刻还不在存档 `units.yml` 里（还没被召唤过）——
+    所以"在名册里"那条只是碰巧成立，语义是错的（规范 §8.1）。
+    """
+    doc = w.save.read_yaml("document/main.yml", None)
+    if not isinstance(doc, dict):
+        return None
+    for e in (doc.get("card_type_units") or []):
+        if isinstance(e, dict) and e.get("card_type") == card_type:
+            uid = e.get("unit_id")
+            if isinstance(uid, int) and not isinstance(uid, bool):
+                return uid
+    return None
+
+
+def _card_unit_id_in_hand(w, card_type: str) -> int | None:
+    """手牌里那张卡的 `unit_id`（用于校验已存在的条目）。"""
+    for c in w.save.root_cards():
+        if isinstance(c, dict) and c.get("card_type") == card_type:
+            uid = c.get("unit_id")
+            if isinstance(uid, int) and not isinstance(uid, bool):
+                return uid
     return None
 
 
@@ -260,6 +324,176 @@ def _hq_force_pool(w, e: Edit) -> Outcome:
     return oc
 
 
+def _hq_field(w, e: Edit) -> Outcome:
+    """总部的某个字段（经验 / CP / 补给 / 卡车 / 俘虏 …）。"""
+    oc = Outcome()
+    hq_id = e.params.get("hq_id")
+    field = e.params.get("field")
+    value = e.params.get("value")
+    if not w.require(w.caps.can_edit_hqs, "hqs", "hqs.yml"):
+        return oc
+    if field not in HQ_FIELD_ALLOWED:
+        oc.errors.append(
+            f"不允许改总部字段 {field!r}；可改：{', '.join(sorted(HQ_FIELD_ALLOWED))}")
+        return oc
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        oc.errors.append(f"{field} 必须是非负整数，收到 {value!r}")
+        return oc
+
+    hqs = w.table("hqs.yml", [])
+    hq = _find_by_id(hqs, hq_id)
+    if hq is None:
+        oc.errors.append(f"存档里没有 id 为 {hq_id} 的总部")
+        return oc
+
+    old = hq.get(field)
+    hq[field] = value
+    w.touch("hqs.yml")
+    oc.summary = f"总部 {hq_id} 的 {field}：{old} → {value}"
+
+    if field == "cp" and isinstance(hq.get("max_cp"), int) and value > hq["max_cp"]:
+        oc.warnings.append(
+            f"CP {value} 超过上限 {hq['max_cp']} —— 游戏可能读不出这个值")
+    if field == "xp" and isinstance(old, int) and value < old:
+        oc.warnings.append(
+            "降低总部经验会让下属单位掉经验（游戏按『总部经验 - 单位经验』算欠账）")
+    if field == "xp_target" and isinstance(old, int) and value < old:
+        oc.warnings.append(
+            "降低经验目标会让下属单位立刻算成欠账")
+    if field in ("prisoners", "loss_count", "intels_revealed", "trucks"):
+        oc.warnings.append(
+            f"{field} 是游戏自己累计的统计值，改了不会被重算，但界面可能对不上")
+    return oc
+
+
+def _hq_branch_level(w, e: Edit) -> Outcome:
+    """总部的分支等级（总部"升级"= 五个分支各一个等级）。"""
+    oc = Outcome()
+    hq_id = e.params.get("hq_id")
+    branch = e.params.get("branch")
+    level = e.params.get("level")
+    suppressed = e.params.get("suppressed")
+    if not w.require(w.caps.can_edit_hqs, "hqs", "hqs.yml"):
+        return oc
+    if branch not in HQ_BRANCHES:
+        oc.errors.append(
+            f"未知的分支 {branch!r}；合法取值：{', '.join(HQ_BRANCHES)}")
+        return oc
+    if not isinstance(level, int) or isinstance(level, bool) or level < 0:
+        oc.errors.append(f"分支等级必须是非负整数，收到 {level!r}")
+        return oc
+    if suppressed is not None and not isinstance(suppressed, bool):
+        oc.errors.append(f"suppressed 必须是 True / False，收到 {suppressed!r}")
+        return oc
+
+    hqs = w.table("hqs.yml", [])
+    hq = _find_by_id(hqs, hq_id)
+    if hq is None:
+        oc.errors.append(f"存档里没有 id 为 {hq_id} 的总部")
+        return oc
+    levels = hq.get("branch_levels")
+    if not isinstance(levels, dict):
+        oc.errors.append(f"总部 {hq_id} 没有 branch_levels 结构")
+        return oc
+    node = levels.get(branch)
+    if not isinstance(node, dict):
+        oc.errors.append(
+            f"总部 {hq_id} 没有 {branch} 分支（存档里有：{', '.join(sorted(levels))}）")
+        return oc
+
+    old = node.get("level")
+    node["level"] = level
+    if suppressed is not None:
+        node["suppressed"] = suppressed
+    w.touch("hqs.yml")
+    oc.summary = f"总部 {hq_id} 的 {branch} 分支：等级 {old} → {level}"
+    if isinstance(old, int) and level < old:
+        oc.warnings.append(
+            f"**降级**（{old} → {level}）—— 总部已经投过的点不会退回来，"
+            "而且这个分支提供的加成/容量会立刻变小")
+    return oc
+
+
+def _hq_force_pool_add(w, e: Edit) -> Outcome:
+    """总部兵库加一条。"""
+    oc = Outcome()
+    hq_id = e.params.get("hq_id")
+    entry = e.params.get("entry")
+    index = e.params.get("index")
+    if not w.require(w.caps.can_edit_force_pool, "force_pool", "hqs.yml"):
+        return oc
+    if not isinstance(entry, dict):
+        oc.errors.append("兵库条目必须是字典")
+        return oc
+    if not isinstance(entry.get("quantity"), int) or isinstance(entry.get("quantity"), bool) \
+            or entry.get("quantity") < 0:
+        oc.errors.append(f"quantity 必须是非负整数，收到 {entry.get('quantity')!r}")
+        return oc
+    has_spec = bool(entry.get("spec"))
+    has_equipment = bool(entry.get("equipment"))
+    if has_spec and has_equipment:
+        oc.errors.append("兵库条目同时有 spec 与 equipment（二选一），不能安全修改")
+        return oc
+    if not has_spec and not has_equipment:
+        oc.errors.append("兵库条目必须给 spec（特种兵）或 equipment（兵种）之一")
+        return oc
+
+    hqs = w.table("hqs.yml", [])
+    hq = _find_by_id(hqs, hq_id)
+    if hq is None:
+        oc.errors.append(f"存档里没有 id 为 {hq_id} 的总部")
+        return oc
+    pool = hq.get("force_pool")
+    if not isinstance(pool, list):
+        oc.errors.append(f"总部 {hq_id} 没有 force_pool 列表")
+        return oc
+    if index is None:
+        index = len(pool)
+    if not isinstance(index, int) or isinstance(index, bool) \
+            or not (0 <= index <= len(pool)):
+        oc.errors.append(f"总部 {hq_id} 的兵库没有第 {index} 条")
+        return oc
+
+    # 条目字段补齐：游戏自己写的是 {delay, nationality, quantity, spec?|equipment?}
+    new = dict(entry)
+    new.setdefault("delay", 0)
+    new.setdefault("nationality", "")
+    pool.insert(index, new)
+    hq["force_pool"] = pool
+    w.touch("hqs.yml")
+    oc.summary = (f"总部 {hq_id} 兵库加一条"
+                  f"（{new.get('spec') or new.get('equipment')} × {new.get('quantity')}）")
+    oc.warnings.append(
+        "兵库条目的**国籍**要填国籍 id（uk / us / german …），不是阵营"
+        "（allies / axis）—— 填错游戏读不出来")
+    return oc
+
+
+def _hq_force_pool_remove(w, e: Edit) -> Outcome:
+    """总部兵库删一条。"""
+    oc = Outcome()
+    hq_id = e.params.get("hq_id")
+    index = e.params.get("index")
+    if not w.require(w.caps.can_edit_force_pool, "force_pool", "hqs.yml"):
+        return oc
+    hqs = w.table("hqs.yml", [])
+    hq = _find_by_id(hqs, hq_id)
+    if hq is None:
+        oc.errors.append(f"存档里没有 id 为 {hq_id} 的总部")
+        return oc
+    pool = hq.get("force_pool")
+    if not isinstance(pool, list) or not (0 <= index < len(pool)):
+        oc.errors.append(f"总部 {hq_id} 没有第 {index} 条兵库记录")
+        return oc
+    entry = pool[index]
+    what = (entry.get("spec") or entry.get("equipment")) if isinstance(entry, dict) else "?"
+    del pool[index]
+    hq["force_pool"] = pool
+    w.touch("hqs.yml")
+    oc.summary = f"总部 {hq_id} 兵库删第 {index} 条（{what}）"
+    return oc
+
+
 def _card_add(w, e: Edit) -> Outcome:
     """加卡（根 `cards.yml`）。"""
     oc = Outcome()
@@ -290,14 +524,25 @@ def _card_add(w, e: Edit) -> Outcome:
         return oc
 
     info = w.catalog.card_type(card_type) or {}
-    if info.get("has_unit") and unit_id is None:
-        oc.errors.append(f"卡牌 {card_type} 带单位，必须指定 unit_id")
-        return oc
-    if unit_id is not None:
-        roster = w.save.roster_ids()
-        if roster and unit_id not in roster:
-            oc.errors.append(f"unit_id={unit_id} 不在战役名册里")
+    if info.get("has_unit"):
+        # ⚠️ unit_id 的真实语义 = 本战役为这张卡登记的**预留 id**（§8.1）
+        reserved = _reserved_unit_id(w, card_type)
+        if reserved is None:
+            oc.errors.append(
+                f"卡牌 {card_type} 会召唤单位，但本战役没有为它登记可召唤的单位"
+                "（document/main.yml.card_type_units）—— 硬写进去用卡时游戏会崩"
+                "（§7.5.1）")
             return oc
+        if unit_id is None:
+            unit_id = reserved
+        elif unit_id != reserved:
+            oc.errors.append(
+                f"卡牌 {card_type} 预留的单位是 {reserved}，不能填 {unit_id}"
+                "（填错会召唤出**错误的单位**）")
+            return oc
+    elif unit_id is not None:
+        oc.errors.append(f"卡牌 {card_type} 不召唤单位，unit_id 必须是 None")
+        return oc
 
     cards.append({"card_type": card_type,
                   "is_free": bool(e.params.get("is_free")),
@@ -306,6 +551,47 @@ def _card_add(w, e: Edit) -> Outcome:
                   "used": False})
     w.touch("cards.yml")
     oc.summary = f"加卡 {card_type}（槽位 {position}）"
+    limit = CARD_DECK_LIMIT.get(_level_of(w))
+    if limit is not None and len(cards) > limit:
+        oc.warnings.append(
+            f"手牌已经有 {len(cards)} 张，超过本难度（{_level_of(w)}）的"
+            f"上限 {limit} —— 游戏可能只发前 {limit} 张")
+    return oc
+
+
+def _card_set(w, e: Edit) -> Outcome:
+    """改手牌某一张的某个字段（目前只有 `is_free`）。"""
+    oc = Outcome()
+    position = e.params.get("position")
+    field = e.params.get("field")
+    value = e.params.get("value")
+    if not w.require(w.caps.can_edit_hand, "hand", "cards.yml"):
+        return oc
+    if field not in CARD_FIELD_ALLOWED:
+        oc.errors.append(
+            f"不允许改手牌字段 {field!r}；可改：{', '.join(sorted(CARD_FIELD_ALLOWED))}")
+        return oc
+    if not isinstance(value, bool):
+        oc.errors.append(f"{field} 必须是 True / False，收到 {value!r}")
+        return oc
+
+    cards = w.table("cards.yml", [])
+    if not isinstance(cards, list):
+        oc.errors.append("根 cards.yml 结构异常")
+        return oc
+    target = next((c for c in cards
+                   if isinstance(c, dict) and c.get("position") == position), None)
+    if target is None:
+        oc.errors.append(f"手牌里没有槽位号为 {position} 的卡")
+        return oc
+
+    old = target.get(field)
+    target[field] = value
+    w.touch("cards.yml")
+    oc.summary = f"手牌槽位 {position} 的 {field}：{old} → {value}"
+    oc.warnings.append(
+        "手牌上的 is_free **没有玩法影响** —— 只改 tooltip 文案与卡背贴图；"
+        "想改价格要改货架上的卡（§7.5.2）")
     return oc
 
 
@@ -330,34 +616,300 @@ def _card_remove(w, e: Edit) -> Outcome:
     return oc
 
 
+def _store_list(w, front, sub):
+    """取 `{战线: {sub: [...]}}` 里的那个列表。
+
+    `store.yml` 是**两层**的：`{战线: {store: [...], elite_store: [...]}}`
+    （`e154` 实证）—— 不带 `sub` 会改错列表（规范 §8.1）。
+
+    返回 `(entries, None)` 或 `(None, 错误说明)`。
+    """
+    store = w.table("store.yml", {})
+    if not isinstance(store, dict):
+        return None, "根 store.yml 结构异常"
+    if front not in store:
+        return None, (f"存档里没有战线 {front!r} —— 只能改存档已有的战线键，"
+                      "不要凭空新建（§10 第 12 条）")
+    blob = store.get(front)
+    if not isinstance(blob, dict):
+        return None, (f"战线 {front} 的商店结构异常"
+                      "（应是 {store: [...], elite_store: [...]}）")
+    entries = blob.get(sub)
+    if entries is None:
+        label = "普通商店" if sub == "store" else "精英商店"
+        return None, f"战线 {front} 本次会议没有启用{label}（{sub} 是空的）"
+    if not isinstance(entries, list):
+        return None, f"战线 {front} 的 {sub} 结构异常"
+    return entries, None
+
+
+def _validate_store_entry(entry) -> list[str]:
+    """校验一条要上架的商品（schema 来自游戏的 `store_schema`，`e154` 实证）。
+
+    * `price` 必填、非负整数；
+    * `quantity` 必填、正整数；
+    * `spec` 与 `equipment` **Exclusive（二选一，不能都给）**。
+    """
+    errs: list[str] = []
+    if not isinstance(entry, dict):
+        return ["商品条目必须是字典"]
+    has_spec = entry.get("spec") is not None
+    has_eq = entry.get("equipment") is not None
+    if has_spec and has_eq:
+        errs.append("spec 与 equipment 二选一，不能都给")
+    if not has_spec and not has_eq:
+        errs.append("必须给 spec（特种兵）或 equipment（兵种）之一")
+    price = entry.get("price")
+    if not isinstance(price, int) or isinstance(price, bool) or price < 0:
+        errs.append(f"price={price!r} 必须是非负整数")
+    qty = entry.get("quantity")
+    if not isinstance(qty, int) or isinstance(qty, bool) or qty < 1:
+        errs.append(f"quantity={qty!r} 必须是正整数 —— 游戏没有「售罄」标记，"
+                    "下架请**删除该条目**（§4.6、§6.3）")
+    nat = entry.get("nationality")
+    if not isinstance(nat, str) or not nat:
+        errs.append("nationality 必须是国籍 id（uk / us / german …），不是阵营")
+    return errs
+
+
+def _check_store_universe(w, entry) -> list[str]:
+    """商品本身必须是**游戏定义过的**（schema 是枚举校验）。
+
+    依据 = 战役包该会议所有战线的默认商店 + 存档自己的商店 + 游戏包的特种兵表。
+    拿不到游戏包就不查（只提示，不拦）。
+    """
+    if w.catalog is None:
+        return []
+    main = w.table("main.yml", {})
+    in_state = (main.get("in_state") or {}) if isinstance(main, dict) else {}
+    campaign_id = main.get("campaign_id") if isinstance(main, dict) else None
+    universe = w.catalog.store_item_universe(campaign_id, in_state.get("conference"))
+
+    save_equip: set[str] = set()
+    save_nat: set[str] = set()
+    for blob in w.save.root_store().values():
+        if not isinstance(blob, dict):
+            continue
+        for items in blob.values():
+            if not isinstance(items, list):
+                continue
+            for e in items:
+                if not isinstance(e, dict):
+                    continue
+                if e.get("equipment"):
+                    save_equip.add(str(e["equipment"]))
+                if e.get("nationality"):
+                    save_nat.add(str(e["nationality"]))
+    equips = universe["equipment"] | save_equip
+    nats = universe["nationality"] | save_nat
+
+    errs: list[str] = []
+    spec = entry.get("spec")
+    if spec and universe["spec"] and spec not in universe["spec"]:
+        errs.append(f"特种兵 {spec!r} 游戏里没有 —— 不能凭空新增种类")
+    eq = entry.get("equipment")
+    if eq and equips and eq not in equips:
+        errs.append(f"兵种 {eq!r} 游戏里没有（可选：{', '.join(sorted(equips))}）")
+    nat = entry.get("nationality")
+    if nat and nats and nat not in nats:
+        errs.append(f"国籍 {nat!r} 游戏里没有（可选：{', '.join(sorted(nats)[:12])} …）")
+    return errs
+
+
+def _shelf_of(w):
+    """根 `main.yml` 的 `card_store`（货架）；不在会议阶段返回 None。"""
+    main = w.table("main.yml", {})
+    if not isinstance(main, dict):
+        return None
+    shelf = main.get("card_store")
+    return shelf if isinstance(shelf, list) else None
+
+
+def _card_store_set(w, e: Edit) -> Outcome:
+    """改卡牌商店货架上的某一张（换牌 / 改成免费 / 改成收费）。"""
+    oc = Outcome()
+    position = e.params.get("position")
+    card_type = e.params.get("card_type")
+    is_free = e.params.get("is_free")
+    if not w.require(w.caps.can_edit_shelf, "shelf", "main.yml"):
+        return oc
+    if card_type is None and is_free is None:
+        oc.errors.append("card_store_set 至少要改一个字段（card_type / is_free）")
+        return oc
+    if is_free is not None and not isinstance(is_free, bool):
+        oc.errors.append(f"is_free 必须是 True / False，收到 {is_free!r}")
+        return oc
+
+    main = w.table("main.yml", {})
+    if not isinstance(main, dict):
+        oc.errors.append("根 main.yml 结构异常")
+        return oc
+    shelf = main.get("card_store")
+    if not isinstance(shelf, list):
+        oc.errors.append(
+            "当前不在会议界面 —— 根 main.yml 里没有 card_store（货架不存在）")
+        return oc
+    target = next((c for c in shelf
+                   if isinstance(c, dict) and c.get("position") == position), None)
+    if target is None:
+        oc.errors.append(f"货架上没有槽位号为 {position} 的卡")
+        return oc
+
+    if card_type is not None:
+        if w.catalog is None:
+            oc.errors.append("没有游戏包目录，无法校验卡牌能不能上架")
+            return oc
+        wl = w.catalog.card_whitelist(w.save)
+        if not wl.is_allowed(card_type):
+            reason = wl.reason(card_type) or "不在本战役商店的可上架清单里"
+            oc.errors.append(f"卡牌 {card_type} 不能上架：{reason}")
+            return oc
+        info = w.catalog.card_type(card_type) or {}
+        if info.get("has_unit"):
+            uid = _reserved_unit_id(w, card_type)
+            if uid is None:
+                oc.errors.append(
+                    f"卡牌 {card_type} 会召唤单位，但本战役没有为它登记可召唤的单位")
+                return oc
+            target["unit_id"] = uid
+        else:
+            target["unit_id"] = None
+        old_type = target.get("card_type")
+        target["card_type"] = card_type
+        oc.summary = f"货架槽位 {position} 的牌：{old_type} → {card_type}"
+
+    if is_free is not None:
+        old_free = target.get("is_free")
+        target["is_free"] = is_free
+        if oc.summary:
+            oc.summary += f"；{'改成免费' if is_free else '改成收费'}"
+        else:
+            oc.summary = (f"货架槽位 {position}：{'改成免费' if is_free else '改成收费'}"
+                          f"（原来 {old_free}）")
+
+    w.touch("main.yml")
+    if is_free:
+        oc.warnings.append(
+            "货架上的 is_free=True = **价格 0**（不扣声望）—— 这是白嫖（§7.5.2）")
+    oc.warnings.append(
+        "货架只管**这一场会议** —— 进入新会议时游戏会按权重重掷（§7.5）")
+    return oc
+
+
+def _card_store_remove(w, e: Edit) -> Outcome:
+    """下架货架上的一张卡。"""
+    oc = Outcome()
+    position = e.params.get("position")
+    if not w.require(w.caps.can_edit_shelf, "shelf", "main.yml"):
+        return oc
+    main = w.table("main.yml", {})
+    if not isinstance(main, dict):
+        oc.errors.append("根 main.yml 结构异常")
+        return oc
+    shelf = main.get("card_store")
+    if not isinstance(shelf, list):
+        oc.errors.append(
+            "当前不在会议界面 —— 根 main.yml 里没有 card_store（货架不存在）")
+        return oc
+    target = next((c for c in shelf
+                   if isinstance(c, dict) and c.get("position") == position), None)
+    if target is None:
+        oc.errors.append(f"货架上没有槽位号为 {position} 的卡")
+        return oc
+    shelf.remove(target)
+    w.touch("main.yml")
+    oc.summary = f"下架货架槽位 {position}（{target.get('card_type')}）"
+    return oc
+
+
+def _card_store_add(w, e: Edit) -> Outcome:
+    """上架一张卡到货架。"""
+    oc = Outcome()
+    position = e.params.get("position")
+    card_type = e.params.get("card_type")
+    is_free = bool(e.params.get("is_free"))
+    if not w.require(w.caps.can_edit_shelf, "shelf", "main.yml"):
+        return oc
+    if not isinstance(position, int) or isinstance(position, bool) or position < 1:
+        oc.errors.append(f"槽位号必须是 ≥ 1 的整数，收到 {position!r}")
+        return oc
+    if w.catalog is None:
+        oc.errors.append("没有游戏包目录，无法校验卡牌能不能上架")
+        return oc
+
+    main = w.table("main.yml", {})
+    if not isinstance(main, dict):
+        oc.errors.append("根 main.yml 结构异常")
+        return oc
+    shelf = main.get("card_store")
+    if not isinstance(shelf, list):
+        oc.errors.append(
+            "当前不在会议界面 —— 根 main.yml 里没有 card_store（货架不存在）")
+        return oc
+
+    limit = CARD_STORE_LIMIT.get(_level_of(w), 5)
+    if position > limit:
+        oc.errors.append(f"货架只有 {limit} 格（第 {position} 格不存在）")
+        return oc
+    if any(isinstance(c, dict) and c.get("position") == position for c in shelf):
+        oc.errors.append(f"槽位 {position} 已经被占了")
+        return oc
+
+    wl = w.catalog.card_whitelist(w.save)
+    if not wl.is_allowed(card_type):
+        reason = wl.reason(card_type) or "不在本战役商店的可上架清单里"
+        oc.errors.append(f"卡牌 {card_type} 不能上架：{reason}")
+        return oc
+
+    unit_id = None
+    info = w.catalog.card_type(card_type) or {}
+    if info.get("has_unit"):
+        unit_id = _reserved_unit_id(w, card_type)
+        if unit_id is None:
+            oc.errors.append(
+                f"卡牌 {card_type} 会召唤单位，但本战役没有为它登记可召唤的单位")
+            return oc
+
+    shelf.append({"card_type": card_type, "is_free": is_free,
+                  "position": position, "unit_id": unit_id, "used": False})
+    w.touch("main.yml")
+    oc.summary = f"上架卡 {card_type}（槽位 {position}）"
+    if is_free:
+        oc.warnings.append("is_free=True = **价格 0**（不扣声望）—— 这是白嫖")
+    oc.warnings.append(
+        "货架只管**这一场会议** —— 进入新会议时游戏会按权重重掷（§7.5）")
+    return oc
+
+
 def _store_set(w, e: Edit) -> Outcome:
     """改商店条目的 price / quantity（根 `store.yml`）。"""
     oc = Outcome()
     front = e.params.get("front")
+    sub = e.params.get("sub")
     index = e.params.get("index")
     field = e.params.get("field")
     value = e.params.get("value")
     if not w.require(w.caps.can_edit_store, "store", "store.yml"):
         return oc
+    if sub not in STORE_SUBS:
+        oc.errors.append(
+            f"未知的子商店 {sub!r}；合法取值：{', '.join(STORE_SUBS)}"
+            "（store.yml 是两层结构，普通商店 / 精英商店）")
+        return oc
     if field not in ("price", "quantity"):
         oc.errors.append(f"商店条目只能改 price / quantity，收到 {field!r}")
         return oc
-    store = w.table("store.yml", {})
-    if not isinstance(store, dict):
-        oc.errors.append("根 store.yml 结构异常")
+    entries, err = _store_list(w, front, sub)
+    if err:
+        oc.errors.append(err)
         return oc
-    if front not in store:
-        oc.errors.append(
-            f"存档里没有战线 {front!r} —— 只能改存档已有的战线键，"
-            "不要凭空新建（§10 第 12 条）")
-        return oc
-    entries = store.get(front)
-    if not isinstance(entries, list) or not (0 <= index < len(entries)):
-        oc.errors.append(f"战线 {front} 没有第 {index} 条商品")
+    if not isinstance(index, int) or isinstance(index, bool) \
+            or not (0 <= index < len(entries)):
+        oc.errors.append(f"战线 {front} 的 {sub} 没有第 {index} 条商品")
         return oc
     entry = entries[index]
     if not isinstance(entry, dict):
-        oc.errors.append(f"战线 {front} 第 {index} 条结构异常")
+        oc.errors.append(f"战线 {front} 的 {sub} 第 {index} 条结构异常")
         return oc
     if field == "quantity":
         if not isinstance(value, int) or isinstance(value, bool) or value < 1:
@@ -372,7 +924,7 @@ def _store_set(w, e: Edit) -> Outcome:
     old = entry.get(field)
     entry[field] = value
     w.touch("store.yml")
-    oc.summary = (f"商店 {front} 第 {index} 条"
+    oc.summary = (f"商店 {front}/{sub} 第 {index} 条"
                   f"（{entry.get('spec') or entry.get('equipment')}）"
                   f" 的 {field}：{old} → {value}")
     if field == "price" and value == 0:
@@ -389,25 +941,68 @@ def _store_remove(w, e: Edit) -> Outcome:
     """下架商品 —— 删条目（根 `store.yml`）。"""
     oc = Outcome()
     front = e.params.get("front")
+    sub = e.params.get("sub")
     index = e.params.get("index")
     if not w.require(w.caps.can_edit_store, "store", "store.yml"):
         return oc
-    store = w.table("store.yml", {})
-    if not isinstance(store, dict):
-        oc.errors.append("根 store.yml 结构异常")
+    if sub not in STORE_SUBS:
+        oc.errors.append(
+            f"未知的子商店 {sub!r}；合法取值：{', '.join(STORE_SUBS)}")
         return oc
-    if front not in store:
-        oc.errors.append(f"存档里没有战线 {front!r}")
+    entries, err = _store_list(w, front, sub)
+    if err:
+        oc.errors.append(err)
         return oc
-    entries = store.get(front)
-    if not isinstance(entries, list) or not (0 <= index < len(entries)):
-        oc.errors.append(f"战线 {front} 没有第 {index} 条商品")
+    if not isinstance(index, int) or isinstance(index, bool) \
+            or not (0 <= index < len(entries)):
+        oc.errors.append(f"战线 {front} 的 {sub} 没有第 {index} 条商品")
         return oc
     entry = entries[index]
     what = (entry.get("spec") or entry.get("equipment")) if isinstance(entry, dict) else "?"
     del entries[index]
     w.touch("store.yml")
-    oc.summary = f"下架商店 {front} 第 {index} 条（{what}）"
+    oc.summary = f"下架商店 {front}/{sub} 第 {index} 条（{what}）"
+    return oc
+
+
+def _store_add(w, e: Edit) -> Outcome:
+    """上架新商品（根 `store.yml`）。"""
+    oc = Outcome()
+    front = e.params.get("front")
+    sub = e.params.get("sub")
+    entry = e.params.get("entry")
+    if not w.require(w.caps.can_edit_store, "store", "store.yml"):
+        return oc
+    if sub not in STORE_SUBS:
+        oc.errors.append(
+            f"未知的子商店 {sub!r}；合法取值：{', '.join(STORE_SUBS)}")
+        return oc
+    errs = _validate_store_entry(entry)
+    if errs:
+        oc.errors.extend(errs)
+        return oc
+    errs = _check_store_universe(w, entry)
+    if errs:
+        oc.errors.extend(errs)
+        return oc
+
+    entries, err = _store_list(w, front, sub)
+    if err:
+        oc.errors.append(err)
+        return oc
+
+    new = {"equipment": entry.get("equipment"), "spec": entry.get("spec"),
+           "nationality": entry.get("nationality"),
+           "price": entry.get("price"), "quantity": entry.get("quantity")}
+    # 只留真正填了的那个 —— 游戏自己不会两个都写
+    if new["spec"] is None:
+        new.pop("spec")
+    if new["equipment"] is None:
+        new.pop("equipment")
+    entries.append(new)
+    w.touch("store.yml")
+    oc.summary = (f"上架商品 {new.get('spec') or new.get('equipment')}"
+                  f"（{front}/{sub}，价格 {new.get('price')}，库存 {new.get('quantity')}）")
     return oc
 
 
@@ -490,10 +1085,19 @@ _HANDLERS = {
     "unit_spec_add": _unit_spec_add,
     "unit_spec_remove": _unit_spec_remove,
     "hq_force_pool": _hq_force_pool,
+    "hq_field": _hq_field,
+    "hq_branch_level": _hq_branch_level,
+    "hq_force_pool_add": _hq_force_pool_add,
+    "hq_force_pool_remove": _hq_force_pool_remove,
     "card_add": _card_add,
     "card_remove": _card_remove,
+    "card_set": _card_set,
     "store_set": _store_set,
     "store_remove": _store_remove,
+    "store_add": _store_add,
+    "card_store_set": _card_store_set,
+    "card_store_remove": _card_store_remove,
+    "card_store_add": _card_store_add,
     "hand_restore": _hand_restore,
     "theater_asset": _theater_asset,
 }

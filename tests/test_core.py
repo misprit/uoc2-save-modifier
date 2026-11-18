@@ -145,7 +145,9 @@ class TestCapabilities(unittest.TestCase):
                     self.assertFalse(caps.can_edit_units and not caps.has_root_units)
                     self.assertFalse(caps.can_edit_cards and not caps.has_root_cards)
                     self.assertFalse(caps.can_edit_store and not caps.has_root_store)
-                    self.assertFalse(caps.can_edit_hand and not caps.has_card_store)
+                    # ⚠️ 手牌 = 根 cards.yml；货架 = main.yml.card_store（`e157`/`e160`）
+                    self.assertFalse(caps.can_edit_hand and not caps.has_root_cards)
+                    self.assertFalse(caps.can_edit_shelf and not caps.has_card_store)
                     self.assertFalse(caps.can_restore_hand and not caps.cp_conference)
                     self.assertFalse(caps.can_edit_theater_assets and not caps.in_battle)
                     self.assertTrue(caps.can_edit_progress)   # 根 main.yml 恒可用

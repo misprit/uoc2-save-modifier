@@ -20,18 +20,30 @@ __all__ = ["Edit", "EDIT_KINDS"]
 
 #: 全部合法的 kind —— 写错会直接报错，不会静默忽略
 EDIT_KINDS = (
-    "progress",          # 声望 / 分数（根 main.yml）
-    "unit_field",        # 单位的某个字段（根 units.yml）
-    "unit_spec_add",     # 加特种（根 units.yml）
-    "unit_spec_remove",  # 卸特种（根 units.yml）
-    "hq_force_pool",     # 总部兵库数量（根 hqs.yml）
-    "card_add",          # 加卡（根 cards.yml）
-    "card_remove",       # 删卡（根 cards.yml）
-    "store_set",         # 改商店条目字段（根 store.yml）
-    "store_remove",      # 下架商店条目 —— 删条目，不是把 quantity 设 0
-    "hand_restore",      # 恢复上次会议的牌局（读 L2 → 写 L1）
-    "theater_asset",     # 战区资产（唯一的 L3 例外）
+    "progress",            # 声望 / 分数（根 main.yml）
+    "unit_field",          # 单位的某个字段（根 units.yml）
+    "unit_spec_add",       # 加特种（根 units.yml）
+    "unit_spec_remove",    # 卸特种（根 units.yml）
+    "hq_force_pool",       # 总部兵库数量（根 hqs.yml）
+    "hq_field",            # 总部的某个字段（根 hqs.yml）
+    "hq_branch_level",     # 总部分支等级（根 hqs.yml）
+    "hq_force_pool_add",   # 总部兵库加一条（根 hqs.yml）
+    "hq_force_pool_remove",  # 总部兵库删一条（根 hqs.yml）
+    "card_add",            # 加卡到手牌（根 cards.yml）
+    "card_remove",         # 删手牌（根 cards.yml）
+    "card_set",            # 改手牌某个字段（根 cards.yml）
+    "store_set",           # 改商店条目字段（根 store.yml）
+    "store_remove",        # 下架商店条目 —— 删条目，不是把 quantity 设 0
+    "store_add",           # 上架新商品（根 store.yml）
+    "card_store_set",      # 改货架上的卡（根 main.yml → card_store）
+    "card_store_remove",   # 下架一张卡（根 main.yml → card_store）
+    "card_store_add",      # 上架一张卡（根 main.yml → card_store）
+    "hand_restore",        # 恢复上次会议的牌局（读 L2 → 写 L1）
+    "theater_asset",       # 战区资产（唯一的 L3 例外）
 )
+
+#: 商店的两个子商店（`store.yml` = `{战线: {store: [...], elite_store: [...]}}`）
+STORE_SUBS = ("store", "elite_store")
 
 
 @dataclass(frozen=True)
@@ -79,9 +91,36 @@ class Edit:
                     {"hq_id": hq_id, "index": index, "quantity": quantity})
 
     @staticmethod
+    def hq_field(hq_id: int, field: str, value: Any) -> "Edit":
+        """改总部的某个字段（经验 / CP / 补给 / 卡车 / 俘虏 …）。"""
+        return Edit("hq_field", {"hq_id": hq_id, "field": field, "value": value})
+
+    @staticmethod
+    def hq_branch_level(hq_id: int, branch: str, level: int,
+                        suppressed: bool | None = None) -> "Edit":
+        """改总部的**分支等级**（总部"升级"= 五个分支各一个等级）。"""
+        return Edit("hq_branch_level", {"hq_id": hq_id, "branch": branch,
+                                        "level": level, "suppressed": suppressed})
+
+    @staticmethod
+    def hq_force_pool_add(hq_id: int, entry: Mapping[str, Any],
+                          index: int | None = None) -> "Edit":
+        """往总部兵库**加一条**（`{delay, nationality, quantity, spec?|equipment?}`）。
+
+        `index` 给了就插在那个位置，不给就追加到末尾。
+        """
+        return Edit("hq_force_pool_add",
+                    {"hq_id": hq_id, "entry": dict(entry), "index": index})
+
+    @staticmethod
+    def hq_force_pool_remove(hq_id: int, index: int) -> "Edit":
+        """从总部兵库**删一条**。"""
+        return Edit("hq_force_pool_remove", {"hq_id": hq_id, "index": index})
+
+    @staticmethod
     def card_add(card_type: str, *, is_free: bool = False,
                  position: int | None = None, unit_id: int | None = None) -> "Edit":
-        """加一张卡。"""
+        """加一张卡到手牌。"""
         return Edit("card_add", {
             "card_type": card_type, "is_free": is_free,
             "position": position, "unit_id": unit_id,
@@ -89,19 +128,70 @@ class Edit:
 
     @staticmethod
     def card_remove(position: int) -> "Edit":
-        """按槽位号删一张卡。"""
+        """按槽位号删一张手牌。"""
         return Edit("card_remove", {"position": position})
 
     @staticmethod
-    def store_set(front: str, index: int, field: str, value: Any) -> "Edit":
-        """改商店某战线条目的 `price` 或 `quantity`。"""
-        return Edit("store_set",
-                    {"front": front, "index": index, "field": field, "value": value})
+    def card_set(position: int, field: str, value: Any) -> "Edit":
+        """改手牌某一张的某个字段（目前只有 `is_free`）。
+
+        ⚠️ 手牌的 `is_free` **没有玩法影响** —— 只改 tooltip 文案与卡背贴图。
+        货架上的 `is_free` 才是真价格（`Edit.card_store_set`）。
+        """
+        return Edit("card_set", {"position": position, "field": field,
+                                 "value": value})
 
     @staticmethod
-    def store_remove(front: str, index: int) -> "Edit":
+    def store_set(front: str, sub: str, index: int, field: str,
+                  value: Any) -> "Edit":
+        """改商店某战线条目的 `price` 或 `quantity`。
+
+        ⚠️ `sub` 是**子商店**（`store` 普通 / `elite_store` 精英）——
+        `store.yml` 是两层结构，不带 `sub` 会改错列表（规范 §7.6、§8.1）。
+        """
+        return Edit("store_set", {"front": front, "sub": sub, "index": index,
+                                  "field": field, "value": value})
+
+    @staticmethod
+    def store_remove(front: str, sub: str, index: int) -> "Edit":
         """下架商品 —— **删条目**（`quantity: 0` 是非法值，§4.6）。"""
-        return Edit("store_remove", {"front": front, "index": index})
+        return Edit("store_remove", {"front": front, "sub": sub, "index": index})
+
+    @staticmethod
+    def store_add(front: str, sub: str, entry: Mapping[str, Any]) -> "Edit":
+        """上架新商品。
+
+        `entry` = `{spec XOR equipment, nationality, price, quantity}`。
+        商品本身（特种兵 / 兵种 / 国籍）必须是游戏定义过的（规范 §7.6）。
+        """
+        return Edit("store_add", {"front": front, "sub": sub,
+                                  "entry": dict(entry)})
+
+    @staticmethod
+    def card_store_set(position: int, card_type: str | None = None,
+                       is_free: bool | None = None) -> "Edit":
+        """改卡牌商店**货架**上的某一张（换牌 / 改成免费 / 改成收费）。
+
+        ⚠️ `card_type` 必须在**白名单**里（规范 §7.5.1）——
+        登陆 / 空降卡会召唤单位，战役里没有就崩。
+        货架上的 `is_free` = **真实价格**（True ⇒ 0 声望）。
+        """
+        return Edit("card_store_set", {"position": position,
+                                       "card_type": card_type,
+                                       "is_free": is_free})
+
+    @staticmethod
+    def card_store_remove(position: int) -> "Edit":
+        """下架货架上的一张卡。"""
+        return Edit("card_store_remove", {"position": position})
+
+    @staticmethod
+    def card_store_add(position: int, card_type: str,
+                       is_free: bool = False) -> "Edit":
+        """上架一张卡到货架（`card_type` 同样要在白名单里）。"""
+        return Edit("card_store_add", {"position": position,
+                                       "card_type": card_type,
+                                       "is_free": is_free})
 
     @staticmethod
     def hand_restore() -> "Edit":
@@ -135,15 +225,45 @@ class Edit:
         if k == "hq_force_pool":
             return (f"总部 {p.get('hq_id')} 兵库第 {p.get('index')} 条"
                     f"：{p.get('quantity')}")
+        if k == "hq_field":
+            return f"总部 {p.get('hq_id')} 的 {p.get('field')}：{p.get('value')}"
+        if k == "hq_branch_level":
+            return (f"总部 {p.get('hq_id')} 的 {p.get('branch')} 分支："
+                    f"等级 {p.get('level')}")
+        if k == "hq_force_pool_add":
+            entry = p.get("entry") or {}
+            return (f"总部 {p.get('hq_id')} 兵库加一条"
+                    f"（{entry.get('spec') or entry.get('equipment')} ×"
+                    f" {entry.get('quantity')}）")
+        if k == "hq_force_pool_remove":
+            return f"总部 {p.get('hq_id')} 兵库删第 {p.get('index')} 条"
         if k == "card_add":
             return f"加卡 {p.get('card_type')}"
         if k == "card_remove":
-            return f"删卡（槽位 {p.get('position')}）"
+            return f"删手牌（槽位 {p.get('position')}）"
+        if k == "card_set":
+            return (f"手牌槽位 {p.get('position')} 的 {p.get('field')}："
+                    f"{p.get('value')}")
         if k == "store_set":
-            return (f"商店 {p.get('front')} 第 {p.get('index')} 条的 "
+            return (f"商店 {p.get('front')}/{p.get('sub')} 第 {p.get('index')} 条的 "
                     f"{p.get('field')}：{p.get('value')}")
         if k == "store_remove":
-            return f"下架商店 {p.get('front')} 第 {p.get('index')} 条"
+            return f"下架商店 {p.get('front')}/{p.get('sub')} 第 {p.get('index')} 条"
+        if k == "store_add":
+            entry = p.get("entry") or {}
+            return (f"上架商品 {entry.get('spec') or entry.get('equipment')}"
+                    f"（{p.get('front')}/{p.get('sub')}）")
+        if k == "card_store_set":
+            bits = []
+            if p.get("card_type"):
+                bits.append(f"换成 {p.get('card_type')}")
+            if p.get("is_free") is not None:
+                bits.append("改成免费" if p.get("is_free") else "改成收费")
+            return f"货架槽位 {p.get('position')}：" + "、".join(bits)
+        if k == "card_store_remove":
+            return f"下架货架槽位 {p.get('position')}"
+        if k == "card_store_add":
+            return f"上架卡 {p.get('card_type')}（槽位 {p.get('position')}）"
         if k == "hand_restore":
             return "恢复上次会议的牌局"
         if k == "theater_asset":

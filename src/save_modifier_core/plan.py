@@ -258,23 +258,29 @@ def validate(plan: Plan) -> ValidationResult:
                 if isinstance(u, dict):
                     res.errors.extend(_check_unit(u))
         if entry == "store.yml" and isinstance(data, dict):
-            for front, entries in data.items():
-                if not isinstance(entries, list):
+            # store.yml 是两层：{战线: {store: [...], elite_store: [...]}}
+            for front, blob in data.items():
+                if not isinstance(blob, dict):
                     continue
-                for i, e in enumerate(entries):
-                    if not isinstance(e, dict):
+                for sub, entries in blob.items():
+                    if not isinstance(entries, list):
                         continue
-                    q = e.get("quantity")
-                    if isinstance(q, int) and q < 1:
-                        res.errors.append(
-                            f"商店 {front} 第 {i} 条的 quantity={q} 是非法值"
-                            "（游戏没有售罄标记，下架请删条目）")
-                    p = e.get("price")
-                    if isinstance(p, int) and p < 0:
-                        res.errors.append(f"商店 {front} 第 {i} 条的 price={p} 为负")
-                    if "spec" in e and "equipment" in e:
-                        res.errors.append(
-                            f"商店 {front} 第 {i} 条同时有 spec 与 equipment（二选一）")
+                    for i, e in enumerate(entries):
+                        if not isinstance(e, dict):
+                            continue
+                        q = e.get("quantity")
+                        if isinstance(q, int) and q < 1:
+                            res.errors.append(
+                                f"商店 {front}/{sub} 第 {i} 条的 quantity={q} 是非法值"
+                                "（游戏没有售罄标记，下架请删条目）")
+                        p = e.get("price")
+                        if isinstance(p, int) and p < 0:
+                            res.errors.append(
+                                f"商店 {front}/{sub} 第 {i} 条的 price={p} 为负")
+                        if "spec" in e and "equipment" in e:
+                            res.errors.append(
+                                f"商店 {front}/{sub} 第 {i} 条同时有 spec 与 equipment"
+                                "（二选一）")
 
     res.ok = not res.errors
     return res

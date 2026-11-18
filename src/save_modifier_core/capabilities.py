@@ -61,7 +61,7 @@ class Capabilities:
 
     @property
     def can_edit_cards(self) -> bool:
-        """卡牌库存（`cards.yml`）。"""
+        """手牌（根 `cards.yml`）。"""
         return self.has_root_cards
 
     @property
@@ -71,7 +71,16 @@ class Capabilities:
 
     @property
     def can_edit_hand(self) -> bool:
-        """会议手里的牌（`main.yml` 的 `card_store`）—— 正停在会议界面时。"""
+        """手牌（根 `cards.yml`）—— 和 `can_edit_cards` 是一回事。
+
+        ⚠️ **别和货架搞反**：手牌是 `cards.yml`，货架是 `main.yml.card_store`
+        （`e157`/`e160` 实证：手牌张数上限 = `card_deck_limit`，货架格数 = `card_store_limit`）。
+        """
+        return self.has_root_cards
+
+    @property
+    def can_edit_shelf(self) -> bool:
+        """卡牌商店货架（`main.yml` 的 `card_store`）—— 正停在会议界面时。"""
         return self.has_card_store
 
     @property
@@ -95,9 +104,10 @@ class Capabilities:
             "units": "该存档还没有可编辑的单位（战役开局尚未生成名册）",
             "hqs": "该存档没有总部数据",
             "force_pool": "该存档没有总部数据",
-            "cards": "该存档没有卡牌库存数据",
+            "cards": "该存档没有手牌数据（cards.yml）",
             "store": "该存档没有商店数据",
-            "hand": "当前不在会议界面",
+            "hand": "该存档没有手牌数据（cards.yml）",
+            "shelf": "当前不在会议界面，没有卡牌商店货架",
             "restore_hand": "该存档没有会议检查点，无法恢复牌局",
             "theater_assets": "当前不在战斗中，战区资产由场景在开打时计算",
         }
