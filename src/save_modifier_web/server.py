@@ -526,11 +526,19 @@ def api_plan(payload) -> dict:
     catalog = Catalog(CorePaths.discover())
     with open_save(save_id) as save:
         plan = save.plan_edit(_edits_from(payload), catalog=catalog)
+        # 备份文件名提前算出来给确认框显示（写盘前就能告诉玩家备份叫什么）
+        try:
+            from save_modifier_core.writer import backup_path_for
+            backup = backup_path_for(Path(save.path)).name
+        except Exception:
+            backup = ""
         return {
             "ok": plan.ok,
             "errors": list(plan.errors),
             "warnings": list(plan.warnings),
             "notes": list(plan.notes),
+            "backup": backup,
+            "save_name": Path(save.path).name,
             "changes": [{"entry": c.entry, "notes": list(c.notes),
                          "diff": c.diff, "layer": c.layer,
                          "is_l3_exception": c.is_l3_exception}

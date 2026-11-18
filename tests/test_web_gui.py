@@ -1077,3 +1077,94 @@ class TestTheaterWriteApi(WebGuiTestBase):
                                   "uses_turn": 0}}]})
         self.assertFalse(cm["ok"])
         self.assertTrue(cm["errors"])
+
+
+class TestWriteConfirmGate(WebGuiTestBase):
+    """U40：写盘前的闸门 —— `/api/plan` 要能报出「改哪些文件 + 备份叫什么」。
+
+    ⚠️ **plan 不碰磁盘**（规范 §6.3）—— 确认框就是靠它来预览的。
+    """
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="webplan_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            p = str(info.path)
+            if "BACKUP" not in p and p.endswith(".usg"):
+                src = p
+                break
+        if src is None:
+            self.skipTest("本机没有存档")
+        self.copy = str(self.tmp / "copy.usg")
+        shutil.copyfile(src, self.copy)
+        self.before = os.path.getmtime(self.copy)
+
+    def post(self, path, body):
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            self.url(path),
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Token": server._Handler.token},
+            method="POST")
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+
+    def test_plan_reports_files_backup_and_touches_nothing(self):
+        """plan 要报：改动条目、备份文件名、存档名 —— 且**不碰磁盘**。"""
+        r = self.post("/api/plan", {
+            "save_id": self.copy,
+            "edits": [{"kind": "progress",
+                       "params": {"field": "prestige", "value": 12345}}]})
+        self.assertTrue(r["ok"], r.get("errors"))
+        self.assertTrue(r["changes"])
+        self.assertIn("main.yml", [c["entry"] for c in r["changes"]])
+        self.assertTrue(r.get("backup"), "没报备份文件名")
+        self.assertTrue(r.get("save_name"), "没报存档名")
+        # **plan 不碰磁盘**
+        self.assertEqual(os.path.getmtime(self.copy), self.before)
+
+    def test_plan_reports_errors_without_writing(self):
+        """越界 ⇒ plan.ok False + errors（确认框的硬错误分支）。"""
+        r = self.post("/api/plan", {
+            "save_id": self.copy,
+            "edits": [{"kind": "hq_field",
+                       "params": {"hq_id": 1, "field": "cp", "value": 99}}]})
+        self.assertFalse(r["ok"])
+        self.assertTrue(r["errors"])
+        self.assertEqual(os.path.getmtime(self.copy), self.before)
+
+
+class TestFrontendGateExists(unittest.TestCase):
+    """U40：前端**必须**先 plan 再写盘（闸门不能被绕过）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "src", "save_modifier_web", "web", "index.html")
+        cls.html = io.open(p, encoding="utf-8").read()
+
+    def test_apply_goes_through_plan(self):
+        self.assertIn("/api/plan", self.html)
+        self.assertIn("openConfirm(", self.html)
+
+    def test_three_confirm_variants_exist(self):
+        """确认 / 硬错误 / 软警告 三个变体。"""
+        self.assertIn('openConfirm("error"', self.html)
+        self.assertIn('openConfirm("warn"', self.html)
+        self.assertIn('openConfirm("ok"', self.html)
+
+    def test_error_variant_disables_the_button(self):
+        """硬错误 ⇒ 应用按钮禁用（原存档不会被写入）。"""
+        self.assertIn("disabled>应用更改", self.html)
+
+    def test_three_operation_modals_exist(self):
+        """设计稿 §9②③④：加兵库条目 / 换牌 / 上架新商品。"""
+        for fn in ("openHqPoolModal", "openCardPickerModal", "openStoreAddModal"):
+            self.assertIn("function " + fn, self.html)

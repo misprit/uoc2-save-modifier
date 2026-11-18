@@ -446,6 +446,62 @@ table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
 .fptab .rm{color:var(--danger);cursor:pointer;font-size:11.5px}
 .hqpick{margin-top:10px}
 
+
+
+/* 模态框里的选择器与表单行 */
+.modal .spick{border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);
+  overflow:hidden;margin:2px 0 10px}
+.modal .spick .sphd{display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--surface);
+  border-bottom:1px solid var(--border)}
+.modal .spick .spt{font-size:12.5px;font-weight:700;color:var(--accent-dark);white-space:nowrap}
+.modal .spick .spc{font-size:11px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.modal .spick .spgrid{display:flex;flex-wrap:wrap;gap:6px;padding:10px 11px;max-height:186px;overflow:auto}
+.modal .spick .spgrid .pcell{position:relative}
+.modal .spick .spgrid .pcell.on{border-color:var(--accent);background:var(--accent-light);
+  box-shadow:0 0 0 2px rgba(36,91,143,.35)}
+.modal .spick .spgrid .pcell .dup{position:absolute;right:0;bottom:0;font-size:8.5px;line-height:1;
+  padding:1.5px 3px;border-radius:3px 0 5px 0;background:var(--muted);color:#fff;font-family:var(--mono)}
+.modal .spick .spgrid .pcell.blocked{opacity:.42;filter:grayscale(.9);cursor:not-allowed}
+.modal .spick .spgrid .pcell.blocked .dup{background:var(--danger)}
+.modal .spick .spfoot{padding:9px 11px;background:var(--surface);border-top:1px solid var(--border)}
+.modal .spick .slot.spcard{cursor:default}
+.modal .spick .slot.spcard:hover{border-color:var(--border);background:var(--surface-alt)}
+.modal .spick .slot.spcard:hover .slotname{color:inherit}
+.modal .modnote{font-size:11.5px;color:var(--muted);background:var(--surface-alt);
+  border:1px solid var(--border);border-radius:6px;padding:9px 11px;line-height:1.6}
+.modal .modnote b{color:var(--text)}
+.modal .numrow{display:flex;align-items:center;gap:8px}
+
+/* ---------------- 模态框 + 写盘确认框（U40 · 视觉稿 §9） ---------------- */
+.mask{position:fixed;inset:0;background:rgba(16,26,38,.45);display:none;place-items:center;z-index:200}
+.mask.on{display:grid}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:9px;width:560px;
+  box-shadow:0 20px 50px rgba(20,40,60,.32);overflow:hidden;max-height:88vh;
+  display:flex;flex-direction:column}
+.modal.err{border-color:#eec3c5}
+.modal.warn{border-color:#e6cf9a}
+.modal .mh{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;
+  color:var(--accent-dark);display:flex;align-items:center;gap:8px}
+.modal.err .mh{color:var(--danger)}
+.modal.warn .mh{color:var(--warn)}
+.modal .mb{padding:14px 16px;font-size:12.5px;overflow:auto;line-height:1.6}
+.modal .mf{padding:11px 16px;background:var(--surface-alt);border-top:1px solid var(--border);
+  display:flex;gap:8px;justify-content:flex-end}
+.elist{font-family:var(--mono);font-size:12px;background:var(--surface-alt);
+  border:1px solid var(--border);border-radius:6px;padding:9px 11px;margin-top:9px}
+.elist div{padding:2px 0}
+.elist .f{font-weight:700;color:var(--accent-dark)}
+.elist .d{color:var(--muted);font-family:inherit;margin-left:8px}
+.modal .mrow{display:flex;align-items:center;gap:9px;padding:8px 0;flex-wrap:wrap}
+.modal .mrow .lb{font-size:12px;color:var(--muted);width:76px;flex:none}
+.modal .mrow .hint{font-size:11px;color:var(--muted)}
+.modal .erow{color:var(--danger);font-size:12px;padding:3px 0}
+.modal .wrow{color:var(--warn);font-size:12px;padding:3px 0}
+.modal .fine{color:var(--muted);font-size:11.5px;margin-top:10px;line-height:1.6}
+.modal .fine b{font-family:var(--mono);color:var(--text)}
+.modal .ro{font-size:10px;padding:1px 6px;border:1px dashed var(--border);border-radius:4px;
+  color:var(--muted);font-family:var(--mono);font-weight:400}
+
 /* 待应用清单（全局底部抽屉 —— 换页也看得见改了什么） */
 .drawer{position:relative;margin:0 14px 8px;background:var(--surface);
   border:1px solid var(--border);border-radius:9px;box-shadow:0 -6px 20px rgba(20,40,60,.08);
@@ -530,6 +586,11 @@ table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
   <div class="status" id="status"></div>
 </div>
 
+<!-- ============ 模态框（写盘确认 / 上架 / 换牌 / 加条目） ============ -->
+<div class="mask" id="mask">
+  <div class="modal" id="modal"></div>
+</div>
+
 <script>
 const QS = new URLSearchParams(location.search);
 const TOKEN = QS.get("t") || "";
@@ -538,6 +599,7 @@ const OPEN_PAGE = QS.get("page") || "";
 let SAVES = [], VIEW = null, PAGE = "overview";
 let UQUERY = "", UHQFILTER = "";
 let HQSTATE = {};
+let MODAL = null;      /* 模态框的状态（U40） */
 
 const FEATURE_CN = {units:"单位", hqs:"总部", hand:"手牌", shelf:"货架",
   store:"商店", theater_assets:"战区资产", restore_hand:"恢复上次会议牌局"};
@@ -696,7 +758,7 @@ function bindTun(){
 let CATALOG = null;      /* /api/catalog —— 游戏包目录（静态，进程内缓存） */
 let PICK = null;         /* /api/pickers —— 当前选择器的候选 */
 let SEL = {};            /* 每页当前选中项 */
-let PICKCACHE = {};      /* unit_type → 候选池（省得来回切单位就重拉） */
+let PICKCACHE = {};      /* unit_type → 候选池（"" = 通用那一份；换存档时清空） */
 
 /* 贴图：必须走服务端代理（http 页面读不到 file://）—— U29
    `/surfaces/*` 要 token ⇒ 只能走 query（<img> 带不了 header）。 */
@@ -1201,7 +1263,6 @@ function hqPoolHTML(h){
       <button class="btn" style="margin-left:auto;padding:3px 10px;font-size:12px"
         onclick="toggleHqPicker(${h.id})">${SEL.hqPicker===h.id?"收起":"加条目"}</button>
     </div>
-    ${SEL.hqPicker===h.id ? hqPickerHTML(h) : ""}
     <table class="fptab">
       <thead><tr><th class="l">图</th><th class="l">名称</th><th>国籍</th>
         <th>攻 / 防 / 装</th><th>特性</th><th>数量</th><th></th></tr></thead>
@@ -1209,24 +1270,8 @@ function hqPoolHTML(h){
 }
 
 /* 加条目：特种兵选择器（U22 的 .pcell 网格） */
-function hqPickerHTML(h){
-  const pool = (PICK && PICK.campaign_pool) || [];
-  if(!pool.length) return `<div class="hqpick note">还没有取到战役的特种兵池</div>`;
-  const have = projectedPool(h).map(e=>e.spec||("eq:"+e.equipment));
-  const cells = pool.map(t=>{
-    const dup = have.includes(t);
-    const st = (CATALOG&&CATALOG.spec_types[t])||{};
-    return `<div class="pcell ${dup?'blocked':''}" title="${esc(specCn(t))} · ${esc(natCn(st.nationality))}${
-      dup?"（兵库里已经有了）":""}" onclick="${dup?'void 0':('hqPoolAdd('+h.id+','+esc(JSON.stringify(t))+')')}">
-      ${imgTag(specTex(t), specCn(t))}</div>`;
-  }).join("");
-  return `<div class="spick hqpick">
-    <div class="sphd"><span class="spt">加一条兵库条目</span>
-      <span class="spc">战役池 ${pool.length} 种 · 国籍自动跟着特种兵类型走</span></div>
-    <div class="spgrid">${cells}</div></div>`;
-}
-
-function toggleHqPicker(id){ SEL.hqPicker = (SEL.hqPicker===id) ? null : id; show("hqs"); }
+/* 加条目现在走**模态框**（U40b）：数量 / 延迟都能填 */
+function toggleHqPicker(id){ openHqPoolModal(id); }
 
 function hqDetailHTML(h){
   if(!h) return `<div class="placeholder"><div class="big">没有总部</div></div>`;
@@ -1465,38 +1510,9 @@ function cardTileHTML(c, kind){
   </div>`;
 }
 
-function cardPickerHTML(target){
-  /* target = {kind:"hand"|"shelf"|"shelfset", position:n} */
-  const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
-  const types = Object.keys(CATALOG&&CATALOG.card_types ? CATALOG.card_types : {}).sort();
-  const cells = types.map(t=>{
-    const blocked = wl.blocked && wl.blocked[t];
-    const ok = !blocked;
-    const info = cardInfo(t);
-    return `<div class="card ${ok?'':'blocked'}" title="${esc(info.subtitle||"")}${
-      blocked?("："+esc(blocked)):""}" onclick="${ok ? (
-        target.kind==="hand" ? ("cardAdd("+esc(JSON.stringify(t))+")") :
-        target.kind==="shelf" ? ("cardStoreAdd("+target.position+","+esc(JSON.stringify(t))+")") :
-        ("cardStoreSet("+target.position+","+esc(JSON.stringify(t))+")")
-      ) : "void 0"}">
-      <div class="ci">${imgTag(cardImg(t), cardCn(t))}</div>
-      <div class="cn">${esc(cardCn(t))}</div>
-      <div class="cs">${info.cost!==undefined&&info.cost!==null?("CP "+info.cost):""}</div>
-      ${blocked?`<div class="cs blk">${esc(blocked)}</div>`:""}
-    </div>`;
-  }).join("");
-  const title = target.kind==="hand" ? "加一张到手牌"
-    : (target.kind==="shelf" ? ("上架到货架第 "+target.position+" 格") : ("换掉货架第 "+target.position+" 格的牌"));
-  return `<div class="spick" style="margin:10px 12px">
-    <div class="sphd"><span class="spt">${esc(title)}</span>
-      <span class="spc">游戏包共 ${types.length} 种卡 · 白名单 ${(wl.allowed||[]).length} 种</span>
-      <button class="btn" style="margin-left:auto;padding:2px 9px;font-size:12px"
-        onclick="closeCardPicker()">收起</button></div>
-    <div class="cardgrid">${cells}</div></div>`;
-}
-
-function openCardPicker(kind, position){ SEL.cardPicker = {kind:kind, position:position}; show("cards"); }
-function closeCardPicker(){ SEL.cardPicker = null; show("cards"); }
+/* 卡牌选择器现在走**模态框**（U40b） */
+function openCardPicker(kind, position){ openCardPickerModal(kind, position); }
+function closeCardPicker(){ closeModal(); }
 
 function cardAdd(type){
   const hand = projectedCards(VIEW.hand, "hand");
@@ -1539,7 +1555,6 @@ function pageCards(w){
   const hand = projectedCards(VIEW.hand, "hand");
   const shelf = projectedCards(VIEW.shelf, "shelf");
   const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
-  const picker = SEL.cardPicker;
   const handHTML = hand.length
     ? hand.map(c=>cardTileHTML(c,"hand")).join("")
     : `<div class="note" style="padding:14px">手牌是空的</div>`;
@@ -1563,7 +1578,6 @@ function pageCards(w){
           <button class="btn" style="padding:3px 10px;font-size:12px"
             onclick="restoreHand()">恢复上次会议牌局</button>
         </div>
-        ${picker && picker.kind==="hand" ? cardPickerHTML(picker) : ""}
         ${SEL.cardErr?`<div class="err">${esc(SEL.cardErr)}</div>`:""}
         <div class="note">手牌是<b>你手里已经拿到的牌</b>；货架是<b>这一场会议可以买的牌</b>。
           两者的 is_free 只是 tooltip 文案与卡背贴图，**没有玩法影响**（§7.5.2）。</div>
@@ -1574,8 +1588,6 @@ function pageCards(w){
         <div class="costs">
           <span>货架只管<b>这一场会议</b> —— 进入新会议时游戏会按权重重掷</span>
         </div>
-        ${picker && picker.kind==="shelf" ? cardPickerHTML(picker) : ""}
-        ${picker && picker.kind==="shelfset" ? cardPickerHTML(picker) : ""}
       </div></div>
   </div>`;
 }
@@ -1665,7 +1677,6 @@ function pageStore(w){
       <div class="storetitle">${esc(SEL.storeFront)} / ${esc(SEL.storeSub==="elite_store"?"精英商店":"普通商店")}
         · ${items.length} 条
         <button class="btn" onclick="toggleStorePicker()">${SEL.storePicker?"收起":"上架新商品"}</button></div>
-      ${SEL.storePicker?storePickerHTML() : ""}
       <table class="spec-tbl">
         <thead><tr><th>图</th><th>商品</th><th>国籍</th><th>攻 / 防 / 装 / 炮</th>
           <th>特性</th><th style="text-align:right">价格</th>
@@ -1699,37 +1710,10 @@ function pageStore(w){
 
 function pickStoreFront(f){ SEL.storeFront = f; SEL.storeSub = null; show("store"); }
 function pickStoreSub(s){ SEL.storeSub = s; show("store"); }
-function toggleStorePicker(){ SEL.storePicker = !SEL.storePicker; show("store"); }
+function toggleStorePicker(){ openStoreAddModal(); }
 
-function storePickerHTML(){
-  const pool = (PICK && PICK.campaign_pool) || [];
-  const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[], spec:[]};
-  const have = projectedStore().filter(r=>r.e.front===SEL.storeFront && r.e.sub===SEL.storeSub)
-    .map(r=>r.e.spec||("eq:"+r.e.equipment+":"+r.e.nationality));
-  const specs = pool.map(t=>{
-    const dup = have.includes(t);
-    const st = (CATALOG&&CATALOG.spec_types[t])||{};
-    return `<div class="pcell ${dup?'blocked':''}" title="${esc(specCn(t))} · ${esc(natCn(st.nationality))}${
-      dup?"（这个商店已经有了）":""}" onclick="${dup?'void 0':('storeAddSpec('+esc(JSON.stringify(t))+')')}">
-      ${imgTag(specTex(t), specCn(t))}</div>`;
-  }).join("");
-  const eqs = (uni.equipment||[]).flatMap(eq=>
-    (uni.nationality||[]).map(nat=>({eq, nat})));
-  const eqHTML = eqs.map(x=>{
-    const dup = have.includes("eq:"+x.eq+":"+x.nat);
-    return `<div class="pcell ${dup?'blocked':''}" title="${esc(hqEquipCn(x.eq))} · ${esc(natCn(x.nat))}${
-      dup?"（这个商店已经有了）":""}" onclick="${dup?'void 0':('storeAddEquip('+esc(JSON.stringify(x.eq))+','+esc(JSON.stringify(x.nat))+')')}">
-      ${imgTag("steps/step.png", hqEquipCn(x.eq))}</div>`;
-  }).join("");
-  return `<div class="spick" style="margin:8px 10px">
-    <div class="sphd"><span class="spt">上架新商品</span>
-      <span class="spc">特种兵 ${pool.length} 种 · 兵种 ${eqs.length} 种 ·
-        上架后价格默认 10、库存 1，可在下表直接改</span></div>
-    <div class="spgrid">${specs}</div>
-    ${eqHTML?`<div class="sphead" style="padding:6px 11px 0;font-size:11.5px;color:var(--muted)">兵种</div>
-    <div class="spgrid">${eqHTML}</div>`:""}
-  </div>`;
-}
+/* 上架新商品现在走**模态框**（U40b）：价格 / 库存都能填 */
+function storePickerHTML(){ return ""; }
 
 function storeAddSpec(t){
   const st = (CATALOG&&CATALOG.spec_types[t])||{};
@@ -1882,19 +1866,401 @@ function pageCampaign(w){
   </div></div>`;
 }
 
+
+/* ===================================================================
+   模态框（U40）—— 设计稿 §9 的写盘确认框 + 三个操作对话框
+   =================================================================== */
+function openModal(html, opts){
+  opts = opts || {};
+  const m = document.getElementById("modal");
+  m.className = "modal" + (opts.cls ? (" " + opts.cls) : "");
+  m.innerHTML = html;
+  document.getElementById("mask").classList.add("on");
+  if(opts.onOpen) opts.onOpen();
+}
+function closeModal(){
+  document.getElementById("mask").classList.remove("on");
+  document.getElementById("modal").innerHTML = "";
+  MODAL = null;
+  if(VIEW) show(PAGE);
+}
+document.addEventListener("keydown", function(ev){
+  if(ev.key==="Escape" && document.getElementById("mask").classList.contains("on")) closeModal();
+});
+document.getElementById("mask").addEventListener("mousedown", function(ev){
+  if(ev.target===this) closeModal();          /* 点遮罩 = 取消 */
+});
+
+/* ---------- 写盘确认框（设计稿 §9） ---------- */
+function planFiles(changes){
+  const out = [];
+  (changes||[]).forEach(c=>{
+    let row = out.find(x=>x.entry===c.entry);
+    if(!row){ row = {entry:c.entry, notes:[]}; out.push(row); }
+    (c.notes||[]).forEach(n=>row.notes.push(n));
+  });
+  return out;
+}
+function openConfirm(mode, info){
+  const files = planFiles(info.changes);
+  let title, body, foot;
+  if(mode==="error"){
+    title = `✕ 无法应用：${(info.errors||[]).length} 处错误`;
+    body = `<div>${(info.errors||[]).map(e=>`<div class="erow">✕ ${esc(e)}</div>`).join("")}</div>
+      <div class="fine">硬拦：<b>plan.errors</b> 非空时按钮禁用 —— <b>原存档不会被写入</b>。</div>`;
+    foot = `<button class="btn" onclick="closeModal()">返回修改</button>
+      <button class="btn pri" disabled>应用更改</button>`;
+  } else if(mode==="warn"){
+    title = `⚠ 有 ${(info.warnings||[]).length} 条软警告`;
+    body = `<div>${(info.warnings||[]).map(w=>`<div class="wrow">⚠ ${esc(w)}</div>`).join("")}</div>
+      <div class="fine">软警告：照写，只是提醒。</div>`;
+    foot = `<button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="reallyApply()">仍然应用</button>`;
+  } else {
+    title = `⚠ 应用 ${files.length} 处改动？`;
+    body = `<div>将改动存档 <b>${esc(info.save_name||VIEW.save&&VIEW.save.name||"")}</b> 里的：</div>
+      <div class="elist">${files.map(f=>`<div><span class="f">${esc(f.entry)}</span>${
+        f.notes.length?`<span class="d">${esc(f.notes.join("；"))}</span>`:""}</div>`).join("")}</div>
+      <div class="fine">写回前会自动备份：<b>${esc(info.backup||"（原文件保留为 _BACKUP）")}</b>
+        （同名已存在则递增为 <b>_BACKUP_2</b>）· 改动后仍可一键撤销。</div>`;
+    foot = `<button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="reallyApply()">应用更改</button>`;
+  }
+  openModal(`<div class="mh">${title}</div><div class="mb">${body}</div><div class="mf">${foot}</div>`,
+            {cls: mode==="error" ? "err" : (mode==="warn" ? "warn" : "")});
+}
+
+
+/* ===================================================================
+   三个操作模态框（U40b）—— 设计稿 §9②③④
+   =================================================================== */
+/* 通用特种兵图标网格（选中态 .on；重复态 .blocked + 「已有」角标） */
+function spickCellsHTML(items, onPick){
+  return items.map(it=>`<div class="pcell ${it.blocked?'blocked':''} ${it.sel?'on':''}"
+    title="${esc(it.title||it.name)}" onclick="${it.blocked?'void 0':onPick.replace("@ID", esc(JSON.stringify(it.id)))}">
+    ${imgTag(it.tex, it.name)}${it.dup?`<span class="dup">${esc(it.dup)}</span>`:""}</div>`).join("");
+}
+/* 详情卡（复用 .slot 样式，但去掉「点击=卸下」的语义） */
+function spickCardHTML(it){
+  if(!it) return `<div class="slot empty" style="justify-content:center">还没选</div>`;
+  const tags = (it.flags||[]).map(f=>`<span class="ftag">${esc(f)}</span>`).join("");
+  return `<div class="slot spcard">
+    <span class="sq">${imgTag(it.tex, it.name)}</span>
+    <span class="slotinfo"><span class="slotname">${esc(it.name)}</span>
+      <span class="slotflags">${tags||'<span class="none">无特性</span>'}</span></span>
+    <span class="slotstats">
+      <span class="st"><i>攻</i><b>${it.attack??"—"}</b></span>
+      <span class="st"><i>防</i><b>${it.defense??"—"}</b></span>
+      <span class="st"><i>装</i><b>${it.armor??"—"}</b></span>
+      <span class="st"><i>炮</i><b>${it.artillery??"—"}</b></span>
+    </span></div>`;
+}
+function natRowHTML(it){
+  if(!it) return "";
+  return `<div class="spnat" style="margin-top:8px">国籍 <b>${esc(it.nat||"—")}</b>
+    <span class="auto">跟着特种兵自动 · 不用手选</span></div>`;
+}
+/* 模态框里的 Alt+滚轮数字 */
+function bindModalSpin(id, get, set, min, max){
+  const el = document.getElementById(id);
+  if(!el) return;
+  bindSpin(el, {base:get(), cur:get(), min:min, max:max, onChange(v){
+    set(v);
+    el.textContent = v;
+    el.classList.toggle("dirty", v!==get());
+  }});
+}
+
+/* ---------- ① 给总部兵库加一条 ---------- */
+function hqPoolItems(h){
+  const pool = (PICK && PICK.campaign_pool) || [];
+  const have = projectedPool(h);
+  return pool.map(t=>{
+    const st = (CATALOG&&CATALOG.spec_types[t])||{};
+    const dup = have.filter(e=>e.spec===t).length;
+    return {id:t, name:specCn(t), tex:specTex(t), nat:natCn(st.nationality),
+      attack:st.attack, defense:st.defense, armor:st.armor, artillery:st.artillery,
+      flags:st.flags||[], blocked:false, dup:dup?("已有 "+dup):"",
+      title:specCn(t)+" · "+natCn(st.nationality)};
+  });
+}
+function openHqPoolModal(hqId){
+  const h = (VIEW.hqs||[]).find(x=>x.id===hqId); if(!h) return;
+  const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[]};
+  MODAL = {kind:"hqpool", hqId:hqId, mode:"spec", sel:null, quantity:1, delay:0,
+    equipType:(uni.equipment||["infantry"])[0], equipNat:(uni.nationality||["german"])[0]};
+  renderHqPoolModal();
+}
+function renderHqPoolModal(){
+  const M = MODAL; if(!M) return;
+  const h = (VIEW.hqs||[]).find(x=>x.id===M.hqId);
+  const items = hqPoolItems(h);
+  const cells = spickCellsHTML(items, "hqPoolPick(@ID)");
+  const sel = items.find(i=>i.id===M.sel);
+  /* 兵种模式：兵种只有 2 种，国籍从「游戏在该会议会卖的」里取 */
+  const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[]};
+  const equipTypes = uni.equipment || ["infantry", "armor"];
+  const equipNats = uni.nationality || [];
+  openModal(`<div class="mh">给「${esc(h.name_cn||h.name_brief||h.id)}」加一条
+      <span class="ro">存进 hqs.yml</span></div>
+    <div class="mb">
+      <div class="mrow"><span class="lb">条目类型</span>
+        <span class="numrow">
+          <button class="btn ${M.mode==="spec"?"pri":""}" onclick="hqPoolMode('spec')">特种兵</button>
+          <button class="btn ${M.mode==="equip"?"pri":""}" onclick="hqPoolMode('equip')">兵种</button>
+        </span>
+        <span class="hint">特种兵 ${items.length} 种 · 兵种 2 种</span></div>
+      ${M.mode==="spec" ? `<div class="spick">
+        <div class="sphd"><span class="spt">选一个特种兵</span>
+          <span class="spc">战役池 ${items.length} 种</span></div>
+        <div class="spgrid">${cells}</div>
+        <div class="spfoot">${spickCardHTML(sel)}${natRowHTML(sel)}</div>
+      </div>` : `<div class="mrow"><span class="lb">兵种</span>
+        <select class="sel" onchange="hqPoolEquip('${esc(M.equipType||"infantry")}','this.value')">
+          ${(equipTypes||[]).map(eq=>`<option value="${eq}" ${
+            eq===(M.equipType||"infantry")?'selected':''}>${esc(hqEquipCn(eq))}</option>`).join("")}
+        </select></div>
+        <div class="mrow"><span class="lb">国籍</span>
+        <select class="sel" onchange="hqPoolEquip('${esc(M.equipType||"infantry")}','this.value')">
+          ${(equipNats||[]).map(nt=>`<option value="${esc(nt)}" ${
+            nt===(M.equipNat||"german")?'selected':''}>${esc(natCn(nt))}</option>`).join("")}
+        </select>
+        <span class="hint">兵种的国籍要**手选**（特种兵是自动跟着类型走的）</span></div>`}
+      <div class="mrow"><span class="lb">数量</span>
+        <span class="spin" id="mp_q"></span>
+        <span class="hint">Alt+滚轮 ±1 · 非负整数</span></div>
+      <div class="mrow"><span class="lb">延迟</span>
+        <span class="spin" id="mp_d"></span>
+        <span class="hint">Alt+滚轮 ±1 · 0 = 立即可用</span></div>
+      <div class="modnote">条目的**国籍**要填国籍 id（uk / us / german …），不是阵营
+        （allies / axis）—— 填错游戏读不出来。<br>
+        同一个总部里，<b>同样的条目 + 同样的延迟不许并存</b>；延迟不同可以共存
+        （延迟 X 回合 = 部队要等 X 个回合才能部署，是游戏合法机制）。</div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="hqPoolConfirm()">添加</button></div>`,
+    {onOpen:function(){
+      bindModalSpin("mp_q", ()=>MODAL.quantity, v=>MODAL.quantity=v, 0, 99);
+      bindModalSpin("mp_d", ()=>MODAL.delay, v=>MODAL.delay=v, 0, 99);
+    }});
+}
+function hqPoolPick(id){ MODAL.sel = id; renderHqPoolModal(); }
+function hqPoolEquip(eq, nat){
+  MODAL.equipType = eq;
+  MODAL.equipNat = nat;
+  renderHqPoolModal();
+}
+function hqPoolMode(m){ MODAL.mode = m; MODAL.sel = null; renderHqPoolModal(); }
+function hqPoolConfirm(){
+  const M = MODAL; if(!M) return;
+  const h = (VIEW.hqs||[]).find(x=>x.id===M.hqId);
+  let entry = null;
+  if(M.mode==="spec"){
+    if(!M.sel){ alertModal("请先选一个特种兵"); return; }
+    const st = (CATALOG&&CATALOG.spec_types[M.sel])||{};
+    entry = {spec:M.sel, nationality:st.nationality||"", quantity:M.quantity, delay:M.delay};
+  } else {
+    const nat = (M.equipNat || "german");
+    entry = {equipment:M.equipType||"infantry", nationality:nat, quantity:M.quantity, delay:M.delay};
+  }
+  const nm = M.mode==="spec" ? specCn(M.sel) : hqEquipCn(M.equipType||"infantry");
+  setPending("hq_force_pool_add", `hq_force_pool_add:${M.hqId}:${M.mode}:${M.sel||M.equipType||""}`,
+    {hq_id:M.hqId, entry}, `总部 ${M.hqId} 兵库加 ${nm} × ${M.quantity}`);
+  closeModal();
+}
+
+/* ---------- ② 换掉货架上的一张卡 ---------- */
+function openCardPickerModal(kind, position){
+  const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
+  const types = Object.keys(CATALOG&&CATALOG.card_types ? CATALOG.card_types : {}).sort();
+  MODAL = {kind:"card", mode:kind, position:position, sel:null};
+  renderCardPickerModal();
+}
+function renderCardPickerModal(){
+  const M = MODAL; if(!M) return;
+  const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
+  const types = Object.keys(CATALOG&&CATALOG.card_types ? CATALOG.card_types : {}).sort();
+  const items = types.map(t=>{
+    const info = cardInfo(t);
+    const blocked = wl.blocked && wl.blocked[t];
+    return {id:t, name:cardCn(t), tex:cardImg(t), blocked:!!blocked,
+      dup:"", title:(info.subtitle||"")+(blocked?("："+blocked):""),
+      cost:info.cost, sub:info.subtitle};
+  });
+  const sel = items.find(i=>i.id===M.sel);
+  const isHand = M.mode==="hand";
+  openModal(`<div class="mh">${isHand?"加一张到手牌":"换掉位置 "+M.position+" 的卡"}
+      <span class="ro">${isHand?"cards.yml":"main.yml · card_store"}</span></div>
+    <div class="mb">
+      <div class="modnote">只列本存档本会议商店**本来就能抽到的卡** ——
+        玩家阵营 ${esc(wl.player_faction||"—")}，共 ${(wl.allowed||[]).length} 种
+        （其余 ${Object.keys(wl.blocked||{}).length} 种被屏蔽）。</div>
+      <div class="spick">
+        <div class="sphd"><span class="spt">选一张卡</span>
+          <span class="spc">${types.length} 种 · 可上架 ${(wl.allowed||[]).length} 种</span></div>
+        <div class="spgrid">${spickCellsHTML(items, "cardPick(@ID)")}</div>
+        <div class="spfoot">${sel?`<div class="slot spcard">
+          <span class="sq">${imgTag(sel.tex, sel.name)}</span>
+          <span class="slotinfo"><span class="slotname">${esc(sel.name)}</span>
+            <span class="slotflags">${sel.sub?`<span class="ftag">${esc(sel.sub)}</span>`:
+              '<span class="none">—</span>'}</span></span>
+          <span class="slotstats"><span class="st"><i>费</i><b>${sel.cost??"—"}</b></span></span>
+        </div>`:`<div class="slot empty" style="justify-content:center">还没选</div>`}</div>
+      </div>
+      <div class="modnote">抽卡权重 15/6/3 三档（<b>easy</b> / <b>normal</b> / <b>classic+hard</b>）
+        → 会议覆盖 <code>card_probabilities</code> → 前线缩放 <code>card_probability_scales</code>。<br>
+        登陆/空降卡必须在战役里登记 <code>card_type_units</code>，否则 <code>unit_id</code> 为空、
+        用卡时游戏会崩。</div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="cardPickConfirm()">${isHand?"加到手牌":"换牌"}</button></div>`);
+}
+function cardPick(id){ MODAL.sel = id; renderCardPickerModal(); }
+function cardPickConfirm(){
+  const M = MODAL; if(!M || !M.sel){ alertModal("请先选一张卡"); return; }
+  if(M.mode==="hand") cardAdd(M.sel);
+  else cardStoreSet(M.position, M.sel);
+  closeModal();
+}
+
+/* ---------- ③ 上架新商品 ---------- */
+function openStoreAddModal(){
+  MODAL = {kind:"store", mode:"spec", sel:null, price:10, quantity:1};
+  renderStoreAddModal();
+}
+function storeAddItems(){
+  const pool = (PICK && PICK.campaign_pool) || [];
+  const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[]};
+  const have = projectedStore().filter(r=>r.e.front===SEL.storeFront && r.e.sub===SEL.storeSub);
+  const specs = pool.map(t=>{
+    const st = (CATALOG&&CATALOG.spec_types[t])||{};
+    const dup = have.filter(e=>e.spec===t).length;
+    return {id:t, name:specCn(t), tex:specTex(t), nat:natCn(st.nationality),
+      attack:st.attack, defense:st.defense, armor:st.armor, artillery:st.artillery,
+      flags:st.flags||[], blocked:false, dup:dup?("已有 "+dup):"",
+      title:specCn(t)+" · "+natCn(st.nationality)};
+  });
+  const equips = [];
+  (uni.equipment||[]).forEach(eq=>{
+    (uni.nationality||[]).forEach(nat=>{
+      const dup = have.filter(e=>e.equipment===eq && e.nationality===nat).length;
+      equips.push({id:eq+"@"+nat, eq:eq, nat:nat, name:hqEquipCn(eq), tex:"steps/step.png",
+        natName:natCn(nat), blocked:false, dup:dup?("已有 "+dup):"",
+        title:hqEquipCn(eq)+" · "+natCn(nat)});
+    });
+  });
+  return {specs:specs, equips:equips};
+}
+function renderStoreAddModal(){
+  const M = MODAL; if(!M) return;
+  const it = storeAddItems();
+  const list = M.mode==="spec" ? it.specs : it.equips;
+  const sel = list.find(i=>i.id===M.sel);
+  openModal(`<div class="mh">上架新商品
+      <span class="ro">存进 store.yml</span></div>
+    <div class="mb">
+      <div class="mrow"><span class="lb">商品类型</span>
+        <span class="numrow">
+          <button class="btn ${M.mode==="spec"?"pri":""}" onclick="storeAddMode('spec')">特种兵</button>
+          <button class="btn ${M.mode==="equip"?"pri":""}" onclick="storeAddMode('equip')">兵种</button>
+        </span>
+        <span class="hint">特种兵 ${it.specs.length} 种 · 兵种 ${it.equips.length} 种</span></div>
+      <div class="spick">
+        <div class="sphd"><span class="spt">选一个商品</span>
+          <span class="spc">${list.length} 种</span></div>
+        <div class="spgrid">${spickCellsHTML(list, "storeAddPick(@ID)")}</div>
+        <div class="spfoot">${M.mode==="spec" ? spickCardHTML(sel)+natRowHTML(sel)
+          : (sel?`<div class="slot spcard"><span class="sq">${imgTag(sel.tex, sel.name)}</span>
+             <span class="slotinfo"><span class="slotname">${esc(sel.name)}</span>
+             <span class="slotflags"><span class="none">兵种</span></span></span>
+             </div><div class="spnat" style="margin-top:8px">国籍 <b>${esc(sel.natName||"—")}</b></div>`
+             : `<div class="slot empty" style="justify-content:center">还没选</div>`)}</div>
+      </div>
+      <div class="mrow"><span class="lb">价格</span>
+        <input class="numin" id="mp_price" type="text" inputmode="numeric" autocomplete="off"
+          value="${M.price}" style="width:72px">
+        <span class="hint">任意非负整数（0 = 免费）</span></div>
+      <div class="mrow"><span class="lb">库存</span>
+        <span class="spin" id="mp_qty"></span>
+        <span class="hint">Alt+滚轮 ±1 · 正整数（不能是 0）</span></div>
+      <div class="modnote">商品必须是**游戏自己定义过**的（否则游戏拒收）；
+        特种兵的**国籍自动跟着类型走**，兵种的国籍手选。<br>
+        同一个 <b>(战线, 子商店)</b> 里<b>任何重复条目都不许</b>（价格库存不同也算重复）——
+        要改已有条目就直接改那一行。<br>
+        <b>库存不能填 0</b> —— 游戏没有「售罄」标记，下架请用「下架」删条目。</div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="storeAddConfirm()">上架</button></div>`,
+    {onOpen:function(){
+      const pe = document.getElementById("mp_price");
+      if(pe) pe.addEventListener("input", function(){ MODAL.price = parseInt(this.value,10)||0; });
+      bindModalSpin("mp_qty", ()=>MODAL.quantity, v=>MODAL.quantity=v, 1, 99);
+    }});
+}
+function storeAddMode(m){ MODAL.mode = m; MODAL.sel = null; renderStoreAddModal(); }
+function storeAddPick(id){ MODAL.sel = id; renderStoreAddModal(); }
+function storeAddConfirm(){
+  const M = MODAL; if(!M) return;
+  if(!M.sel){ alertModal("请先选一个商品"); return; }
+  const price = Math.max(0, parseInt(M.price,10)||0);
+  const quantity = Math.max(1, M.quantity||1);
+  let entry = null, nm = "";
+  if(M.mode==="spec"){
+    const st = (CATALOG&&CATALOG.spec_types[M.sel])||{};
+    entry = {spec:M.sel, nationality:st.nationality||"", price:price, quantity:quantity};
+    nm = specCn(M.sel);
+  } else {
+    const [eq, nat] = String(M.sel).split("@");
+    entry = {equipment:eq, nationality:nat, price:price, quantity:quantity};
+    nm = hqEquipCn(eq);
+  }
+  setPending("store_add", `store_add:${SEL.storeFront}:${SEL.storeSub}:${M.mode}:${M.sel}`,
+    {front:SEL.storeFront, sub:SEL.storeSub, entry},
+    `上架 ${nm}（${SEL.storeFront}/${SEL.storeSub}，价格 ${price}，库存 ${quantity}）`);
+  closeModal();
+}
+
+/* 小提示（替代 alert —— 弹窗太丑） */
+function alertModal(msg){
+  openModal(`<div class="mh">⚠ ${esc(msg)}</div>
+    <div class="mb"><div class="fine">这一步还差一步。</div></div>
+    <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`);
+}
+
 /* ---------- 应用 / 撤销 ---------- */
+/* 待应用的编辑列表 → 请求体（兵库**删条目**要排在最后：
+   删了会让后面条目的下标整体前移，先删再改数量就会改错行，U35） */
+function pendingEdits(){
+  const edits = PENDING.map(p=>({kind:p.kind, params:p.params}));
+  edits.sort((a,b)=>(a.kind==="hq_force_pool_remove"?1:0)
+                    -(b.kind==="hq_force_pool_remove"?1:0));
+  return edits;
+}
 async function doApply(){
   if(!PENDING.length) return;
   const box = document.getElementById("errBox");
   const wbox = document.getElementById("warnBox");
   box.textContent = ""; wbox.textContent = "";
-  /* ⚠️ 兵库**删条目**要排在最后 —— 删了会让后面条目的下标整体前移，
-     先删再改数量就会改错行（U35）。其余编辑保持加入顺序（JS 的 sort 是稳定的）。 */
-  const edits = PENDING.map(p=>({kind:p.kind, params:p.params}));
-  edits.sort((a,b)=>(a.kind==="hq_force_pool_remove"?1:0)
-                    -(b.kind==="hq_force_pool_remove"?1:0));
-  const r = await post("/api/commit", {save_id: VIEW._save_id, edits});
+  /* ⚠️ 先 plan（**不碰磁盘**）再弹确认框 —— 写盘前让玩家看清要改什么。
+     plan.errors 非空 ⇒ 硬拦；只有 warnings ⇒ 软警告；都没有 ⇒ 正常确认。 */
+  const r = await post("/api/plan", {save_id: VIEW._save_id, edits: pendingEdits()});
   const d = r.data;
+  if(!d.ok){
+    openConfirm("error", {errors:d.errors||[], changes:d.changes||[]});
+    return;
+  }
+  if((d.warnings||[]).length){
+    openConfirm("warn", {warnings:d.warnings||[], changes:d.changes||[],
+      backup:d.backup, save_name:d.save_name});
+    return;
+  }
+  openConfirm("ok", {changes:d.changes||[], backup:d.backup, save_name:d.save_name});
+}
+/* 确认框里点「应用更改」才真的写盘 */
+async function reallyApply(){
+  const r = await post("/api/commit", {save_id: VIEW._save_id, edits: pendingEdits()});
+  const d = r.data;
+  closeModal();
   if(d.ok){
     PENDING = [];
     paintPending();
@@ -1902,7 +2268,8 @@ async function doApply(){
     const w = document.getElementById("warnBox");
     if(w) w.textContent = (d.warnings||[]).join("\n");
   } else {
-    box.textContent = (d.errors||[]).join("\n");
+    const box = document.getElementById("errBox");
+    if(box) box.textContent = (d.errors||[]).join("\n");
   }
 }
 async function doUndo(){
@@ -1951,6 +2318,10 @@ async function openSave(sid){
   document.getElementById("app").style.display = "flex";
   /* 目录是异步的 ⇒ 到位后**重绘一次**，否则中文名与卡牌贴图一开始全是 id / 404 */
   loadCatalog().then(()=>{ if(VIEW) show(PAGE); }).catch(()=>{});
+  /* 选择器候选（战役池 / 商店可上架范围 / 卡牌白名单）**每个存档加载一次** ——
+     商店页与卡牌页都要用（之前只有单位页按需加载 ⇒ 模态框里 0 种）。 */
+  PICKCACHE = {};
+  loadPickers("").then(()=>{ if(VIEW) show(PAGE); }).catch(()=>{});
   document.getElementById("hTitle").textContent = VIEW.save.display || VIEW.save.name;
   document.getElementById("hCaps").innerHTML = (VIEW._features||[]).map(f =>
     `<span class="pill ${f.ok?'on':'off'}" title="${esc(f.reason)}">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</span>`
