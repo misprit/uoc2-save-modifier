@@ -830,7 +830,7 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 
 ### 7.5 卡牌页
 
-> **【实证 · 2026-11-18 · `e157` / `e158`】修正前一版**：卡牌商店**确实存在**。
+> **【实证 · 2026-11-18 · `e157` / `e158` / `e160`】修正前一版**：卡牌商店**确实存在**。
 > 上一版"游戏里没有卡牌商店"是**取样错误** —— 当时那份存档不在会议阶段，
 > `main.yml.card_store` 自然是 `None`。用**会议阶段已激活卡牌商店**的存档复核后，机制如下。
 
@@ -874,6 +874,97 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 ⇒ **货架可以改**：换牌 / 改成免费 / 下架 / 上架（`position` ≤ 货架格数）。
 ⇒ **但下次进入新会议会被重掷覆盖** —— 界面必须写明这一点。
 
+---
+
+#### 7.5.1 ★ 可上架白名单：只允许改成「商店本来就能生成」的卡
+
+**【决策 · 2026-11-18 用户提出】** 用户担心：
+> 有些登陆和空降卡牌会召唤相关单位，如果这个战役本来没有设定这个单位，
+> 大概率游戏要崩溃。既然你能知道卡牌商店的生成抽选规则，
+> 我们改卡牌的时候也仅允许改成商店能自然生成的卡牌，其他卡牌屏蔽掉。
+
+**这个担心成立，机制如下（`e160` 实证）**：
+
+| 环节 | 事实 | 依据 |
+|---|---|---|
+| 战役名册 | `document/units.yml` = 战役**全部**单位（实测 blitzkrieg 835 个） | `CampaignDoc._load` |
+| 卡→单位登记表 | `document/main.yml.card_type_units` = 哪些卡召唤名册里**哪个 id** | `CampaignDoc.get_card_type_unit_id` |
+| 已召唤记录 | 根 `main.yml.used_card_types_with_unit` | `Campaign.get_cards_probabilities` |
+| 实测 | blitzkrieg：`{tactical_para_german: unit_id 718}`；718 = 名册里的 `ger_fsjg_40`（德国伞兵团） | `e160` |
+
+**崩溃是怎么发生的**（`BuyCard.do`）：
+
+```python
+c = campaign.card_store.pop(position)
+self._create_campaign_unit = bool(c.unit_id) and (c.unit_id not in campaign.units)
+campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, ...)
+```
+
+* `unit_id` 为 **None** ⇒ **不会召唤单位**，但卡进了手牌 ⇒
+  玩家用这张卡时游戏找不到对应单位 ⇒ **崩**；
+* `unit_id` 指向名册里**别的**单位 ⇒ 召唤出**错误的单位**。
+
+⇒ 所以**不能只靠"卡牌类型存在于游戏包"来放行**。
+
+**规则（逐条复刻 `Campaign.get_cards_probabilities`，`e160` 已用两个存档验证）**：
+
+```
+可上架卡牌 = { ct :  ∃ meta_type, p(meta_type) > 0,
+                  ct.faction == player_faction,            ← 存档 document/main.yml
+                  ct.meta_type == meta_type,
+                  (¬ct.has_unit)                            ← 不召唤单位 ⇒ 无条件可上架
+                  OR ( ct ∈ card_type_units                ← 本战役登记过 ⇒ 有单位可召唤
+                       ∧ ct ∉ used_card_types_with_unit    ← 还没召唤过
+                       ∧ ct ∉ 当前手牌
+                       ∧ (units.get(unit_id) 不存在 OR 该单位未阵亡) ) }
+```
+
+**实测两个存档（`e160`，脚本在 `docs/证据脚本/e160_card_whitelist.py`）**：
+
+| 存档 | 玩家阵营 | 可上架 | 被屏蔽的原因（举例） |
+|---|---|---|---|
+| blitzkrieg / c_40_06 | axis | **13 / 39** | 26 张全是「阵营 allies/soviet ≠ 玩家 axis」 |
+| stalingrad / c_42_07 | axis | **11 / 39** | `naval_bombardment_axis`：本次会议概率 = 0（会议覆盖成 0.0）；`tactical_para_german`：**本战役没有可召唤的单位** |
+
+**两个存档的真实货架，每一张都落在算出来的候选集内**（`⇒ 真实货架每张都在候选集内: True`）
+—— 这条是规则正确性的判据。候选集里没被抽到的那几张，是 `random.choices` 的随机结果。
+
+**界面怎么表现**（【决策】）：
+
+* **换牌对话框 / 上架对话框只列可上架的那几张** —— 不列被屏蔽的，
+  避免玩家以为"游戏能抽到但不让改"；
+* **图鉴 39 种照旧全列**（图鉴是手册），但被屏蔽的**置灰**，
+  鼠标悬停给原因（例："本战役没有可召唤的单位"、"阵营 allies ≠ 玩家 axis"）；
+* **核心库必须自己再校验一遍** —— 不能只靠 GUI 挡，
+  `Edit.card_store_set` / `card_store_add` 要在写盘前拒绝不在白名单里的卡牌。
+
+**⚠️ 白名单是"当前存档 + 当前会议"的状态**：
+换战役、换会议、玩到下一场会议，白名单都会变
+（阵营不变，但会议概率覆盖会变，单位也会被召唤掉）。
+⇒ **每次开卡牌页都重算**，不要缓存成静态表。
+
+#### 7.5.2 `is_free` 开关（手牌 + 货架都有）
+
+**【决策 · 2026-11-18 用户提出】** 不管卡在手牌还是货架，都给一个按钮切换 `is_free`。
+
+两处**语义不同**，界面上要区分：
+
+| 位置 | `is_free` 的作用 | 改了会怎样 |
+|---|---|---|
+| **货架** | **购买价**：`True` ⇒ 价格 0（不扣声望）；`False` ⇒ 价格 = 卡的 `cost` | 真实影响 —— 把付费卡改免费 = 白嫖 |
+| **手牌** | **没有玩法影响** —— 只改 tooltip 文案（`id_tooltip_deck_card_free` / `_paid`）和卡背贴图（`face_down_free` / `face_down`） | 只是"来源标记"，改坏也无所谓 |
+
+⇒ **货架上的开关要标清当前状态**（"改成免费" / "改成收费"），
+并提示"免费卡不扣声望"；
+**手牌上的开关要说明它只影响显示**（tooltip 与卡背），免得玩家以为能刷声望。
+
+* 手牌改 `is_free` = `Edit.card_set(position, "is_free", value)`（**核心库目前没有，要补**）；
+* 货架改 `is_free` = `Edit.card_store_set(position, is_free=...)`；
+* 游戏里免费卡数由难度决定（`card_store_free_cards`），
+  **手动改的要标注"手动改的"**，不能让玩家以为是游戏发的。
+
+---
+
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ 卡牌                                        会议 c_40_06 · 难度 classic      │
@@ -884,7 +975,7 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 │ └─────┘└─────┘└─────┘└─────┘ │ └─────┘└─────┘└─────┘└─────┘└─────┘        │
 │ 位置1 位置2 位置3 位置4       │ 位置1 位置2 位置3 位置4 位置5               │
 │ 费用75 费用30 费用45 费用20    │ 10    10    30    40    75   ← 声望         │
-│ [移除][移除][移除][移除]       │ [换][免][下架] …                           │
+│ [移除][免费] [移除][免费] …    │ [换][免][下架] …                           │
 │                               │ ⓘ 进入新会议时货架会按权重重掷             │
 ├───────────────────────────────┼──────────────────────────────────────────────┤
 │                               │ 卡牌图鉴（39 种 · 只读）                   │
@@ -893,19 +984,23 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 │                               │ └─────┘└─────┘└─────┘└─────┘              │
 │                               │ 精确轰炸 飞行炮兵 航空舰队 空中总部         │
 │                               │ 费用75  费用40  费用60  费用50             │
+│                               │ ⓘ 灰色 = 本战役商店不会抽到（悬停看原因）  │
 └───────────────────────────────┴──────────────────────────────────────────────┘
 ```
 
 * **手牌区**：`cards.yml` 的 `position` / `card_type` / `is_free` / `used`；
   移除手牌 = `Edit.card_remove(position)`（按位置，不是按类型）；
+  切 `is_free` = `Edit.card_set(position, "is_free", value)`；
   「恢复上次会议的牌局」（`Edit.hand_restore()`）读 L2 检查点写回 L1；
 * **货架区**（**只在会议阶段存在**）：
   不在会议里时这一半显示说明卡「卡牌商店只在会议阶段开放」；
-  * **换牌** = 改 `card_type`（从图鉴选）；
-  * **改成免费** = 改 `is_free`（游戏里免费卡数由难度决定，手动改的要标注"手动改的"）；
-  * **下架** = 删条目；**上架** = 新增条目（`position` 不能超过 `card_store_limit[level]`）；
+  * **换牌** = 改 `card_type` —— **只能从可上架白名单里选**（§7.5.1）；
+  * **改成免费 / 改成收费** = 改 `is_free`（见 §7.5.2）；
+  * **下架** = 删条目；**上架** = 新增条目（`position` 不能超过 `card_store_limit[level]`），
+    卡牌同样必须在白名单里；
   * 每张牌下面显示**价格（声望）**，声望不够的置灰并提示"当前声望 315"；
 * **图鉴区**：39 种，**只读**（数值在游戏包），是"看不懂卡牌时查手册"的入口；
+  **不在白名单里的置灰 + 悬停给原因**；
   贴图查找顺序（`e155` 实测 39/39 全中）：
   `bgt_` / `bgmf_` / `bgm_` / `logo_` + 原名 → 原名
   → 去掉 `_allies` / `_axis` / `_soviet` 后缀再试 → `logo_<类型名>.png` → 占位；
@@ -1019,15 +1114,48 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 | `Edit.hq_branch_level(hq_id, branch, level, suppressed?)` | 总部"升级"= 五个分支的等级 | `hqs.yml` | 分支枚举：`engineering` / `force_pool` / `intel` / `logistics` / `operations`；**降级要二次确认** |
 | `Edit.hq_force_pool_add/remove(hq_id, ...)` | 总部兵库**条目**的增删（现在只能改存量） | `hqs.yml` | 条目 = `{delay, nationality, quantity, spec? \| equipment?}` |
 | `Edit.store_add(front, sub, entry)` | **上架**新商品 | `store.yml` | `sub` = `store` / `elite_store`；条目须过 schema（`spec` XOR `equipment`、正整数库存、非负价格） |
-| `Edit.card_store_set(position, card_type?, is_free?)` | **改卡牌商店货架**：换牌 / 改成免费 | `main.yml` → `card_store` | `card_type` 必须在 `entity_types/cards/` 的 39 种里 |
+| `Edit.card_store_set(position, card_type?, is_free?)` | **改卡牌商店货架**：换牌 / 改成免费 | `main.yml` → `card_store` | `card_type` **必须在白名单里**（§7.5.1），不能只查"39 种里存在" |
 | `Edit.card_store_remove(position)` | **下架**一张卡 | `main.yml` → `card_store` | |
-| `Edit.card_store_add(position, card_type, is_free?)` | **上架**一张卡 | `main.yml` → `card_store` | `position` ≤ `card_store_limit[level]`（恒为 5） |
+| `Edit.card_store_add(position, card_type, is_free?)` | **上架**一张卡 | `main.yml` → `card_store` | `position` ≤ `card_store_limit[level]`（恒为 5）；`card_type` 同样要在白名单里 |
+| `Edit.card_set(position, field, value)` | **改手牌某个字段**（现在只能加卡 / 删卡） | `cards.yml` | 目前只用于 `is_free`；白名单字段：`is_free` |
 
-**另外一处要复活的能力**（不是 Edit，是读能力）：
+**另外两处要复活 / 新增的能力**（不是 Edit，是读能力）：
 
 | 缺的 | 为什么需要 | 落点 | 备注 |
 |---|---|---|---|
 | `TranslationStore`（locale 查询） | 所有中文显示名都在 `localization/chi/strings.yml`，核心库现在**一个都不解析** | 游戏包 | 见 §5.7；**旧 REPL 的 `src/save_modifier/translations.py` 里已经有一份可用实现**（S11 重构时当冗余删了）⇒ 搬进 `save_modifier_core/locale.py`，别重写；找不到文件时 `get()` 返回空串 |
+| `Catalog.card_whitelist(save)` | 算出「本存档本会议商店能自然生成哪几张卡」+ 每张被屏蔽卡的**原因** | 存档 + 游戏包 | 见 §7.5.1；逐条复刻 `Campaign.get_cards_probabilities`（`e160` 已用两个存档验证：真实货架每张都在候选集内）。**每次开卡牌页重算，别缓存** |
+
+**⚠️ 核心库现有的 `card_add` 校验要改**（`handlers.py::_card_add`）：
+
+现在是这样：
+
+```python
+if info.get("has_unit") and unit_id is None:
+    报错 "带单位，必须指定 unit_id"
+if unit_id is not None and unit_id not in w.save.roster_ids():
+    报错 "unit_id 不在战役名册里"
+```
+
+**问题**：`unit_id` 的真实语义不是"名册里任意一个单位"，而是
+**`document/main.yml.card_type_units` 里为这张卡登记的那个预留 id**。
+实测 blitzkrieg 的 `tactical_para_german` → `unit_id = 718`（名册里的 `ger_fsjg_40` 德国伞兵团），
+而 718 **此刻还不在存档的 `units.yml` 里**（还没被召唤过）——
+所以"在名册里"这条只是碰巧成立，语义是错的。
+
+**改成**：
+
+```python
+if info.get("has_unit"):
+    必须能从 document/main.yml.card_type_units[card_type].unit_id 取出 id
+    → 取不到 ⇒ 报错「本战役没有这张卡可召唤的单位」
+    → 传进来的 unit_id 必须与它一致 ⇒ 否则报错
+else:
+    unit_id 必须是 None
+```
+
+理由见 §7.5.1：`unit_id` 给错 ⇒ 召唤出**错误的单位**；
+给 None ⇒ 牌进手牌但没有单位 ⇒ 用卡时崩。
 
 **另外两处要改判定逻辑的**（不是新增，是修正）：
 
@@ -1341,7 +1469,8 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 | `e156_specialist_hq_types.py` | 特种兵数值在游戏包（存档只有引用）+ 总部 26 字段与分支等级结构 |
 | `e157_card_store.py` | **会议阶段存档**的 `main.yml.card_store`（卡牌商店货架，5 条）+ 与手牌同字段 |
 | `e158_cardshop_bytecode.py` | 卡牌商店常量（`card_store_limit` / `card_store_free_cards` / `card_deck_limit`）+ 基础权重 15/6/3 + `BuyCard` 扣声望 + `load` 不重掷 / `set_conference` 才重掷 |
-| `e159_locale_names.py` | 中文名全在 `localization/chi/strings.yml`（16786 条）+ 各类实体只存键 + 核心库**不解析** locale |
+| `e159_locale_names.py` | 中文名全在 `localization/chi/strings.yml`（16786 键）+ 各类实体只存键 + 核心库**不解析** locale |
+| `e160_card_whitelist.py` | **卡牌白名单**：逐条复刻 `Campaign.get_cards_probabilities` 的候选集算法 + 两个存档实测（真实货架每张都在候选集内）+ 每张被屏蔽卡的原因 |
 | `e135_assetmap.py` | 贴图全清单 + 实测尺寸（629 单位类型 / 379 特种兵目录 / 11 step / 44 theater） |
 | `e136_fphelper.py` | `_fp_helper` 反汇编 ⇒ step 图标命名规则与步数来源 |
 | `e137_scan_pyc.py` | 全量 pyc 字符串扫描 ⇒ 定位 `n_steps` / `force_pool` 的定义方 |

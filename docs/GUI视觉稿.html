@@ -207,6 +207,15 @@ h3{font-size:15px;margin:20px 0 6px;color:var(--accent-dark)}
 .card .cs{font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-top:2px}
 .card .used{font-size:10px;color:var(--accent);margin-top:2px}
 
+/* ---------- 卡牌白名单：被屏蔽的卡牌（换牌 / 上架 时不可选） ---------- */
+.card.blocked{opacity:.38;filter:grayscale(.85);cursor:not-allowed}
+.card.blocked:hover{border-color:var(--border);box-shadow:none}
+.card.blocked .ci{background:var(--surface-alt)}
+.card.blocked .cn{color:var(--muted)}
+.card .cs.blk{background:transparent;color:var(--danger);font-family:inherit;
+  font-size:10px;line-height:1.3;margin-top:3px}
+.card .cs.ok{background:transparent;color:var(--ok);font-family:inherit;font-size:10px}
+
 /* 战区资产 */
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px;padding:12px}
 .titem{display:flex;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--border);
@@ -696,13 +705,18 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
           <h3>手牌 · 4 / 上限 4 <span class="ro">cards.yml</span></h3>
           <div class="hand" id="hand"></div>
           <div class="note">手牌 = 你<b>已经拿到</b>的牌（<code>is_free=True</code>）。
-            移除按<b>位置</b>，不是按类型。</div>
+            移除按<b>位置</b>，不是按类型。<br>
+            ⓘ 手牌上的 <code>is_free</code> <b>没有玩法影响</b> —— 只改 tooltip 文案
+            （免费卡 / 已付费）与卡背贴图（<code>face_down_free</code> / <code>face_down</code>）。</div>
         </div>
         <div class="panel">
           <h3>卡牌商店货架 · 5 格 <span class="ro">main.yml · card_store</span></h3>
           <div class="hand" id="shelf"></div>
-          <div class="note">ⓘ 购买<b>扣声望</b>（不是 CP）；<code>is_free=True</code> 的免费送。
-            ⓘ <b>加载时不会重掷</b>，但<b>进入新会议会按权重重掷</b> —— 改了只管这一场。</div>
+          <div class="note">ⓘ 购买<b>扣声望</b>（不是 CP）；<code>is_free=True</code> 的免费送
+            ⇒ 改免费就是<b>白嫖</b>，改收费按卡牌 <code>cost</code> 扣。
+            ⓘ <b>加载时不会重掷</b>，但<b>进入新会议会按权重重掷</b> —— 改了只管这一场。<br>
+            ⓘ <b>换牌 / 上架只能选白名单里的卡</b>（本存档本会议本来就能抽到的那 13 种）——
+            登陆 / 空降卡会召唤单位，本战役没有登记的<b>一律屏蔽</b>。</div>
         </div>
       </div>
       <div class="cols" style="margin-top:14px">
@@ -715,10 +729,38 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
             <span>基础 3 分：伞兵 / 破坏 / 商店 / 精确轰炸 / 航空舰队 / 总部强化 …</span></div>
           <div class="note">贴图文件名 ≠ <code>image</code> 字段 ⇒ 查找顺序
             <code>bgt_</code> → <code>bgmf_</code> → <code>bgm_</code> → <code>logo_</code> → 原名
-            → <b>去掉阵营后缀再试</b> → <b>用类型名兜底</b> → 占位（实测 <b>39/39 全部命中</b>）。</div>
+            → <b>去掉阵营后缀再试</b> → <b>用类型名兜底</b> → 占位（实测 <b>39/39 全部命中</b>）。<br>
+            ⓘ <b>灰色 = 本战役商店不会抽到</b>（换牌 / 上架时不可选），悬停看原因。屏蔽有三种：
+            <b>①</b> 阵营不是玩家阵营（本存档玩家 = <b>axis</b>，所以 26 张盟军 / 苏联牌全灰）；
+            <b>②</b> 本次会议权重被覆盖成 0（如 <code>naval_bombardment</code>）；
+            <b>③</b> 登陆 / 空降卡<b>本战役没有可召唤的单位</b>。</div>
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="app" style="margin-top:14px">
+  <div class="hdr" style="border-bottom:1px solid var(--border)">
+    <div class="brand"><span class="logo">U2</span>换牌 · 卡牌商店货架</div>
+  </div>
+  <div class="modal" style="width:auto;margin:14px;box-shadow:none;border:1px solid var(--border)">
+    <div class="mh">换掉位置 2 的卡 <span class="ro">main.yml · card_store</span></div>
+    <div class="mb">
+      <div style="font-size:13px;margin-bottom:10px">
+        只列<b>本存档本会议商店本来就能抽到</b>的卡 —— 玩家阵营 <b>axis</b>，共 <b>13</b> 种。
+        <span style="color:var(--muted)">（其余 26 种被屏蔽，见图鉴的灰色卡）</span>
+      </div>
+      <div class="grid" id="pickgrid" style="grid-template-columns:repeat(auto-fill,minmax(104px,1fr));padding:0"></div>
+      <div class="note" style="border:1px solid var(--border);border-radius:7px;margin-top:12px">
+        ⓘ 抽卡规则：基础权重 <b>15 / 6 / 3</b> 三档 → 会议文件 <code>card_probabilities</code> 覆盖
+        → 各前线 <code>card_probability_scales</code> 缩放。<br>
+        ⓘ <b>登陆 / 空降卡会召唤单位</b>。本战役 <code>document/main.yml.card_type_units</code>
+        里没登记的 ⇒ <code>unit_id</code> 为空 ⇒ 卡进手牌却没有单位 ⇒ <b>用卡时游戏会崩</b>。<br>
+        ⓘ 所以<b>只允许换成商店本来就能生成的卡</b>，核心库写盘前还会再校验一遍。
+      </div>
+    </div>
+    <div class="mf"><button class="btn">取消</button><button class="btn pri">换牌</button></div>
   </div>
 </div>
 
@@ -1199,6 +1241,38 @@ if(sp2){
   sp2.appendChild(a2);
 }
 
+const CARD_WL = {
+  playerFaction: 'axis',
+  allowed: ["air_attack_axis", "air_fleet_axis", "air_hq_axis", "air_supply_axis", "flying_artillery_axis", "long_range_recon_axis", "naval_bombardment_axis", "power_hq_axis", "precision_bombing_axis", "sabotage_axis", "store_axis", "tactical_para_german", "truck_axis"],
+  blocked: {
+    air_attack_allies: '阵营 allies ≠ 玩家 axis',
+    air_attack_soviet: '阵营 soviet ≠ 玩家 axis',
+    air_supply_allies: '阵营 allies ≠ 玩家 axis',
+    air_supply_soviet: '阵营 soviet ≠ 玩家 axis',
+    arty_prep_soviet: '阵营 soviet ≠ 玩家 axis',
+    divisional_para_allies_1: '阵营 allies ≠ 玩家 axis',
+    divisional_para_allies_101: '阵营 allies ≠ 玩家 axis',
+    divisional_para_allies_82: '阵营 allies ≠ 玩家 axis',
+    espionage_allies: '阵营 allies ≠ 玩家 axis',
+    espionage_soviet: '阵营 soviet ≠ 玩家 axis',
+    long_range_recon_allies: '阵营 allies ≠ 玩家 axis',
+    long_range_recon_soviet: '阵营 soviet ≠ 玩家 axis',
+    naval_bombardment_allies: '阵营 allies ≠ 玩家 axis',
+    sabotage_allies: '阵营 allies ≠ 玩家 axis',
+    sabotage_soviet: '阵营 soviet ≠ 玩家 axis',
+    saturation_strike_allies: '阵营 allies ≠ 玩家 axis',
+    store_allies: '阵营 allies ≠ 玩家 axis',
+    store_soviet: '阵营 soviet ≠ 玩家 axis',
+    tactical_naval_assault_uk: '阵营 allies ≠ 玩家 axis',
+    tactical_naval_assault_us: '阵营 allies ≠ 玩家 axis',
+    tactical_para_polish: '阵营 allies ≠ 玩家 axis',
+    tactical_para_soviet: '阵营 soviet ≠ 玩家 axis',
+    tactical_para_uk: '阵营 allies ≠ 玩家 axis',
+    tactical_para_us: '阵营 allies ≠ 玩家 axis',
+    truck_allies: '阵营 allies ≠ 玩家 axis',
+    truck_soviet: '阵营 soviet ≠ 玩家 axis',
+  }
+};
 /* ---------- 卡牌页 · 手牌（真实存档 cards.yml：4 张，全 is_free=True） ---------- */
 const hd=document.getElementById("hand");
 if(hd){
@@ -1207,7 +1281,8 @@ if(hd){
     const c1=document.createElement("div"); c1.className="hcard";
     c1.innerHTML=`<div class="ci"><img alt=""></div>
       <div class="cp">${pos} · 免费<br>费用 <b>${c}</b></div>
-      <button class="btn rm">移除</button>`;
+      <button class="btn rm">移除</button>
+      <button class="btn rm" style="margin-top:4px">改成收费</button>`;
     cardImg(c1.querySelector("img"), t);
     hd.appendChild(c1);
   });
@@ -1224,7 +1299,7 @@ if(shf){
     c1.innerHTML=`<div class="ci"><img alt=""></div>
       <div class="cp">${pos}<br>${c} <b>声望</b></div>
       <button class="btn rm">换牌</button>
-      <button class="btn rm" style="margin-top:4px">改免费</button>`;
+      <button class="btn rm" style="margin-top:4px">改成免费</button>`;
     if(!afford) c1.querySelector(".ci").style.opacity=".45";
     cardImg(c1.querySelector("img"), t);
     shf.appendChild(c1);
@@ -1234,10 +1309,32 @@ const cg=document.getElementById("cardgrid");
 if(cg){
   CARDS.forEach(([t,n,c,a])=>{
     const el=document.createElement("div"); el.className="card";
+    const why = CARD_WL.blocked[t];
+    if(why){
+      el.classList.add("blocked");
+      el.title = "本战役商店不会抽到：" + why;
+    }
     el.innerHTML=`<div class="ci"><img alt=""></div><div class="cn">${n}</div>
       <div class="cs">费用 ${c} · ${a}</div>`;
+    if(why) el.insertAdjacentHTML("beforeend",
+      `<div class="cs blk">✕ ${why}</div>`);
     cardImg(el.querySelector("img"), t);
     cg.appendChild(el);
+  });
+}
+
+/* ---------- 换牌对话框：只列白名单里的卡 ---------- */
+const pg=document.getElementById("pickgrid");
+if(pg){
+  const CN={}; CARDS.forEach(([t,n])=>{CN[t]=n;});
+  CARD_WL.allowed.forEach(t=>{
+    const row = CARDS.find(x=>x[0]===t); if(!row) return;
+    const el=document.createElement("div"); el.className="card";
+    el.innerHTML=`<div class="ci"><img alt=""></div><div class="cn">${row[1]}</div>
+      <div class="cs">费用 ${row[2]} · ${row[3]}</div>
+      <div class="cs ok">✓ 本战役可上架</div>`;
+    cardImg(el.querySelector("img"), t);
+    pg.appendChild(el);
   });
 }
 
