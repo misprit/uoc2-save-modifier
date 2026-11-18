@@ -397,7 +397,7 @@ cat.step_icon("us_arm_42")   # "step_armor_2"
 ### 5.7 中文名从哪来（不是存档，也不是类型定义）
 
 **【实证 · 2026-11-18 · `e159`】** 所有**中文显示名**都在游戏包的
-`_packages/base/localization/chi/strings.yml` —— **扁平 id → 文本，16786 条，2 MB**。
+`_packages/base/localization/chi/strings.yml` —— **扁平 id → 文本**。
 实体类型与存档里存的都只是**键**：
 
 | 对象 | 键在哪 | 字段 | 例 |
@@ -411,21 +411,39 @@ cat.step_icon("us_arm_42")   # "step_armor_2"
 * 总部类型定义 `entity_types/hq_types/*.yml` 里**没有** name 字段 ——
   名字键在**存档**里（每个总部自带 `name_brief` / `name_full`）。
 * 语言目录：`localization/{chi,eng,ger,rus}/`；
-  **中文只有一个大 `strings.yml`**，英文是按主题拆成 40 个 yml。
+  **中文只有一个大 `strings.yml`**（2 MB），英文是按主题拆成 40 个 yml。
+* 文件里 **16786 个键 = 16764 条普通文本 + 22 条参数化模板**：
+  `idp_*` 是 **dict**（`{"default": "每回合{}次空袭", "1": "每回合{}次空袭"}`），
+  按数量取变体、缺省取 `default` ⇒ GUI 显示"每回合 3 次空袭"要用它。
 
-**⚠️ 核心库现在完全没有 locale 能力** ——
+**⚠️ 核心库现在没有 locale 能力** ——
 `Catalog.unit_type_names()` / `hq_type_names()` / `spec_type_names()`
 返回的都是**英文类型标识符**（`aus_inf_41` / `aus_hq` / `bel_arty_towed_40`），
 **不是中文显示名**。
 
-⇒ **GUI 要显示中文，就得有人读这个 yml。**
-【决策】把它做成核心库能力（§8.1），GUI 不自己解析 2 MB 的字符串表：
-GUI 要么调 `Catalog.locale_text(key)`，要么让核心库直接给
-`Catalog.unit_type_cn(type_name)` 这样的成品。
+**✅ 但这个能力曾经存在过 —— 别重写，去复活它。**
+旧 REPL 的 `src/save_modifier/translations.py::TranslationStore`
+在 S11 重构（`0444628`）时当"冗余"删掉了，它本来就能做这件事：
 
-* 找不到 locale 文件时（游戏目录缺失）⇒ 退回显示**类型标识符**，
-  并在页面顶部挂一条提示"未找到游戏目录，中文名不可用"。
-  **功能不缺**，只是名字难看。
+```python
+class TranslationStore:
+    def __init__(self, packages_path: Path, locale: str = "chi"): ...
+    def get(self, key: str, default: str = "") -> str: ...
+    def __contains__(self, key: str) -> bool: ...
+```
+
+* 读 `<packages>/<pkg>/localization/<locale>/strings.yml`（外加 `ui.yml`）；
+* **多包合并**：按包名**自然序**加载（`dlc2` 先于 `dlc10`），**后加载的覆盖先加载的**；
+* 实测（`e159`）：对真实包跑出来的 **16764 条与直读 base 包零差异**，
+  键集合完全相同 ⇒ 机制正确，可以直接搬。
+
+⇒ **【决策】** 把 `TranslationStore` 搬进 `save_modifier_core`
+（建议 `src/save_modifier_core/locale.py`），GUI 不自己解析 2 MB 的字符串表，
+也不在 GUI 里各写一套解析。
+
+* 找不到 locale 文件时（游戏目录缺失）⇒ `get()` 返回空串，
+  GUI 退回显示**类型标识符**，并在页面顶部挂一条提示
+  "未找到游戏目录，中文名不可用"。**功能不缺**，只是名字难看。
 
 ---
 
@@ -1005,11 +1023,11 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 | `Edit.card_store_remove(position)` | **下架**一张卡 | `main.yml` → `card_store` | |
 | `Edit.card_store_add(position, card_type, is_free?)` | **上架**一张卡 | `main.yml` → `card_store` | `position` ≤ `card_store_limit[level]`（恒为 5） |
 
-**另外一处要新增的读能力**（不是 Edit，是 Catalog）：
+**另外一处要复活的能力**（不是 Edit，是读能力）：
 
 | 缺的 | 为什么需要 | 落点 | 备注 |
 |---|---|---|---|
-| `Catalog.locale_text(key)` | 所有中文显示名都在 `localization/chi/strings.yml`（16786 条），核心库现在**一个都不解析** | 游戏包 | 见 §5.7；找不到文件时返回 `None`，GUI 退回显示类型标识符 |
+| `TranslationStore`（locale 查询） | 所有中文显示名都在 `localization/chi/strings.yml`，核心库现在**一个都不解析** | 游戏包 | 见 §5.7；**旧 REPL 的 `src/save_modifier/translations.py` 里已经有一份可用实现**（S11 重构时当冗余删了）⇒ 搬进 `save_modifier_core/locale.py`，别重写；找不到文件时 `get()` 返回空串 |
 
 **另外两处要改判定逻辑的**（不是新增，是修正）：
 
