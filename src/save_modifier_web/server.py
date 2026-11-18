@@ -229,6 +229,21 @@ def api_view(save_id: str) -> dict:
             for e in ("infantry", "armor")
         }
 
+        # 战线中文名（§5.7）—— 商店页的 tab 原来直接显示 id（caucasus / south）
+        try:
+            from save_modifier_core.campaigns import (CampaignData,
+                                                     default_campaign_index)
+            _cd = CampaignData(CorePaths.discover(), default_campaign_index())
+            _cid = save.info.campaign_id
+            _fs: dict[str, str] = {}
+            for _e in (data.get("store") or []):
+                _f = str(_e.get("front") or "")
+                if _f and _f not in _fs:
+                    _fs[_f] = _cd.front_name(_f, _cid) or _f
+            data["front_names"] = _fs
+        except Exception:
+            data["front_names"] = {}
+
         # 手牌 / 货架的**格数上限跟难度走**（e158 字节码实证）：
         #   手牌 card_deck_limit  = easy 5 / normal 5 / classic 4 / hard 3
         #   货架 card_store_limit = 四个难度恒为 5
@@ -307,10 +322,15 @@ def _catalog_payload() -> dict:
         }
 
     spec_types: dict = {}
+    #: 特种兵「特性」的中文名（locale 键 `id_sheet_spec_flag_<flag>`）——
+    #: 查不到就**退回英文 flag**（**绝不自己翻译**，§5.7）。
+    spec_flags: dict[str, str] = {}
     for name in catalog.spec_type_names():
         s = catalog.spec_type(name)
         if s is None:
             continue
+        for _f in (s.flags or []):
+            spec_flags.setdefault(_f, cn("id_sheet_spec_flag_" + _f, _f))
         spec_types[name] = {
             "cn": cn(s.name_brief, name),
             "full": cn(s.name_full, ""),
@@ -354,6 +374,7 @@ def _catalog_payload() -> dict:
         "spec_types": spec_types,
         "card_types": card_types,
         "nationalities": nationalities,
+        "spec_flags": spec_flags,
     }
     return _CATALOG_CACHE
 
@@ -696,6 +717,16 @@ def api_campaign_detail(save_id: str) -> dict:
             if sl is not None:
                 store = _jsonable(sl)
 
+        # 战线中文名（§5.7）—— 「已激活战线」原来直接显示 id
+        front_names: dict[str, str] = {}
+        try:
+            for _f in data.fronts(cid):
+                front_names[_f] = data.front_name(_f, cid) or _f
+        except Exception:
+            front_names = {}
+        active_fronts = [str(f) for f in (getattr(pos, "fronts", None) or [])]
+        active_front_names = [front_names.get(f, f) for f in active_fronts]
+
         return {
             "campaign_id": cid,
             "route_name": chosen_route,
@@ -703,6 +734,8 @@ def api_campaign_detail(save_id: str) -> dict:
             "roster": roster,
             "store": store,
             "position": _jsonable(pos),
+            "front_names": front_names,
+            "active_front_names": active_front_names,
         }
 
 

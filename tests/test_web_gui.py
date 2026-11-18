@@ -1419,3 +1419,47 @@ class TestSpecialistIconScale(unittest.TestCase):
             rule = self._rule(css, "table.spec-tbl .thumb img")
             self.assertIn("max-width:100%", rule, tag)
             self.assertIn("img.spico", css, tag)
+
+
+# =====================================================================
+# U47：对话框形态 / 中文名 / 空态 / 目录加载态
+# =====================================================================
+
+
+class TestUiDialogsAndNames(unittest.TestCase):
+    """U47 的界面规则 —— 用「读前端源码」的方式锁死。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+        cls.srv = io.open(os.path.join(root, "src", "save_modifier_web",
+                                       "server.py"), encoding="utf-8").read()
+
+    def test_three_pickers_have_a_search_box(self):
+        """三个操作模态框（兵库加条目 / 商店上架 / 卡牌换牌）都要有搜索框。"""
+        self.assertEqual(self.html.count('id="spick_q"'), 3)
+        self.assertIn("function bindSpickSearch(", self.html)
+        self.assertIn("function spickMatch(", self.html)
+
+    def test_picker_search_filters_by_chinese_flag(self):
+        """搜索要能按**中文特性**匹配（`recon` → 侦察）。"""
+        self.assertIn("(it.flags||[]).map(flagCn).join", self.html)
+
+    def test_specialist_flags_use_chinese_names(self):
+        """特种兵特性标签走 locale（`id_sheet_spec_flag_<flag>`）。"""
+        self.assertIn("function flagCn(", self.html)
+        self.assertIn("id_sheet_spec_flag_", self.srv)
+        self.assertIn('"spec_flags": spec_flags', self.srv)
+
+    def test_front_names_are_chinese(self):
+        """战线要显示中文名，不是 id。"""
+        self.assertIn('data["front_names"]', self.srv)
+        self.assertIn('"front_names": front_names', self.srv)
+        self.assertIn("front_names", self.html)
+
+    def test_catalog_loading_state(self):
+        """目录到位前不渲染半成品（否则先闪一遍 type id + 空图标）。"""
+        self.assertIn("const NEEDS_CATALOG", self.html)
+        self.assertIn("正在加载游戏目录", self.html)
