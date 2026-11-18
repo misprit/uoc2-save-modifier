@@ -1,9 +1,11 @@
 """e155 —— 卡牌：有多少种？数值在哪？贴图怎么对应文件？
 
 三条结论：
-  A) **没有"卡牌商店"** —— 卡牌是会议结束按 `card_probabilities` 抽的，
-     概率表在 L2 `document/conferences/c_*.yml`（air_fleet / naval_bombardment /
-     power_hq / store 四类）。
+  A) ~~**没有"卡牌商店"**~~ —— **这条后来被推翻了（见 e157 / e158）**。
+     卡牌商店确实存在，= 存档 `main.yml.card_store`，与手牌同字段。
+     本脚本当时取样的存档不在会议阶段，`card_store` 是 `None`，
+     误当成"功能不存在"。**别用"字段为空"推断"功能不存在"。**
+     会议阶段的实测见 `e157_card_store.py`。
   B) 卡牌**数值**在 `entity_types/cards/*.yml`（39 个类型）：
      cost / description / faction / has_unit / image / layout / meta_type /
      persistent / recoup / reward / subtitle / theater_asset / title。

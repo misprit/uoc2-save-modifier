@@ -779,54 +779,87 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 
 ### 7.5 卡牌页
 
-> **【实证 · 2026-11-18 · `e155`】** 修正一个误解：**游戏里没有"卡牌商店"**。
->
-> * 卡牌是**会议结束时按概率抽**的 —— 概率表在 **L2** `document/conferences/c_*.yml`
->   的 `card_probabilities` 里，类别只有四种：
->   `air_fleet` / `naval_bombardment` / `power_hq` / `store`；
-> * 存档 `cards.yml` 极简：**`{card_type, is_free, position, unit_id, used}`**（实测 3 张）；
-> * 卡牌**数值**在游戏包 `entity_types/cards/*.yml`（39 个类型）：
->   `cost / description / faction / has_unit / image / layout / meta_type /
->   persistent / recoup / reward / subtitle / theater_asset / title`；
-> * **贴图文件名 ≠ `image` 字段** —— 实测 `image: cards/air_attack_allies`
->   对应的实际文件是 `cards/bgt_air_attack_allies.png`；
->   `image: cards/sabotage_allies` 对应的是 `cards/bgm_sabotage.png`（**还去了阵营后缀**）；
->   `image: cards/generic_para` 没有对应文件，伞兵卡实际用 `cards/logo_divisional_para_allies_1.png`。
->   ⇒ 查找顺序（`e155` 实测 39 种全跑通）：
->   **①** `bgt_` / `bgmf_` / `bgm_` / `logo_` + 原名 → **②** 原名
->   → **③** 去掉 `_allies` / `_axis` / `_soviet` 后缀再试 ① ②
->   → **④** `logo_<类型名>.png` / `bgt_<类型名>.png` → **⑤** 占位。
+> **【实证 · 2026-11-18 · `e157` / `e158`】修正前一版**：卡牌商店**确实存在**。
+> 上一版"游戏里没有卡牌商店"是**取样错误** —— 当时那份存档不在会议阶段，
+> `main.yml.card_store` 自然是 `None`。用**会议阶段已激活卡牌商店**的存档复核后，机制如下。
+
+**两个容器，一套字段**
+
+| 容器 | 位置 | 含义 | `is_free` |
+|---|---|---|---|
+| **卡牌商店货架** | `main.yml` → `card_store` | **在售**的牌（会议阶段才有） | `False` = 要花**声望**买；`True` = 免费 |
+| **手牌** | `cards.yml` | 你**已经拿到**的牌 | 均为 `True` |
+
+条目字段（两者完全一致）：`{card_type, is_free, position, unit_id, used}`。
+
+**货架是怎么来的（字节码实证）**
+
+```
+进入会议 set_conference()
+  └─ create_random_card_data(card_store_limit[level], all_free=False)
+       ├─ 权重 = 全局 card_meta_types_base_probabilities（15 / 6 / 3 三档）
+       │         → common_conferences 的会议文件覆盖
+       │         → 各前线 card_probability_scales 再缩放
+       ├─ 按权重抽 card_store_limit[level] 张
+       └─ 前 card_store_free_cards[level] 张标成 is_free=True（免费送）
+```
+
+| 常量（`constants.pyc`，按难度 easy/normal/classic/hard） | 值 |
+|---|---|
+| `card_store_limit`（货架格数） | 5 / 5 / 5 / 5 |
+| `card_store_free_cards`（免费几张） | 2 / 1 / 0 / 0 |
+| `card_deck_limit`（手牌上限） | 5 / 5 / 4 / 3 |
+
+**购买做了什么（`conference_actions.pyc::BuyCard`）**
+
+1. 前置：商店存在 → 该 `position` 有货 → 手牌未满 → 目标手牌位未被占；
+2. 价格：`0`（`is_free`）否则 `card_types.get_type(card_type).cost`
+   —— **扣的是声望 `prestige`**，不是 CP；
+3. 结果：`card_store.pop(position)` + 牌进手牌；
+4. 撤销：`conference_start_state` 快照（`store_cards` / `restore`）—— 会议内操作可回滚。
+
+**能不能改？—— 能。** `Campaign.load` 直接从存档读 `card_store`，**加载时不重掷**；
+重掷只发生在 `set_conference`（进入**新**会议时）。
+⇒ **货架可以改**：换牌 / 改成免费 / 下架 / 上架（`position` ≤ 货架格数）。
+⇒ **但下次进入新会议会被重掷覆盖** —— 界面必须写明这一点。
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ 卡牌                                                                         │
+│ 卡牌                                        会议 c_40_06 · 难度 classic      │
 ├───────────────────────────────┬──────────────────────────────────────────────┤
-│ 手牌（3 张 · cards.yml）      │ 卡牌图鉴（39 种 · 只读）                     │
-│ ┌─────┐┌─────┐┌─────┐        │ ┌─────┐┌─────┐┌─────┐┌─────┐                │
-│ │卡图 ││卡图 ││卡图 │        │ │卡图 ││卡图 ││卡图 ││卡图 │                │
-│ └─────┘└─────┘└─────┘        │ └─────┘└─────┘└─────┘└─────┘                │
-│ 位置1 位置2 位置3             │ 精确轰炸 航空舰队 空中支援 强化总部            │
-│  120   240   180              │ 费用40  费用60  费用20  费用50                 │
-│ [移除][移除][移除]            │ 剧院资产 空军舰队 空运     HQ                  │
-│ [＋加一张]                    │                                              │
-│ [恢复上次会议的牌局]           │ 抽卡来源（只读 · L2）                         │
-│                               │  本次会议 c_42_07：空中舰队 6.0 / 总部强化 6.0 │
-│                               │  ⓘ 游戏没有卡牌商店，卡牌按概率抽             │
+│ 手牌（4 / 上限 4）             │ 卡牌商店货架（5 格 · 会议阶段才有）        │
+│ ┌─────┐┌─────┐┌─────┐┌─────┐ │ ┌─────┐┌─────┐┌─────┐┌─────┐┌─────┐        │
+│ │卡图 ││卡图 ││卡图 ││卡图 │ │ │卡图 ││卡图 ││卡图 ││卡图 ││卡图 │        │
+│ └─────┘└─────┘└─────┘└─────┘ │ └─────┘└─────┘└─────┘└─────┘└─────┘        │
+│ 位置1 位置2 位置3 位置4       │ 位置1 位置2 位置3 位置4 位置5               │
+│ 费用75 费用30 费用45 费用20    │ 10    10    30    40    75   ← 声望         │
+│ [移除][移除][移除][移除]       │ [换][免][下架] …                           │
+│                               │ ⓘ 进入新会议时货架会按权重重掷             │
+├───────────────────────────────┼──────────────────────────────────────────────┤
+│                               │ 卡牌图鉴（39 种 · 只读）                   │
+│                               │ ┌─────┐┌─────┐┌─────┐┌─────┐              │
+│                               │ │卡图 ││卡图 ││卡图 ││卡图 │              │
+│                               │ └─────┘└─────┘└─────┘└─────┘              │
+│                               │ 精确轰炸 飞行炮兵 航空舰队 空中总部         │
+│                               │ 费用75  费用40  费用60  费用50             │
 └───────────────────────────────┴──────────────────────────────────────────────┘
 ```
 
-* **左半 · 手牌**：来自 `cards.yml`（`position` / `card_type` / `is_free` / `used` / `unit_id`）；
-  贴图按上面的前缀顺序找，找不到用占位卡（游戏自己也有 `face_down.png`）；
-* 手牌只在会议界面存在（`has_card_store`），否则这半边显示说明卡；
-* 「恢复上次会议的牌局」（`Edit.hand_restore()`）是**唯一**能改手牌的手段
-  —— 它读 L2 检查点写回 L1，**不是**新增卡牌；
-* 移除手牌 = `Edit.card_remove(position)`（按位置，不是按类型）；
-* 「＋加一张」= `Edit.card_add(card_type, position=…)`，从右边图鉴里选；
-  `unit_id` 用来绑定到某个单位（`has_unit: true` 的卡牌才有意义）；
-* **右半 · 卡牌图鉴**：39 种，**只读**（数值在游戏包）。
-  这半边是"看不懂卡牌时查手册"的入口，不是编辑器；
-* **右半 · 抽卡来源**：只读，显示 L2 的概率表，并明确写一句
-  「游戏没有卡牌商店，卡牌是按概率抽的」—— 免得玩家到处找入口。
+* **手牌区**：`cards.yml` 的 `position` / `card_type` / `is_free` / `used`；
+  移除手牌 = `Edit.card_remove(position)`（按位置，不是按类型）；
+  「恢复上次会议的牌局」（`Edit.hand_restore()`）读 L2 检查点写回 L1；
+* **货架区**（**只在会议阶段存在**）：
+  不在会议里时这一半显示说明卡「卡牌商店只在会议阶段开放」；
+  * **换牌** = 改 `card_type`（从图鉴选）；
+  * **改成免费** = 改 `is_free`（游戏里免费卡数由难度决定，手动改的要标注"手动改的"）；
+  * **下架** = 删条目；**上架** = 新增条目（`position` 不能超过 `card_store_limit[level]`）；
+  * 每张牌下面显示**价格（声望）**，声望不够的置灰并提示"当前声望 315"；
+* **图鉴区**：39 种，**只读**（数值在游戏包），是"看不懂卡牌时查手册"的入口；
+  贴图查找顺序（`e155` 实测 39/39 全中）：
+  `bgt_` / `bgmf_` / `bgm_` / `logo_` + 原名 → 原名
+  → 去掉 `_allies` / `_axis` / `_soviet` 后缀再试 → `logo_<类型名>.png` → 占位；
+* **抽卡来源**（只读）：基础权重表（15/6/3）+ 公共会议覆盖 + 前线缩放三层，
+  以及本次实际抽到的 5 张 —— 让玩家知道"下一场会议大概会出什么"。
 
 ### 7.6 商店页
 
@@ -935,6 +968,9 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
 | `Edit.hq_branch_level(hq_id, branch, level, suppressed?)` | 总部"升级"= 五个分支的等级 | `hqs.yml` | 分支枚举：`engineering` / `force_pool` / `intel` / `logistics` / `operations`；**降级要二次确认** |
 | `Edit.hq_force_pool_add/remove(hq_id, ...)` | 总部兵库**条目**的增删（现在只能改存量） | `hqs.yml` | 条目 = `{delay, nationality, quantity, spec? \| equipment?}` |
 | `Edit.store_add(front, sub, entry)` | **上架**新商品 | `store.yml` | `sub` = `store` / `elite_store`；条目须过 schema（`spec` XOR `equipment`、正整数库存、非负价格） |
+| `Edit.card_store_set(position, card_type?, is_free?)` | **改卡牌商店货架**：换牌 / 改成免费 | `main.yml` → `card_store` | `card_type` 必须在 `entity_types/cards/` 的 39 种里 |
+| `Edit.card_store_remove(position)` | **下架**一张卡 | `main.yml` → `card_store` | |
+| `Edit.card_store_add(position, card_type, is_free?)` | **上架**一张卡 | `main.yml` → `card_store` | `position` ≤ `card_store_limit[level]`（恒为 5） |
 
 **另外两处要改判定逻辑的**（不是新增，是修正）：
 
@@ -943,6 +979,9 @@ Tk 的 Treeview 本身够快（它就是虚拟的），但**自定义行控件**
    ⇒ `index` 必须**带子商店**（`store` 还是 `elite_store`），否则改的是错的列表。
 2. `store_remove` 现在只删 `store[front]['store']` 的条目 ——
    要能删 `elite_store` 里的。
+
+**卡牌商店的"会议阶段"限制**：`main.yml.card_store` 只在 `in_state.conference` 有值时存在。
+不在会议阶段时，卡牌页的货架区显示说明卡，**相关 Edit 一律报错**（不要静默改一个游戏不读的地方）。
 
 ### 8.2 8 个函数的用法
 
@@ -1196,8 +1235,10 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 1. **特种兵页不是"没意义"，是定位错了** ——
    数值确实在游戏包里（改不了），但「谁挂了谁」在存档里（能改）⇒ 改成
    **「图鉴（只读）+ 挂载（可改）」**（§7.3）。
-2. **游戏里没有"卡牌商店"** —— 卡牌是会议结束按 `card_probabilities` 抽的 ⇒
-   卡牌页右半改成**图鉴 + 抽卡来源说明**（§7.5）。
+2. **卡牌商店确实存在**（**本条曾一度写错，见 §12.10**）——
+   第一次取样用的存档不在会议阶段，`main.yml.card_store` 是 `None`，
+   一度误判成"游戏里没有卡牌商店"。用会议阶段存档复核后确认：
+   **卡牌商店 = `main.yml.card_store`**，按权重抽取生成，花**声望**购买（§7.5）。
 3. **商店的价格/数量都在存档里，游戏不会用包默认盖回来** ——
    字节码 `set_store_data` 用存档覆盖会议默认 ⇒
    **可以自由改价、可以上架**（§7.6）；但商品**种类**必须是游戏定义过的。
@@ -1207,6 +1248,29 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 真实结构是 `{战线: {store: [...], elite_store: [...]}}` ——
 **两档商店**，不是一张列表。核心库现有 `store_set` / `store_remove`
 的 `index` 语义要跟着改（见 §8.1）。
+
+### 12.10 卡牌商店：一次被纠正的错误结论（2026-11-18 · 用户纠正）
+
+> 用户原话：「你对卡牌商店的理解是错误的，因为我从不在卡牌商店激活时存档，
+> 给了你这个错觉。」
+
+**错在哪**：我第一次取样用的存档（`campaigns/Stalingrad.usg`）**不在会议阶段**，
+`main.yml.card_store` = `None` ⇒ 我据此写下"游戏里没有卡牌商店"。
+**教训**：**用"字段为空"推断"功能不存在"是错的** —— 要先确认取样条件
+（这里是"在不在会议阶段"），再下结论。
+
+**改对后的机制**（用会议阶段存档 + 字节码复核，见 §7.5）：
+
+| 事实 | 依据 |
+|---|---|
+| 卡牌商店 = `main.yml.card_store`，与手牌 `cards.yml` **同一套字段** | 实测两份存档 |
+| 货架按**权重**抽取生成，权重三层叠加 | `campaign_doc.get_cards_probabilities` |
+| 购买**扣声望**（不是 CP），`is_free=True` 的免费 | `conference_actions.pyc::BuyCard` |
+| 货架格数 / 免费张数 / 手牌上限**按难度** | `constants.pyc` |
+| **加载时不重掷**（可改），**进入新会议才重掷**（会被覆盖） | `campaign.pyc::load` vs `set_conference` |
+
+⇒ 卡牌页从「图鉴 + 抽卡来源」改成 **「手牌 + 卡牌商店货架 + 图鉴」** 三块，
+货架可换牌 / 改免费 / 下架 / 上架。
 
 ---
 
@@ -1218,6 +1282,8 @@ tot_st = act_st + sup_st      （当前血量 = 未被压制 + 被压制）
 | `e154_store_listing.py` | 商店结构 + 存档 vs 包默认逐条对比 + 字节码「存档覆盖包默认」 |
 | `e155_card_types.py` | 卡牌 39 种定义 + **贴图文件名 ≠ `image` 字段**（前缀查找规则） |
 | `e156_specialist_hq_types.py` | 特种兵数值在游戏包（存档只有引用）+ 总部 26 字段与分支等级结构 |
+| `e157_card_store.py` | **会议阶段存档**的 `main.yml.card_store`（卡牌商店货架，5 条）+ 与手牌同字段 |
+| `e158_cardshop_bytecode.py` | 卡牌商店常量（`card_store_limit` / `card_store_free_cards` / `card_deck_limit`）+ 基础权重 15/6/3 + `BuyCard` 扣声望 + `load` 不重掷 / `set_conference` 才重掷 |
 | `e135_assetmap.py` | 贴图全清单 + 实测尺寸（629 单位类型 / 379 特种兵目录 / 11 step / 44 theater） |
 | `e136_fphelper.py` | `_fp_helper` 反汇编 ⇒ step 图标命名规则与步数来源 |
 | `e137_scan_pyc.py` | 全量 pyc 字符串扫描 ⇒ 定位 `n_steps` / `force_pool` 的定义方 |

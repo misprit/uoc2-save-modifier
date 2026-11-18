@@ -667,9 +667,10 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>5 · 卡牌页（手牌 + 图鉴 + 抽卡来源）</h2>
-<p class="lead"><b>游戏里没有"卡牌商店"</b> —— 卡牌是会议结束按 <code>card_probabilities</code> 抽的。
-存档 <code>cards.yml</code> 只有 <code>{card_type, is_free, position, unit_id, used}</code>。</p>
+<h2>5 · 卡牌页（手牌 + 卡牌商店 + 图鉴）</h2>
+<p class="lead"><b>卡牌商店 = <code>main.yml.card_store</code></b>，和手牌 <code>cards.yml</code> <b>同一套字段</b>
+<code>{card_type, is_free, position, unit_id, used}</code>。只在<b>会议阶段</b>存在。
+货架按<b>权重</b>抽出来（基础 15/6/3 三档 → 公共会议覆盖 → 前线缩放），购买<b>扣声望</b>。</p>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -678,31 +679,41 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
       <div class="nav"><span class="ic">▥</span>单位</div>
       <div class="nav"><span class="ic">▦</span>特种兵</div>
       <div class="nav"><span class="ic">▧</span>总部</div>
-      <div class="nav on"><span class="ic">▨</span>卡牌<span class="ct">3</span></div>
+      <div class="nav on"><span class="ic">▨</span>卡牌<span class="ct">4</span></div>
       <div class="nav"><span class="ic">▩</span>商店</div>
     </div>
     <div class="work">
       <div class="toolbar">
-        <span style="font-size:12.5px;color:var(--muted)">手牌 = 存档 <code>cards.yml</code>（当前 3 张）</span>
+        <span style="font-size:12.5px;color:var(--muted)">会议 <b style="font-family:var(--mono);color:var(--accent-dark)">c_40_06</b>
+          · 难度 <b style="font-family:var(--mono);color:var(--accent-dark)">classic</b>
+          · 声望 <b style="font-family:var(--mono);color:var(--accent-dark)">315</b></span>
         <span class="sp"></span>
-        <button class="btn">＋ 加一张</button>
+        <button class="btn">＋ 加一张到手牌</button>
         <button class="btn">恢复上次会议的牌局</button>
       </div>
       <div class="cols">
         <div class="panel">
-          <h3>手牌 · 3 张</h3>
+          <h3>手牌 · 4 / 上限 4 <span class="ro">cards.yml</span></h3>
           <div class="hand" id="hand"></div>
-          <div class="note">手牌只在<b>会议界面</b>存在（<code>has_card_store</code>）。
-            不在会议里时这一半显示说明卡。</div>
+          <div class="note">手牌 = 你<b>已经拿到</b>的牌（<code>is_free=True</code>）。
+            移除按<b>位置</b>，不是按类型。</div>
         </div>
         <div class="panel">
+          <h3>卡牌商店货架 · 5 格 <span class="ro">main.yml · card_store</span></h3>
+          <div class="hand" id="shelf"></div>
+          <div class="note">ⓘ 购买<b>扣声望</b>（不是 CP）；<code>is_free=True</code> 的免费送。
+            ⓘ <b>加载时不会重掷</b>，但<b>进入新会议会按权重重掷</b> —— 改了只管这一场。</div>
+        </div>
+      </div>
+      <div class="cols" style="margin-top:14px">
+        <div class="panel" style="grid-column:1 / -1">
           <h3>卡牌图鉴 · 39 种 <span class="ro">只读</span></h3>
           <div class="grid" id="cardgrid" style="grid-template-columns:repeat(auto-fill,minmax(96px,1fr))"></div>
-          <div class="costs"><span>抽卡来源（L2 · 只读）：</span>
-            <span>空中舰队 <b>6.0</b></span><span>舰炮轰击 <b>0.0</b></span>
-            <span>总部强化 <b>6.0</b></span><span>商店 <b>0.0</b></span></div>
-          <div class="note">ⓘ <b>游戏里没有卡牌商店</b>，卡牌是按概率抽的。
-            贴图文件名 ≠ <code>image</code> 字段 ⇒ 查找顺序
+          <div class="costs"><span>抽卡权重（只读）：</span>
+            <span>基础 15 分：空袭 / 远程侦察 / 卡车</span>
+            <span>基础 6 分：空中补给 / 舰炮轰击 / 饱和攻击 / 间谍 / 飞行炮兵</span>
+            <span>基础 3 分：伞兵 / 破坏 / 商店 / 精确轰炸 / 航空舰队 / 总部强化 …</span></div>
+          <div class="note">贴图文件名 ≠ <code>image</code> 字段 ⇒ 查找顺序
             <code>bgt_</code> → <code>bgmf_</code> → <code>bgm_</code> → <code>logo_</code> → 原名
             → <b>去掉阵营后缀再试</b> → <b>用类型名兜底</b> → 占位（实测 <b>39/39 全部命中</b>）。</div>
         </div>
@@ -1153,17 +1164,35 @@ if(sp2){
   sp2.appendChild(a2);
 }
 
-/* ---------- 卡牌页 ---------- */
+/* ---------- 卡牌页 · 手牌（真实存档 cards.yml：4 张，全 is_free=True） ---------- */
 const hd=document.getElementById("hand");
 if(hd){
-  [["precision_bombing_axis",75,"位置1",true],["flying_artillery_axis",40,"位置2",false],
-   ["sabotage_axis",30,"位置3",false]].forEach(([t,c,pos,free])=>{
+  [["precision_bombing_axis",75,"位置1"],["air_supply_axis",30,"位置2"],
+   ["naval_bombardment_axis",45,"位置3"],["store_axis",20,"位置4"]].forEach(([t,c,pos])=>{
     const c1=document.createElement("div"); c1.className="hcard";
     c1.innerHTML=`<div class="ci"><img alt=""></div>
-      <div class="cp">${pos}${free?' · 免费':''}<br>费用 <b>${c}</b></div>
+      <div class="cp">${pos} · 免费<br>费用 <b>${c}</b></div>
       <button class="btn rm">移除</button>`;
     cardImg(c1.querySelector("img"), t);
     hd.appendChild(c1);
+  });
+}
+
+/* ---------- 卡牌页 · 卡牌商店货架（真实存档 main.yml.card_store：5 格，全 is_free=False） ---------- */
+const shf=document.getElementById("shelf");
+if(shf){
+  [["long_range_recon_axis",10,"位置1"],["long_range_recon_axis",10,"位置2"],
+   ["air_supply_axis",30,"位置3"],["flying_artillery_axis",40,"位置4"],
+   ["tactical_para_german",75,"位置5"]].forEach(([t,c,pos])=>{
+    const c1=document.createElement("div"); c1.className="hcard";
+    const afford = c <= 315;
+    c1.innerHTML=`<div class="ci"><img alt=""></div>
+      <div class="cp">${pos}<br>${c} <b>声望</b></div>
+      <button class="btn rm">换牌</button>
+      <button class="btn rm" style="margin-top:4px">改免费</button>`;
+    if(!afford) c1.querySelector(".ci").style.opacity=".45";
+    cardImg(c1.querySelector("img"), t);
+    shf.appendChild(c1);
   });
 }
 const cg=document.getElementById("cardgrid");
