@@ -4,10 +4,12 @@
 ------
 ```
 <包>/data/entity_types/unit_types/<类型名>.yml     627 个  → max_st / max_spec / equipment / equipment_q
-<包>/data/entity_types/specialists/<类型名>.yml     375 个
+<包>/data/entity_types/specialists/<类型名>.yml     375 个  → 攻防装甲火力 / 国籍 / 阵营 / flags
 <包>/data/entity_types/cards/<类型名>.yml            39 个
 <包>/data/entity_types/hq_types/<类型名>.yml        213 个
 <包>/data/entity_types/generals/<类型名>.yml        304 个
+<包>/data/entity_types/nationalities.yml             40 个  → faction / parent_nationality
+<包>/data/entity_types/nationalities_2.yml           （mod 用的空模板，base 里是 {}）
 <包>/data/campaigns/<战役>.usc/fronts/<战线>/         战线清单（**每个战役包各有一份**）
 ```
 
@@ -40,7 +42,8 @@ from typing import Any, Mapping
 from . import yamlio
 from .paths import CorePaths
 
-__all__ = ["Catalog", "UnitType", "CardWhitelist", "TypeKind"]
+__all__ = ["Catalog", "UnitType", "SpecialistType", "Nationality",
+           "CardWhitelist", "TypeKind"]
 
 #: 类型表的种类 → `entity_types/` 下的子目录名
 TypeKind = str
@@ -52,6 +55,10 @@ ENTITY_DIRS = {
     "hq_types": "hq_types",
     "generals": "generals",
 }
+
+#: 国籍表是**文件**（不是目录）⇒ 不走 `ENTITY_DIRS` 那套目录索引
+#: base 里 `nationalities.yml` 有 40 个；`nationalities_2.yml` 是给 mod 用的空模板
+NATIONALITY_FILES = ("nationalities.yml", "nationalities_2.yml")
 
 #: 抽卡的基础权重表（`card_types.pyc::card_meta_types_base_probabilities`，`e158` 实证）
 #:
@@ -123,6 +130,42 @@ def _as_int(v) -> int | None:
 
 
 @dataclass(frozen=True)
+class SpecialistType:
+    """一个特种兵类型的定义（来自 `specialists/<名>.yml`）。
+
+    ⚠️ **数值只在游戏包里，不在存档里**（`e156` 实证）——
+    存档 `units.yml` 的 `specs[]` 只有 `{active, captured, idx, type}`。
+    ⇒ 改数值 = 改游戏包（mod 范畴）⇒ **本工具只读**。
+    """
+
+    name: str
+    faction: str | None = None
+    nationality: str | None = None
+    name_brief: str | None = None
+    name_full: str | None = None
+    attack: int | None = None
+    defense: int | None = None
+    armor: int | None = None
+    artillery: int | None = None
+    att_idx: int | None = None
+    dfe_idx: int | None = None
+    #: 特殊类型旗标（`at` / `arty` / `towed` / `engineers` / `recon` / `ski` / `lci` / `special`）
+    flags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Nationality:
+    """一个国籍的定义（来自 `nationalities.yml` / `nationalities_2.yml`）。"""
+
+    name: str
+    faction: str | None = None
+    name_brief: str | None = None
+    short: str | None = None
+    #: 父国籍 —— 游戏判定「可挂特种兵」时会用到（`e162` 字节码实证）
+    parent_nationality: str | None = None
+
+
+@dataclass(frozen=True)
 class CardWhitelist:
     """「本存档本会议，卡牌商店本来就能生成哪几张卡」。
 
@@ -180,6 +223,8 @@ class Catalog:
         self._indexes: dict[str, dict[str, Path]] = {}
         self._types: dict[tuple[str, str], dict] = {}
         self._fronts: dict[str, list[str]] = {}
+        self._nats: dict[str, dict] | None = None
+        self._camp_pool: dict[str, set[str]] = {}
 
     # ---- 索引 ----
 
@@ -295,6 +340,204 @@ class Catalog:
 
     def has_card_type(self, name: str) -> bool:
         return name in self._index("cards")
+
+    # ---- 特种兵 / 国籍 ----
+
+    def spec_type(self, name: str) -> SpecialistType | None:
+        """查一个特种兵类型；查不到返回 None（**不是错误**）。"""
+        if not name:
+            return None
+        d = self._load("specialists", name)
+        if d is None:
+            return None
+        flags = d.get("flags") or []
+        return SpecialistType(
+            name=name,
+            faction=d.get("faction"),
+            nationality=d.get("nationality"),
+            name_brief=d.get("name_brief"),
+            name_full=d.get("name_full"),
+            attack=_as_int(d.get("attack")),
+            defense=_as_int(d.get("defense")),
+            armor=_as_int(d.get("armor")),
+            artillery=_as_int(d.get("artillery")),
+            att_idx=_as_int(d.get("att_idx")),
+            dfe_idx=_as_int(d.get("dfe_idx")),
+            flags=tuple(str(f) for f in flags),
+        )
+
+    def _nationalities(self) -> dict[str, dict]:
+        """国籍表（`nationalities.yml` + `nationalities_2.yml`）。
+
+        ⚠️ **这两个是文件，不是目录** ⇒ 不走 `_index` 那套目录索引。
+        用户包优先（与 `_index` 同样的「先到先得」语义）。
+        base 里的 `nationalities_2.yml` 是**空模板**（`{}`），给 mod 用的。
+        """
+        if self._nats is not None:
+            return self._nats
+        out: dict[str, dict] = {}
+        for pkg in self.paths.packages():
+            d = pkg / "data" / "entity_types"
+            for fn in NATIONALITY_FILES:
+                p = d / fn
+                if not p.is_file():
+                    continue
+                try:
+                    data = yamlio.load(p.read_bytes())
+                except Exception:
+                    continue
+                if not isinstance(data, dict):
+                    continue
+                for k, v in data.items():
+                    if isinstance(v, dict) and k not in out:
+                        out[k] = v
+        self._nats = out
+        return out
+
+    def nationality(self, name: str) -> Nationality | None:
+        """查一个国籍；查不到返回 None。"""
+        if not name:
+            return None
+        d = self._nationalities().get(name)
+        if d is None:
+            return None
+        return Nationality(
+            name=name,
+            faction=d.get("faction"),
+            name_brief=d.get("name_brief"),
+            short=d.get("short"),
+            parent_nationality=d.get("parent_nationality"),
+        )
+
+    def nationality_names(self) -> list[str]:
+        """全部国籍名（40 个）。"""
+        return sorted(self._nationalities())
+
+    def spec_can_attach(self, spec_name: str, unit_type_name: str,
+                        captured: bool = False) -> bool:
+        """这个特种兵能不能挂到这个单位类型上。
+
+        **逐条复刻游戏自己的判定**（`uoc2/state/entities/unit.pyc::UnitState`
+        的 `_can_add_specialist_no_len`，`e162` 字节码实证）：
+
+        ```python
+        if not specialist: return False
+        if not captured:
+            if self._type.faction != specialist.faction: return False
+            if self._type.nationality != specialist.nationality:
+                nat = nationality_types.get_type(self._type.nationality)
+                if nat.parent_nationality != specialist.nationality: return False
+        return True
+        ```
+
+        ⇒ 阵营必须相同；国籍相同，**或单位国籍的 `parent_nationality` == 特种兵国籍**。
+        `captured=True`（被俘获的牌）**跳过**这两项检查。
+
+        ⚠️ 槽位容量（`len(specs) < max_spec`）是**另一个**判定，不在这里。
+        """
+        spec = self.spec_type(spec_name)
+        unit = self.unit_type(unit_type_name)
+        if spec is None or unit is None:
+            return False
+        if captured:
+            return True
+        if unit.faction != spec.faction:
+            return False
+        if unit.nationality != spec.nationality:
+            nat = self.nationality(unit.nationality or "")
+            if nat is None or nat.parent_nationality != spec.nationality:
+                return False
+        return True
+
+    def campaign_specialist_pool(self, campaign_id: str | None) -> set[str]:
+        """该战役的「默认特种兵集合」。
+
+        ```
+        战役默认池 = { 该战役 所有战线 × 所有会议 的商店 spec 条目 }
+                   ∪ { 该战役 所有场景 units.yml 里 specs[].type 出现过的 }
+        ```
+
+        **为什么是这个口径**（`e163` 实测，15 个战役全跑）：
+
+        * 每个战役的商店**只卖玩家一方阵营**（allies / axis / soviet 各自纯净）⇒ 天然是「我方」；
+        * 商店集合**年代自洽**（blitzkrieg 只有 `_39/_40/_42`，desert 只有 `_42`）;
+        * **只用商店会漏 113 种**「游戏自己在该战役场景里挂过」的特种兵
+          （`us_spec_42` / `ff_recon_42` / `ger_at_40` …）
+          ⇒ 加上场景集合后**漏 0 种**（零假阴性）。
+
+        ⚠️ **找不到战役包返回空集合**（不是错误）⇒ 调用方要自己走兜底（见
+        `specialist_candidates`）。
+
+        ⚠️ **实测耗时**：base/west 扫 19 个会议 + 44 个场景 units.yml ≈ **170 ms**
+        （会议 20 ms + 场景 146 ms）⇒ **按战役缓存**，别在滚动路径上反复调。
+        """
+        if not campaign_id:
+            return set()
+        if campaign_id in self._camp_pool:
+            return self._camp_pool[campaign_id]
+        cdir = self.campaign_dir(campaign_id)
+        pool: set[str] = set()
+        if cdir is not None:
+            # ① 商店：所有战线 × 所有会议的 store / elite_store
+            for cf in sorted(cdir.rglob("conferences/*.yml")):
+                try:
+                    data = yamlio.load(cf.read_bytes())
+                except Exception:
+                    continue
+                if not isinstance(data, dict):
+                    continue
+                for sub in STORE_SUBS:
+                    for e in (data.get(sub) or []):
+                        if isinstance(e, dict) and e.get("spec"):
+                            pool.add(str(e["spec"]))
+            # ② 场景：游戏自己在 units.yml 里挂过的 specs[].type
+            for uf in sorted(cdir.rglob("scenarios/*/units.yml")):
+                try:
+                    data = yamlio.load(uf.read_bytes())
+                except Exception:
+                    continue
+                if not isinstance(data, list):
+                    continue
+                for u in data:
+                    if not isinstance(u, dict):
+                        continue
+                    for s in (u.get("specs") or []):
+                        if isinstance(s, dict) and s.get("type"):
+                            pool.add(str(s["type"]))
+        self._camp_pool[campaign_id] = pool
+        return pool
+
+    def specialist_candidates(self, unit_type_name: str,
+                              campaign_id: str | None = None,
+                              captured: bool = False) -> tuple[list[str], str]:
+        """某个单位类型能挂的特种兵候选 + 口径标签。
+
+        **口径**（U10 拍板，2026-11-18）：
+
+        ```
+        最终候选 = 战役默认池 ∩ 游戏规则可挂集合
+        ```
+
+        **三层兜底**（用户拍板）：
+
+        | 情形 | 结果 | 标签 |
+        |---|---|---|
+        | 正常 | 战役默认池 ∩ 规则 | `campaign` |
+        | 找不到战役包 | 放宽成「仅规则」 | `no_campaign` |
+        | 某个单位交集为空（敌国单位） | 放宽成「仅规则」 | `empty_intersection` |
+
+        返回 `(候选类型名列表, 标签)`；标签给 GUI 决定怎么提示玩家。
+        候选**按类型名排序**（GUI 再按中文名排）。
+        """
+        pool = self.campaign_specialist_pool(campaign_id)
+        rule_ok = [n for n in self.spec_type_names()
+                   if self.spec_can_attach(n, unit_type_name, captured)]
+        if not pool:
+            return rule_ok, "no_campaign"
+        inter = [n for n in rule_ok if n in pool]
+        if not inter:
+            return rule_ok, "empty_intersection"
+        return inter, "campaign"
 
     # ---- 战役与战线 ----
 
@@ -590,6 +833,27 @@ def card_types() -> list[str]:
 def spec_types() -> list[str]:
     """全部特种兵类型名。"""
     return default().spec_type_names()
+
+
+def spec_type(name: str) -> SpecialistType | None:
+    """一个特种兵类型的定义（攻防装甲火力 / 国籍 / 阵营 / flags）。"""
+    return default().spec_type(name)
+
+
+def nationality(name: str) -> Nationality | None:
+    """一个国籍的定义（含 `parent_nationality`）。"""
+    return default().nationality(name)
+
+
+def campaign_specialist_pool(campaign_id: str | None) -> set[str]:
+    """某战役的「默认特种兵集合」（商店 ∪ 场景，见 `e163`）。"""
+    return default().campaign_specialist_pool(campaign_id)
+
+
+def specialist_candidates(unit_type_name: str, campaign_id: str | None = None,
+                          captured: bool = False) -> tuple[list[str], str]:
+    """某单位类型能挂的特种兵候选 + 口径标签（见 `Catalog.specialist_candidates`）。"""
+    return default().specialist_candidates(unit_type_name, campaign_id, captured)
 
 
 def fronts(campaign_id: str) -> list[str]:
