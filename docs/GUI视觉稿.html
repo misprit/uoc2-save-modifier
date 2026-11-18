@@ -374,8 +374,8 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .hqtabs .tb.on{background:var(--surface);color:var(--accent-dark);font-weight:600;
   box-shadow:0 1px 3px rgba(20,40,60,.12)}
 .hqtabs .tb .n{font-family:var(--mono);font-size:11px;opacity:.7;margin-left:4px}
-.matrix{border:1px solid var(--border);border-radius:7px;overflow:hidden}
-.mx-head,.mx-row{display:grid;grid-template-columns:106px repeat(3,minmax(88px,1fr)) 74px}
+.matrix{border:1px solid var(--border);border-radius:0 0 7px 7px;overflow:hidden}
+.mx-head,.mx-row{display:grid;grid-template-columns:120px repeat(3,minmax(88px,1fr))}
 .mx-head{background:var(--surface-alt);border-bottom:1px solid var(--border);
   font-size:11px;color:var(--muted);text-align:center}
 .mx-head>div{padding:5px 0}
@@ -394,10 +394,25 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .mx-cell{display:flex;align-items:center;gap:5px;padding:6px;border-right:1px solid #f0f3f6;
   flex-wrap:wrap;min-height:54px}
 .mx-cell.na{justify-content:center;color:var(--muted);font-size:11px}
-.mx-price{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-  font-size:10px;color:var(--muted);text-align:center;padding:0 4px}
-.mx-price b{font-family:var(--mono);font-size:12.5px;color:var(--warn)}
-.mx-price .free{font-size:9.5px;color:var(--accent);font-weight:700}
+/* U13：补给卡车链 —— 5 个图标，点第 N 个 = 卡车数 N（1–5，不能是 0）
+   数字（5/8/10/11/12 = 补给作用范围）已经画在贴图里了 */
+.trucks{display:flex;align-items:center;gap:9px;padding:8px 12px;
+  border:1px solid var(--border);border-bottom:none;border-radius:7px 7px 0 0;
+  background:var(--surface-alt)}
+.trucks .tl{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.trucks .trk{width:58px;height:45px;cursor:pointer;flex:none;border-radius:4px}
+.trucks .trk img{width:100%;height:100%;object-fit:contain;display:block}
+.trucks .trk:hover{outline:1px solid var(--accent)}
+.trucks .cnt{margin-left:auto;font-size:11.5px;color:var(--muted)}
+.trucks .cnt b{font-family:var(--mono);color:var(--accent-dark)}
+/* 分支压制：被压制的等级数（整数，不是开关） */
+.supctl{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.supctl b{font-family:var(--mono);font-size:11.5px;color:var(--muted);min-width:12px;text-align:center}
+.supctl b.on{color:var(--warn);font-weight:700}
+.supctl button{width:16px;height:16px;line-height:13px;text-align:center;font-size:11px;
+  border:1px solid var(--border);background:var(--surface);color:var(--muted);
+  border-radius:4px;cursor:pointer;padding:0}
+.supctl button:hover{border-color:var(--accent);color:var(--accent-dark)}
 /* 技能图标：140×140 游戏原贴图，右下角数字 = CP 消耗，右上角小点 = 专精槽位 */
 .sk{position:relative;width:40px;height:40px;flex:none;cursor:pointer}
 .sk img{width:100%;height:100%;object-fit:contain;display:block}
@@ -804,7 +819,9 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 （<b>每个总部自己的</b>技能清单，249 个总部 / 4818 条技能实测）。<br>
 本页照<b>游戏内的升级面板</b>重做：<b>行 = 分支、列 = 级别 1/2/3</b>，格子里是技能图标 ——
 <b>右下角数字 = 该技能 CP 消耗</b>，<b>右上角小点 = 专精槽位</b>（金色实心 = 已专精）。
-图标、徽章全部<b>取游戏原贴图</b>（<code>surfaces/hq_upgrade/</code>，140×140，20 个动作全覆盖）。</p>
+图标、徽章全部<b>取游戏原贴图</b>（<code>surfaces/hq_upgrade/</code>，140×140，20 个动作全覆盖）。<br>
+<b>U13 追加</b>：顶部加<b>补给卡车链</b>（5 个卡车图标，点哪里激活到几辆、<b>不扣声望</b>）、
+删掉最右的「升级价」列、每行加回<b>「压制 N」</b>（被压制的等级数）。</p>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -820,7 +837,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
         <input class="inp" placeholder="搜索总部…" style="width:190px">
         <span class="sel">按战线 ▾</span><span class="sel">按阵营 ▾</span>
         <span class="sp"></span>
-        <span style="font-size:12px;color:var(--muted)">分支等级：− / ＋ 可升可降 · 技能图标：点一下 = 专精一次</span>
+        <span style="font-size:12px;color:var(--muted)">分支等级：− / ＋ 可升可降 · 压制：被扣住的级数 · 卡车：点图标改辆数 · 技能图标：点一下 = 专精一次</span>
       </div>
       <div class="cols">
         <div class="panel">
@@ -849,14 +866,19 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
             </div>
 
             <div id="tab-mx">
+              <div class="trucks" id="trucks"></div>
               <div class="matrix" id="matrix"></div>
               <div class="note">
                 ⓘ 灰色图标 = <b>未解锁</b>（该列的级别 &gt; 该行的分支等级）——
                 <b>降一级就会重新锁上</b>。<br>
                 ⓘ <b>点图标 = 专精一次</b>（该技能发动时 <b>CP 消耗 −1</b>），再点 = 取消；
                 小点画满 = 不能再专精；<b>兵库行的技能没有小点</b>（不能专精）。<br>
-                ⓘ 右侧 ¢ 是<b>游戏内</b>升这一级的声望价；
-                <b>本工具升级 / 专精都不扣声望</b>（白拿）。<br>
+                ⓘ <b>卡车行</b>：点第几个图标就激活到几辆（1–5，<b>不可能是 0</b>）；
+                图标上的数字 = 补给作用范围（5 / 8 / 10 / 11 / 12）。<br>
+                ⓘ <b>压制 N</b> = 被压制的等级数（整数，不是开关）：
+                压制会让该分支的<b>生效等级</b>下降，真实解锁等级不变。<br>
+                ⓘ 总部详情里<b>不显示任何声望价格</b> ——
+                <b>本工具升级 / 专精 / 卡车都不扣声望</b>（白拿）。<br>
                 ⓘ <b>情报分支没有技能</b>（存档里恒为空）⇒ 整行不活跃。
               </div>
             </div>
@@ -2011,8 +2033,6 @@ img(document.getElementById("s4"), SUR+"specialist/ger_towed_at_dlc3/hq_action_i
    分支等级 = branch_levels[分支].level（0–3），tier > 等级 ⇒ 锁定（置灰） */
 const HQ_BRANCH_ROWS=[["force_pool","兵库"],["intel","情报"],["operations","作战"],
                       ["logistics","后勤"],["engineering","工程建设"]];
-const HQ_BRANCH_PRICE={force_pool:[25,25,50],intel:[25,50,75],operations:[25,50,50],
-                        logistics:[25,25,50],engineering:[25,50,50]};
 const HQ_SKILL_CN={assault_crossing:"强渡",bridge_create:"架设桥梁",
   bridge_destroy:"摧毁桥梁",bridge_repair:"修复桥梁",deploy:"deploy",
   elastic_defense:"反击",entrenchment:"掘壕 / 筑垒",motor_pool:"车辆调度场",
@@ -2021,30 +2041,73 @@ const HQ_SKILL_CN={assault_crossing:"强渡",bridge_create:"架设桥梁",
   security_unit:"警卫队",set_piece_attack:"定位攻击",supply_dump:"补给点",
   supply_emergency:"显示可补给单位",suppressive_fire:"火力压制",transfer:"transfer"};
 const HQ_SKILLS={
-  force_pool:{lv:1,t:{1:[["deploy",0,null,null],["reorg",1,null,null],["transfer",2,null,null]],
+  force_pool:{lv:1,supp:0,t:{1:[["deploy",0,null,null],["reorg",1,null,null],["transfer",2,null,null]],
                     2:[["security_unit",2,null,null]],3:[]}},
-  intel:{lv:0,t:{1:[],2:[],3:[]}},
-  operations:{lv:2,t:{1:[["no_retreat",1,1,1],["set_piece_attack",1,1,1]],
+  intel:{lv:0,supp:0,t:{1:[],2:[],3:[]}},
+  operations:{lv:2,supp:0,t:{1:[["no_retreat",1,1,1],["set_piece_attack",1,1,1]],
                       2:[["pindown",3,2,0],["suppressive_fire",2,2,1]],
                       3:[["rearguard",3,2,0],["elastic_defense",4,2,0],["recon_in_force",4,2,0]]}},
-  logistics:{lv:2,t:{1:[["supply_emergency",2,2,1]],2:[["supply_dump",2,2,1]],3:[]}},
-  engineering:{lv:1,t:{1:[["bridge_repair",2,2,1],["river_crossing",1,1,1],["entrenchment",1,1,1]],
+  logistics:{lv:2,supp:0,t:{1:[["supply_emergency",2,2,1]],2:[["supply_dump",2,2,1]],3:[]}},
+  engineering:{lv:1,supp:0,t:{1:[["bridge_repair",2,2,1],["river_crossing",1,1,1],["entrenchment",1,1,1]],
                         2:[["bridge_destroy",2,1,0],["assault_crossing",3,2,0]],
                         3:[["bridge_create",3,2,0]]}}
 };
+/* ---------- U13：补给卡车链 ----------
+   5 个图标（游戏原贴图 hq_upgrade/truck_<N>_{on,off,hover}.png，数字已画在贴图里）
+   点第 N 个 ⇒ 卡车数 = N（1–5，不能是 0）；不涉及声望。 */
+const HQ_TRUCK_RANGE=[5,8,10,11,12];
+let hqTrucks=3;
+const trEl=document.getElementById("trucks");
+function renderTrucks(){
+  if(!trEl) return;
+  trEl.innerHTML="";
+  const lab=document.createElement("span"); lab.className="tl"; lab.textContent="补给卡车";
+  trEl.appendChild(lab);
+  for(let i=1;i<=5;i++){
+    const on=i<=hqTrucks;
+    const b=document.createElement("div"); b.className="trk";
+    b.title="点第 "+i+" 个 ⇒ 卡车数 = "+i+"（补给作用范围 "+HQ_TRUCK_RANGE[i-1]+" 格）";
+    const im=document.createElement("img");
+    img(im, SUR+"hq_upgrade/truck_"+i+(on?"_on":"_off")+".png", "补给卡车 "+i);
+    b.appendChild(im);
+    b.addEventListener("mouseenter",()=>{im.src=SUR+"hq_upgrade/truck_"+i+"_hover.png";});
+    b.addEventListener("mouseleave",()=>{im.src=SUR+"hq_upgrade/truck_"+i+(on?"_on":"_off")+".png";});
+    b.addEventListener("click",()=>{hqTrucks=i;renderTrucks();});
+    trEl.appendChild(b);
+  }
+  const cnt=document.createElement("span"); cnt.className="cnt";
+  cnt.innerHTML="当前 <b>"+hqTrucks+"</b> 辆 · 补给作用范围 <b>"+HQ_TRUCK_RANGE[hqTrucks-1]
+    +"</b> 格 · <span style='opacity:.7'>不扣声望</span>";
+  trEl.appendChild(cnt);
+}
+renderTrucks();
+/* ---------- 分支 × 级别矩阵（U13：删掉最右的「升级价」列，每行加「压制 N」） ---------- */
 const mxEl=document.getElementById("matrix");
-if(mxEl){
+function renderMatrix(){
+  if(!mxEl) return;
+  mxEl.innerHTML="";
   const head=document.createElement("div"); head.className="mx-head";
-  head.innerHTML='<div class="h-branch">分支</div><div>1 级</div><div>2 级</div>'
-                +'<div>3 级</div><div>升级价</div>';
+  head.innerHTML='<div class="h-branch">分支</div><div>1 级</div><div>2 级</div><div>3 级</div>';
   mxEl.appendChild(head);
   HQ_BRANCH_ROWS.forEach(([b,cn])=>{
     const m=HQ_SKILLS[b]; const row=document.createElement("div"); row.className="mx-row";
     const left=document.createElement("div"); left.className="mx-branch";
     left.innerHTML=`<span class="bn">${cn}</span>`
       +`<span class="lvctl"><button title="降一级">−</button><b>Lv${m.lv}</b>`
-      +`<button title="升一级">＋</button></span>`;
+      +`<button title="升一级">＋</button></span>`
+      +`<span class="supctl" title="被压制的等级数（游戏里：压制 N 级 ⇒ 生效等级 −N、真实解锁等级不变）">`
+      +`压制 <b class="${(m.supp||0)>0?"on":""}">${m.supp||0}</b>`
+      +`<button title="少压一级">−</button><button title="多压一级">＋</button></span>`;
     row.appendChild(left);
+    /* 压制控件：真实等级（Lv + 压制）不变，只改「被压制的级数」 */
+    left.querySelectorAll(".supctl button").forEach((btn,k)=>{
+      btn.addEventListener("click",()=>{
+        const real=(m.lv+(m.supp||0));
+        m.supp=Math.max(0,Math.min(real,(m.supp||0)+(k===0?-1:1)));
+        m.lv=real-m.supp;
+        renderMatrix();
+      });
+    });
     for(let t=1;t<=3;t++){
       const cell=document.createElement("div"); cell.className="mx-cell";
       const list=(m.t[t]||[]);
@@ -2055,7 +2118,7 @@ if(mxEl){
           const cn=HQ_SKILL_CN[act]||act;
           const sk=document.createElement("div");
           sk.className="sk"+(locked?" locked":"")+(av!==null&&used>=av?" max":"");
-          sk.title=cn+"  ("+act+")\nCP 消耗 "+cost
+          sk.title=cn+" ("+act+")\nCP 消耗 "+cost
             +(av===null?"\n没有技能点 —— 不能专精"
                        :"\n专精 "+used+"/"+av+"（每次 −1 CP）");
           const im=document.createElement("img");
@@ -2074,16 +2137,10 @@ if(mxEl){
       }
       row.appendChild(cell);
     }
-    const seq=HQ_BRANCH_PRICE[b]||[];
-    const price=(m.lv<seq.length)?seq[m.lv]:null;
-    const pr=document.createElement("div"); pr.className="mx-price";
-    pr.innerHTML=(price!==null)
-      ? `<b>¢${price}</b><span>游戏内价</span>`
-      : `<b>—</b><span>已满级</span>`;
-    row.appendChild(pr);
     mxEl.appendChild(row);
   });
 }
+renderMatrix();
 /* 总部详情两个标签 */
 const hqtabs=document.getElementById("hqtabs");
 if(hqtabs){
