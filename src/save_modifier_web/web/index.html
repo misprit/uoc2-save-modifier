@@ -364,6 +364,19 @@ table.spec-tbl .spin{font-size:13px;padding:0 7px;min-width:30px}
 .titem .xnum .num.inf{color:var(--muted);font-size:13px;min-width:26px}
 .titem .xnum .sep{color:var(--muted);font-weight:400}
 .titem .twarn{font-size:10.5px;color:var(--danger);margin-top:4px;line-height:1.35;white-space:normal}
+/* U45：不在当前 phase 里的候选（可添加） */
+.titem.off{background:var(--surface-alt);border-style:dashed}
+.titem.off>img{opacity:.62}
+.titem .thead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px}
+.titem .thead .tn{margin:0}
+.tbadge{font-size:10px;line-height:1.6;padding:0 5px;border-radius:3px;background:var(--accent-light);
+  color:var(--accent-dark);border:1px solid var(--border)}
+.tbadge.new{background:#e6f4ea;color:#1d7a3c;border-color:#bfe3cb}
+.tbadge.warn{background:#fdecec;color:#b3261e;border-color:#f3c6c6}
+.tbadge.dim{background:transparent;color:var(--muted)}
+.titem .tact{margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.titem .tact .btn{font-size:11px;padding:2px 8px}
+.titem .talt{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.4;white-space:normal}
 /* ---------------- 战役页（U39） ---------------- */
 .cpos{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;
   background:var(--accent-light);border:1px solid var(--border);border-radius:7px;font-size:12.5px}
@@ -791,7 +804,7 @@ function paintHeader(){
   const el = document.getElementById("hSave");
   if(!el || !VIEW) return;
   const save = VIEW.save||{};
-  const inBattle = (VIEW.theater_assets||[]).length > 0;
+  const inBattle = theaterEditable();
   el.innerHTML = `<span class="nm">${esc(save.display_name||save.file_name||save.save_id||"—")}</span>
     ${inBattle?'<span class="badge battle">战斗中</span>':""}`;
 }
@@ -806,7 +819,9 @@ function paintRail(){
   const nav = document.querySelector('.rail .nav[data-p="theater"]');
   const why = document.getElementById("whyTheater");
   if(nav && why){
-    const ok = (VIEW.theater_assets||[]).length > 0;
+    /* ⚠️ 判定用「**在不在战斗中**」，不是「当前 phase 有没有资产」——
+       战斗里一个资产都没有时也要能进去**添加**（U45）。 */
+    const ok = theaterEditable();
     nav.classList.toggle("dis", !ok);
     why.textContent = ok ? "" : "不在战斗中";
   }
@@ -1949,19 +1964,54 @@ function storeRemove(front, sub, index){
 }
 
 /* ===================================================================
-   战区资产页（U38）
+   战区资产页（U38 → U45 全量候选）
+   ------------------------------------------------------------------
+   U45 的口径：**候选全集 = 游戏那 7 种**（`constants.theater_asset_types`），
+   不管存档里有没有都列出来 ——
+     * 当前 phase 里有的 → 三个次数可调 + 「删除这一项」；
+     * 没有的 → 「添加」（对话框里填「每回合恢复 / 本场景剩余」）。
+   「无中生有」与「删除」都要**看得见**：
+     * 场景本来没有、现在有了 ⇒ 标 **新增**；
+     * 待应用里删掉的 ⇒ 标 **待删除**。
    =================================================================== */
 function theaterCn(a){ return (VIEW.theater_cn||{})[a] || a; }
 function theaterKey(asset){ return `theater_asset:${asset}`; }
+function theaterAddKey(asset){ return `theater_asset_add:${asset}`; }
+function theaterDelKey(asset){ return `theater_asset_remove:${asset}`; }
+/** 现在**在不在战斗中**（能不能改）—— 不是「当前 phase 有没有资产」。 */
+function theaterEditable(){
+  const m = VIEW && VIEW.theater_meta;
+  if(m) return !!m.editable;
+  return ((VIEW&&VIEW.theater_assets)||[]).length > 0;
+}
+function theaterPend(kind, asset){
+  const key = (kind==="theater_asset_add") ? theaterAddKey(asset) : theaterDelKey(asset);
+  return PENDING.find(x=>x.kind===kind && x.key===key) || null;
+}
+/** 这一项现在在不在当前 phase 里（**含待应用的增删**）。 */
+function theaterInCurrent(asset){
+  if(theaterPend("theater_asset_remove", asset)) return false;
+  if(theaterPend("theater_asset_add", asset)) return true;
+  return ((VIEW&&VIEW.theater_assets)||[]).some(x=>x.asset===asset);
+}
+/** 当前显示的三个数（含待应用的改动）。 */
 function theaterCur(asset){
-  const a = (VIEW.theater_assets||[]).find(x=>x.asset===asset) || {};
+  const a = ((VIEW&&VIEW.theater_assets)||[]).find(x=>x.asset===asset) || {};
   const p = PENDING.find(x=>x.kind==="theater_asset" && x.key===theaterKey(asset));
-  const base = {to_use:a.to_use, uses_total:a.uses_total, uses_turn:a.uses_turn};
-  if(!p) return base;
-  return {to_use:p.params.to_use, uses_total:p.params.uses_total, uses_turn:p.params.uses_turn};
+  if(p) return {to_use:p.params.to_use, uses_total:p.params.uses_total,
+                uses_turn:p.params.uses_turn};
+  const add = theaterPend("theater_asset_add", asset);
+  if(add){
+    const ut = add.params.uses_turn;
+    const tot = (add.params.uses_total===null||add.params.uses_total===undefined)
+      ? null : add.params.uses_total;
+    /* 与核心库同一套口径：to_use = uses_turn 或 min(uses_turn, uses_total) */
+    return {to_use:(tot===null)?ut:Math.min(ut, tot), uses_total:tot, uses_turn:ut};
+  }
+  return {to_use:a.to_use, uses_total:a.uses_total, uses_turn:a.uses_turn};
 }
 function theaterSet(asset, field, value){
-  const a = (VIEW.theater_assets||[]).find(x=>x.asset===asset) || {};
+  const a = ((VIEW&&VIEW.theater_assets)||[]).find(x=>x.asset===asset) || {};
   const cur = theaterCur(asset);
   const params = {asset, to_use:cur.to_use, uses_total:cur.uses_total, uses_turn:cur.uses_turn};
   params[field] = value;
@@ -1973,65 +2023,103 @@ function theaterSet(asset, field, value){
 const theaterFieldCn = {to_use:"当前可用", uses_total:"本场景剩余", uses_turn:"每回合恢复"};
 
 function pageTheater(w){
-  const list = VIEW.theater_assets||[];
-  if(!list.length){
+  const uni = (VIEW&&VIEW.theater_universe)||[];
+  const meta = (VIEW&&VIEW.theater_meta)||{};
+  const editable = theaterEditable();
+  if(!uni.length){
     w.innerHTML = `<div class="panel"><h3>战区资产</h3><div class="placeholder">
-      <div class="big">当前没有进行中的战斗</div>
-      战区资产是**战斗中的**东西（存档里的 <code>games/&lt;场景&gt;/main.yml</code>）——
-      不在战斗里就没有这一页的内容。</div></div>`;
+      <div class="big">没有读到战区资产候选</div>
+      战区资产的名单来自游戏自己的常量（<code>constants.theater_asset_types</code>）——
+      没找到游戏包就列不出来。</div></div>`;
     return;
   }
-  const cards = list.map(a=>{
-    const cur = theaterCur(a.asset);
+  const onCount = uni.filter(u=>theaterInCurrent(u.asset)).length;
+  const cards = uni.map(u=>{
+    const asset = u.asset;
+    const on = theaterInCurrent(asset);
+    const cur = theaterCur(asset);
     const tot = cur.uses_total;
+    const inf = (tot===null||tot===undefined);
+    let badge;
+    if(theaterPend("theater_asset_remove", asset)) badge = `<span class="tbadge warn">待删除</span>`;
+    else if(on && !u.scenario) badge = `<span class="tbadge new">新增</span>`;
+    else if(u.scenario) badge = `<span class="tbadge">场景自带</span>`;
+    else badge = `<span class="tbadge dim">场景没有</span>`;
+    const head = `<div class="thead"><span class="tn">${esc(theaterCn(asset))}</span>${badge}</div>`;
+    if(!on){
+      return `<div class="titem off">
+        ${imgTag(theaterTex(asset), theaterCn(asset))}
+        <div class="tbody">
+          ${head}
+          <div class="talt">这个场景<b>当前没有</b>这项战区资产${u.scenario
+            ? "（场景定义里有，多半是已经用完 / 被删了）" : "（场景本来就没有）"}。</div>
+          ${u.in_other ? `<div class="talt">后面第 ${(VIEW.theater_meta.phase_count||2)>1
+            ? "2" : "2"} 阶段里有这项（那边不生效）。</div>` : ""}
+          <div class="tact">
+            <button class="btn pri" ${editable?"":"disabled"}
+              onclick="openTheaterAddModal('${asset}')">${editable?"添加这一项":"不在战斗中"}</button>
+          </div>
+        </div></div>`;
+    }
     return `<div class="titem">
-      ${imgTag(theaterTex(a.asset), theaterCn(a.asset))}
+      ${imgTag(theaterTex(asset), theaterCn(asset))}
       <div class="tbody">
-        <div class="tn">${esc(theaterCn(a.asset))}</div>
+        ${head}
         <div class="trow">当前可用
-          <span class="xnum"><span class="spin" id="th_tu_${a.asset}"></span></span></div>
+          <span class="xnum"><span class="spin" id="th_tu_${asset}"></span></span></div>
         <div class="trow">本场景剩余
-          <span class="xnum">${tot===null||tot===undefined
-            ? `<span class="num inf" id="th_tot_inf_${a.asset}">无限</span>`
-            : `<input class="numin" id="th_tot_${a.asset}" type="text" inputmode="numeric" autocomplete="off" value="${tot}">`}
+          <span class="xnum">${inf
+            ? `<span class="num inf" id="th_tot_inf_${asset}">无限</span>`
+            : `<input class="numin" id="th_tot_${asset}" type="text" inputmode="numeric" autocomplete="off" value="${tot}">`}
             <button class="btn" style="padding:0 6px;font-size:10.5px;margin-left:4px"
-              onclick="theaterToggleTotal('${a.asset}')">${tot===null||tot===undefined?"设成数字":"改成无限"}</button></span></div>
+              onclick="theaterToggleTotal('${asset}')">${inf?"设成数字":"改成无限"}</button></span></div>
         <div class="trow">每回合恢复
-          <span class="xnum"><span class="spin" id="th_ut_${a.asset}"></span></span></div>
-        ${(cur.uses_total!==null&&cur.uses_total!==undefined&&cur.to_use>cur.uses_total)
+          <span class="xnum"><span class="spin" id="th_ut_${asset}"></span></span></div>
+        ${(!inf && cur.to_use>cur.uses_total)
           ? `<div class="twarn">当前可用 ${cur.to_use} 次 大于 本场景剩余 ${cur.uses_total} 次 ⇒ 游戏读档会失败</div>`:""}
-        ${(cur.uses_total!==null&&cur.uses_total!==undefined&&cur.uses_turn>cur.uses_total)
+        ${(!inf && cur.uses_turn>cur.uses_total)
           ? `<div class="twarn">每回合恢复 ${cur.uses_turn} 次 大于 本场景剩余 ${cur.uses_total} 次 ——
              实际每回合只能用 ${cur.uses_total} 次</div>`:""}
-        ${(cur.uses_total!==null&&cur.uses_total!==undefined
-            && cur.to_use > Math.min(cur.uses_turn, cur.uses_total))
+        ${(!inf && cur.to_use > Math.min(cur.uses_turn, cur.uses_total))
           ? `<div class="twarn">当前可用 ${cur.to_use} 次 大于 回合开始后的有效值
              ${Math.min(cur.uses_turn, cur.uses_total)} 次 —— 回合开始会重置为
              ${Math.min(cur.uses_turn, cur.uses_total)} 次</div>`:""}
+        <div class="tact">
+          <button class="btn" ${editable?"":"disabled"}
+            onclick="theaterRemove('${asset}')">删除这一项</button>
+          <span class="talt">删的是整项（不是把次数清零）</span>
+        </div>
       </div></div>`;
   }).join("");
-  w.innerHTML = `<div class="panel"><h3>战区资产 · 当前战斗的 ${list.length} 项</h3>
+  w.innerHTML = `<div class="panel"><h3>战区资产 · 候选 ${uni.length} 种（当前战斗里有 ${onCount} 种）</h3>
     <div class="pbody"><div class="tgrid">${cards}</div>
-      <div class="note">战区资产是<b>唯一的 L3 写入例外</b>（写的是
+      <div class="note">候选全集 = <b>游戏那 7 种</b>（<code>constants.theater_asset_types</code>）——
+        存档里没有的也列出来，可以<b>添加</b>；有的可以<b>删除</b>。<br>
+        战区资产是<b>唯一的 L3 写入例外</b>（写的是
         <code>games/&lt;场景&gt;/main.yml</code>，不是 5 张 L1 表）——
-        所以这一页<b>只有进行中的战斗才有内容</b>。<br>
+        所以这一页<b>只有进行中的战斗才能改</b>。<br>
         不变式：<b>当前可用 ≤ 本场景剩余</b>（游戏每用一次就让剩余减 1，减成负数存档会打不开）。
-        <b>本场景剩余 = 无限</b> 时，每回合恢复多少就永远有多少。</div>
+        <b>本场景剩余 = 无限</b> 时，每回合恢复多少就永远有多少。<br>
+        标 <b>新增</b> 的 = 场景本来没有、被加进来的（无中生有）；删掉的项会整个消失，
+        游戏里那个按钮也就没了。</div>
     </div></div>`;
 
-  list.forEach(a=>{
-    const cur = theaterCur(a.asset);
-    const tu = document.getElementById("th_tu_"+a.asset);
+  uni.forEach(u=>{
+    const asset = u.asset;
+    if(!theaterInCurrent(asset)) return;
+    const cur = theaterCur(asset);
+    const a = ((VIEW&&VIEW.theater_assets)||[]).find(x=>x.asset===asset) || {};
+    const tu = document.getElementById("th_tu_"+asset);
     if(tu) bindSpin(tu, {base:a.to_use, cur:cur.to_use, min:0, max:null,
-      onChange(v){ theaterSet(a.asset, "to_use", v); }});
-    const ut = document.getElementById("th_ut_"+a.asset);
+      onChange(v){ theaterSet(asset, "to_use", v); }});
+    const ut = document.getElementById("th_ut_"+asset);
     if(ut) bindSpin(ut, {base:a.uses_turn, cur:cur.uses_turn, min:1, max:null,
-      onChange(v){ theaterSet(a.asset, "uses_turn", v); }});
-    const tot = document.getElementById("th_tot_"+a.asset);
+      onChange(v){ theaterSet(asset, "uses_turn", v); }});
+    const tot = document.getElementById("th_tot_"+asset);
     if(tot) bindNumIn(tot, {base:a.uses_total, cur:cur.uses_total, min:0, max:null,
-      kind:"theater_asset", key:theaterKey(a.asset),
-      params:{asset:a.asset, to_use:cur.to_use, uses_total:cur.uses_total, uses_turn:cur.uses_turn},
-      onChange(v){ theaterSet(a.asset, "uses_total", v); }});
+      kind:"theater_asset", key:theaterKey(asset),
+      params:{asset:asset, to_use:cur.to_use, uses_total:cur.uses_total, uses_turn:cur.uses_turn},
+      onChange(v){ theaterSet(asset, "uses_total", v); }});
   });
 }
 
@@ -2039,6 +2127,81 @@ function theaterToggleTotal(asset){
   const cur = theaterCur(asset);
   const v = (cur.uses_total===null||cur.uses_total===undefined) ? 1 : null;
   theaterSet(asset, "uses_total", v);
+}
+
+/* ---------- 删除一项（删整项，不是清零） ---------- */
+function theaterRemove(asset){
+  const cur = theaterCur(asset);
+  const tot = (cur.uses_total===null||cur.uses_total===undefined) ? "无限" : cur.uses_total;
+  setPending("theater_asset_remove", theaterDelKey(asset), {asset:asset},
+    `删除战区资产 ${theaterCn(asset)}（当前可用 ${cur.to_use}，本场景剩余 ${tot}）`);
+  show("theater");
+}
+
+/* ---------- 添加一项（弹对话框：每回合恢复 / 本场景剩余） ---------- */
+function openTheaterAddModal(asset){
+  MODAL = {kind:"theater", asset:asset, uses_turn:1, uses_total:null};
+  renderTheaterAddModal();
+}
+function theaterAddToggleTotal(){
+  const M = MODAL; if(!M) return;
+  M.uses_total = (M.uses_total===null||M.uses_total===undefined) ? 1 : null;
+  renderTheaterAddModal();
+}
+function renderTheaterAddModal(){
+  const M = MODAL; if(!M) return;
+  const u = ((VIEW&&VIEW.theater_universe)||[]).find(x=>x.asset===M.asset) || {};
+  const inf = (M.uses_total===null||M.uses_total===undefined);
+  openModal(`<div class="mh">添加战区资产 · ${esc(theaterCn(M.asset))}
+      <span class="ro">存进 games/&lt;场景&gt;/main.yml</span></div>
+    <div class="mb">
+      <div class="mrow"><span class="lb">每回合恢复</span>
+        <span class="spin" id="mp_tut"></span>
+        <span class="hint">Alt+滚轮 ±1 · 正整数（≥ 1）</span></div>
+      <div class="mrow"><span class="lb">本场景剩余</span>
+        <span class="numrow">
+          ${inf?`<span class="num inf">无限</span>`
+            : `<input class="numin" id="mp_tot" type="text" inputmode="numeric" autocomplete="off" value="${M.uses_total}" style="width:72px">`}
+          <button class="btn" onclick="theaterAddToggleTotal()">${inf?"设成数字":"改成无限"}</button>
+        </span>
+        <span class="hint">${inf?"无限 = 这场战斗随便用":"整场战斗一共能用几次"}</span></div>
+      <div class="modnote">${u.scenario
+        ? `这个场景<b>本来就有</b>这项战区资产（场景定义：每回合恢复 ${u.scenario_uses_turn}，
+           本场景剩余 ${u.scenario_uses_total===null||u.scenario_uses_total===undefined
+             ? "无限" : u.scenario_uses_total}），现在存档里没有 —— 多半是已经用完了。`
+        : `⚠️ <b>这个场景本来就没有</b>这项战区资产（无中生有）。<br>
+           数据上安全（游戏只认这 7 种，贴图和中文名都齐全，游戏里会正常出现这个按钮），
+           但<b>能不能用得起来要看地图</b> —— 比如「炮舰轰炸」要有海岸目标、
+           「空中补给」要有己方部队在补给中。`}
+        <br><br>
+        新加的资产<b>只对当前 phase 生效</b>；场景自己的定义不动，
+        下一场战斗会按场景重新初始化。<br>
+        新增时会把 5 个字段<b>一次写全并保持自洽</b>，不会出现「次数全是 0」的死条目。</div>
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="theaterAddConfirm()">添加</button></div>`,
+    {onOpen:function(){
+      bindModalSpin("mp_tut", ()=>MODAL.uses_turn, v=>MODAL.uses_turn=v, 1, 99);
+      const pe = document.getElementById("mp_tot");
+      if(pe) pe.addEventListener("input", function(){
+        MODAL.uses_total = parseInt(this.value,10);
+        if(isNaN(MODAL.uses_total)) MODAL.uses_total = 0;
+      });
+    }});
+}
+function theaterAddConfirm(){
+  const M = MODAL; if(!M) return;
+  const ut = Math.max(1, parseInt(M.uses_turn,10)||1);
+  let tot = M.uses_total;
+  if(tot!==null && tot!==undefined){
+    tot = parseInt(tot,10);
+    if(isNaN(tot)){ alertModal("「本场景剩余」要填整数，或点「改成无限」"); return; }
+    if(tot < 1){ alertModal("「本场景剩余」不能是 0 —— 0 会让这个资产永远用不了"); return; }
+  } else tot = null;
+  setPending("theater_asset_add", theaterAddKey(M.asset),
+    {asset:M.asset, uses_total:tot, uses_turn:ut},
+    `添加战区资产 ${theaterCn(M.asset)}（每回合恢复 ${ut}，本场景剩余 ${tot===null?"无限":tot}）`);
+  closeModal();
 }
 
 /* ===================================================================
@@ -2857,7 +3020,9 @@ function show(p){
   if(p==="cards"){ pageCards(w); return; }
   if(p==="store"){ pageStore(w); return; }
   if(p==="theater"){
-    if(!(VIEW.theater_assets||[]).length){
+    /* ⚠️ 守卫用「在不在战斗中」，不是「当前 phase 有没有资产」——
+       战斗里一个资产都没有时也要能进去**添加**（U45）。 */
+    if(!theaterEditable()){
       w.innerHTML = `<div class="panel"><h3>战区资产</h3><div class="placeholder">
         <div class="big">当前不在战斗中</div>
         战区资产是**战斗中的**东西（存档里的 <code>games/&lt;场景&gt;/main.yml</code>）——

@@ -346,6 +346,49 @@ class Save:
             return None
         return f"games/{scenario}" if self.has(f"games/{scenario}/main.yml") else None
 
+    def document_theater_assets(self) -> dict:
+        """存档自带的**场景定义**里，这场战斗本来有哪些战区资产。
+
+        数据源：战役存档里带着**整份战役的场景副本**
+        （`document/scenarios/<场景>/main.yml`）—— 这是「这场战斗开打时的设计」。
+
+        返回 `{asset: {"uses_total": …, "uses_turn": …}}`；找不到返回 `{}`
+        （**不报错** —— 只是没有对照信息）。
+
+        ⚠️ 场景定义里只有 **3 个字段**（`asset` / `uses_total` / `uses_turn`），
+        **没有** `to_use` —— 那是运行时字段。
+        """
+        scen = self.current_scenario()
+        if not scen:
+            return {}
+        variant = self.in_state().get("variant") or None
+        cands = []
+        if variant:
+            cands.append("document/scenarios/%s/variants/%s/main.yml" % (scen, variant))
+        cands.append("document/scenarios/%s/main.yml" % scen)
+        for entry in cands:
+            if not self.has(entry):
+                continue
+            data = self.read_yaml(entry, {})
+            if not isinstance(data, dict):
+                continue
+            ta = data.get("theater_assets")
+            if not isinstance(ta, list):
+                continue
+            out: dict[str, dict] = {}
+            for grp in ta:
+                if not isinstance(grp, list):
+                    continue
+                for it in grp:
+                    if isinstance(it, dict) and it.get("asset"):
+                        out[str(it["asset"])] = {
+                            "uses_total": it.get("uses_total"),
+                            "uses_turn": it.get("uses_turn"),
+                        }
+            if out:
+                return out
+        return {}
+
     def battle_main(self) -> dict:
         """当前战斗的 `main.yml`（含 `theater_assets`）。"""
         d = self.battle_dir()

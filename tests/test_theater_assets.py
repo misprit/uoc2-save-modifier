@@ -1,5 +1,8 @@
 """S9：战区资产（`theater_assets`）—— **唯一的 L3 写入白名单**。
 
+⚠️ **U45 追加**：`theater_asset_add` / `theater_asset_remove` ——
+战区资产改成**全量候选**（游戏那 7 种），存档里没有的也能加、能删。
+
 **验收口径**（规范 §6.2b、§7.2 W8、§10 第 52/53/55/57 条）：
 
 * **只在当前进行中的战斗里可改** —— 战斗外改会被 `Game.new` 重算覆盖，
@@ -325,3 +328,249 @@ class TestTheaterAssetThreeFields(TheaterAssetTestBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# =====================================================================
+# U45：加一项 / 删一项
+# =====================================================================
+
+
+class TestTheaterAssetAddRemove(TheaterAssetTestBase):
+    """战区资产**全量候选** —— 加一项 / 删一项（U45）。
+
+    取证依据（U45 字节码 + 真实存档实测）：
+
+    * 候选全集 = `constants.theater_asset_types` 的 **7 种**；
+    * `theater_assets` 恒为 **2 个 phase 组** ⇒ 增删**只动组内项**；
+    * 运行时一项的字段恒为 5 个
+      （`asset` / `to_use` / `to_use_not_used` / `uses_total` / `uses_turn`）；
+    * 游戏回合开始按 `to_use = min(uses_turn, uses_total)` 恢复
+      ⇒ `uses_total = 0` 的新条目**永远用不了**（就是「000 残留」）。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.save_path = self.make()
+
+    # ---- 读回 ----
+
+    def groups(self, path=None):
+        with zipfile.ZipFile(path or self.save_path) as zf:
+            data = yaml.safe_load(zf.read("games/avalanche/main.yml"))
+        return data["theater_assets"]
+
+    def items(self, path=None, phase=0):
+        return self.groups(path)[phase]
+
+    def item(self, asset, path=None, phase=0):
+        for it in self.items(path, phase):
+            if it["asset"] == asset:
+                return it
+        return None
+
+    # ---------------------------------------------------------- 加一项
+
+    def test_add_writes_all_five_fields_and_is_self_consistent(self):
+        """加一项 ⇒ 5 个字段**一次写全**且自洽（杜绝「次数全是 0」的死条目）。"""
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset_add("flying_artillery",
+                                                       uses_total=3, uses_turn=2)])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        it = self.item("flying_artillery")
+        self.assertIsNotNone(it, "新加的资产没写进存档")
+        self.assertEqual(sorted(it.keys()),
+                         ["asset", "to_use", "to_use_not_used",
+                          "uses_total", "uses_turn"])
+        # 游戏回合开始的口径：to_use = min(uses_turn, uses_total)
+        self.assertEqual(it["to_use"], 2)
+        # to_use_not_used = uses_turn - to_use
+        self.assertEqual(it["to_use_not_used"], 0)
+        self.assertEqual(it["uses_total"], 3)
+        self.assertEqual(it["uses_turn"], 2)
+
+    def test_add_with_infinite_total(self):
+        """`uses_total=None` = 无限 ⇒ to_use = uses_turn。"""
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset_add("precision_bombing",
+                                                       uses_total=None, uses_turn=3)])
+        self.assertTrue(res.ok, res.errors)
+        it = self.item("precision_bombing")
+        self.assertIsNone(it["uses_total"])
+        self.assertEqual(it["to_use"], 3)
+        self.assertEqual(it["to_use_not_used"], 0)
+
+    def test_add_keeps_group_count(self):
+        """⚠️ **组数不能变** —— 改组数会让游戏的 `phase` 索引错位。"""
+        before = len(self.groups())
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset_add("flying_artillery",
+                                                       uses_total=1, uses_turn=1)])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(len(self.groups()), before)
+
+    def test_add_only_touches_current_phase_group(self):
+        """phase=1 的存档 ⇒ 加到第 1 组，第 0 组一个字节都不动。"""
+        p = self.make("phase1.usg", battle_overrides={
+            "phase": 1,
+            "theater_assets": [[
+                {"asset": "air_attack", "to_use": 1, "to_use_not_used": None,
+                 "uses_total": None, "uses_turn": 1},
+            ], []],
+        })
+        plan, res = self.commit(p, [Edit.theater_asset_add("flying_artillery",
+                                                          uses_total=1, uses_turn=1)])
+        self.assertTrue(res.ok, res.errors)
+        g = self.groups(p)
+        self.assertEqual(len(g), 2)
+        self.assertEqual([x["asset"] for x in g[0]], ["air_attack"])
+        self.assertEqual([x["asset"] for x in g[1]], ["flying_artillery"])
+
+    def test_add_rejects_asset_outside_the_seven(self):
+        """`sabotage` 是**卡牌的一次性能力**，不是战区资产 ⇒ 写进去游戏直接拒收。"""
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset_add("sabotage",
+                                                uses_total=1, uses_turn=1)])
+        self.assertFalse(plan.ok)
+        self.assertIn("不是游戏的战区资产", plan.errors[0])
+
+    def test_add_rejects_duplicate_in_same_group(self):
+        """同组里不能有同名 —— 游戏按名字取**第一个**匹配。"""
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset_add("air_attack",
+                                                uses_total=1, uses_turn=1)])
+        self.assertFalse(plan.ok)
+        self.assertIn("已经有战区资产", plan.errors[0])
+
+    def test_add_rejects_zero_uses_total(self):
+        """`uses_total=0` ⇒ `to_use = min(uses_turn, 0) = 0` ⇒ 永远用不了。"""
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset_add("flying_artillery",
+                                                uses_total=0, uses_turn=1)])
+        self.assertFalse(plan.ok)
+        self.assertIn("uses_total", plan.errors[0])
+
+    def test_add_rejects_zero_uses_turn(self):
+        """`uses_turn` 的 schema 是 `Range(min=1)`。"""
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset_add("flying_artillery",
+                                                uses_total=1, uses_turn=0)])
+        self.assertFalse(plan.ok)
+        self.assertIn("uses_turn", plan.errors[0])
+
+    def test_add_rejected_outside_battle(self):
+        """战斗外不能加（那儿根本没有 theater_assets）。"""
+        p = self.make("out.usg", main_overrides={"in_state": _no_battle_state()})
+        plan = self.plan(p, [Edit.theater_asset_add("flying_artillery",
+                                                    uses_total=1, uses_turn=1)])
+        self.assertFalse(plan.ok)
+        self.assertIn("不在战斗中", plan.errors[0])
+
+    # ---------------------------------------------------------- 删一项
+
+    def test_remove_deletes_the_whole_item(self):
+        """删的是**整项**（不是把次数清零）—— 这才是「清理干净」。"""
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset_remove("air_attack")])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        self.assertIsNone(self.item("air_attack"), "air_attack 还在")
+        # 别的项一个都不能少
+        self.assertIsNotNone(self.item("naval_bombardment"))
+        self.assertIsNotNone(self.item("long_range_recon"))
+
+    def test_remove_keeps_group_count(self):
+        before = len(self.groups())
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset_remove("air_attack")])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(len(self.groups()), before)
+
+    def test_remove_warns_about_lost_uses(self):
+        """删掉会丢掉剩余次数 ⇒ 必须提醒。"""
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset_remove("long_range_recon")])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(any("还剩" in w for w in plan.warnings), plan.warnings)
+
+    def test_remove_rejects_missing_asset(self):
+        plan = self.plan(self.save_path,
+                         [Edit.theater_asset_remove("flying_artillery")])
+        self.assertFalse(plan.ok)
+        self.assertIn("没有战区资产", plan.errors[0])
+
+    def test_remove_rejected_outside_battle(self):
+        p = self.make("out2.usg", main_overrides={"in_state": _no_battle_state()})
+        plan = self.plan(p, [Edit.theater_asset_remove("air_attack")])
+        self.assertFalse(plan.ok)
+        self.assertIn("不在战斗中", plan.errors[0])
+
+    # ---------------------------------------------------------- 撤销
+
+    def test_undo_restores_removed_item(self):
+        """删掉的东西必须能用修改器自己的撤销找回来。"""
+        from save_modifier_core.undo import undo_save
+
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset_remove("air_attack")])
+        self.assertTrue(res.ok, res.errors)
+        self.assertIsNone(self.item("air_attack"))
+        ur = undo_save(self.save_path)
+        self.assertTrue(ur.ok, getattr(ur, "errors", None))
+        self.assertIsNotNone(self.item("air_attack"), "撤销没把 air_attack 找回来")
+
+    def test_undo_removes_added_item(self):
+        """加进来的东西也要能撤掉。"""
+        from save_modifier_core.undo import undo_save
+
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset_add("flying_artillery",
+                                                       uses_total=1, uses_turn=1)])
+        self.assertTrue(res.ok, res.errors)
+        self.assertIsNotNone(self.item("flying_artillery"))
+        ur = undo_save(self.save_path)
+        self.assertTrue(ur.ok, getattr(ur, "errors", None))
+        self.assertIsNone(self.item("flying_artillery"))
+
+    # ---------------------------------------------------------- 描述
+
+    def test_describe_mentions_the_asset(self):
+        d = Edit.theater_asset_add("flying_artillery",
+                                    uses_total=3, uses_turn=2).describe()
+        self.assertIn("flying_artillery", d)
+        self.assertIn("每回合恢复 2", d)
+        self.assertIn("本场景剩余 3", d)
+        d2 = Edit.theater_asset_add("flying_artillery",
+                                     uses_total=None, uses_turn=1).describe()
+        self.assertIn("无限", d2)
+        self.assertIn("删战区资产", Edit.theater_asset_remove("air_attack").describe())
+
+
+# =====================================================================
+# U45：候选全集 + 场景定义对照
+# =====================================================================
+
+
+class TestTheaterAssetUniverse(TheaterAssetTestBase):
+    """候选全集 = 游戏那 7 种（`constants.theater_asset_types`）。"""
+
+    def test_universe_is_the_seven_game_types(self):
+        from save_modifier_core.catalog import THEATER_ASSET_TYPES
+
+        self.assertEqual(len(THEATER_ASSET_TYPES), 7)
+        self.assertIn("air_attack", THEATER_ASSET_TYPES)
+        self.assertIn("flying_artillery", THEATER_ASSET_TYPES)
+        self.assertNotIn("sabotage", THEATER_ASSET_TYPES)
+
+    def test_catalog_universe_lists_all_with_texture_flag(self):
+        uni = self.catalog.theater_asset_universe()
+        self.assertEqual(len(uni), 7)
+        for it in uni:
+            self.assertIn("asset", it)
+            self.assertIn("has_texture", it)
+
+    def test_catalog_universe_matches_constant(self):
+        from save_modifier_core.catalog import THEATER_ASSET_TYPES
+
+        names = [it["asset"] for it in self.catalog.theater_asset_universe()]
+        self.assertEqual(names, list(THEATER_ASSET_TYPES))

@@ -77,6 +77,30 @@ BASE_CARD_WEIGHTS: dict[str, float] = {
 #: 商店的两个子商店（`store.yml` = `{战线: {store: [...], elite_store: [...]}}`）
 STORE_SUBS = ("store", "elite_store")
 
+#: 战区资产**全集**（U45 字节码取证 —— `lib/uoc2/state/constants.pyc` 第 61 行）：
+#:
+#: ```python
+#: theater_asset_types = ('air_supply', 'air_attack', 'saturation_strike',
+#:                         'long_range_recon', 'naval_bombardment',
+#:                         'flying_artillery', 'precision_bombing')
+#: ```
+#:
+#: ⚠️ 这张表**不在游戏包的数据文件里**（在字节码常量里）⇒ 只能写死一份，
+#: 但有字节码依据 —— 与 `BASE_CARD_WEIGHTS` 同一个做法。
+#:
+#: 游戏的 `scenario_data_validation.theater_asset_dict` 是
+#: `Required('asset'): In(theater_asset_types)` ⇒ **存档里只认这 7 个**。
+#:
+#: ⚠️ **卡牌里的 `theater_asset` 是另一套名单**（`entity_types/card_types.pyc`
+#: 的 `_theater_asset_types` = 10 个一次性能力 sabotage / espionage /
+#: tactical_para / divisional_para / maquis / maskirovka / radio_silence /
+#: clear_rubble / tactical_naval_assault / divisional_naval_assault
+#: **并上**这 7 个）—— 那 10 个**不能**进战区资产列表（游戏 schema 会拒）。
+THEATER_ASSET_TYPES = (
+    "air_supply", "air_attack", "saturation_strike", "long_range_recon",
+    "naval_bombardment", "flying_artillery", "precision_bombing",
+)
+
 
 @dataclass(frozen=True)
 class UnitType:
@@ -784,6 +808,122 @@ class Catalog:
             campaign_id=campaign_id,
             probabilities=prob,
         )
+
+    # ---- 战区资产（U45）----
+
+    def theater_asset_types(self) -> list[str]:
+        """战区资产**候选全集**（7 种，顺序按游戏常量）。
+
+        ⚠️ 这是**游戏自己的名单**（`constants.theater_asset_types`），
+        不是修改器自己定的 ⇒ 存档里能写什么、界面就该列什么。
+        """
+        return list(THEATER_ASSET_TYPES)
+
+    def theater_asset_has_texture(self, name: str) -> bool:
+        """这个战区资产有没有游戏原贴图（`<asset>_neutral.png`）。
+
+        游戏自己的 `TheaterCtrl._add_theater_asset` 拼的是
+        `theater/<asset>_<阵营>_neutral`，找不到就退回 `<asset>_neutral`
+        ⇒ 只要有 `_neutral.png` 就能显示。
+        """
+        for pkg in self.paths.packages():
+            cand = Path(pkg) / "assets" / "surfaces" / "theater" / (name + "_neutral.png")
+            try:
+                if cand.is_file():
+                    return True
+            except OSError:
+                continue
+        return False
+
+    def theater_asset_universe(self) -> list[dict]:
+        """战区资产**候选全集** + 每项的贴图情况。
+
+        返回 `[{"asset": 名字, "has_texture": bool}, …]`。
+        """
+        out = []
+        for name in THEATER_ASSET_TYPES:
+            out.append({"asset": name, "has_texture": self.theater_asset_has_texture(name)})
+        return out
+
+    def scenario_theater_assets(self, scenario_id: str,
+                                campaign_id: str | None = None,
+                                variant: str | None = None) -> dict:
+        """**游戏包**里这个场景本来有哪些战区资产。
+
+        返回 `{asset: {"uses_total": …, "uses_turn": …}}`；找不到返回 `{}`。
+
+        ⚠️ 场景定义里只有 **3 个字段**（`asset` / `uses_total` / `uses_turn`），
+        **没有** `to_use` —— 那是运行时字段（`Game.new` 载入时现算）。
+        """
+        for main in self._scenario_mains(scenario_id, campaign_id, variant):
+            data = self._yaml(main)
+            if not isinstance(data, dict):
+                continue
+            ta = data.get("theater_assets")
+            if not isinstance(ta, list):
+                continue
+            out: dict[str, dict] = {}
+            for grp in ta:
+                if not isinstance(grp, list):
+                    continue
+                for it in grp:
+                    if isinstance(it, dict) and it.get("asset"):
+                        out[str(it["asset"])] = {
+                            "uses_total": it.get("uses_total"),
+                            "uses_turn": it.get("uses_turn"),
+                        }
+            if out:
+                return out
+        return {}
+
+    def _scenario_mains(self, scenario_id: str, campaign_id: str | None,
+                        variant: str | None) -> list[Path]:
+        """场景 `main.yml` 的候选路径（用户包 → 游戏包，先到先得）。
+
+        两种摆法：
+
+        * **战役里的场景** —— `<包>/data/campaigns/<战役>.usc/scenarios/<场景>/main.yml`
+          （独立场景存档也要靠这个找 —— 独立场景也是某个战役里的场景）；
+        * **独立场景包** —— `<包>/data/scenarios/<场景>.usc/scenarios/<场景>/main.yml`。
+
+        ⚠️ 不知道战役时（`campaign_id=None`）会把**所有战役包**都扫一遍
+        （实测每个包最多 11 个战役目录，很便宜）。
+        """
+        rels = []
+        if variant:
+            rels.append("scenarios/%s/variants/%s/main.yml" % (scenario_id, variant))
+        rels.append("scenarios/%s/main.yml" % scenario_id)
+        out: list[Path] = []
+        for pkg in self.paths.packages():
+            data = pkg / "data"
+            roots: list[Path] = []
+            if campaign_id:
+                roots.append(data / ("campaigns/%s.usc" % campaign_id))
+            else:
+                roots.append(data / ("scenarios/%s.usc" % scenario_id))
+                camps = data / "campaigns"
+                try:
+                    roots.extend(sorted(camps.glob("*.usc")))
+                except OSError:
+                    pass
+            for root in roots:
+                for rel in rels:
+                    cand = root / rel
+                    try:
+                        if cand.is_file():
+                            out.append(cand)
+                    except OSError:
+                        continue
+        return out
+
+    @staticmethod
+    def _yaml(path: Path):
+        try:
+            if not Path(path).is_file():
+                return None
+            return yamlio.load(Path(path).read_bytes())
+        except (OSError, Exception):
+            return None
 
     # ---- 批量预热 ----
 

@@ -1078,6 +1078,74 @@ class TestTheaterWriteApi(WebGuiTestBase):
         self.assertFalse(cm["ok"])
         self.assertTrue(cm["errors"])
 
+    # ------------------------------------------------ U45：全量候选
+
+    def test_view_has_theater_universe(self):
+        """视图要带**全量候选**（游戏那 7 种）与本次战斗的上下文。"""
+        v = self._view()
+        uni = v.get("theater_universe") or []
+        self.assertEqual(len(uni), 7)
+        for u in uni:
+            for k in ("asset", "has_texture", "in_current", "in_other",
+                      "scenario", "added"):
+                self.assertIn(k, u)
+        meta = v.get("theater_meta") or {}
+        for k in ("editable", "reason", "phase", "phase_count", "groups"):
+            self.assertIn(k, meta)
+
+    def test_universe_assets_all_have_chinese_names(self):
+        """7 种候选**都要有中文名**（locale `id_<asset>_view`）。"""
+        v = self._view()
+        cn = v.get("theater_cn") or {}
+        for u in (v.get("theater_universe") or []):
+            self.assertIn(u["asset"], cn)
+            self.assertTrue(cn[u["asset"]])
+
+    def test_add_asset_through_api(self):
+        """API 加一项 ⇒ 存档里多一项，且 5 个字段写全。"""
+        v = self._view()
+        have = {a["asset"] for a in (v.get("theater_assets") or [])}
+        from save_modifier_core.catalog import THEATER_ASSET_TYPES
+        missing = [a for a in THEATER_ASSET_TYPES if a not in have]
+        if not missing:
+            self.skipTest("这场战斗已经有全部 7 种")
+        target = missing[0]
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "theater_asset_add",
+                       "params": {"asset": target, "uses_total": 2,
+                                  "uses_turn": 1}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        it = [x for x in v1["theater_assets"] if x["asset"] == target]
+        self.assertTrue(it, "新加的资产没出现在视图里")
+        self.assertEqual(it[0]["uses_total"], 2)
+
+    def test_remove_asset_through_api(self):
+        """API 删一项 ⇒ 存档里那一项整个没了。"""
+        v = self._view()
+        ta = v.get("theater_assets") or []
+        if not ta:
+            self.skipTest("这场战斗没有战区资产")
+        target = ta[0]["asset"]
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "theater_asset_remove",
+                       "params": {"asset": target}}]})
+        self.assertTrue(cm["ok"], cm.get("errors"))
+        v1 = self._view()
+        self.assertNotIn(target, {a["asset"] for a in (v1.get("theater_assets") or [])})
+
+    def test_add_out_of_seven_is_rejected(self):
+        """`sabotage` 是卡牌的一次性能力 ⇒ API 也必须拒。"""
+        cm = self.post("/api/commit", {
+            "save_id": self.copy,
+            "edits": [{"kind": "theater_asset_add",
+                       "params": {"asset": "sabotage", "uses_total": 1,
+                                  "uses_turn": 1}}]})
+        self.assertFalse(cm["ok"])
+        self.assertTrue(cm["errors"])
+
 
 class TestWriteConfirmGate(WebGuiTestBase):
     """U40：写盘前的闸门 —— `/api/plan` 要能报出「改哪些文件 + 备份叫什么」。
@@ -1257,3 +1325,27 @@ class TestUiDetailsPresent(unittest.TestCase):
         """战区资产的两条联动警告（设计稿 §7）。"""
         self.assertIn("每回合恢复", self.html)
         self.assertIn("回合开始后的有效值", self.html)
+
+    # ------------------------------------------------ U45：全量候选
+
+    def test_theater_universe_is_rendered(self):
+        """U45：战区资产页列**全量候选**，并区分「有/没有」。"""
+        self.assertIn("theater_universe", self.html)
+        self.assertIn("theater_meta", self.html)
+        self.assertIn("添加这一项", self.html)
+        self.assertIn("删除这一项", self.html)
+        self.assertIn("场景自带", self.html)
+        self.assertIn("场景没有", self.html)
+
+    def test_theater_add_remove_edits_exist(self):
+        """前端要能发出 `theater_asset_add` / `theater_asset_remove`。"""
+        self.assertIn("theater_asset_add", self.html)
+        self.assertIn("theater_asset_remove", self.html)
+        self.assertIn("openTheaterAddModal", self.html)
+        self.assertIn("theaterRemove", self.html)
+
+    def test_theater_page_is_not_gated_on_having_assets(self):
+        """⚠️ 守卫用「在不在战斗中」，不是「当前 phase 有没有资产」——
+        战斗里一个资产都没有时也要能进去**添加**。"""
+        self.assertIn("theaterEditable", self.html)
+        self.assertNotIn("if(!(VIEW.theater_assets||[]).length){", self.html)

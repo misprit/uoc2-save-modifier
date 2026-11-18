@@ -155,6 +155,10 @@ class TestEditKinds(unittest.TestCase):
 
     ⚠️ 2026-11-18 再 +2 种（U13 / `e166`）：`hq_trucks`（补给卡车数）、
     `hq_branch_suppressed`（分支「被压制的等级数」）。
+
+    ⚠️ 2026-11-18 再 +2 种（U45）：`theater_asset_add`（往当前 phase 组加一项
+    战区资产）、`theater_asset_remove`（从当前 phase 组删一项）——
+    战区资产从此**全量候选可编辑**（存档没有的也能加）。
     """
 
     EXPECTED = {
@@ -165,6 +169,7 @@ class TestEditKinds(unittest.TestCase):
         "hq_force_pool_remove", "card_add", "card_remove", "card_set",
         "store_set", "store_remove", "store_add", "card_store_set",
         "card_store_remove", "card_store_add", "hand_restore", "theater_asset",
+        "theater_asset_add", "theater_asset_remove",
     }
 
     def test_kinds_are_frozen(self):
@@ -183,7 +188,8 @@ class TestEditKinds(unittest.TestCase):
                      "hq_force_pool_remove", "card_add", "card_remove",
                      "card_set", "store_set", "store_remove", "store_add",
                      "card_store_set", "card_store_remove", "card_store_add",
-                     "hand_restore", "theater_asset"):
+                     "hand_restore", "theater_asset",
+                     "theater_asset_add", "theater_asset_remove"):
             self.assertTrue(callable(getattr(Edit, name)), name)
 
     def test_store_edits_take_sub_store(self):

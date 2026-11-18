@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .catalog import THEATER_ASSET_TYPES
 from .edits import UNSET, Edit
 
 __all__ = ["Outcome", "apply_edit"]
@@ -133,6 +134,30 @@ THEATER_FIELD_CN = {
     "uses_total": "本场景剩余",
     "uses_turn": "每回合恢复",
 }
+
+#: 战区资产**全集** —— 唯一来源是 `catalog.THEATER_ASSET_TYPES`
+#: （游戏常量 `uoc2.state.constants.theater_asset_types`，U45 字节码取证）。
+#:
+#: 游戏的 `scenario_data_validation.theater_asset_dict` 是
+#: `Required('asset'): In(theater_asset_types)` ⇒ **存档里只认这 7 个**，
+#: 写别的名字 voluptuous 校验失败 ⇒ **存档直接打不开**。
+
+#: 运行时存档里战区资产一项的**字段全集**（U45 实测：730 个战斗文件、
+#: 2320 个条目，字段组合 **100% 都是这 5 个**）。
+#:
+#: ⚠️ **场景定义**（游戏包 `scenarios/<id>/main.yml`）里只有 3 个字段
+#: （`asset` / `uses_total` / `uses_turn`），**没有** `to_use` ——
+#: 那两个是运行时字段（`Game.new` 载入时现算）。
+THEATER_ITEM_FIELDS = ("asset", "to_use", "to_use_not_used",
+                       "uses_total", "uses_turn")
+
+#: 新增战区资产时 `uses_total` 的**下限**。
+#:
+#: ⚠️ **0 不行** —— 游戏回合开始时按 `to_use = min(uses_turn, uses_total)`
+#: 恢复（`Game.theater_assets_start_turn`），`uses_total=0` ⇒ `to_use` 恒为 0
+#: ⇒ 这个资产**永远用不了**，却还在游戏里占一个按钮 —— 就是「000 残留」。
+#: （存档里**已存在**的 `uses_total=0` 是正常的：那是「已经用完」的状态。）
+THEATER_ADD_USES_TOTAL_MIN = 1
 
 #: 分支等级的**上限**（游戏 `BRANCH_MAX = 3`；`can_add_branch_level` 里
 #: `current_level = level + suppressed`，`== 3` 就不许再加）
@@ -1515,6 +1540,49 @@ def _hand_restore(w, e: Edit) -> Outcome:
     return oc
 
 
+def _is_int(v):
+    """是不是一个**真整数**（`bool` 是 `int` 的子类，要排除）。"""
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _theater_group(w):
+    """定位当前战斗的战区资产：**当前 phase 那一组**。
+
+    返回 `(entry, data, idx, items)`；定位不到就返回 `None`
+    （原因已经写进 `w.outcomes`）。
+
+    ⚠️ `theater_assets` 是**按 phase 分组**的（存档里形如 [[phase0], [phase1], …]），
+    必须改**当前 phase 那一组**，不是永远改第 0 组（U20 真实存档实测）。
+    ⚠️ **组数恒为 2**（U45 实测 730/730 个战斗文件）⇒ 增删**只动组内项**，
+    绝不新增或删除组（改组数会让游戏的 `phase` 索引错位）。
+    """
+    if not w.require(w.caps.can_edit_theater_assets, "theater_assets",
+                     "games/<场景>/main.yml"):
+        return None
+    battle_dir = w.save.battle_dir()
+    if battle_dir is None:
+        w.outcomes.append(Outcome(errors=["当前存档没有进行中的战斗"]))
+        return None
+    entry = f"{battle_dir}/main.yml"
+    data = w.table(entry, {})
+    if not isinstance(data, dict):
+        w.outcomes.append(Outcome(errors=[f"{entry} 结构异常"]))
+        return None
+    theater = data.get("theater_assets")
+    if not isinstance(theater, list) or not theater or not isinstance(theater[0], list):
+        w.outcomes.append(Outcome(errors=[f"{entry} 里没有 theater_assets"]))
+        return None
+    phase = data.get("phase")
+    idx = (phase if isinstance(phase, int) and not isinstance(phase, bool)
+           and 0 <= phase < len(theater) else 0)
+    items = theater[idx]
+    if not isinstance(items, list):
+        w.outcomes.append(Outcome(
+            errors=[f"{entry} 里 theater_assets 第 {idx} 组不是列表"]))
+        return None
+    return entry, data, idx, items
+
+
 def _theater_asset(w, e: Edit) -> Outcome:
     """战区资产（唯一的 L3 写入白名单）。
 
@@ -1533,41 +1601,19 @@ def _theater_asset(w, e: Edit) -> Outcome:
     oc = Outcome()
     asset = e.params.get("asset")
     want = {f: e.params.get(f) for f in ("to_use", "uses_total", "uses_turn")}
-    if not w.require(w.caps.can_edit_theater_assets, "theater_assets", "games/<场景>/main.yml"):
+    ctx = _theater_group(w)
+    if ctx is None:
         return oc
-    battle_dir = w.save.battle_dir()
-    if battle_dir is None:
-        oc.errors.append("当前存档没有进行中的战斗")
-        return oc
-    entry = f"{battle_dir}/main.yml"
-    data = w.table(entry, {})
-    if not isinstance(data, dict):
-        oc.errors.append(f"{entry} 结构异常")
-        return oc
-    theater = data.get("theater_assets")
-    if not isinstance(theater, list) or not theater or not isinstance(theater[0], list):
-        oc.errors.append(f"{entry} 里没有 theater_assets")
-        return oc
-    # `theater_assets` 是**按 phase 分组**的（存档里形如 [[phase0], [phase1], …]），
-    # 必须改**当前 phase 那一组**，不是永远改第 0 组（U20 真实存档实测）。
-    phase = data.get("phase")
-    idx = (phase if isinstance(phase, int) and not isinstance(phase, bool)
-           and 0 <= phase < len(theater) else 0)
-    items = theater[idx]
-    if not isinstance(items, list):
-        oc.errors.append(f"{entry} 里 theater_assets 第 {idx} 组不是列表")
-        return oc
+    entry, _data, idx, items = ctx
     target = next((it for it in items
                    if isinstance(it, dict) and it.get("asset") == asset), None)
     if target is None:
         avail = ", ".join(str(it.get("asset")) for it in items if isinstance(it, dict))
         oc.errors.append(
             f"该场景没有战区资产 {asset!r}；本场景有：{avail or '（空）'}。"
-            "修改器**不会凭空新增**资产条目（§6.2b）")
+            "修改器**不会凭空新增**资产条目（§6.2b）"
+            "—— 要新增请用「添加战区资产」操作")
         return oc
-
-    def _is_int(v):
-        return isinstance(v, int) and not isinstance(v, bool)
 
     # 改后值：没传的字段（UNSET）沿用存档里的原值
     after = {f: (target.get(f) if want[f] is UNSET else want[f])
@@ -1631,6 +1677,129 @@ def _theater_asset(w, e: Edit) -> Outcome:
     return oc
 
 
+def _theater_asset_add(w, e: Edit) -> Outcome:
+    """**新增**一项战区资产到**当前 phase** 那一组（U45）。
+
+    「无中生有」的安全边界（全部有依据）：
+
+    | 检查 | 依据 |
+    |---|---|
+    | `asset` 必须在 7 种全集里 | `theater_asset_dict` = `Required('asset'): In(theater_asset_types)` |
+    | 同组内不能有同名 | 游戏按名字取**第一个**匹配（`Game.get_theater_asset_uses`） |
+    | **组数不变** | 实测 730/730 个战斗文件恒为 2 组 |
+    | `uses_total` 不能是 0 | 回合开始按 `to_use = min(uses_turn, uses_total)` 恢复 ⇒ 0 = 永远用不了 |
+    | `uses_turn ≥ 1` | `positive_int_schema` |
+    | 写全 5 个字段且自洽 | 运行时项字段组合实测 2320/2320 一致 |
+
+    ⚠️ 新加的资产**只对当前 phase 生效**；游戏载入战斗时 `Game.new`
+    会把 `to_use` 重置成 `uses_turn`、`to_use_not_used` 重置成 `None`
+    （我们写的是「存档里的样子」，不保证游戏里立刻是这个数）。
+    """
+    oc = Outcome()
+    asset = e.params.get("asset")
+    uses_total = e.params.get("uses_total")
+    uses_turn = e.params.get("uses_turn")
+    ctx = _theater_group(w)
+    if ctx is None:
+        return oc
+    entry, _data, idx, items = ctx
+
+    if not isinstance(asset, str) or asset not in THEATER_ASSET_TYPES:
+        oc.errors.append(
+            f"{asset!r} 不是游戏的战区资产；游戏只认这 7 种："
+            + "、".join(THEATER_ASSET_TYPES)
+            + "（写别的名字存档直接打不开）")
+        return oc
+    if any(isinstance(it, dict) and it.get("asset") == asset for it in items):
+        oc.errors.append(
+            f"当前 phase（第 {idx} 组）已经有战区资产 {asset!r} —— "
+            "同一个组里不能有同名（游戏按名字取第一个匹配）")
+        return oc
+    if not _is_int(uses_turn) or uses_turn < THEATER_USES_TURN_MIN:
+        oc.errors.append(
+            f"uses_turn={uses_turn!r} 必须是不小于 {THEATER_USES_TURN_MIN} 的整数")
+        return oc
+    if uses_total is not None and (not _is_int(uses_total)
+                                   or uses_total < THEATER_ADD_USES_TOTAL_MIN):
+        oc.errors.append(
+            f"uses_total={uses_total!r} 必须是不小于 {THEATER_ADD_USES_TOTAL_MIN}"
+            " 的整数，或 None（无限）"
+            " —— 0 会让这个资产永远用不了"
+            "（回合开始时按 min(每回合恢复, 本场景剩余) 恢复）")
+        return oc
+
+    # 自洽地算出 to_use / to_use_not_used（游戏回合开始时的口径）：
+    #   uses_total 为 None -> to_use = uses_turn
+    #   否则              -> to_use = min(uses_turn, uses_total)
+    #   to_use_not_used    = uses_turn - to_use
+    eff = uses_turn if uses_total is None else min(uses_turn, uses_total)
+    items.append({
+        "asset": asset,
+        "to_use": eff,
+        "to_use_not_used": uses_turn - eff,
+        "uses_total": uses_total,
+        "uses_turn": uses_turn,
+    })
+    w.touch(entry)
+    oc.summary = ("加战区资产 %s（当前 phase 第 %d 组；每回合恢复 %d，本场景剩余 %s）"
+                  % (asset, idx, uses_turn,
+                     "无限" if uses_total is None else uses_total))
+    oc.warnings.append(
+        "新加的战区资产**只对当前 phase 生效** —— "
+        "场景自己的定义（存档里的 document/scenarios/…）不动，"
+        "下一场战斗会按它重新初始化")
+    oc.warnings.append(
+        "游戏载入战斗时会把「当前可用」重置成「每回合恢复」"
+        "（本场景剩余有限时取两者较小值）")
+    oc.warnings.append(
+        "战区资产**无法通过游戏内的『重置会议』撤销** —— 需要用修改器自己的撤销（§6.4）")
+    return oc
+
+
+def _theater_asset_remove(w, e: Edit) -> Outcome:
+    """从**当前 phase** 那一组里**删掉**一项战区资产（U45）。
+
+    删的是**整项**，不是把次数清零 —— 这才是「清理干净」：
+    清零会留下一个永远用不了的死条目，游戏里还白占一个按钮。
+
+    ⚠️ 只删**当前 phase** 那一组里的那一个；别的 phase 组不动。
+    """
+    oc = Outcome()
+    asset = e.params.get("asset")
+    ctx = _theater_group(w)
+    if ctx is None:
+        return oc
+    entry, _data, idx, items = ctx
+    pos = next((i for i, it in enumerate(items)
+                if isinstance(it, dict) and it.get("asset") == asset), None)
+    if pos is None:
+        avail = ", ".join(str(it.get("asset")) for it in items if isinstance(it, dict))
+        oc.errors.append(
+            f"当前 phase（第 {idx} 组）没有战区资产 {asset!r}；本组有："
+            f"{avail or '（空）'}")
+        return oc
+    target = items[pos]
+    items.pop(pos)
+    w.touch(entry)
+    oc.summary = "删战区资产 %s（当前 phase 第 %d 组）" % (asset, idx)
+
+    total = target.get("uses_total")
+    if isinstance(total, int) and not isinstance(total, bool) and total > 0:
+        oc.warnings.append(
+            f"这个资产本场景还剩 {total} 次可用 —— 删掉就没有了"
+            "（想保留次数就改数值，不要删）")
+    to_use = target.get("to_use")
+    if isinstance(to_use, int) and not isinstance(to_use, bool) and to_use > 0:
+        oc.warnings.append(f"当前还有 {to_use} 次没用 —— 删掉等于放弃")
+    if not items:
+        oc.warnings.append(
+            f"当前 phase（第 {idx} 组）删完是空的 —— "
+            "游戏里这一阶段就没有战区资产了")
+    oc.warnings.append(
+        "战区资产**无法通过游戏内的『重置会议』撤销** —— 需要用修改器自己的撤销（§6.4）")
+    return oc
+
+
 def _theater_val(field: str, value) -> str:
     """战区资产字段的中文展示值（`uses_total=None` = 无限）。"""
     if field == "uses_total" and value is None:
@@ -1664,6 +1833,8 @@ _HANDLERS = {
     "card_store_add": _card_store_add,
     "hand_restore": _hand_restore,
     "theater_asset": _theater_asset,
+    "theater_asset_add": _theater_asset_add,
+    "theater_asset_remove": _theater_asset_remove,
 }
 
 

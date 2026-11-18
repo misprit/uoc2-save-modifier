@@ -2040,6 +2040,88 @@ campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, .
   `Game.theater_assets[self.phase]` 语义吻合；
 * 不在战斗里时，这一页显示说明卡 + 存档体检信息。
 
+**★ U45：战区资产「全量候选」（用户拍板）**
+
+> **【2026-11-19 · U45 用户拍板】** 原话：
+> 「战区资产编辑里，很多时候存档并不自带战区资产。我们要列出战区资产所有可能的候选项，
+> 允许玩家编辑。例如一个存档的战斗本来没有空中炮击，我们也应该有对应的位置允许玩家添加相关数量。
+> 你要注意鉴别无中生有和删除战区资产对存档的影响，要清理干净相关数据，
+> 不然如果有个000数据的战区资产可能让游戏出错。」
+
+**候选全集 = 游戏那 7 种**（`uoc2.state.constants.theater_asset_types`，U45 字节码取证）：
+
+| `asset` | 中文名（locale 键） |
+|---|---|
+| `air_supply` | 空中补给（`id_air_supply_view`） |
+| `air_attack` | 空袭（`id_air_attack_view`） |
+| `saturation_strike` | 饱和打击（`id_saturation_strike_view`） |
+| `long_range_recon` | 远程侦察（`id_long_range_recon_view`） |
+| `naval_bombardment` | 炮舰轰炸（`id_naval_bombardment_view`） |
+| `flying_artillery` | **空中炮击**（`id_flying_artillery_view`） |
+| `precision_bombing` | 精准轰炸（`id_precision_bombing_view`） |
+
+⇒ **不管存档里有没有，7 张卡全部列出来**：
+
+```
++-- 战区资产 · 候选 7 种（当前战斗里有 4 种）--------------------------------+
+| [icon] 空中补给 [场景自带]   可用 [1] / 本场景剩余 [2]                      |
+|                           每回合恢复 [1]        [删除这一项]              |
+| [icon] 饱和打击 [场景没有]   这个场景当前没有这项战区资产（场景本来就没有） |
+|                                   [添加这一项]                           |
++---------------------------------------------------------------------------+
+```
+
+* **有**（当前 phase 那一组里）⇒ 三个数可调 + 「**删除这一项**」；
+* **没有** ⇒ 「**添加这一项**」（弹对话框填「每回合恢复 / 本场景剩余」）。
+
+**徽章（把「无中生有」与「删除」显式标出来）**
+
+| 徽章 | 含义 |
+|---|---|
+| **场景自带** | 场景定义里本来就有这一项 |
+| **场景没有** | 场景定义里没有 —— 加上去就是「无中生有」 |
+| **新增** | 当前 phase 有、但场景定义里没有 ⇒ **无中生有的那一项** |
+| **待删除** | 已挂起删除 |
+
+**「无中生有」的安全边界（每一行都有依据）**
+
+| 检查 | 依据 |
+|---|---|
+| `asset` 必须在 7 种全集里 | `scenario_data_validation.theater_asset_dict` = `Required('asset'): In(theater_asset_types)` ⇒ 写别的名字**存档直接打不开** |
+| 贴图齐全 | `_packages/base/assets/surfaces/theater/<asset>_neutral.png` **7/7** 在 |
+| 中文名齐全 | locale `id_<asset>_view` **7/7** 在 |
+| 游戏会正常显示它 | `TheaterCtrl._show_theater` 遍历**当前 phase 那一组**建按钮 |
+| **组数不变** | 实测 730/730 个战斗文件恒为 **2 组** ⇒ 增删只动组内项 |
+| 同组不能有同名 | `Game.get_theater_asset_uses` 取**第一个**匹配的 |
+| 新增的 `uses_total` **不能是 0** | 回合开始按 `to_use = min(uses_turn, uses_total)` 恢复 ⇒ 0 = **永远用不了**（用户说的「000 数据」） |
+
+⚠️ **卡牌里的 `theater_asset` 是另一套名单**（`entity_types/card_types.pyc` 的
+`_theater_asset_types` = 10 个一次性能力 sabotage / espionage / tactical_para /
+divisional_para / maquis / maskirovka / radio_silence / clear_rubble /
+tactical_naval_assault / divisional_naval_assault **并上**这 7 个）
+⇒ 那 10 个**不能**进战区资产列表（游戏 schema 会拒 ⇒ 存档打不开）。
+
+**「删除」= 删整项，不是清零**
+
+* 清零会留下一个**永远用不了的死条目**，游戏里还白占一个按钮；
+* 删整项 ⇒ 游戏里那个按钮**整个消失**；
+* 删除会丢掉剩余次数 ⇒ 挂起时**必须提醒**（「本场景还剩 N 次可用 —— 删掉就没有了」）。
+
+**新增时 5 个字段一次写全（自洽）**
+
+| 字段 | 新增时怎么算 |
+|---|---|
+| `to_use` | `uses_turn`（`uses_total` 为 `None` 时）或 `min(uses_turn, uses_total)` |
+| `to_use_not_used` | `uses_turn - to_use` |
+| `uses_total` | 玩家填（`None` = 无限） |
+| `uses_turn` | 玩家填（≥ 1） |
+
+⇒ 写出来的项**永远不是 000**；且与游戏回合开始的重算口径一致。
+
+⚠️ **只对当前 phase 生效** —— 场景自己的定义
+（存档里的 `document/scenarios/<场景>/main.yml`）**不动**，
+下一场战斗会按它重新初始化。
+
 #### 7.4.7a ★ 兵库的「延迟」语义（U24 · 字节码取证）
 
 > **【2026-11-18 · U24 用户提出】** 原话：
@@ -2855,7 +2937,7 @@ params = {unit_id:12, field:"xp", value:350}   ← 真正写进存档的内容
 |---|---|---|
 | **卡牌** | 手牌（你手里已拿到的牌）+ 货架（这一场会议能买的牌，5 格） | 加卡 / 移除 / 上架 / 下架 / 恢复上次会议牌局 |
 | **商店** | 按 **战线 → 子商店** 分组的商品表（名称 / 国籍 / 攻防装炮 / 特性 / 价格 / 库存） | 价格（输入框）、库存（Alt+滚轮）、上架 / 下架 |
-| **战区资产** | 当前战斗的资产卡（游戏原贴图 + 中文名 + 三个字段） | 当前可用 / 本场景剩余 / 每回合恢复 |
+| **战区资产** | **全量候选 7 张卡**（游戏原贴图 + 中文名 + 场景自带/没有徽章） | 当前可用 / 本场景剩余 / 每回合恢复 · **加一项 / 删一项**（U45） |
 | **战役** | 战役位置条 + 这场会议的可选场景 + 总部一览 | **只读** |
 
 **格数上限跟难度走**（`e158` 字节码实证）
@@ -3058,6 +3140,45 @@ return self.represent_scalar('tag:yaml.org,2002:float', str(float(data)))
    ⇒ 界面与存档不一致。⇒ `dropPending` 之后重绘当前页。
 3. **`btnApply` 重复 id** —— Header 与抽屉各一个 ⇒ `getElementById` 只拿到第一个
    ⇒ 抽屉里那个按钮**永远不禁用**。⇒ 两个按钮各有 id，禁用状态同步。
+
+#### 10.10.15 ★ 战区资产「全量候选」编辑机制（U45）
+
+**两个新 Edit kind**
+
+| kind | 参数 | 作用 |
+|---|---|---|
+| `theater_asset_add` | `asset` / `uses_total` / `uses_turn` | 往**当前 phase** 那一组**加**一项 |
+| `theater_asset_remove` | `asset` | 从**当前 phase** 那一组**删掉**这一项 |
+
+（`theater_asset` 这个 kind 保持原义：**只改已有项的三个字段**，不碰增删。）
+
+**核心库硬规则**（`handlers.py`）
+
+| 规则 | 违反时 |
+|---|---|
+| `asset ∈ THEATER_ASSET_TYPES`（7 种） | 硬拦 |
+| 当前组内不能有同名 | 硬拦 |
+| `uses_turn ≥ 1` | 硬拦 |
+| 新增的 `uses_total` 是 `None` 或 **≥ 1** | 硬拦（0 = 000 死条目） |
+| **组数不变** | 只动组内项 |
+| 新增写全 5 个字段且自洽 | `to_use = uses_turn` 或 `min(uses_turn, uses_total)`；`to_use_not_used = uses_turn - to_use` |
+| 战斗外 | 能力位拦（`can_edit_theater_assets`） |
+
+**数据通道**（`/api/view` 新增两个键）
+
+| 键 | 内容 |
+|---|---|
+| `theater_universe` | 7 种候选 × `{asset, has_texture, in_current, in_other, other_count, scenario, scenario_uses_total, scenario_uses_turn, added}` |
+| `theater_meta` | `{editable, reason, phase, phase_count, groups, scenario_source, scenario_found}` |
+
+`scenario_source`（**这场战斗本来有什么**）的优先级：
+**存档自带的** `document/scenarios/<场景>/main.yml` → **游戏包**里的场景定义。
+
+⚠️ **前端的守卫改了**：Rail 上「战区资产」这一项的禁用判定，从
+「当前 phase 有没有资产」改成「**在不在战斗中**」（`theater_meta.editable`）
+—— 否则**战斗里一个资产都没有时根本进不去**，也就没法添加。
+
+**测试**：456 → **484**（新增 28 项：核心库 20 + API 5 + 前端 3）。
 
 ## 11. 实施路线
 

@@ -162,6 +162,9 @@ def api_view(save_id: str) -> dict:
         # ---- 6 个功能页各自要的东西（U33 补齐）----
         # 战区资产：按当前 phase 取那一组（L3 例外的只读侧）
         data["theater_assets"] = _theater_assets_of(save)
+        # 战区资产**全量候选**（U45）：7 种全集 + 每种在存档里的状态
+        # + 「这场战斗本来有没有」的场景定义对照。
+        data["theater_universe"], data["theater_meta"] = _theater_universe_of(save, catalog)
         # 战役位置（只读）
         try:
             pos = save.campaign_position()
@@ -212,10 +215,14 @@ def api_view(save_id: str) -> dict:
         data["skills"] = skills
         data["generals"] = generals
         # 战区资产的中文名 = locale `id_<asset>_view`（如 id_air_supply_view → 空中补给）
+        # ⚠️ **全集 7 种都要有名字**（U45）—— 界面要列没在存档里的那些候选。
+        _t_assets = [str(a.get("asset")) for a in (data.get("theater_assets") or [])
+                     if isinstance(a, dict)]
+        _t_assets += [str(u.get("asset")) for u in (data.get("theater_universe") or [])
+                      if isinstance(u, dict)]
         data["theater_cn"] = {
-            str(a.get("asset")): (((_tr.get("id_" + str(a.get("asset")) + "_view", ""))
-                                    if _tr else "") or str(a.get("asset")))
-            for a in (data.get("theater_assets") or []) if isinstance(a, dict)
+            a: (((_tr.get("id_" + a + "_view", "") if _tr else "") or a))
+            for a in _t_assets
         }
         data["equipment_cn"] = {
             e: ((_tr.get("id_equipment_type_" + e, "") if _tr else "") or e)
@@ -470,6 +477,98 @@ def _theater_assets_of(save) -> list:
             "uses_turn": it.get("uses_turn"),
         })
     return out
+
+
+def _theater_universe_of(save, catalog) -> tuple[list, dict]:
+    """战区资产的**全量候选**（U45）。
+
+    返回 `(universe, meta)`：
+
+    * `universe` —— 游戏那 **7 种**候选，每项：
+      `{asset, has_texture, in_current, in_other, other_count, scenario,
+        scenario_uses_total, scenario_uses_turn, added}`
+      * `in_current` —— **当前 phase** 那一组里有没有它；
+      * `in_other`  —— 别的 phase 组里有没有它（那些组不生效，只是留着）；
+      * `scenario` —— **这场战斗本来有没有**它（场景定义）；
+      * `added`     —— 场景本来没有、现在有了 ⇒ **「无中生有」的那一项**。
+    * `meta` —— `{editable, reason, phase, phase_count, groups, scenario_source,
+      scenario_found}`。
+
+    ⚠️ `scenario_source` 的数据源优先级：
+    **存档自带**的 `document/scenarios/<场景>/main.yml` → **游戏包**里的场景定义。
+    （前者是「这份存档这场战斗开打时的设计」，后者是「游戏现在怎么定义的」。）
+    """
+    caps = save.capabilities()
+    editable = bool(getattr(caps, "can_edit_theater_assets", False))
+    reason = "" if editable else caps.unavailable_reason("theater_assets")
+
+    try:
+        data = save.battle_main()
+    except Exception:
+        data = {}
+    theater = data.get("theater_assets") if isinstance(data, dict) else None
+    phase = data.get("phase") if isinstance(data, dict) else None
+
+    groups: list[list] = []
+    if isinstance(theater, list):
+        for grp in theater:
+            groups.append([it for it in grp if isinstance(it, dict)]
+                          if isinstance(grp, list) else [])
+    idx = (phase if isinstance(phase, int) and not isinstance(phase, bool)
+           and 0 <= phase < len(groups) else 0)
+    current = groups[idx] if groups else []
+
+    other: dict[str, int] = {}
+    for i, grp in enumerate(groups):
+        if i == idx:
+            continue
+        for it in grp:
+            a = it.get("asset")
+            if isinstance(a, str):
+                other[a] = other.get(a, 0) + 1
+
+    # 场景定义：这场战斗**本来**有哪些战区资产
+    scenario: dict = {}
+    try:
+        scenario = save.document_theater_assets() or {}
+    except Exception:
+        scenario = {}
+    if not scenario:
+        try:
+            scen = save.current_scenario()
+            if scen:
+                cid = getattr(save.info, "campaign_id", None) or None
+                scenario = catalog.scenario_theater_assets(scen, cid) or {}
+        except Exception:
+            scenario = {}
+
+    universe = []
+    for it in catalog.theater_asset_universe():
+        name = str(it.get("asset"))
+        cur = next((x for x in current if x.get("asset") == name), None)
+        defn = scenario.get(name)
+        universe.append({
+            "asset": name,
+            "has_texture": bool(it.get("has_texture")),
+            "in_current": cur is not None,
+            "in_other": name in other,
+            "other_count": other.get(name, 0),
+            "scenario": defn is not None,
+            "scenario_uses_total": (defn or {}).get("uses_total"),
+            "scenario_uses_turn": (defn or {}).get("uses_turn"),
+            "added": defn is None and cur is not None,
+        })
+
+    meta = {
+        "editable": editable,
+        "reason": reason,
+        "phase": idx,
+        "phase_count": len(groups),
+        "groups": groups,
+        "scenario_source": scenario,
+        "scenario_found": bool(scenario),
+    }
+    return universe, meta
 
 
 def _summary_of(obj) -> str:

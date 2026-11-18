@@ -43,6 +43,8 @@ EDIT_KINDS = (
     "card_store_add",      # 上架一张卡（根 main.yml → card_store）
     "hand_restore",        # 恢复上次会议的牌局（读 L2 → 写 L1）
     "theater_asset",       # 战区资产（唯一的 L3 例外）
+    "theater_asset_add",   # 往当前 phase 组**加**一项战区资产（U45）
+    "theater_asset_remove",  # 从当前 phase 组**删**一项战区资产（U45）
 )
 
 #: 商店的两个子商店（`store.yml` = `{战线: {store: [...], elite_store: [...]}}`）
@@ -300,6 +302,34 @@ class Edit:
             "uses_total": uses_total, "uses_turn": uses_turn,
         })
 
+    @staticmethod
+    def theater_asset_add(asset: str, *, uses_total: Any = None,
+                          uses_turn: int = 1) -> "Edit":
+        """往**当前 phase** 的战区资产组里**加**一项（U45）。
+
+        ⚠️ `asset` 只能是游戏那 **7 种**之一（`THEATER_ASSET_TYPES`）——
+        游戏的 `scenario_data_validation.theater_asset_dict` 是
+        `Required('asset'): In(theater_asset_types)` ⇒ 写别的名字**存档直接打不开**。
+
+        ⚠️ **不给 `to_use`** —— handler 会按（`uses_turn`, `uses_total`）
+        算出**自洽**的一组值（`to_use` / `to_use_not_used`）写全，
+        这样不会留下「次数全是 0」的死条目。
+
+        ⚠️ `uses_total=None` = **无限**（游戏自己的「空袭」就是无限）。
+        """
+        return Edit("theater_asset_add", {
+            "asset": asset, "uses_total": uses_total, "uses_turn": uses_turn,
+        })
+
+    @staticmethod
+    def theater_asset_remove(asset: str) -> "Edit":
+        """从**当前 phase** 的战区资产组里**删掉**这一项（U45）。
+
+        删的是**整项**，不是把次数清零 —— 清零会留下一个永远用不了的
+        死条目，游戏里还白占一个按钮。
+        """
+        return Edit("theater_asset_remove", {"asset": asset})
+
     # ---------------------------------------------------------------- 描述
 
     def describe(self) -> str:
@@ -373,4 +403,10 @@ class Edit:
                     v = "无限"
                 bits.append(f"{cn} → {v}")
             return f"战区资产 {p.get('asset')}：" + "、".join(bits)
+        if k == "theater_asset_add":
+            v = "无限" if p.get("uses_total") is None else p.get("uses_total")
+            return (f"加战区资产 {p.get('asset')}"
+                    f"（每回合恢复 {p.get('uses_turn')}，本场景剩余 {v}）")
+        if k == "theater_asset_remove":
+            return f"删战区资产 {p.get('asset')}"
         return k
