@@ -36,6 +36,9 @@ class Page(tk.Frame):
         super().__init__(master, bg=C.WINDOW)
         self.app = app
         self.view = None
+        #: 占位框（`None` = 这一页没有占位框，是有真内容的页）
+        #: —— 留给 `tests/test_gui_smoke.py` 做回归断言
+        self._placeholder_box = None
         self.build()
 
     # ---- 子类实现 ----
@@ -68,6 +71,7 @@ class Page(tk.Frame):
         tk.Label(box, text=text, bg=C.SURFACE, fg=C.MUTED,
                  font=(UI_FONT, FS_BODY), wraplength=560,
                  justify="left").pack(padx=22, pady=26, anchor="nw")
+        self._placeholder_box = box
 
 
 class SimplePage(Page):

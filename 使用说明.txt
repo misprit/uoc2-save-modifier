@@ -65,7 +65,7 @@
               save_modifier_gui\    图形界面
               save_modifier\        自测入口
     docs\     参考文档（核心库调用说明 / 命令参考 / 开发上下文 / GUI 设计规范 / GUI 视觉稿）
-    tests\    自动化测试（242 项）
+    tests\    自动化测试（249 项）
     run_gui.bat       启动图形界面
     run.bat           启动自测入口
     run_tests.bat    跑全部自动化测试

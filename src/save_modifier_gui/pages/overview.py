@@ -23,6 +23,10 @@ class OverviewPage(Page):
     icon = "▤"
     title = "概览"
     caption = "存档体检"
+    #: 这一页是**真内容**（下面自己建面板）⇒ 不叠 `Page` 的通用占位框。
+    #: ⚠️ 忘了置空的话，页首会出现"这一页将在后续阶段实现"，
+    #: 与下方的真实体检结果自相矛盾（2026-11-18 实测踩到）。
+    default_placeholder = ""
 
     def build(self) -> None:
         super().build()
