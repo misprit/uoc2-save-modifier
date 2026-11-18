@@ -246,6 +246,67 @@ table.spec-tbl .thumb{width:30px;height:30px;background:var(--stage);border:1px 
   border-radius:4px;display:grid;place-items:center;overflow:hidden}
 table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
 
+/* ---------- 只读徽章（游戏包里的数值） ---------- */
+.ro{display:inline-block;font-size:10px;color:var(--muted);border:1px dashed var(--border);
+  border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:middle}
+.card .cs{background:var(--surface-alt);border-radius:4px;padding:2px 0;color:var(--muted)}
+
+/* ---------- 可调比例的两列 ---------- */
+.cols-wide{grid-template-columns:minmax(520px,1.45fr) minmax(340px,1fr)}
+
+/* ---------- 总部页 ---------- */
+.hqlist{padding:4px 0;max-height:300px;overflow:hidden}
+.hqrow{display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid #f0f3f6;font-size:12.5px}
+.hqrow:hover{background:var(--accent-light)}
+.hqrow.on{background:var(--selection)}
+.hqrow .nm{flex:1;min-width:0}
+.hqrow .nm b{display:block;font-weight:600}
+.hqrow .nm span{font-size:11px;color:var(--muted)}
+.hqrow .lv{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:right}
+.expbar{height:9px;border-radius:5px;background:var(--surface-alt);border:1px solid var(--border);
+  overflow:hidden;margin-top:6px}
+.expbar i{display:block;height:100%;background:var(--accent)}
+.branches{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.brow{display:flex;align-items:center;gap:9px;padding:6px 11px;border-bottom:1px solid #f0f3f6;font-size:12.5px}
+.brow:last-child{border-bottom:none}
+.brow .bn{width:46px;color:var(--muted)}
+.brow .bl{font-family:var(--mono);font-weight:700;color:var(--accent-dark);width:40px}
+.brow .sup{font-size:10.5px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 5px}
+.brow .step{font-family:var(--mono);color:var(--muted);letter-spacing:.18em}
+.brow .hint{margin-left:auto;font-size:10.5px;color:var(--muted);text-align:right}
+.fpool{margin-top:12px;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.fprow{display:flex;align-items:center;gap:10px;padding:7px 11px;border-bottom:1px solid #f0f3f6;font-size:12.5px}
+.fprow:last-child{border-bottom:none}
+.fprow .thumb{width:28px;height:28px;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:4px;display:grid;place-items:center;overflow:hidden;flex:none}
+.fprow .thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.fprow .q{font-family:var(--mono);font-weight:700;color:var(--accent-dark);width:32px;text-align:right}
+
+/* ---------- 卡牌页 ---------- */
+.hand{display:flex;gap:12px;padding:12px;flex-wrap:wrap}
+.hcard{width:92px}
+.hcard .ci{width:92px;height:112px;background:var(--stage);border:1px solid var(--stage-edge);
+  border-radius:7px;display:grid;place-items:center;overflow:hidden}
+.hcard .ci img{max-width:100%;max-height:100%;object-fit:contain}
+.hcard .cp{font-size:11px;color:var(--muted);text-align:center;margin-top:4px}
+.hcard .cp b{font-family:var(--mono);color:var(--accent-dark)}
+.hcard .rm{width:100%;margin-top:5px;font-size:11px;padding:3px}
+.costs{display:flex;gap:9px;padding:10px 12px;font-size:11.5px;color:var(--muted);
+  border-top:1px solid var(--border);flex-wrap:wrap}
+.costs b{font-family:var(--mono);color:var(--accent-dark)}
+.note{padding:10px 12px;font-size:11.5px;color:var(--muted);background:var(--surface-alt);
+  border-top:1px solid var(--border);line-height:1.6}
+.note b{color:var(--warn)}
+.note .w{color:var(--accent);font-weight:600}
+
+/* ---------- 商店 tab（普通 / 精英） ---------- */
+.tabs{display:flex;gap:2px;background:var(--surface-alt);border:1px solid var(--border);
+  border-radius:6px;padding:2px}
+.tabs .tb{padding:4px 13px;font-size:12.5px;border-radius:5px;color:var(--muted)}
+.tabs .tb.on{background:var(--surface);color:var(--accent-dark);font-weight:600;
+  box-shadow:0 1px 3px rgba(20,40,60,.12)}
+.tabs .tb .n{font-family:var(--mono);font-size:11px;opacity:.75;margin-left:4px}
+
 /* ---------- 窄窗口兜底（真程序是 1440×900，这里只是让本稿在窄窗口也不至于挤坏） ---------- */
 @media (max-width:1240px){
   .cols{grid-template-columns:1fr}
@@ -467,8 +528,10 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>3 · 特种兵图鉴</h2>
-<p class="lead">378 种真实贴图，网格卡片。主图用 <code>hq_action_icon.png</code>（160×160，唯一够大的一张）。</p>
+<h2>3 · 特种兵页（图鉴只读 + 挂载可改）</h2>
+<p class="lead"><b>数值在游戏包里，存档里没有</b> —— <code>entity_types/specialists/*.yml</code> 定义攻/防/装/火，
+存档 <code>units.yml</code> 的 <code>specs</code> 只有 <code>{active, captured, idx, type}</code>。
+所以这一页是<b>图鉴（只读）+ 挂载（可改）</b>，不是编辑器。</p>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -482,51 +545,259 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
     </div>
     <div class="work">
       <div class="toolbar">
-        <input class="inp" placeholder="搜索特种兵…" style="width:200px">
-        <span class="sel">按国籍 ▾</span><span class="sel">按攻击 ▾</span>
-        <label class="chk"><input type="checkbox"> 只看本存档已有的</label>
+        <input class="inp" placeholder="搜索特种兵…" style="width:190px">
+        <span class="sel">按国籍 ▾</span><span class="sel">按阵营 ▾</span>
+        <label class="chk"><input type="checkbox"> 只看已挂载</label>
         <span class="sp"></span>
-        <span style="font-size:12px;color:var(--muted)">当前单位：第 1 装甲师</span>
+        <span style="font-size:12px;color:var(--muted)">375 种 · 数值只读</span>
       </div>
-      <div class="panel"><h3>全部特种兵 · 378 种</h3><div class="grid" id="specgrid"></div></div>
-    </div>
-  </div>
-</div>
-
-<h2>4 · 商店页</h2>
-<div class="app">
-  <div class="body" style="min-height:0">
-    <div class="rail" style="width:150px">
-      <div class="grp">功能</div>
-      <div class="nav on"><span class="ic">▩</span>商店</div>
-    </div>
-    <div class="work">
-      <div class="toolbar"><span class="sel">战线：西部 ▾</span><span class="sel">会议：第 3 次 ▾</span>
-        <span class="sp"></span><span style="font-size:12px;color:var(--muted)">价格 / 库存：滚轮可调</span></div>
-      <div class="panel">
-        <h3>商品 · 5 条</h3>
-        <table class="spec-tbl">
-          <tr><th style="width:46px"></th><th>商品</th><th>国籍</th><th style="text-align:right">价格</th>
-              <th style="text-align:right">库存</th><th style="text-align:right">操作</th></tr>
-          <tr><td><div class="thumb"><img id="s1" alt=""></div></td><td>第 1 装甲师</td><td>美</td>
-              <td class="num">120</td><td class="num">2</td>
-              <td class="num"><button class="btn danger">下架</button></td></tr>
-          <tr><td><div class="thumb"><img id="s2" alt=""></div></td><td>特种兵 · 拖曳炮</td><td>德</td>
-              <td class="num">60</td><td class="num">1</td>
-              <td class="num"><button class="btn danger">下架</button></td></tr>
-          <tr><td><div class="thumb"><img id="s3" alt=""></div></td><td>摩托化步兵</td><td>英</td>
-              <td class="num">95</td><td class="num">3</td>
-              <td class="num"><button class="btn danger">下架</button></td></tr>
-        </table>
-        <div style="padding:10px 13px;font-size:12px;color:var(--muted)">
-          「下架」= 删条目（<code>Edit.store_remove</code>），<b>不是</b>把库存设成 0 —— 游戏里没有售罄标记，设 0 会被核心库硬拦。
+      <div class="cols cols-wide">
+        <div class="panel">
+          <h3>特种兵图鉴 · 375 种 <span class="ro">数值来自游戏包，只读</span></h3>
+          <div class="grid" id="specgrid"></div>
+        </div>
+        <div class="panel">
+          <h3>挂载</h3>
+          <div class="detail">
+            <div class="toolbar" style="margin-bottom:10px">
+              <span class="sel">单位：第 1 装甲师 ▾</span>
+            </div>
+            <div class="umeta" style="margin-bottom:8px">可挂 <b style="font-family:var(--mono);color:var(--accent-dark)">2</b>
+              · 已挂 <b style="font-family:var(--mono);color:var(--accent-dark)">1</b></div>
+            <div class="specs" id="specs2"></div>
+            <div class="note" style="border-radius:7px;border:1px solid var(--border);border-top:1px solid var(--border);margin-top:14px">
+              点左侧图鉴卡片 = <span class="w">挂到当前单位</span>。<br>
+              数值（攻/防/装/火）写在游戏包里，改它要改 mod，<b>不在本工具范围内</b>。
+            </div>
+            <div style="margin-top:12px">
+              <div class="grp" style="font-size:11px;color:var(--muted);padding:0 0 6px">全存档占用</div>
+              <div class="costs" style="border:1px solid var(--border);border-radius:7px;padding:8px 10px">
+                反坦克手 <b>×3</b> · 工兵 <b>×1</b> · 拖曳炮 <b>×1</b>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<h2>5 · 战区资产页（四态图标直接复用游戏贴图）</h2>
+<h2>4 · 总部页（经验 / 升级 / 兵库）</h2>
+<p class="lead"><code>hqs.yml</code> 里每个总部 <b>26 个字段</b>：「经验」= <code>xp / xp_target</code>，
+「升级」= 五个分支 <code>branch_levels</code>（工程/兵库/情报/后勤/作战），
+「兵库」= <code>force_pool</code>。<b>三样都在存档里，都能改。</b></p>
+<div class="app">
+  <div class="body" style="min-height:0">
+    <div class="rail" style="width:150px">
+      <div class="grp">功能</div>
+      <div class="nav"><span class="ic">▤</span>概览</div>
+      <div class="nav"><span class="ic">▥</span>单位</div>
+      <div class="nav"><span class="ic">▦</span>特种兵</div>
+      <div class="nav on"><span class="ic">▧</span>总部<span class="ct">23</span></div>
+      <div class="nav"><span class="ic">▨</span>卡牌</div>
+      <div class="nav"><span class="ic">▩</span>商店</div>
+    </div>
+    <div class="work">
+      <div class="toolbar">
+        <input class="inp" placeholder="搜索总部…" style="width:190px">
+        <span class="sel">按战线 ▾</span><span class="sel">按阵营 ▾</span>
+        <span class="sp"></span>
+        <span style="font-size:12px;color:var(--muted)">经验 / 分支等级：滚轮可调</span>
+      </div>
+      <div class="cols">
+        <div class="panel">
+          <h3>总部 · 23 个</h3>
+          <div class="hqlist" id="hqlist"></div>
+        </div>
+        <div class="panel">
+          <h3>总部详情</h3>
+          <div class="detail">
+            <div class="dhead">
+              <div>
+                <div class="dtitle">北方集团军 <span class="edit">✎ 改名</span></div>
+                <div class="dsub">ger_hq_dlc4_17 · 将军 冯·博克 · CP 6/6 · 补给 3</div>
+              </div>
+            </div>
+
+            <div class="stat" style="margin-top:12px">
+              <div class="lb"><span>总部经验</span><span class="hintw">滚轮调 xp</span></div>
+              <div class="v">87 <small>/ 220 升到下一级</small></div>
+              <div class="expbar"><i style="width:40%"></i></div>
+            </div>
+
+            <div class="branches">
+              <div class="brow"><span class="bn">工程</span><span class="bl">Lv3</span>
+                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
+                <span class="hint">升到 Lv3 解锁：架桥 / 渡河 / 强攻渡河 / 固守</span></div>
+              <div class="brow"><span class="bn">兵库</span><span class="bl">Lv1</span>
+                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
+                <span class="hint">解锁：整编 / 输送 / 警戒部队</span></div>
+              <div class="brow"><span class="bn">情报</span><span class="bl">Lv1</span>
+                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
+                <span class="hint">解锁：补给紧急状态 / 补给倾泻</span></div>
+              <div class="brow"><span class="bn">后勤</span><span class="bl">Lv2</span>
+                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
+                <span class="hint">解锁：摩托化兵库</span></div>
+              <div class="brow"><span class="bn">作战</span><span class="bl">Lv2</span>
+                <span class="sup">压制 0</span><span class="step">◀ ▶</span>
+                <span class="hint">解锁：压制射击 / 固守反击 / 前出侦察</span></div>
+            </div>
+
+            <div class="fpool">
+              <div class="fprow" style="background:var(--surface-alt);font-weight:600">
+                <span style="width:28px"></span><span style="flex:1">总部兵库 · 4 条</span>
+                <span class="q">存量</span><span style="width:74px"></span></div>
+              <div class="fprow"><div class="thumb"><img alt=""></div>
+                <span style="flex:1">第 1 装甲师</span><span class="q">2</span>
+                <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
+              <div class="fprow"><div class="thumb"><img alt=""></div>
+                <span style="flex:1">摩托化步兵</span><span class="q">0</span>
+                <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
+              <div class="fprow"><div class="thumb"><img alt=""></div>
+                <span style="flex:1">特种兵 · 工兵</span><span class="q">1</span>
+                <span class="step" style="font-family:var(--mono);color:var(--muted)">◀ ▶</span></div>
+              <div class="fprow" style="justify-content:flex-end;gap:8px">
+                <button class="btn" style="font-size:11.5px">＋ 添加条目</button>
+                <button class="btn danger" style="font-size:11.5px">－ 移除条目</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>5 · 卡牌页（手牌 + 图鉴 + 抽卡来源）</h2>
+<p class="lead"><b>游戏里没有"卡牌商店"</b> —— 卡牌是会议结束按 <code>card_probabilities</code> 抽的。
+存档 <code>cards.yml</code> 只有 <code>{card_type, is_free, position, unit_id, used}</code>。</p>
+<div class="app">
+  <div class="body" style="min-height:0">
+    <div class="rail" style="width:150px">
+      <div class="grp">功能</div>
+      <div class="nav"><span class="ic">▤</span>概览</div>
+      <div class="nav"><span class="ic">▥</span>单位</div>
+      <div class="nav"><span class="ic">▦</span>特种兵</div>
+      <div class="nav"><span class="ic">▧</span>总部</div>
+      <div class="nav on"><span class="ic">▨</span>卡牌<span class="ct">3</span></div>
+      <div class="nav"><span class="ic">▩</span>商店</div>
+    </div>
+    <div class="work">
+      <div class="toolbar">
+        <span style="font-size:12.5px;color:var(--muted)">手牌 = 存档 <code>cards.yml</code>（当前 3 张）</span>
+        <span class="sp"></span>
+        <button class="btn">＋ 加一张</button>
+        <button class="btn">恢复上次会议的牌局</button>
+      </div>
+      <div class="cols">
+        <div class="panel">
+          <h3>手牌 · 3 张</h3>
+          <div class="hand" id="hand"></div>
+          <div class="note">手牌只在<b>会议界面</b>存在（<code>has_card_store</code>）。
+            不在会议里时这一半显示说明卡。</div>
+        </div>
+        <div class="panel">
+          <h3>卡牌图鉴 · 39 种 <span class="ro">只读</span></h3>
+          <div class="grid" id="cardgrid" style="grid-template-columns:repeat(auto-fill,minmax(96px,1fr))"></div>
+          <div class="costs"><span>抽卡来源（L2 · 只读）：</span>
+            <span>空中舰队 <b>6.0</b></span><span>舰炮轰击 <b>0.0</b></span>
+            <span>总部强化 <b>6.0</b></span><span>商店 <b>0.0</b></span></div>
+          <div class="note">ⓘ <b>游戏里没有卡牌商店</b>，卡牌是按概率抽的。
+            贴图文件名 ≠ <code>image</code> 字段 ⇒ 查找顺序
+            <code>bgt_</code> → <code>bgmf_</code> → <code>bgm_</code> → <code>logo_</code> → 原名
+            → <b>去掉阵营后缀再试</b> → <b>用类型名兜底</b> → 占位（实测 <b>39/39 全部命中</b>）。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>6 · 商店页（普通店 / 精英店 + 上架）</h2>
+<p class="lead">真实结构是 <code>{战线: {store: [...], elite_store: [...]}}</code> —— <b>两档商店</b>。
+<b>价格和数量都在存档里</b>（字节码：<code>set_store_data</code> 用存档覆盖会议默认）⇒
+<b>可以自由改价、可以上架</b>，但商品种类必须是游戏定义过的。</p>
+<div class="app">
+  <div class="body" style="min-height:0">
+    <div class="rail" style="width:150px">
+      <div class="grp">功能</div>
+      <div class="nav"><span class="ic">▤</span>概览</div>
+      <div class="nav"><span class="ic">▥</span>单位</div>
+      <div class="nav"><span class="ic">▦</span>特种兵</div>
+      <div class="nav"><span class="ic">▧</span>总部</div>
+      <div class="nav"><span class="ic">▨</span>卡牌</div>
+      <div class="nav on"><span class="ic">▩</span>商店</div>
+    </div>
+    <div class="work">
+      <div class="toolbar">
+        <span class="sel">战线：南部 ▾</span>
+        <div class="tabs"><span class="tb on">普通商店<span class="n">13</span></span>
+          <span class="tb">精英商店<span class="n">0</span></span></div>
+        <span class="sp"></span>
+        <span style="font-size:12px;color:var(--muted)">价格 / 库存：滚轮可调</span>
+        <button class="btn pri">＋ 上架</button>
+      </div>
+      <div class="panel">
+        <h3>普通商店 · 13 条</h3>
+        <table class="spec-tbl">
+          <tr><th style="width:46px"></th><th>商品</th><th>国籍</th><th style="text-align:right">价格</th>
+              <th style="text-align:right">库存</th><th style="text-align:right">操作</th></tr>
+          <tr><td><div class="thumb"><img id="s1" alt=""></div></td><td>步兵</td><td>德</td>
+              <td class="num">10</td><td class="num">19</td>
+              <td class="num"><button class="btn danger">下架</button></td></tr>
+          <tr><td><div class="thumb"><img id="s2" alt=""></div></td><td>装甲</td><td>德</td>
+              <td class="num">10</td><td class="num">6</td>
+              <td class="num"><button class="btn danger">下架</button></td></tr>
+          <tr><td><div class="thumb"><img id="s3" alt=""></div></td><td>特种兵 · 拖曳炮</td><td>德</td>
+              <td class="num">40</td><td class="num">2</td>
+              <td class="num"><button class="btn danger">下架</button></td></tr>
+          <tr><td><div class="thumb"><img id="s4" alt=""></div></td><td>特种兵 · 拖曳炮</td><td>德</td>
+              <td class="num">25</td><td class="num">4</td>
+              <td class="num"><button class="btn danger">下架</button></td></tr>
+        </table>
+        <div class="note">
+          「下架」= <b>删条目</b>（<code>Edit.store_remove</code>），<b>不是</b>把库存设成 0 ——
+          游戏里没有售罄标记，设 0 会被 schema 拒绝。<br>
+          实测（战线 南部 / 会议 c_42_07）：会议默认 19 条，存档 13 条 ——
+          少的 6 条是游戏自动下架的，<b>价格零差异</b>，3 条库存递减（20→19 / 10→6 / 3→1）。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="app" style="margin-top:14px">
+  <div class="hdr" style="border-bottom:1px solid var(--border)">
+    <div class="brand"><span class="logo">U2</span>上架新商品</div>
+  </div>
+  <div class="modal" style="width:auto;margin:14px;box-shadow:none;border:1px solid var(--border)">
+    <div class="mh">上架新商品 <span class="ro">存进 store.yml</span></div>
+    <div class="mb">
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:64px;color:var(--muted)">商品类型</span>
+          <span class="sel">特种兵 ▾</span><span class="sel">拖曳炮 · 42 ▾</span>
+          <span style="font-size:11.5px;color:var(--muted)">（375 种特种兵 / 2 种兵种 × 34 种国籍）</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:64px;color:var(--muted)">国籍</span><span class="sel">德 ▾</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:64px;color:var(--muted)">价格</span>
+          <span style="font-family:var(--mono);font-weight:700;color:var(--accent-dark);font-size:17px">40</span>
+          <span style="font-size:11.5px;color:var(--muted)">Ctrl+滚轮 ±5 · 任意非负整数，不必是会议默认值</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:64px;color:var(--muted)">库存</span>
+          <span style="font-family:var(--mono);font-weight:700;color:var(--accent-dark);font-size:17px">2</span>
+          <span style="font-size:11.5px;color:var(--muted)">Ctrl+滚轮 ±1 · 正整数</span></div>
+      </div>
+      <div class="note" style="border:1px solid var(--border);border-radius:7px;margin-top:12px;border-top:1px solid var(--border)">
+        ⓘ 商品必须是游戏里定义过的（<b>特种兵 / 兵种 × 国籍</b>）—— schema 会校验。<br>
+        ⓘ 库存<b>不能为 0</b> —— 游戏没有"售罄"标记，要下架请删条目。<br>
+        ⓘ <code>spec</code> 与 <code>equipment</code> <b>二选一</b>，不能同时给。
+      </div>
+    </div>
+    <div class="mf"><button class="btn">取消</button><button class="btn pri">上架</button></div>
+  </div>
+</div>
+
+<h2>7 · 战区资产页（四态图标直接复用游戏贴图）</h2>
 <p class="lead">11 个资产，各 4 态：<code>_neutral</code> / <code>_hover</code> / <code>_down</code> / <code>_disabled</code>。游戏已经画好了，我们只管换文件名。</p>
 <div class="app">
   <div class="body" style="min-height:0">
@@ -540,7 +811,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>6 · 写盘确认框</h2>
+<h2>8 · 写盘确认框</h2>
 <p class="lead">任何写盘前都要先出现"要改什么"。软警告不拦、硬拦禁用按钮。</p>
 <div style="display:flex;gap:18px;flex-wrap:wrap">
   <div class="modal">
@@ -583,7 +854,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>7 · 其它页 · 概览（存档体检）</h2>
+<h2>9 · 其它页 · 概览（存档体检）</h2>
 <div class="app">
   <div class="body" style="min-height:0">
     <div class="rail" style="width:150px">
@@ -620,7 +891,7 @@ table.spec-tbl .thumb img{max-width:100%;max-height:100%;object-fit:contain}
   </div>
 </div>
 
-<h2>8 · 启动页（选存档）</h2>
+<h2>10 · 启动页（选存档）</h2>
 <div class="app" style="max-width:760px">
   <div class="body" style="min-height:0;justify-content:center;padding:34px">
     <div style="width:100%;max-width:600px">
@@ -705,6 +976,73 @@ const THEATER = [
   ["precision_bombing","精确轰炸"],["saturation_strike","饱和攻击"]
 ];
 
+/* ---------------- 新增数据（全部取自真实存档 / 游戏包） ---------------- */
+
+/* 总部：字段结构来自真实 hqs.yml（xp/xp_target/branch_levels/force_pool…） */
+const HQS = [
+  ["ger_hq_dlc4_17","北方集团军","冯·博克","德",6,6,3,87,220,"Lv3/Lv1/Lv1/Lv2/Lv2",4],
+  ["ger_hq_dlc4_4","西部集团军","伦茨 · 冯 · 曼陀菲尔","德",8,8,2,140,220,"Lv2/Lv1/Lv2/Lv2/Lv1",6],
+  ["ger_hq_dlc4_9","东部集团军","约德尔 · 冯 · 克莱因希特","德",4,8,4,60,220,"Lv1/Lv1/Lv1/Lv1/Lv3",3],
+  ["sws_hq_dlc4_3","苏军北方方面军","朱可夫","苏",7,9,5,196,220,"Lv3/Lv2/Lv2/Lv3/Lv2",5],
+  ["sws_hq_dlc4_11","苏军南方方面军","瓦图金","苏",5,9,3,124,220,"Lv2/Lv1/Lv2/Lv2/Lv2",4],
+  ["uk_hq_dlc4_2","英军中央司令部","蒙哥马利","英",6,10,4,158,220,"Lv3/Lv2/Lv1/Lv3/Lv1",7],
+  ["ita_hq_dlc4_6","意大利军集群","梅塞特","意",3,7,2,44,220,"Lv1/Lv1/Lv1/Lv2/Lv1",2],
+  ["rom_hq_dlc4_1","罗马尼亚军集群","安东内斯库","罗",2,6,1,31,220,"Lv1/Lv1/Lv1/Lv1/Lv1",1]
+];
+
+/* 卡牌：cost / theater_asset / image 全部来自 entity_types/cards/*.yml */
+const CARDS = [
+  ["precision_bombing_axis","精确轰炸",75,"精确轰炸"],["flying_artillery_axis","飞行炮兵",40,"飞行炮兵"],
+  ["air_fleet_axis","航空舰队",60,"空袭"],["air_hq_axis","空中总部",50,"飞行炮兵"],
+  ["naval_bombardment_axis","舰炮轰击",45,"舰炮轰击"],["sabotage_axis","破坏行动",30,"破坏"],
+  ["store_allies","物资补给",20,"—"],["truck_allies","卡车运输",25,"—"],
+  ["espionage_allies","间谍行动",30,"间谍"],["power_hq_axis","总部强化",20,"—"],
+  ["long_range_recon_allies","远程侦察",10,"远程侦察"],["saturation_strike_allies","饱和攻击",40,"饱和攻击"]
+];
+
+/* 卡牌 image 字段 → 实际 PNG：文件名带前缀，且 image 字段**不总是**等于文件名
+   （实测 image='cards/generic_para' 的文件其实是 logo_divisional_para_allies_1.png） */
+const CARD_IMG = {
+  air_attack_allies:"cards/air_attack_allies", air_attack_axis:"cards/air_attack_allies",
+  air_attack_soviet:"cards/air_attack_soviet", air_fleet_axis:"cards/air_fleet_allies",
+  air_hq_axis:"cards/air_hq_axis", air_supply_allies:"cards/air_supply_allies",
+  air_supply_axis:"cards/air_supply_allies", air_supply_soviet:"cards/air_supply_soviet",
+  arty_prep_soviet:"cards/arty_prep_soviet", divisional_para_allies_1:"cards/generic_para",
+  divisional_para_allies_101:"cards/generic_para", divisional_para_allies_82:"cards/generic_para",
+  espionage_allies:"cards/espionage_allies", espionage_soviet:"cards/espionage_soviet",
+  flying_artillery_axis:"cards/flying_artillery_axis", long_range_recon_allies:"cards/long_range_recon_allies",
+  long_range_recon_axis:"cards/long_range_recon_axis", long_range_recon_soviet:"cards/long_range_recon_soviet",
+  naval_bombardment_allies:"cards/naval_bombardment_allies", naval_bombardment_axis:"cards/naval_bombardment_axis",
+  power_hq_axis:"cards/power_hq_axis", precision_bombing_axis:"cards/precision_bombing_axis",
+  sabotage_allies:"cards/sabotage_allies", sabotage_axis:"cards/sabotage_axis",
+  sabotage_soviet:"cards/sabotage_soviet", saturation_strike_allies:"cards/saturation_strike_allies",
+  store_allies:"cards/store_allies", store_axis:"cards/store_axis", store_soviet:"cards/store_soviet",
+  tactical_naval_assault_uk:"cards/generic_lst", tactical_naval_assault_us:"cards/generic_lst",
+  tactical_para_german:"cards/generic_para", tactical_para_polish:"cards/generic_para",
+  tactical_para_soviet:"cards/generic_para", tactical_para_uk:"cards/generic_para",
+  tactical_para_us:"cards/generic_para", truck_allies:"cards/truck_allies",
+  truck_axis:"cards/truck_axis", truck_soviet:"cards/truck_soviet"
+};
+function cardImg(el, type){
+  const base = SUR+"cards/";
+  const b = (CARD_IMG[type]||("cards/"+type)).split("/").pop();
+  const b2 = b.replace(/_(allies|axis|soviet)$/,"");   /* 去掉阵营后缀 */
+  const cands = [];
+  ["bgt_","bgmf_","bgm_","logo_"].forEach(p=>cands.push(p+b+".png"));
+  cands.push(b+".png");
+  ["bgt_","bgmf_","bgm_","logo_"].forEach(p=>cands.push(p+b2+".png"));
+  cands.push(b2+".png");
+  cands.push("logo_"+type+".png");       /* 伞兵卡：用类型名 */
+  cands.push("bgt_"+type+".png");
+  let i = 0;
+  el.onerror = function(){
+    if (i < cands.length){ this.src = base + cands[i++]; }
+    else { this.style.display="none"; }
+  };
+  el.src = base + cands[i++];
+  el.alt = type;
+}
+
 /* ---------------- 渲染 ---------------- */
 const sw = document.getElementById("sw");
 PALETTE.forEach(([n,v,d])=>{
@@ -780,10 +1118,64 @@ SPECIALISTS.forEach(([t,n,a,d,f])=>{
   sg.appendChild(c);
 });
 
-/* 商店缩略 */
-img(document.getElementById("s1"), SUR+"unit/us_arm_42/sheet_L.png");
-img(document.getElementById("s2"), SUR+"specialist/bel_arty_towed_40/hq_action_icon.png");
-img(document.getElementById("s3"), SUR+"unit/uk_arm_div_late_dlc6/sheet_L.png");
+/* 商店缩略（真实商店条目：步兵/装甲/拖曳炮…） */
+img(document.getElementById("s1"), SUR+"unit/ger_jag_dlc4/sheet_L.png");
+img(document.getElementById("s2"), SUR+"unit/us_arm_42/sheet_L.png");
+img(document.getElementById("s3"), SUR+"specialist/ger_towed_arty_42/hq_action_icon.png");
+img(document.getElementById("s4"), SUR+"specialist/ger_towed_at_dlc3/hq_action_icon.png");
+
+/* ---------- 总部页 ---------- */
+const hql=document.getElementById("hqlist");
+HQS.forEach(([t,n,g,nat,cp,mcp,sup,xp,xpt,lv,fp],i)=>{
+  const r=document.createElement("div"); r.className="hqrow"+(i===0?" on":"");
+  r.innerHTML=`<div class="nm"><b>${n}</b><span>${g} · ${nat} · CP ${cp}/${mcp} · 补给 ${sup}</span></div>
+    <div class="lv">${xp}/${xpt}</div>`;
+  hql.appendChild(r);
+});
+/* 总部兵库缩略 */
+document.querySelectorAll(".fpool .fprow .thumb img").forEach((im,i)=>{
+  const srcs=[SUR+"unit/us_arm_42/sheet_L.png", SUR+"unit/ger_jag_dlc4/sheet_L.png",
+              SUR+"specialist/cz_s_eng_dlc9/hq_action_icon.png"];
+  if(srcs[i]) img(im, srcs[i]);
+});
+
+/* ---------- 特种兵页 · 挂载面板 ---------- */
+const sp2=document.getElementById("specs2");
+if(sp2){
+  ["bel_at_40","cz_s_eng_dlc9"].forEach(s=>{
+    const w=document.createElement("div"); w.className="specwrap";
+    w.innerHTML=`<div class="spec"><img alt=""></div><div class="spec">✕</div>`;
+    img(w.querySelectorAll("img")[0], SUR+"specialist/"+s+"/hq_action_icon.png", s);
+    w.querySelectorAll(".spec")[1].style.cssText="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--danger);color:#fff;font-size:10px;display:grid;place-items:center";
+    sp2.appendChild(w);
+  });
+  const a2=document.createElement("div"); a2.className="spec add"; a2.textContent="＋";
+  sp2.appendChild(a2);
+}
+
+/* ---------- 卡牌页 ---------- */
+const hd=document.getElementById("hand");
+if(hd){
+  [["precision_bombing_axis",75,"位置1",true],["flying_artillery_axis",40,"位置2",false],
+   ["sabotage_axis",30,"位置3",false]].forEach(([t,c,pos,free])=>{
+    const c1=document.createElement("div"); c1.className="hcard";
+    c1.innerHTML=`<div class="ci"><img alt=""></div>
+      <div class="cp">${pos}${free?' · 免费':''}<br>费用 <b>${c}</b></div>
+      <button class="btn rm">移除</button>`;
+    cardImg(c1.querySelector("img"), t);
+    hd.appendChild(c1);
+  });
+}
+const cg=document.getElementById("cardgrid");
+if(cg){
+  CARDS.forEach(([t,n,c,a])=>{
+    const el=document.createElement("div"); el.className="card";
+    el.innerHTML=`<div class="ci"><img alt=""></div><div class="cn">${n}</div>
+      <div class="cs">费用 ${c} · ${a}</div>`;
+    cardImg(el.querySelector("img"), t);
+    cg.appendChild(el);
+  });
+}
 
 /* 战区资产 */
 const tg=document.getElementById("theater");
