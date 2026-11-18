@@ -451,8 +451,62 @@ def run(serve_only: bool = False, no_window: bool = False) -> int:
     return 0
 
 
+def check() -> int:
+    """自检（不弹窗）：起服务 → 探接口 → 探贴图 → 退出。
+
+    用来回答「装好了没 / 能不能跑」：游戏目录、存档列表、贴图代理、
+    Edge 在不在，一项一项报出来。
+    """
+    import urllib.request
+
+    ok = True
+    token = secrets.token_urlsafe(16)
+    _Handler.token = token
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    port = httpd.server_address[1]
+    threading.Thread(target=_serve_forever, args=(httpd,), daemon=True).start()
+    base = "http://127.0.0.1:%d" % port
+
+    def get(path):
+        req = urllib.request.Request(base + path)
+        req.add_header("X-Token", token)
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.status, r.headers.get("Content-Type", ""), r.read()
+
+    try:
+        st, _, body = get("/api/saves")
+        n = len(json.loads(body.decode("utf-8")).get("saves") or [])
+        print("[OK ] 存档列表接口正常 —— %d 个存档" % n)
+    except Exception as exc:
+        print("[NG ] 存档列表接口失败：%s" % exc)
+        ok = False
+
+    try:
+        st, ct, body = get("/surfaces/unit/ger_inf_42/sheet_L.png")
+        good = body[:4] == b"\x89PNG"
+        print("[%s ] 贴图代理：%s（%d 字节）"
+              % ("OK" if good else "NG", ct, len(body)))
+        ok = ok and good
+    except Exception as exc:
+        print("[NG ] 贴图代理失败：%s" % exc)
+        ok = False
+
+    edge = find_edge()
+    if edge:
+        print("[OK ] Edge：%s" % edge)
+    else:
+        print("[NG ] 找不到 Edge —— 装 Edge，或用 run_web.bat --serve 自己开浏览器")
+        ok = False
+
+    httpd.shutdown()
+    print("自检" + ("通过" if ok else "失败"))
+    return 0 if ok else 1
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if "--check" in argv:
+        return check()
     return run(serve_only="--serve" in argv, no_window="--no-window" in argv)
 
 

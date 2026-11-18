@@ -18,8 +18,6 @@ if "%~1"=="--check" (
     pause
     exit /b %errorlevel%
 )
+rem The GUI window IS the interface: close it and everything exits (no pause here).
 "python\python.exe" -m save_modifier_web.server %*
-set "rc=%errorlevel%"
-rem Keep the window open only when launched by double-click (no arguments).
-if "%~1"=="" pause
-exit /b %rc%
+exit /b %errorlevel%
