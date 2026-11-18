@@ -63,10 +63,22 @@ CARD_STORE_LIMIT = {"easy": 5, "normal": 5, "classic": 5, "hard": 5}
 CARD_FIELD_ALLOWED = {"is_free"}
 
 #: 总部**允许改**的字段（§7.4）
+#:
+#: ⚠️ `name_brief` / `name_full` 是 U44 补上的 ——
+#: 验收（F1）发现总部页 UI 上有「改名」按钮，但这里**没有**这两个字段
+#: ⇒ 一点就报「不允许改总部字段」。
+#: 取证：游戏的 `scenario_hq_schema` 里 `'name_brief': Or(str, None)`
+#: ⇒ 名字字段本来就是字符串（或 None），写明文合法（与单位改名同一套口径）。
+#: （游戏自己的改名走根 main.yml 的 `renamed_hqs` —— 那是 **id 重映射**，
+#:  键和值都是正整数，不是名字表；它为空时游戏就显示 hqs.yml 里的 name_brief。）
 HQ_FIELD_ALLOWED = {
     "xp", "xp_target", "cp", "max_cp", "supply",
     "trucks", "prisoners", "loss_count", "intels_revealed",
+    "name_brief", "name_full",
 }
+
+#: 总部里**是字符串**的字段（其余都是整数）
+HQ_FIELD_TEXT = {"name_brief", "name_full"}
 
 #: 总部的五个分支（§7.4）
 HQ_BRANCHES = ("engineering", "force_pool", "intel", "logistics", "operations")
@@ -399,7 +411,15 @@ def _hq_field(w, e: Edit) -> Outcome:
         oc.errors.append(
             f"不允许改总部字段 {field!r}；可改：{', '.join(sorted(HQ_FIELD_ALLOWED))}")
         return oc
-    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+    if field in HQ_FIELD_TEXT:
+        # 名字字段：字符串或 None（游戏的 `Or(str, None)`）
+        if value is not None and not isinstance(value, str):
+            oc.errors.append(f"{field} 必须是字符串或 null，收到 {value!r}")
+            return oc
+        if isinstance(value, str) and not value.strip():
+            oc.errors.append(f"{field} 不能是空字符串")
+            return oc
+    elif not isinstance(value, int) or isinstance(value, bool) or value < 0:
         oc.errors.append(f"{field} 必须是非负整数，收到 {value!r}")
         return oc
 

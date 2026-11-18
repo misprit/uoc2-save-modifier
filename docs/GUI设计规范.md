@@ -2249,7 +2249,7 @@ tracks:
 
 | Edit | 做什么 | 落点 | 关键约束 |
 |---|---|---|---|
-| `Edit.hq_field(hq_id, field, value)` | 总部经验 / CP / 补给 / 卡车 / 俘虏 … | `hqs.yml` | 白名单字段：`xp` / `xp_target` / `cp` / `max_cp` / `supply` / `trucks` / `prisoners` / `loss_count` / `intels_revealed` |
+| `Edit.hq_field(hq_id, field, value)` | 总部经验 / CP / 补给 / 卡车 / 俘虏 / **改名** … | `hqs.yml` | 白名单字段：`xp` / `xp_target` / `cp` / `max_cp` / `supply` / `trucks` / `prisoners` / `loss_count` / `intels_revealed` / **`name_brief` / `name_full`**（U44 补） |
 | `Edit.hq_branch_level(hq_id, branch, level, suppressed?)` | 总部"升级"= 五个分支的等级 | `hqs.yml` | 分支枚举：`engineering` / `force_pool` / `intel` / `logistics` / `operations`；**降级会带提醒**（GUI 要二次确认） |
 | `Edit.hq_force_pool_add(hq_id, entry, index?)` | 总部兵库**加一条** | `hqs.yml` | 条目 = `{delay, nationality, quantity, spec? \| equipment?}`；`spec` 与 `equipment` 二选一 |
 | `Edit.hq_force_pool_remove(hq_id, index)` | 总部兵库**删一条** | `hqs.yml` | |
@@ -2557,6 +2557,8 @@ PNG 文件
 | 总部 | `hq_field` | **`supply`** | **0 – 3** | `All(int, Range(min=0, max=3))` ← **U25 补** |
 | 总部 | `hq_field` | **`trucks`** | **1 – 5** | `All(int, Range(min=1, max=5))` ← **U25 补** |
 | 总部 | `hq_field` | `xp` / `xp_target` / `prisoners` / `loss_count` / `intels_revealed` | ≥ 0 | `nonnegative_int_schema` |
+| 总部 | `hq_field` | **`name_brief` / `name_full`** | 字符串（不能是空串）或 `null` | `Or(str, None)` ← **U44 补** |
+| 总部 | `hq_field` | **`name_brief` / `name_full`** | 字符串（不能是空串）或 `null` | `Or(str, None)` ← **U44 补** |
 | 总部 | `hq_branch_level` | `level` / `suppressed` | 各 0 – 3，且 **level + suppressed ≤ 3** | `Range(min=0, max=3)` + `_branch_levels_check` |
 | 总部 | `hq_branch_suppressed` | `suppressed` | 0 – 3，且 ≤ 该分支总等级 | 同上 |
 | 总部 | `hq_branch_sp` | `sp_used` | ≤ `sp_avail`（≤ 2），且 `cost` 不为负 | `branches_with_sps_schema` |
@@ -2999,6 +3001,63 @@ return self.represent_scalar('tag:yaml.org,2002:float', str(float(data)))
 `spec.faction == unit.faction` 且
 （`spec.nationality == unit.nationality` 或 `父国籍 == unit.nationality`）——
 与核心库 `Catalog.spec_can_attach` 同一套规则（`e162` 字节码实证）。
+
+
+#### 10.10.14 ★ F1 全面功能验收（U44 · 用真实存档的备份跑全流程）
+
+用户要求：「用我的一个真实存档的备份做一次全面的功能测试」——
+于是有了两个**证据脚本**（都在 `docs/证据脚本/`）：
+
+| 脚本 | 干什么 |
+|---|---|
+| `gamelib.py` | 把**游戏自己的** .pyc 校验器加载起来（numpy 用 stub，见文件头注释） |
+| `gamerules.py` | **独立复刻**游戏硬约束的规则检查器（常量直接从游戏字节码里读） |
+| `f1_accept.py` | 全流程验收：写 → 读回 → 查规则 → 比字节 → 撤销 |
+
+**规则器的常量出处（当场核对，见 `verify_against_game()`）**
+
+| 常量 | 值的来源 |
+|---|---|
+| `hq_max_cp = 9` / `hq_min_max_cp = 3` | `uoc2.state.constants` |
+| `ap_max_value = 3` | 同上 |
+| `unit_max_entr_level = 2` | 同上 |
+| `max_supply = 3` | 同上 |
+| `max_supply_hubs = 5` | 同上 |
+| `max_branch_level = 3` | 同上（**逻辑**上限，schema 本身不封顶） |
+| `card_deck_limit` / `card_store_limit` | 同上 |
+| `xp ≤ 400` | `uoc2.state.entities.data_validation.unit._scenario_base_unit_schema` 的 `Range(min=0, max=400)` |
+
+⚠️ **只有「超了游戏读档就失败」的才算 FAIL** —— 游戏逻辑层面的（分支等级 ≤3、
+兵库/商店重复）只记**警告**：游戏自己写出来的存档里就有重复
+（实测 `eur` 商店有两条 german armor）。
+
+**验收跑出来的结果：167 项全过**
+
+| 组 | 项数 | 覆盖 |
+|---|---|---|
+| 常量核对 | 10 | 与游戏字节码逐条比对 |
+| A 单位 | 30 | 改名 / 经验 / 兵力 / 增援 / 挂特种兵 / 卸特种兵（每项都验「落盘后读回」「规则仍成立」「只动了目标条目」「撤销后复原」） |
+| B 总部 | 40 | 改名 / CP / CP 上限 / 补给 / 卡车 / 分支等级 / 兵库数量 / 兵库加删 |
+| C 卡牌 | 20 | is_free / 移除 / 加卡 / 换牌 / 下架 |
+| D 商店 | 15 | 价格 / 库存 / 下架 |
+| E 概览 | 10 | 声望 / 分数 |
+| F 战区资产 | 7 | 改当前可用 + 读回 + 规则 + 只动战斗文件 + 撤销 + 两个越界 |
+| 越界拦截 | 26 | 13 个非法操作 × 「被拦」+「磁盘未变」 |
+| 撤销 | 5 | 连续三次提交+连续撤销复原 / 栈深度 / **撤销基准过期被拒** |
+| 备份 | 3 | 每次提交生成备份 / 命名递增 / 备份能打开 |
+
+**验收抓到的三个真问题（已修）**
+
+1. **总部的「改名」按钮核心库不支持** —— `HQ_FIELD_ALLOWED` 里没有 `name_brief`
+   ⇒ 一点就报「不允许改总部字段」。
+   取证：游戏的 `scenario_hq_schema` 里 `'name_brief': Or(str, None)`
+   ⇒ 名字字段本来就是字符串，写明文合法。
+   （游戏自己的改名走根 `main.yml` 的 `renamed_hqs` —— 字节码显示键和值**都是正整数**
+   ⇒ 它是 **id 重映射**，不是名字表；它为空时游戏就显示 `hqs.yml` 里的 `name_brief`。）
+2. **撤掉一条挂起改动后，控件不复原** —— 输入框还停在改后的值，而存档里是原值
+   ⇒ 界面与存档不一致。⇒ `dropPending` 之后重绘当前页。
+3. **`btnApply` 重复 id** —— Header 与抽屉各一个 ⇒ `getElementById` 只拿到第一个
+   ⇒ 抽屉里那个按钮**永远不禁用**。⇒ 两个按钮各有 id，禁用状态同步。
 
 ## 11. 实施路线
 

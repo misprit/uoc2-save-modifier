@@ -713,7 +713,7 @@ tr.oldrow{opacity:.6}
     <div class="dh">待应用 <span id="pendCount" style="font-weight:400">0</span> 条
       <span class="files" id="pendFiles"></span>
       <button class="btn" onclick="doUndo()">↶ 撤销</button>
-      <button class="btn pri" id="btnApply" onclick="doApply()">应用更改</button>
+      <button class="btn pri" id="btnApplyDrawer" onclick="doApply()">应用更改</button>
     </div>
     <div class="dlist"><ul class="pending" id="pendList"></ul>
       <div class="err" id="errBox"></div><div class="warn" id="warnBox"></div></div>
@@ -849,12 +849,23 @@ function paintPending(){
   }
   const hp = document.getElementById("hPending");
   if(hp) hp.textContent = PENDING.length;
-  const ba = document.getElementById("btnApply");
-  if(ba) ba.disabled = !PENDING.length;
+  /* ⚠️ Header 与抽屉各有一个「应用更改」—— 禁用状态要**同步**
+     （之前两个都是 id="btnApply"，getElementById 只拿到第一个，
+      抽屉里那个永远不禁用，U44 实测抓到）。 */
+  ["btnApply", "btnApplyDrawer"].forEach(id=>{
+    const ba = document.getElementById(id);
+    if(ba) ba.disabled = !PENDING.length;
+  });
   const dr = document.getElementById("drawer");
   if(dr) dr.classList.toggle("empty", !PENDING.length);
 }
-function dropPending(i){ PENDING.splice(i,1); paintPending(); }
+function dropPending(i){
+  PENDING.splice(i,1);
+  paintPending();
+  /* ⚠️ 必须重绘当前页 —— 否则控件还停在改后的值，而存档里其实是原值
+     （界面与存档不一致，U44 验收实测抓到）。 */
+  if(VIEW) show(PAGE);
+}
 
 /* ---------- 数值控件（U32） ----------
    大数字（三位以上：声望/分数/经验）= 可直接编辑的输入框（+ Alt+滚轮 ±1）

@@ -570,3 +570,54 @@ class TestHqFieldHardRange(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHqRename(unittest.TestCase):
+    """U44：总部的**改名**（F1 验收抓到的真问题 —— 核心库原本不支持）。
+
+    取证：游戏的 `uoc2.state.entities.data_validation.hq.scenario_hq_schema`
+    里 `'name_brief': Or(str, None)` ⇒ 名字字段本来就是字符串，写明文合法。
+    """
+
+    def _first_hq(self):
+        from save_modifier_core import Catalog, CorePaths, list_saves, open_save
+        cat = Catalog(CorePaths.discover())
+        for info in list_saves():
+            if not info.is_primary:
+                continue
+            try:
+                with open_save(info.save_id) as s:
+                    hqs = s.view(catalog=cat).hqs
+                    if hqs:
+                        return cat, hqs[0]
+            except Exception:
+                continue
+        self.skipTest("本机没有带总部的存档")
+
+    def test_rename_is_allowed(self):
+        from save_modifier_core.edits import Edit
+        cat, hq = self._first_hq()
+        plan = Edit("hq_field", {"hq_id": hq.id, "field": "name_brief",
+                                 "value": "验收改名"})
+        self.assertEqual(plan.kind, "hq_field")
+        from save_modifier_core.handlers import HQ_FIELD_ALLOWED
+        self.assertIn("name_brief", HQ_FIELD_ALLOWED)
+        self.assertIn("name_full", HQ_FIELD_ALLOWED)
+
+    def test_empty_name_is_rejected(self):
+        from save_modifier_core import Catalog, CorePaths, open_save
+        from save_modifier_core.edits import Edit
+        cat, hq = self._first_hq()
+        with open_save(hq._save_path if hasattr(hq, "_save_path") else _first_save_path()) as s:
+            plan = s.plan_edit([Edit("hq_field", {"hq_id": hq.id, "field": "name_brief",
+                                                 "value": "   "})], catalog=cat)
+            self.assertFalse(plan.ok)
+            self.assertTrue(plan.errors)
+
+
+def _first_save_path():
+    from save_modifier_core import list_saves
+    for info in list_saves():
+        if info.is_primary:
+            return str(info.path)
+    raise unittest.SkipTest("本机没有存档")
