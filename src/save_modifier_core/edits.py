@@ -21,6 +21,7 @@ __all__ = ["Edit", "EDIT_KINDS", "UNSET"]
 #: 全部合法的 kind —— 写错会直接报错，不会静默忽略
 EDIT_KINDS = (
     "progress",            # 声望 / 分数（根 main.yml）
+    "level",               # 难度（根 main.yml；决定手牌上限）
     "unit_field",          # 单位的某个字段（根 units.yml）
     "unit_spec_add",       # 加特种（根 units.yml）
     "unit_spec_remove",    # 卸特种（根 units.yml）
@@ -95,6 +96,17 @@ class Edit:
     def progress(field: str, value: int) -> "Edit":
         """改声望（`prestige`）或分数（`score`）。"""
         return Edit("progress", {"field": field, "value": value})
+
+    @staticmethod
+    def level(value: str) -> "Edit":
+        """改难度（根 `main.yml` 的 `level`）。
+
+        `value` ∈ `easy` / `normal` / `classic` / `hard`（游戏常量 `play_levels`）。
+
+        ⚠️ **难度决定手牌上限**（easy/normal 5、classic 4、hard 3）——
+        手里牌数超过新上限时核心库会**硬拦**（让玩家先删手牌）。
+        """
+        return Edit("level", {"value": value})
 
     @staticmethod
     def unit_field(unit_id: int, field: str, value: Any) -> "Edit":

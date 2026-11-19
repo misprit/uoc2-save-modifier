@@ -25,6 +25,7 @@ def dump(obj) -> bytes:
 def make_save(path: Path, *, main_overrides: dict | None = None,
               battle_overrides: dict | None = None,
               store_overrides: dict | None = None,
+              cards_override: list | None = None,
               extra_entries: dict | None = None) -> Path:
     """造一个"像游戏"的 .usg。
 
@@ -185,6 +186,9 @@ def make_save(path: Path, *, main_overrides: dict | None = None,
         {"card_type": "air_attack_allies", "is_free": True, "position": 1,
          "unit_id": None, "used": False},
     ]
+    # U64：`cards_override` 用来改**手牌张数**（测难度与手牌上限的冲突）
+    if cards_override is not None:
+        cards = list(cards_override)
     # ⚠️ store.yml 是**两层**的：`{战线: {store: [...], elite_store: [...]}}`
     # （`e154` 实证：全部 68 个存档都是这个结构，`elite_store` 恒为 null）
     store = {

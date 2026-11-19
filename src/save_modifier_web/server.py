@@ -308,6 +308,15 @@ def _catalog_payload() -> dict:
             return fallback
         return tr.get(key, "") or fallback
 
+    #: 难度列表（游戏常量 `play_levels`）—— 中文名查 locale，
+    #: `deck_limit` = 该难度的**手牌上限**（`card_deck_limit`，改难度时用来判冲突）。
+    from save_modifier_core.handlers import CARD_DECK_LIMIT, PLAY_LEVELS
+    levels = [
+        {"id": lv, "cn": cn("id_difficulty_" + lv, lv),
+         "deck_limit": CARD_DECK_LIMIT.get(lv, 5)}
+        for lv in PLAY_LEVELS
+    ]
+
     unit_types: dict = {}
     for name in catalog.unit_type_names():
         t = catalog.unit_type(name)
@@ -376,6 +385,7 @@ def _catalog_payload() -> dict:
         }
 
     _CATALOG_CACHE = {
+        "levels": levels,
         "unit_types": unit_types,
         "spec_types": spec_types,
         "card_types": card_types,

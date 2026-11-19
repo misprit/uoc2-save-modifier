@@ -2108,3 +2108,37 @@ class TestU63AvatarCentering(unittest.TestCase):
         """列表行与详情抬头都用 `avaImg`（而不是普通 imgTag）。"""
         self.assertIn("function avaImg(type, alt)", self.html)
         self.assertEqual(self.html.count("<div class=\"ava\">${avaImg(u.type, unitCn(u.type))}</div>"), 2)
+
+
+# =====================================================================
+# U64：概览页「难度」
+# =====================================================================
+
+
+class TestU64LevelPicker(unittest.TestCase):
+    """U64 —— 概览页能改难度；手牌超过新上限的难度**置灰**（核心库也会硬拦）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_level_panel_exists(self):
+        self.assertIn("<h3>难度</h3>", self.html)
+        self.assertIn("function levelPickerHTML()", self.html)
+        self.assertIn("function setLevel(lv)", self.html)
+        self.assertIn("function curLevel()", self.html)
+
+    def test_level_buttons_show_the_hand_limit(self):
+        """每个难度按钮上标着它的**手牌上限**。"""
+        self.assertIn("<span class=\"lvlim\">${l.deck_limit} 张</span>", self.html)
+
+    def test_over_limit_levels_are_disabled(self):
+        """手里牌数超过某难度的上限 ⇒ 那个按钮置灰并说明原因。"""
+        self.assertIn("const dis = nHand > l.deck_limit;", self.html)
+        self.assertIn("请先删手牌", self.html)
+
+    def test_level_edit_uses_the_level_kind(self):
+        """写盘用核心库新加的 `level` 编辑类型。"""
+        self.assertIn('queueEdit("level", "level", {value:lv}', self.html)

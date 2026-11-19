@@ -150,6 +150,17 @@ table.list td.k{color:var(--muted)}
 .pbody{padding:14px}
 .placeholder{padding:34px;text-align:center;color:var(--muted)}
 .placeholder .big{font-size:17px;color:var(--text);margin-bottom:6px}
+/* U64：难度按钮（一行四个，括号里是手牌上限） */
+.lvrow{display:flex;gap:8px;flex-wrap:wrap}
+.lvbtn{display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:7px 16px;border:1px solid var(--border);border-radius:8px;
+  background:var(--surface);cursor:pointer;font-weight:600;font-size:14px;
+  line-height:1.25;color:var(--text)}
+.lvbtn:hover:not(:disabled){border-color:var(--accent);color:var(--accent-dark)}
+.lvbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.lvbtn .lvlim{font:400 11px/1.2 var(--mono);opacity:.75}
+.lvbtn:disabled{opacity:.45;cursor:not-allowed}
+
 /* U56：概览页统一排版 —— 两栏面板；能力位卡片列数按**断点**定死。
    （原来用 `auto-fill` ⇒ 窗口一放大，列数说变就变、卡片被拉得极宽
      ⇒ 「位移和大小变化比较随意」。现在只在 1240 / 760 两个断点上换列。） */
@@ -2344,6 +2355,46 @@ function theaterSet(asset, field, value){
 }
 const theaterFieldCn = {to_use:"当前可用", uses_total:"本场景剩余", uses_turn:"每回合恢复"};
 
+/* ---------- 难度（U64） ---------- */
+function levelList(){
+  return (CATALOG && CATALOG.levels) || [];
+}
+/** 当前难度（「待应用」里有就显示待应用里的值） */
+function curLevel(){
+  const p = PENDING.find(x=>x.kind==="level");
+  if(p) return p.params.value;
+  return (VIEW && VIEW.level) || "";
+}
+function levelPickerHTML(){
+  const list = levelList();
+  if(!list.length){
+    return `<div class="fine">游戏目录里没读到难度列表 —— 难度是游戏自己的设定，
+      中文名由游戏的 locale 提供（id_difficulty_*）。</div>`;
+  }
+  const cur = curLevel();
+  const nHand = ((VIEW && VIEW.hand) || []).length;
+  const btns = list.map(l=>{
+    const dis = nHand > l.deck_limit;
+    const tip = dis
+      ? `手里有 ${nHand} 张牌，${l.cn}最多只能放 ${l.deck_limit} 张 —— 请先删手牌`
+      : `${l.cn}：手牌上限 ${l.deck_limit} 张`;
+    return `<button class="lvbtn${l.id===cur?" on":""}"${dis?" disabled":""}
+      onclick="setLevel('${l.id}')" title="${esc(tip)}">${esc(l.cn)}
+      <span class="lvlim">${l.deck_limit} 张</span></button>`;
+  }).join("");
+  const curInfo = list.find(l=>l.id===cur);
+  return `<div class="lvrow">${btns}</div>
+    <div class="fine">当前「${esc(curInfo?curInfo.cn:(cur||"—"))}」
+      · 手牌上限 ${curInfo?curInfo.deck_limit:"—"} 张 · 手里 ${nHand} 张。<br>
+      难度还决定<b>以后</b>开的新会议：免费卡数 / 折扣卡数 / AI 强度，
+      以及「重置会议」时重建的 HQ 卡车与步兵阶梯 —— 现有手牌与货架<b>不会</b>被改动。</div>`;
+}
+function setLevel(lv){
+  const base = (VIEW && VIEW.level) || "";
+  if(lv === base) return;
+  queueEdit("level", "level", {value:lv}, base, lv, "难度");
+  show("overview");
+}
 function pageTheater(w){
   const uni = (VIEW&&VIEW.theater_universe)||[];
   const meta = (VIEW&&VIEW.theater_meta)||{};
@@ -3472,6 +3523,8 @@ function show(p){
                        inputmode="numeric" autocomplete="off">
                 <span class="old" id="o_score"></span></div></div>
           </div></div></div>
+        <div class="panel"><h3>难度</h3>
+          <div class="pbody">${levelPickerHTML()}</div></div>
       </div>
       <div class="ovcol">
         <div class="panel"><h3>备份与撤销栈</h3>

@@ -57,6 +57,9 @@ UNIT_FIELD_RANGE = {
 #: 手牌张数上限（`card_deck_limit`，按难度；`e158` 字节码实证）
 CARD_DECK_LIMIT = {"easy": 5, "normal": 5, "classic": 4, "hard": 3}
 
+#: 游戏的难度列表（`state/constants.pyc::play_levels`，字节码实证）
+PLAY_LEVELS = ("easy", "normal", "classic", "hard")
+
 #: 货架格数（`card_store_limit`，四个难度恒为 5；`e158` 实证）
 CARD_STORE_LIMIT = {"easy": 5, "normal": 5, "classic": 5, "hard": 5}
 
@@ -249,6 +252,61 @@ def _progress(w, e: Edit) -> Outcome:
     main[field] = value
     w.touch("main.yml")
     oc.summary = f"战役进度 {field}：{old} → {value}"
+    return oc
+
+
+def _level_cn(lv: str) -> str:
+    """难度的中文名 —— **一律查游戏 locale**（`id_difficulty_<lv>`），
+    查不到就退回原值（**绝不自己翻译**，§5.7）。"""
+    try:
+        from . import locale as _locale
+        return _locale.default().get("id_difficulty_" + str(lv), "") or str(lv)
+    except Exception:
+        return str(lv)
+
+
+def _level(w, e: Edit) -> Outcome:
+    """难度（根 `main.yml` 的 `level`）。
+
+    **难度决定手牌上限**（`card_deck_limit`：easy/normal 5、classic 4、hard 3）
+    ⇒ 手里牌数超过新上限时**硬拦**：让玩家先删手牌。
+    （改完难度，这个存档**以后开的新会议**才会按新难度生成：
+      免费卡数 `card_store_free_cards`、折扣卡数 `discounted_cards_limit`、
+      AI 强度、重置会议时重建的 HQ 卡车 / 工程兵 / 步兵阶梯 `_restat_d`。）
+    """
+    oc = Outcome()
+    value = e.params.get("value")
+    if value not in PLAY_LEVELS:
+        oc.errors.append(
+            f"难度只能是 {'、'.join(PLAY_LEVELS)}，收到 {value!r}")
+        return oc
+    main = w.table("main.yml", {})
+    if not isinstance(main, dict):
+        oc.errors.append("根 main.yml 结构异常")
+        return oc
+    old = main.get("level")
+    if old == value:
+        oc.summary = "难度没有变化"
+        return oc
+
+    limit = CARD_DECK_LIMIT[value]
+    n_hand = len(w.save.root_cards())
+    if n_hand > limit:
+        oc.errors.append(
+            f"手里有 {n_hand} 张牌，而「{_level_cn(value)}」最多只能放 {limit} 张 —— "
+            f"请先删手牌再改难度（或者选一个手牌上限 ≥ {n_hand} 张的难度）")
+        return oc
+
+    main["level"] = value
+    w.touch("main.yml")
+    oc.summary = f"难度：{_level_cn(old) if old else '（空）'} → {_level_cn(value)}"
+    if n_hand:
+        oc.warnings.append(
+            f"新难度「{_level_cn(value)}」的手牌上限是 {limit} 张，"
+            f"手里现有 {n_hand} 张 —— 都在上限内，但**买新卡**时游戏会按新上限判断")
+    oc.warnings.append(
+        "难度还决定**以后**开的新会议：免费卡数 / 折扣卡数 / AI 强度 / "
+        "「重置会议」时重建的 HQ 卡车与步兵阶梯 —— 现有手牌与货架**不会**被改动")
     return oc
 
 
@@ -1842,6 +1900,7 @@ def _theater_val(field: str, value) -> str:
 
 _HANDLERS = {
     "progress": _progress,
+    "level": _level,
     "unit_field": _unit_field,
     "unit_spec_add": _unit_spec_add,
     "unit_spec_remove": _unit_spec_remove,
