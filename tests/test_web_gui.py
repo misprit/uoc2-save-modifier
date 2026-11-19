@@ -1997,3 +1997,28 @@ class TestU58UnitsPageTweaks(unittest.TestCase):
         self.assertIn("flex-wrap:wrap", head)
         self.assertIn("@container (max-width:760px)", self.html)
         self.assertIn(".dhead .stats{flex:1 1 100%;width:auto}", self.html)
+
+
+# =====================================================================
+# U59：卡牌页恢复横排
+# =====================================================================
+
+
+class TestU59CardsHorizontal(unittest.TestCase):
+    """U59 —— 卡牌容器 `.hand` 之前**根本没有 CSS** ⇒ 卡按 block 逐个换行 = 竖排。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_card_container_is_a_wrapping_row(self):
+        """卡牌容器：横排 + 放不下自动换行。"""
+        self.assertIn(".hand{display:flex;flex-wrap:wrap;gap:9px", self.html)
+        self.assertIn('class="hand"', self.html)
+
+    def test_cards_are_not_squashed(self):
+        """卡与空槽位都不许被 flex 压扁（压扁就会变形）。"""
+        self.assertIn(".hcard{width:104px;flex:none}", self.html)
+        self.assertIn(".slotempty{width:104px;height:124px;flex:none", self.html)

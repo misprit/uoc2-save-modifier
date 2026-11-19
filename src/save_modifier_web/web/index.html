@@ -593,7 +593,11 @@ tr.oldrow{opacity:.6}
 .card.blocked:hover{border-color:var(--border);box-shadow:none}
 .card.on{border-color:var(--accent);background:var(--accent-light);
   box-shadow:0 0 0 2px rgba(36,91,143,.3)}
-.hcard{width:104px}
+/* U59：卡牌**恢复横排** —— 容器 `.hand` 之前**根本没有 CSS**
+   （`.cardgrid` 那条横排规则定义了却从没用过）⇒ 里面的卡按 block 逐个换行 = 竖排。
+   现在：一排放得下就一排，放不下自动换行（手牌 5 张 / 货架 5 格都排成一行）。 */
+.hand{display:flex;flex-wrap:wrap;gap:9px;padding:10px 12px;align-items:flex-start}
+.hcard{width:104px;flex:none}
 .hcard .ci{width:104px;height:124px;background:var(--stage);border:1px solid var(--stage-edge);
   border-radius:7px;display:grid;place-items:center;overflow:hidden}
 .hcard .ci img{max-width:100%;max-height:100%;object-fit:contain}
@@ -603,7 +607,7 @@ tr.oldrow{opacity:.6}
 /* U47：手牌的两个操作**并成一行**（原来一卡两行，卡片区被撑得很高） */
 .hcard .acts{text-align:center;white-space:nowrap}
 .hcard .rm{display:inline-block;width:auto;margin:5px 2px 0;font-size:11px;padding:2px 6px}
-.slotempty{width:104px;height:124px;border:1px dashed var(--border);border-radius:7px;
+.slotempty{width:104px;height:124px;flex:none;border:1px dashed var(--border);border-radius:7px;
   display:grid;place-items:center;color:var(--muted);font-size:12.5px;cursor:pointer;
   background:var(--surface-alt)}
 .slotempty:hover{border-color:var(--accent);color:var(--accent)}
