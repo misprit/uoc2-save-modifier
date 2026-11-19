@@ -3566,8 +3566,8 @@ async function reallyApply(){
     }).join("");
     openModal(L('<div class="mh">✓ 已应用</div>')
       + '<div class="mb">'
-      + L('<div>改动已写入存档')
-      + (d.summary ? '：' + esc(String(d.summary)) : '') + '。</div>'
+      + L2('<div>{0}</div>', L('改动已写入存档')
+           + (d.summary ? L('：') + esc(String(d.summary)) : '') + L('。'))
       + (warns.length ? '<div class="wrow">' + warnHTML + '</div>' : '')
       + L('<div class="fine">写回前已自动备份原存档（<b>') + esc(d.backup||"—")
       + L('</b>）· 仍可一键撤销。</div>')

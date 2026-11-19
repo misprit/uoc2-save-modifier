@@ -170,6 +170,11 @@ def ui_literals():
     for raw in re.findall(r"\bL2?\(\s*`([^`]*)`", nc):
         if CJK.search(raw):
             out.add(raw)
+    # ⚠️ **单引号**也算（U77 补的 16 条就是漏在这儿）
+    for raw in re.findall(r"\bL2?\(\s*'((?:[^'\\]|\\.)*)'", nc):
+        s = raw.replace("\\'", "'")
+        if CJK.search(s):
+            out.add(s)
     return out
 
 
