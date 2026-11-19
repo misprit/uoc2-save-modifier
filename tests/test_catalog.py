@@ -4,8 +4,11 @@
 
 * `unit_types` 627 个、`specialists` 375 个、`cards` 39 个、`hq_types` 213 个、
   `generals` 304 个、战役包 15 个；
-* **`max_st` 分布 = {3:4, 4:9, 5:83, 6:108, 7:245, 无:178}**
+* **`max_st` 分布 = {3:4, 4:9, 5:83, 6:108, 7:423}**
   —— 不是"轴心 7 / 盟军 6"那种硬编码近似；
+  ⚠️ **U60**：类型 yml 里**没写 max_st** 的 178 个类型，游戏按 schema 默认
+  **7** 处理（`unit_types.pyc::_unit_type_schema`: `Required('max_st', default=7)`）⇒
+  有效分布里 7 = 245（显式）+ 178（兜底）= 423；
 * **`max_spec` 分布 = {1:233, 2:314, 3:25, 无:55}**；
 * `fronts` 是**每个战役包各有一份**（west → france/italy）；
 * **用户包优先**（mod 兼容）；
@@ -43,13 +46,18 @@ class TestCatalogCounts(unittest.TestCase):
         self.assertEqual(len(self.cat.campaign_ids()), 15)
 
     def test_max_st_distribution(self):
-        """规范 §5.3 的实测分布 —— 一字不差才算对。"""
+        """规范 §5.3 的实测分布 —— 一字不差才算对。
+
+        ⚠️ **U60**：178 个类型的 yml **没写** `max_st` ⇒ 游戏按 schema 默认
+        **7** 处理（`unit_types.pyc::_unit_type_schema`:
+        `Required('max_st', default=7) : All(int, Range(min=1, max=7))`）
+        ⇒ 有效分布里 7 = 245（显式）+ 178（兜底）= 423。"""
         dist = collections.Counter()
         for name in self.cat.unit_type_names():
             ut = self.cat.unit_type(name)
             dist[ut.max_st if ut else "missing"] += 1
         self.assertEqual(dist, collections.Counter(
-            {3: 4, 4: 9, 5: 83, 6: 108, 7: 245, None: 178}))
+            {3: 4, 4: 9, 5: 83, 6: 108, 7: 423}))
 
     def test_max_spec_distribution(self):
         dist = collections.Counter()
@@ -66,6 +74,18 @@ class TestCatalogCounts(unittest.TestCase):
             expected = min(3, ut.max_spec if ut.max_spec is not None else 3)
             self.assertEqual(ut.spec_cap, expected, name)
             self.assertEqual(self.cat.spec_cap(name), expected, name)
+
+    def test_types_without_max_st_field_use_the_game_default(self):
+        """**U60**：类型 yml 缺 `max_st` ⇒ 上限 = 7（游戏 schema 的默认值），
+        **不是 None** —— 否则单位显示「上限 —」、血量条没有上限格。
+
+        实测影响面：`Stalingrad.usg` 的 354 个单位里 **266 个（75%）**
+        用的是这类类型（U54 当初只统计了 Blitzkrieg，所以漏了）。"""
+        for name in ("ger_jag_dlc4", "sov_tank_dlc4", "rom_inf_dlc4",
+                     "ger_inf_42", "ita_inf_42", "ger_pz_42"):
+            self.assertEqual(self.cat.max_st(name), 7, name)
+        # **查不到的类型**仍然是 None（None 只表示「没这个类型」）
+        self.assertIsNone(self.cat.max_st("definitely_not_a_type"))
 
     def test_known_types(self):
         self.assertEqual(self.cat.max_st("us_inf_42"), 6)

@@ -77,6 +77,16 @@ BASE_CARD_WEIGHTS: dict[str, float] = {
 #: 商店的两个子商店（`store.yml` = `{战线: {store: [...], elite_store: [...]}}`）
 STORE_SUBS = ("store", "elite_store")
 
+#: 类型 yml **缺 `max_st` 字段**时的兜底值 —— 与游戏自己的 schema 默认值一致。
+#:
+#: 字节码实证（`state/entity_types/unit_types.pyc::_unit_type_schema`）：
+#:     Required('max_st', default=7) : All(int, Range(min=1, max=7))
+#: 游戏包 `_packages/base/entity_types/unit_types/`（`_packages/base/data/...`）
+#: 的 627 个类型里，**178 个的 yml 没写 `max_st`** ⇒ 游戏按 **7** 处理。
+#: 修改器若直接读 yml 拿到 None ⇒ 单位显示「上限 —」、血量条没有上限格
+#: （实测 `Stalingrad.usg` 的 354 个单位里 **266 个** 受影响）。
+UNIT_TYPE_MAX_ST_DEFAULT = 7
+
 #: 战区资产**全集**（U45 字节码取证 —— `lib/uoc2/state/constants.pyc` 第 61 行）：
 #:
 #: ```python
@@ -114,6 +124,9 @@ class UnitType:
     defense: int | None = None
     armor: int | None = None
     #: 战力上限 —— **上限在类型定义里，不在存档里**（规范 §5.3）
+    #: ⚠️ U60：类型 yml **没写** `max_st` 时，游戏按 schema 默认 **7** 处理
+    #: （`unit_types.pyc::_unit_type_schema`: `Required('max_st', default=7)`）
+    #: ⇒ 这里也填 7，**不是 None**（None 只表示「这个类型根本查不到」）。
     max_st: int | None = None
     #: 特种兵上限；None 表示该类型没有这个字段
     max_spec: int | None = None
@@ -307,7 +320,9 @@ class Catalog:
             attack=_as_int(d.get("attack")),
             defense=_as_int(d.get("defense")),
             armor=_as_int(d.get("armor")),
-            max_st=_as_int(d.get("max_st")),
+            # U60：缺 max_st 字段 ⇒ 用游戏 schema 的默认值 7（**不是 None**）
+            max_st=(_as_int(d.get("max_st"))
+                   if d.get("max_st") is not None else UNIT_TYPE_MAX_ST_DEFAULT),
             max_spec=_as_int(d.get("max_spec")),
             equipment=d.get("equipment"),
             equipment_q=_as_int(d.get("equipment_q")),

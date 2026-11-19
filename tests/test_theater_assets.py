@@ -209,6 +209,62 @@ class TestTheaterAssetThreeFields(TheaterAssetTestBase):
         self.assertTrue(res.ok, res.errors)
         self.assertEqual(self.assets()["long_range_recon"]["uses_total"], 5)
 
+    def test_air_attack_can_be_set_to_finite(self):
+        """**空袭**（原版默认「本场景剩余无限」）改成**有限** —— 游戏**支持**。
+
+        依据（U60 字节码取证）：
+        * schema `Required('uses_total', default=None): Or(None, 非负)`
+          ⇒ 有限值对**任何**资产都合法；
+        * 游戏自己的场景编辑器 `scenario_editor/edit_ctrl.pyc::slot_ok_edit_theater_assets`
+          给 7 种资产**一视同仁**地各做一个 `__uses_total__N` 输入框
+          （留空 = None = 无限，填数字 = 有限）⇒ 游戏作者本来就允许任意资产有限/无限。
+        """
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset("air_attack", uses_total=5)])
+        self.assertTrue(res.ok, res.errors)
+        self.assertEqual(self.assets()["air_attack"]["uses_total"], 5)
+
+    def test_other_asset_can_be_set_to_infinite(self):
+        """**其它资产**（原版默认有限）改成**本场景剩余无限** —— 游戏**支持**。
+
+        恢复规则（`game.pyc::theater_assets_start_turn`）：
+        `uses_total is None` ⇒ `to_use = uses_turn`
+        ⇒ 每回合恢复到「每回合恢复次数」，**不累积**（上回合没用完的不会叠加上限）。
+        """
+        plan, res = self.commit(self.save_path,
+                                [Edit.theater_asset("long_range_recon", uses_total=None)])
+        self.assertTrue(res.ok, res.errors)
+        self.assertIsNone(self.assets()["long_range_recon"]["uses_total"])
+
+    def test_written_assets_match_the_game_schema(self):
+        """写出来的战区资产必须符合**游戏自己的 schema**（字节码取证的那份）。
+
+        场景：空袭改成有限（5）、空中补给改成无限（None）——
+        两种都是游戏支持的写法 ⇒ 存档必须仍然能通过游戏的校验。
+        """
+        plan, res = self.commit(self.save_path, [
+            Edit.theater_asset("air_attack", uses_total=5),
+            Edit.theater_asset("long_range_recon", uses_total=None),
+        ])
+        self.assertTrue(res.ok, res.errors)
+        a = self.assets()
+        for name, it in a.items():
+            tu, ut, urn = it.get("to_use"), it.get("uses_total"), it.get("uses_turn")
+            tnun = it.get("to_use_not_used")
+
+            def nonneg(v):
+                return isinstance(v, int) and not isinstance(v, bool) and v >= 0
+
+            self.assertIn(name, ("air_supply", "air_attack", "saturation_strike",
+                                 "long_range_recon", "naval_bombardment",
+                                 "flying_artillery", "precision_bombing"))
+            self.assertTrue(nonneg(tu), (name, tu))          # to_use ≥ 0
+            self.assertTrue(ut is None or nonneg(ut), (name, ut))   # uses_total None 或 ≥0
+            self.assertTrue(isinstance(urn, int) and urn >= 1, (name, urn))
+            self.assertTrue(tnun is None or nonneg(tnun), (name, tnun))
+            if ut is not None:
+                self.assertLessEqual(tu, ut, (name, tu, ut))  # to_use ≤ uses_total
+
     def test_uses_total_can_be_set_back_to_infinite(self):
         """`uses_total=None` = 无限 —— 改器必须能把有限值改回无限。"""
         plan, res = self.commit(self.save_path,
