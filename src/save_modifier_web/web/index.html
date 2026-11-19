@@ -202,6 +202,19 @@ table.list td.k{color:var(--muted)}
    =================================================================== */
 :root{--stage-edge:#c7d2dd; --stage-sup:#8fa3b8}
 .cols{display:grid;grid-template-columns:minmax(290px,0.6fr) minmax(430px,1.4fr);gap:14px}
+/* U57：两栏页的**间距统一** —— 栏间隔 = 面板到边缘的间隔（都 14px）。
+   原来 `.cols{gap:14px}` + `.panel{margin:14px}` ⇒ 栏间隔 14+14+14 = 42px，
+   边缘却只有 14px ⇒ 「两个卡贴得比它们离边缘还远」。
+   ⇒ 间距改由 grid 的 gap 负责，面板在 grid 里 margin:0。 */
+.cols{margin:14px}
+.cols > .panel{margin:0}
+/* U57：主从两栏页 —— 两栏**撑满可用高度**，清单在卡内滚。
+   （原来 `.hqlist` 写死 `max-height:430px` ⇒ 下面空一大片也看不到更多总部。） */
+.work > .cols-fill{flex:1 1 auto;min-height:0}
+.cols-fill > .panel{display:flex;flex-direction:column;min-height:0}
+.cols-fill > .panel > .pbody{flex:1;min-height:0;overflow:hidden}
+.cols-fill > .panel > .detail{flex:1;min-height:0;overflow:auto}
+.cols-fill .hqlist{max-height:none;height:100%;overflow:auto}
 .cols>*{min-width:0}
 .cols-wide{grid-template-columns:minmax(520px,1.45fr) minmax(340px,1fr)}
 .cols-half{grid-template-columns:minmax(300px,1fr) minmax(300px,1fr)}
@@ -580,7 +593,7 @@ tr.oldrow{opacity:.6}
 .costs b{font-family:var(--mono);color:var(--accent-dark)}
 
 /* ---------------- 总部页（U35） ---------------- */
-.hqlist{padding:4px 0;max-height:430px;overflow:auto}
+.hqlist{padding:4px 0;overflow:auto}
 .hqrow{display:flex;align-items:center;gap:9px;padding:8px 12px;
   border-bottom:1px solid #f0f3f6;font-size:13.5px;cursor:pointer}
 .hqrow:hover{background:var(--accent-light)}
@@ -591,12 +604,25 @@ tr.oldrow{opacity:.6}
 .expbar{height:9px;border-radius:5px;background:var(--surface-alt);
   border:1px solid var(--border);overflow:hidden;margin-top:6px}
 .expbar i{display:block;height:100%;background:var(--accent)}
+/* U57：详情首行 —— 三块（基本信息 / 经验 / 总部 CP）顶边对齐、体内行对齐。
+   原来 `.idblk` 是 `justify-content:space-between` ⇒ 名称被顶到最上、
+   将领被甩到最下 ⇒ 两者隔了 ~96px，而且和两张卡完全不对齐。 */
 .hqhead{display:flex;gap:16px;align-items:stretch;min-height:78px;margin-bottom:12px}
-.hqhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+.hqhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;
+  justify-content:flex-start;padding-top:8px}
+.hqhead .dsub{margin-top:0}
 .hqhead .vsep{width:1px;background:var(--border);flex:none}
 .hqhead .hqcards{flex:none;display:flex;gap:10px;align-items:stretch}
-.hqhead .stat{min-width:210px}
+.hqhead .stat{width:214px;min-width:214px}
 .hqhead .cphint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.35}
+/* U57：数值框**统一尺寸**（主值 72×34 / 次值 56×26）—— 原来四个框四种大小
+   （经验 100px / CP 滚轮 ~52px / 目标 62px13px / 补给 ~52px），互不对齐。
+   数字一律在框里居中。 */
+.hqhead .stat .v .numin,.hqhead .stat .v .spin{width:72px;height:34px;box-sizing:border-box;
+  line-height:30px;font-size:22px;text-align:center;flex:none}
+.hqhead .cphint .numin,.hqhead .cphint .spin{display:inline-block;width:56px;height:26px;
+  box-sizing:border-box;line-height:24px;font-size:15px;text-align:center;
+  padding:2px 4px;vertical-align:middle}
 .trucks{display:flex;align-items:center;gap:9px;padding:8px 12px;
   border:1px solid var(--border);border-radius:7px;background:var(--surface-alt);margin-bottom:12px}
 .trucks .tl{font-size:12.5px;color:var(--muted);white-space:nowrap}
@@ -1709,7 +1735,7 @@ function hqDetailHTML(h){
           autocomplete="off" value="${xp}"></div>
         <div class="cphint">目标
           <input class="numin" id="h_xt_${h.id}" type="text" inputmode="numeric"
-            autocomplete="off" value="${xt}" style="width:62px;font-size:13px"></div>
+            autocomplete="off" value="${xt}"></div>
       </div>
       <div class="stat">
         <div class="lb"><span>总部 CP</span><span class="hintw">滚轮 ±1</span></div>
@@ -1740,7 +1766,7 @@ function pageHqs(w){
   const hqs = VIEW.hqs||[];
   let cur = hqs.find(h=>h.id===SEL.hqs);
   if(!cur){ cur = hqs[0]; SEL.hqs = cur ? cur.id : null; }
-  w.innerHTML = `<div class="cols">
+  w.innerHTML = `<div class="cols cols-fill">
     <div class="panel"><h3>总部 · 共 ${hqs.length} 个</h3>
       <div class="pbody"><div class="hqlist">${hqs.map(hqRowHTML).join("") ||
         `<div class="placeholder"><div class="big">这个存档没有总部</div>

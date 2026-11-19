@@ -1898,3 +1898,48 @@ class TestU56OverviewLayout(unittest.TestCase):
         self.assertIn('<span class="bt">备份</span>', self.html)
         self.assertIn('<span class="bn" title=', self.html)
         self.assertIn('<span class="bm">', self.html)
+
+
+# =====================================================================
+# U57：总部页排版微调
+# =====================================================================
+
+
+class TestU57HqPageTweaks(unittest.TestCase):
+    """U57 —— 栏间隔 = 到边缘的间隔；详情首行对齐；数值框统一；清单撑满高度。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_column_gap_equals_edge_margin(self):
+        """**栏间隔 = 面板到边缘的间隔**（都 14px）。
+        原来 `.cols{gap:14px}` + `.panel{margin:14px}` ⇒ 栏间隔 42px、边缘 14px。"""
+        self.assertIn(".cols > .panel{margin:0}", self.html)
+        self.assertIn(".cols{margin:14px}", self.html)
+
+    def test_hq_list_fills_the_available_height(self):
+        """总部清单**撑满可用高度**（原来写死 max-height:430px ⇒ 下面空一大片）。"""
+        self.assertIn(".work > .cols-fill{flex:1 1 auto;min-height:0}", self.html)
+        self.assertIn(".cols-fill .hqlist{max-height:none;height:100%;overflow:auto}", self.html)
+        self.assertNotIn(".hqlist{padding:4px 0;max-height:430px", self.html)
+        self.assertIn('<div class="cols cols-fill">', self.html)
+
+    def test_hq_head_blocks_align(self):
+        """名称/将领、经验卡、CP 卡三块对齐；名称与将领不再隔 ~96px。"""
+        blk = self.html.split(".hqhead .idblk{")[1].split("}")[0]
+        self.assertIn("justify-content:flex-start", blk)
+        self.assertNotIn("space-between", blk)
+        self.assertIn("gap:3px", blk)
+        self.assertIn(".hqhead .stat{width:214px;min-width:214px}", self.html)
+
+    def test_hq_value_boxes_have_one_size(self):
+        """总部的数值框统一尺寸（主值 72×34 / 次值 56×26），数字在框里居中。"""
+        self.assertIn(".hqhead .stat .v .numin,.hqhead .stat .v .spin{width:72px;height:34px",
+                      self.html)
+        self.assertIn(".hqhead .cphint .numin,.hqhead .cphint .spin{display:inline-block;width:56px",
+                      self.html)
+        # 目标输入框不能再用内联尺寸（会盖掉 CSS 里的统一尺寸）
+        self.assertNotIn('autocomplete="off" value="${xt}" style=', self.html)
