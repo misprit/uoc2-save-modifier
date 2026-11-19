@@ -6,7 +6,6 @@
 
     · 核心库  src\save_modifier_core\   —— 真正干活的部分，无界面，可被任何 GUI 直接 import
     · 图形界面 src\save_modifier_web\    —— ★ 正式界面（本地 HTTP + 浏览器窗口）
-    · 备用简版 src\save_modifier_gui\    —— Tk 8.6 + ttk，只有概览页（机器上没有 Edge 时用）
     · 自测入口 src\save_modifier\        —— 核心库的命令行外壳，供开发/排查用
 
 
@@ -15,9 +14,7 @@
     图形界面：双击 run_web.bat
                —— 会起一个本地服务（只监听 127.0.0.1，带随机 token），
                   并自动开一个浏览器窗口；关掉窗口服务就退出。
-    备用简版：双击 run_gui.bat
-               —— 机器上没有 Edge（或不想用浏览器）时用；
-                  只有「概览」页有内容，其余页是占位。
+               ⚠️ 需要 **Edge**（Windows 10/11 自带）。
     命令行：  双击 run.bat
     跑测试：  双击 run_tests.bat
     只做自检（不进入交互）：
@@ -79,12 +76,10 @@
 
 六、目录说明
 ------------
-    python\   自带的 CPython 3.14.3 解释器与 PyYAML 6.0.3（含 Tcl/Tk 8.6）
-    lib\      Tcl/Tk 8.6 脚本库（备用简版需要；正式界面不需要）
+    python\   自带的 CPython 3.14.3 解释器与 PyYAML 6.0.3
     src\      程序本体
               save_modifier_core\   ★ 核心库（GUI 只要复制这个包）
               save_modifier_web\    ★ 正式界面（HTML/CSS + 本地 HTTP）
-              save_modifier_gui\    备用简版（Tk）
               save_modifier\        自测入口
     docs\     参考文档（核心库调用说明 / 命令参考 / 开发上下文 / GUI 设计规范 /
                英文支持可行性报告 / 发布清单 / 发布说明）
@@ -92,7 +87,6 @@
                  只在开发机上跑得通 —— 外部使用者不用管。
     tests\    自动化测试（667 项；标准库 unittest，不需要 pytest）
     run_web.bat       ★ 启动正式界面
-    run_gui.bat       启动备用简版
     run.bat           启动自测入口
     run_tests.bat     跑全部自动化测试
 
@@ -120,5 +114,5 @@
       修改器读到的仍是原版文件 —— 暂不支持这种增量写法。
     - Steam 创意工坊 mod 里**新增的战役/场景**暂时进不了「战役」页
       （那一页的战役/场景清单是内置的）。
-    - 正式界面需要 Edge（Windows 自带）；没有 Edge 时只能用备用简版。
     - 随包测试在没有游戏/没有存档的机器上会自动跳过相关用例（不会失败）。
+    - 这个包**只支持 Windows + Edge**（游戏本身就是 Steam Windows 版）。

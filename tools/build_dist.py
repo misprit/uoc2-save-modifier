@@ -10,14 +10,12 @@ zip 里有一个顶层目录 `uoc2-save-modifier/`，**不是**散文件。
 --------
 ```
 uoc2-save-modifier/
-  python/            Python 3.14 运行时（含 PyYAML + tkinter）
-  lib/{tcl8.6,tk8.6} Tcl/Tk 脚本库（Tcl 的 <prefix> 是包根 ⇒ 必须在 lib/）
-  src/               核心库 + 命令行外壳 + GUI
+  python/            Python 3.14 运行时（含 PyYAML）
+  src/               核心库 + 命令行外壳 + Web GUI
   tests/             自动化测试
   docs/              规范文档 + 证据脚本
   run.bat            双击启动（命令行外壳）
   run_web.bat        双击启动（★ 正式界面：本地 HTTP + 浏览器窗口）
-  run_gui.bat        双击启动（备用简版：Tk，无 Edge 时用）
   run_tests.bat      跑自检
   使用说明.txt
 ```
@@ -67,10 +65,16 @@ VERSION = _product_version()
 OUT = OUT_DIR / f"{PKG_NAME}-v{VERSION}.zip"
 
 #: 整个目录打进去
-INCLUDE_DIRS = ("python", "lib", "src", "tests", "docs")
+#:
+#: ⚠️ **不含 `lib/`**（U78）—— 那是 Tcl/Tk 8.6 的脚本库，只有 Tk 界面要；
+#:    正式界面是 Web 版（本地 HTTP + Edge）⇒ 不带，**省 4.55 MB**。
+INCLUDE_DIRS = ("python", "src", "tests", "docs")
 
 #: 单个文件打进去
-INCLUDE_FILES = ("run.bat", "run_gui.bat", "run_web.bat", "run_tests.bat", "使用说明.txt")
+#:
+#: ⚠️ **不含 `run_gui.bat`**（U78）—— 那是 Tk 备用简版的入口；
+#:    「Windows 自带 Edge」⇒ 不带无浏览器兼容层（用户 2026-11-19 拍板）。
+INCLUDE_FILES = ("run.bat", "run_web.bat", "run_tests.bat", "使用说明.txt")
 
 #: 目录名黑名单（任意层级）
 #:
@@ -84,6 +88,32 @@ SKIP_DIRS = {"__pycache__", ".git", ".gitignore", "dist",
 
 #: 只在**仓库根层级**跳过的目录名
 SKIP_DIRS_ROOT = {"data"}
+
+#: U78：**不打包**的 Tk 那套（Web 界面用不上）⇒ 省 8.5 MB
+#:
+#: * `lib/` 整个目录（Tcl/Tk 脚本库）；
+#: * `python/` 里的 Tk 运行时（DLL + tkinter 包）；
+#: * `src/save_modifier_gui/`（Tk 界面 —— **仓库里保留**，只是不打进包）；
+#: * `tests/test_gui_smoke.py`（Tk 界面的冒烟测试）。
+SKIP_PATHS = (
+    "lib",
+    "python/_tkinter.pyd",
+    "python/tcl86t.dll",
+    "python/tk86t.dll",
+    "python/zlib1.dll",
+    "python/Lib/site-packages/tkinter",
+    "src/save_modifier_gui",
+    "tests/test_gui_smoke.py",
+)
+
+
+def _skipped(rel: Path) -> bool:
+    """rel（相对仓库根）是否命中「不打包」清单。"""
+    s = rel.as_posix()
+    for p in SKIP_PATHS:
+        if s == p or s.startswith(p + "/"):
+            return True
+    return False
 
 #: 文件名 / 后缀黑名单
 #:
@@ -118,6 +148,8 @@ def collect() -> list[tuple[Path, str]]:
                 continue
             rel = p.relative_to(REPO)
             if any(part in SKIP_DIRS for part in rel.parts):
+                continue
+            if _skipped(rel):
                 continue
             # 根层级的 data/（运行时状态）不进包；包内的 src/*/data/ 要进
             if rel.parts and rel.parts[0] in SKIP_DIRS_ROOT:
@@ -163,7 +195,6 @@ def main() -> int:
         names = set(zf.namelist())
     must = [
         f"{PKG_NAME}/run.bat",
-        f"{PKG_NAME}/run_gui.bat",
         f"{PKG_NAME}/run_web.bat",                           # U26 Web GUI 入口
         f"{PKG_NAME}/src/save_modifier_web/__init__.py",
         f"{PKG_NAME}/src/save_modifier_web/server.py",
@@ -172,21 +203,11 @@ def main() -> int:
         f"{PKG_NAME}/src/save_modifier_core/locale.py",
         f"{PKG_NAME}/src/save_modifier_core/campaigns.py",            # U18 战役只读
         f"{PKG_NAME}/src/save_modifier_core/data/campaign_index.json",  # U18 内置索引（33.5 KB）
-        f"{PKG_NAME}/src/save_modifier_gui/__init__.py",
-        f"{PKG_NAME}/src/save_modifier_gui/main.py",
-        f"{PKG_NAME}/src/save_modifier_gui/app.py",
-        f"{PKG_NAME}/src/save_modifier_gui/theme.py",
-        f"{PKG_NAME}/src/save_modifier_gui/names.py",
-        f"{PKG_NAME}/src/save_modifier_gui/splash.py",
-        f"{PKG_NAME}/src/save_modifier_gui/pages/__init__.py",
-        f"{PKG_NAME}/lib/tcl8.6/init.tcl",
-        f"{PKG_NAME}/lib/tk8.6/ttk/ttk.tcl",
+        f"{PKG_NAME}/src/save_modifier_web/server.py",
+        f"{PKG_NAME}/src/save_modifier_web/web/index.html",
         f"{PKG_NAME}/python/python314.zip",          # 标准库
-        f"{PKG_NAME}/python/_tkinter.pyd",          # Tk 的 C 扩展
-        f"{PKG_NAME}/python/tcl86t.dll",
         f"{PKG_NAME}/python/Lib/site-packages/yaml/__init__.py",
         f"{PKG_NAME}/python/Lib/site-packages/yaml/_yaml.cp314-win_amd64.pyd",
-        f"{PKG_NAME}/python/Lib/site-packages/tkinter/__init__.py",
         f"{PKG_NAME}/tests/test_api_contract.py",
         # U74/U75 新增的（之前漏了 ⇒ 打出来的包可能缺东西却照样「自检 OK」）
         f"{PKG_NAME}/run_web.bat",
@@ -201,8 +222,8 @@ def main() -> int:
         for m in missing:
             print("   ", m)
         return 1
-    print("自检 OK：run.bat / run_web.bat / run_gui.bat / 核心库 / GUI / locale / 战役索引 / "
-          "i18n 词表 / Tcl-Tk / PyYAML / tkinter / 使用说明 都在包里")
+    print("自检 OK：run.bat / run_web.bat / 核心库 / Web GUI / locale / 战役索引 / "
+          "i18n 词表 / PyYAML / 使用说明 都在包里")
     return 0
 
 
