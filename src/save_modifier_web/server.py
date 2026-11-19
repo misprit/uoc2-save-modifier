@@ -27,6 +27,7 @@ import dataclasses
 import json
 import mimetypes
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -41,6 +42,17 @@ if str(REPO_SRC) not in sys.path:
     sys.path.insert(0, str(REPO_SRC))
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
+
+#: ⚠️ **预热导入核心库**（U74 踩到的坑）
+#:
+#: 浏览器会在**同一瞬间**并发请求 `/api/settings` 与 `/api/i18n`，
+#: 两个线程若同时第一次 `import save_modifier_core` ⇒ importlib 的模块锁
+#: **死锁**（`_DeadlockError: deadlock detected by _ModuleLock`）⇒ 两个请求都 500。
+#: ⇒ 启动时先 import 一次，之后任何请求都不再触发导入。
+try:
+    import save_modifier_core  # noqa: F401
+except Exception:            # pragma: no cover - 核心库不在时照样能起服务
+    pass
 
 #: Edge 的常见安装位置（U26 实测：`--app=` 模式能给独立窗口、无地址栏）
 EDGE_CANDIDATES = (
@@ -105,6 +117,120 @@ def _size(n) -> str:
 # ---------------------------------------------------------------- 只读 API
 
 
+#: 跟着界面语言的战役索引（按语言缓存）
+_CAMP_INDEX: dict = {}
+
+
+def _campaign_index(paths=None):
+    """内置战役索引 —— **名字跟着界面语言**。
+
+    ⚠️ 核心库的 `default_campaign_index()` 用的是**中文** locale
+    ⇒ 战役名 / 会议名 / 场景名在英文界面下还是中文
+    ⇒ 这里自己建一份（核心库不动）。
+    """
+    from save_modifier_core.campaigns import load_campaign_index
+    from save_modifier_core.locale import TranslationStore
+    from save_modifier_core.paths import CorePaths
+
+    paths = paths or CorePaths.discover()
+    lang = data_language()
+    hit = _CAMP_INDEX.get(lang)
+    if hit is None:
+        hit = load_campaign_index(
+            locale=TranslationStore(paths, locale=lang))
+        _CAMP_INDEX[lang] = hit
+    return hit
+
+
+def _campaign_data(paths=None):
+    """战役包数据 —— **战线名跟着界面语言**。
+
+    ⚠️ `CampaignData.locale` 默认是核心库的 `locale.default()`（**中文**）
+    ⇒ 英文界面下战线名还是「高加索 / 南部」。
+    ⇒ 这里在**显示层**把它换成跟着界面语言的那一份（核心库一个字不改）。
+    """
+    from save_modifier_core.campaigns import CampaignData
+    from save_modifier_core.locale import TranslationStore
+    from save_modifier_core.paths import CorePaths
+
+    paths = paths or CorePaths.discover()
+    cd = CampaignData(paths, _campaign_index(paths))
+    cd.locale = TranslationStore(paths, locale=data_language())
+    return cd
+
+
+def _localize_name(tr, cid, sid=None, pkg=None):
+    """按**游戏 locale** 解析一个名字（找不到就返回空串）。"""
+    if sid:
+        for k in ("id_scenario_name_s_%s_c_%s_p_base" % (sid, cid),
+                  "id_scenario_name_s_%s_p_base" % sid):
+            v = tr.get(k)
+            if v:
+                return v
+        return ""
+    if pkg:
+        v = tr.get("id_campaign_name_c_%s_p_%s" % (cid, pkg))
+        return v or ""
+    return ""
+
+
+def _localize_position(cp, cid, paths):
+    """战役位置里的**名字**跟着界面语言（战役 / 会议 / 战线 / 场景）。"""
+    if not isinstance(cp, dict):
+        return cp
+    from save_modifier_core.locale import TranslationStore
+    tr = TranslationStore(paths, locale=data_language())
+    # 战役名（包名从内置索引拿：dlc4 / base …）
+    try:
+        for pkg in (_campaign_index(paths).campaign_packages(cid) or []):
+            v = _localize_name(tr, cid, pkg=pkg)
+            if v:
+                cp["campaign_name"] = v
+                break
+    except Exception:
+        pass
+    # 场景名（当前场景 + 可选场景列表）
+    sid = str(cp.get("scenario_id") or "")
+    if sid:
+        v = _localize_name(tr, cid, sid=sid)
+        if v:
+            cp["scenario_name"] = v
+    for s in (cp.get("available_scenes") or []):
+        if isinstance(s, dict):
+            v = _localize_name(tr, cid, sid=str(s.get("id") or ""))
+            if v:
+                s["name"] = v
+    # 战线名
+    front = str(cp.get("front") or "")
+    if front:
+        try:
+            v = _campaign_data(paths).front_name(front, cid)
+            if v:
+                cp["front_name"] = v
+        except Exception:
+            pass
+    # 会议名（第N次会议 ⇒ Meeting N）
+    txt = str(cp.get("conference_text") or "")
+    if txt:
+        cp["conference_text"] = tr_error(txt)
+    return cp
+
+
+def _save_display(info) -> str:
+    """存档的可读名（**跟着界面语言**）。
+
+    ⚠️ 核心库的 `SaveInfo.display_name` 是**中文属性** ⇒ 英文界面下由这里另拼。
+    """
+    if ui_language() != "en":
+        return info.display_name
+    base = info.name
+    if info.standalone_scenario:
+        return "%s (Standalone scenario · %s)" % (base, info.standalone_scenario)
+    if info.campaign_id:
+        return "%s (Campaign · %s)" % (base, info.campaign_id)
+    return base
+
+
 def api_saves() -> dict:
     """存档列表（启动页用）。"""
     from save_modifier_core import list_saves
@@ -116,10 +242,12 @@ def api_saves() -> dict:
         rows.append({
             "save_id": info.save_id,
             "name": os.path.basename(str(info.path)),
-            "display": info.display_name,
+            "display": _save_display(info),
             "campaign": info.campaign_name or info.campaign_id or "",
             "scenario": info.scenario or "",
-            "kind": "战役" if info.kind == "campaign" else "独立场景",
+            "kind": ("战役" if info.kind == "campaign" else "独立场景")
+                     if ui_language() == "chi" else
+                     ("Campaign" if info.kind == "campaign" else "Standalone scenario"),
             # U72：在**玩家自建的归档目录**里？（游戏只认 campaigns / games）
             "archived": bool(info.archived),
             "mtime": _mtime(info.mtime),
@@ -162,7 +290,8 @@ def api_view(save_id: str) -> dict:
         # ⚠️ `SaveInfo.name` / `display_name` 是**属性**，不是 dataclass 字段
         # ⇒ `_jsonable` 不会输出它们 ⇒ 前端拿不到存档名（U42 实测 Header 显示「—」）。
         try:
-            data["save"]["display_name"] = view.save.display_name
+            # U74：`display_name` 是核心库的**中文属性** ⇒ 英文界面下走 `_save_display()`
+            data["save"]["display_name"] = _save_display(view.save)
             data["save"]["file_name"] = view.save.name
         except Exception:
             pass
@@ -177,6 +306,15 @@ def api_view(save_id: str) -> dict:
         try:
             pos = save.campaign_position()
             data["campaign_position"] = _jsonable(pos)
+            # U74：战役位置里的**名字**跟着界面语言
+            try:
+                _cp = data.get("campaign_position")
+                if isinstance(_cp, dict):
+                    _cid2 = _cp.get("campaign_id") or save.info.campaign_id
+                    if _cid2:
+                        _localize_position(_cp, _cid2, CorePaths.discover())
+            except Exception:
+                pass
         except Exception as exc:
             data["campaign_position"] = {"error": str(exc)}
         # 单位 / 总部的 `name_brief` / `name_full` 存的是**本地化键**
@@ -185,8 +323,9 @@ def api_view(save_id: str) -> dict:
         # ⚠️ 中文一律来自游戏包 `localization/chi/strings.yml` —— 不自己翻译（§5.7）。
         _tr = None
         try:
-            from save_modifier_core import locale as _locale
-            _tr = _locale.default()
+            from save_modifier_core.locale import TranslationStore
+            from save_modifier_core.paths import CorePaths as _CP
+            _tr = TranslationStore(_CP.discover(), locale=data_language())
             for _u in (data.get("units") or []):
                 _u["name_cn"] = _tr.get(_u.get("name_brief") or "", "") or (_u.get("name_brief") or "")
                 _u["full_cn"] = _tr.get(_u.get("name_full") or "", "") or (_u.get("name_full") or "")
@@ -239,9 +378,7 @@ def api_view(save_id: str) -> dict:
 
         # 战线中文名（§5.7）—— 商店页的 tab 原来直接显示 id（caucasus / south）
         try:
-            from save_modifier_core.campaigns import (CampaignData,
-                                                     default_campaign_index)
-            _cd = CampaignData(CorePaths.discover(), default_campaign_index())
+            _cd = _campaign_data()
             _cid = save.info.campaign_id
             _fs: dict[str, str] = {}
             for _e in (data.get("store") or []):
@@ -298,11 +435,12 @@ def _catalog_payload() -> dict:
     if _CATALOG_CACHE is not None:
         return _CATALOG_CACHE
 
-    from save_modifier_core import Catalog, CorePaths, locale
+    from save_modifier_core import Catalog, CorePaths
+    from save_modifier_core.locale import TranslationStore
 
     paths = CorePaths.discover()
     catalog = Catalog(paths)
-    tr = locale.default()
+    tr = TranslationStore(paths, locale=data_language())
 
     def cn(key, fallback: str = "") -> str:
         """查一条中文；查不到退回 `fallback`（一般是内部 id）。"""
@@ -782,6 +920,11 @@ def api_settings() -> dict:
         "packages": [str(p) for p in paths.packages()],
         # U70：被游戏**整包禁用**的 mod（not_moddable 规则命中）⇒ 修改器也不读
         "disabled_packages": [{"path": k, "rule": v} for k, v in disabled.items()],
+        # U74：界面语言（用户选的 / 跟随游戏）与数据名字的语言
+        "ui_language": ui_language(),
+        "game_language": _game_language(),
+        "data_language": data_language(),
+        "available_languages": list(UI_LANGUAGES),
         # U71：Steam 创意工坊里的 mod 包（zip 里还没解压的也算 ⇒ 已并入参考数据）
         "workshop_packages": [
             {"kind": w["kind"], "pkg": w["pkg"], "item": w["item"],
@@ -889,6 +1032,294 @@ def api_save_as(payload) -> dict:
             "summary": "已另存为 %s" % dest.name}
 
 
+# ---------------------------------------------------------------- 界面语言（U74）
+
+#: 修改器**界面**支持的语言（用户拍板：只做英语）
+UI_LANGUAGES = ("chi", "en")
+
+#: 界面语言 ↔ 游戏本地化目录名
+LANG_DIR = {"chi": "chi", "en": "eng"}
+
+_I18N_CACHE = None      # (mtime, 词表)
+
+
+def _i18n_table() -> dict:
+    """词表（`web/i18n.json`）—— 界面文案 + 报错文案。
+
+    ⚠️ **按 mtime 失效** —— 改了词表不用重启服务。
+    """
+    global _I18N_CACHE
+    p = WEB_DIR / "i18n.json"
+    try:
+        mtime = p.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    if _I18N_CACHE is not None and _I18N_CACHE[0] == mtime:
+        return _I18N_CACHE[1]
+    try:
+        import json as _json
+        data = _json.loads(p.read_text(encoding="utf-8"))
+        table = data if isinstance(data, dict) else {}
+    except Exception:
+        table = {}
+    _I18N_CACHE = (mtime, table)
+    return table
+
+
+def _game_language() -> str:
+    r"""**游戏自己**的语言设置（`%LOCALAPPDATA%\.uoc2\settings.yml` 的 `language`）。"""
+    try:
+        import re as _re
+        from save_modifier_core.paths import CorePaths
+        p = CorePaths.discover().uoc2_appdata / "settings.yml"
+        m = _re.search(r"^language:\s*(\S+)", p.read_text(encoding="utf-8",
+                                                             errors="ignore"),
+                       _re.M)
+        if m:
+            return m.group(1).strip().strip("\"'")
+    except Exception:
+        pass
+    return ""
+
+
+#: `ui_language()` 的缓存：(设置文件 mtime, 游戏设置 mtime, 语言)
+_UI_LANG_CACHE: tuple | None = None
+
+
+def ui_language() -> str:
+    """**界面语言**：用户自己选的 > 游戏设置 > 中文。
+
+    ⚠️ 游戏设置里的语言目录名（`chi`/`eng`/`ger`/`rus`）与界面语言不是一回事：
+    界面只做中/英 ⇒ 游戏是德语时界面仍是中文，玩家可以用按钮自己切。
+
+    ⚠️ **按 mtime 缓存** —— 翻译每条报错都要问一次语言，
+    不能每条都去读两个设置文件。
+    """
+    global _UI_LANG_CACHE
+    from save_modifier_core.paths import config_path, read_config
+    try:
+        cfg_mtime = config_path().stat().st_mtime
+    except OSError:
+        cfg_mtime = 0.0
+    try:
+        from save_modifier_core.paths import CorePaths
+        gs_path = CorePaths.discover().uoc2_appdata / "settings.yml"
+        gs_mtime = gs_path.stat().st_mtime
+    except OSError:
+        gs_mtime = 0.0
+    if _UI_LANG_CACHE is not None and _UI_LANG_CACHE[:2] == (cfg_mtime, gs_mtime):
+        return _UI_LANG_CACHE[2]
+    picked = (read_config().get("ui_language") or "").strip()
+    if picked in UI_LANGUAGES:
+        lang = picked
+    elif _game_language() == "eng":
+        lang = "en"
+    else:
+        lang = "chi"
+    _UI_LANG_CACHE = (cfg_mtime, gs_mtime, lang)
+    return lang
+
+
+def data_language() -> str:
+    """**数据名字的语言**（单位/特种兵/卡牌/战役的名字）—— 跟**界面语言**一致。
+
+    ⇒ 界面切到 English，单位/特种兵的名字也从游戏的 `eng` 资源里取
+    （键与中文 100% 覆盖 ⇒ 名字一定取得到）。
+    """
+    return LANG_DIR.get(ui_language(), "chi")
+
+
+def api_i18n() -> dict:
+    """词表 + 当前语言（前端启动时一次拿全）。"""
+    table = _i18n_table()
+    return {
+        "ui": table.get("ui") or {},
+        "errors": table.get("errors") or {},
+        "language": ui_language(),
+        "data_language": data_language(),
+        "available": list(UI_LANGUAGES),
+    }
+
+
+def api_language_set(payload) -> dict:
+    """设置界面语言（写修改器自己的设置文件；**不动存档**）。"""
+    from save_modifier_core.paths import read_config, write_config
+
+    lang = ((payload or {}).get("lang") or "").strip()
+    if lang == "auto":
+        cfg = read_config()
+        cfg.pop("ui_language", None)
+        write_config(cfg)
+        return {"ok": True, "language": ui_language()}
+    if lang not in UI_LANGUAGES:
+        return {"ok": False, "errors": ["不支持的语言：%s（只有 %s）"
+                                        % (lang, " / ".join(UI_LANGUAGES))]}
+    cfg = read_config()
+    cfg["ui_language"] = lang
+    write_config(cfg)
+    return {"ok": True, "language": lang}
+
+
+#: 词表里「带占位符的模板」编译成的正则（长的在前 ⇒ 更具体的先替）
+_ERR_RX_CACHE: tuple | None = None
+
+#: 模板里的占位符 `{name}`
+_ERR_PH = re.compile(r"\{([^{}]*)\}")
+
+#: 中文检测（只翻有中文的串）
+_CJK = re.compile(r"[\u4e00-\u9fff]")
+
+#: 响应里这些键下的字符串是**给玩家看的文案** ⇒ 逐条翻译
+_TR_KEYS = ("error", "errors", "warnings", "notes", "summary", "detail", "reason")
+
+
+def _err_table() -> dict:
+    """报错/警告/摘要的译文表（`i18n.json` 的 `errors` 段）。"""
+    return _i18n_table().get("errors") or {}
+
+
+def _err_values() -> dict:
+    """**占位符级别**的值翻译（`i18n.json` 的 `values` 段）。
+
+    例：核心库内部把难度名写死成中文（`普通`），它作为占位符的值出现 ⇒
+    按**占位符名字**精确替换，不影响别的上下文。
+    """
+    return _i18n_table().get("values") or {}
+
+
+def _compile_err_templates(table: dict):
+    """把「带占位符的模板」编译成正则（长的在前）。"""
+    global _ERR_RX_CACHE
+    if _ERR_RX_CACHE is not None and _ERR_RX_CACHE[0] is table:
+        return _ERR_RX_CACHE[1]
+    pats = []
+    for tpl, en in table.items():
+        if "{" not in tpl:
+            continue
+        parts, pairs, last, lit = [], [], 0, 0
+        for m in _ERR_PH.finditer(tpl):
+            chunk = tpl[last:m.start()]
+            parts.append(re.escape(chunk))
+            lit += len(chunk)
+            raw = m.group(1)
+            gname = "g%d" % len(pairs)
+            pairs.append((raw, gname))
+            # ⚠️ **不跨 `；`** —— 核心库用 `；` 把几条错误拼成一串，
+            # 一条模板不该把两句话连着吃。
+            parts.append("(?P<%s>[^；]*?)" % gname)
+            last = m.end()
+        tail = tpl[last:]
+        parts.append(re.escape(tail))
+        lit += len(tail)
+        try:
+            rx = re.compile("".join(parts), re.S)
+        except re.error:                       # 模板写坏了就跳过它
+            continue
+        pats.append((lit, len(tpl), rx, en, pairs))
+    # 字面量多的（更具体的）先替
+    pats.sort(key=lambda x: (-x[0], -x[1]))
+    out = [(rx, en, pairs) for _, _, rx, en, pairs in pats]
+    _ERR_RX_CACHE = (table, out)
+    return out
+
+
+def _fill_template(en_tpl: str, groups: dict, pairs: list, values: dict,
+                   depth: int = 0) -> str:
+    """把捕获到的值填进英文模板（值本身也可能要翻译）。
+
+    ⚠️ **值里可能还套着中文** —— 核心库的摘要常常是拼出来的
+    （「改了 1 个文件：单位 3 加特种 xxx（槽位 0）」）⇒ 值也要再翻一层。
+    """
+    out = en_tpl
+    for raw, gname in pairs:
+        val = groups.get(gname, "")
+        if depth < 3 and isinstance(val, str) and _CJK.search(val):
+            val = tr_error(val, depth + 1)
+        vmap = values.get(raw)
+        if vmap:
+            for zh, en in vmap.items():
+                val = val.replace(zh, en)
+        out = out.replace("{%s}" % raw, val)
+    return out
+
+
+def tr_error(text, depth: int = 0) -> str:
+    """把**一条**中文报错/警告/摘要翻成英文（**只在显示层**，核心库一个字不改）。
+
+    ① 整条精确匹配；
+    ② **模板**匹配 —— 报错里带着真值（`单位 U1 的 xp=900 越界（必须 0..400）`），
+       整条匹配不上 ⇒ 把词表里的 `{name}` 占位符编译成正则再匹配；
+    ③ 兜底：整串里能认出来的中文片段换掉（核心库把几条错误拼成一串时用）。
+    """
+    if not isinstance(text, str) or not text or not _CJK.search(text):
+        return text
+    if ui_language() != "en":
+        return text
+    table = _err_table()
+    if not table:
+        return text
+    exact = table.get(text)
+    if isinstance(exact, str):
+        return exact
+    values = _err_values()
+    pats = _compile_err_templates(table)
+    out = text
+    for rx, en, pairs in pats:                    # ② 整条模板匹配
+        m = rx.fullmatch(text)
+        if m:
+            got = m.groupdict()
+            # 捕获到的值里含 `，`/`；` ⇒ 它把后面的分句一起吞了
+            # （摘要常常是「……等级 3 → 2，被压制 1 → 0」这种拼出来的）
+            # ⇒ 不算整条匹配，交给下面的片段替换。
+            if any(("，" in v or "；" in v) for v in got.values()):
+                continue
+            out = _fill_template(en, got, pairs, values, depth)
+            break
+    else:
+        out = text                               # ③ 片段替换（字面量多的先替）
+        for rx, en, pairs in pats:
+            def _sub(m, en=en, pairs=pairs):
+                return _fill_template(en, m.groupdict(), pairs, values, depth)
+            out = rx.sub(_sub, out)
+    lits = [(k, v) for k, v in table.items() if "{" not in k and isinstance(v, str)]
+    lits.sort(key=lambda kv: -len(kv[0]))
+    for zh, en in lits:
+        if zh in out:
+            out = out.replace(zh, en)
+    # 中文分隔符 → 英文（正文已经翻完了，这两个符号还留着）
+    for zh, en in (("；", "; "), ("、", ", ")):
+        out = out.replace(zh, en)
+    return out
+
+
+def tr_errors(items) -> list:
+    """一批报错/警告逐条翻译。"""
+    return [tr_error(x) for x in (items or [])]
+
+
+def _tr_payload(obj):
+    """把响应里**给玩家看的文案**翻成英文（数据本身一个字不动）。"""
+    if ui_language() != "en":
+        return obj
+    if isinstance(obj, dict):
+        return {k: (_tr_value(v) if k in _TR_KEYS else _tr_payload(v))
+                for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_tr_payload(x) for x in obj]
+    return obj
+
+
+def _tr_value(v):
+    """一个「文案值」：字符串 ⇒ 翻译；列表/字典 ⇒ 递归。"""
+    if isinstance(v, str):
+        return tr_error(v)
+    if isinstance(v, list):
+        return [tr_error(x) if isinstance(x, str) else _tr_payload(x) for x in v]
+    if isinstance(v, dict):
+        return _tr_payload(v)
+    return v
+
+
 # ---------------------------------------------------------------- 战役页 / 撤销栈
 
 
@@ -899,7 +1330,6 @@ def api_campaign_detail(save_id: str) -> dict:
     单位不一定存活 / 一定继承 / 一定登场（§7.8）。
     """
     from save_modifier_core import CorePaths, open_save
-    from save_modifier_core.campaigns import CampaignData, default_campaign_index
 
     paths = CorePaths.discover()
     with open_save(save_id) as save:
@@ -910,8 +1340,7 @@ def api_campaign_detail(save_id: str) -> dict:
         cid = pos.campaign_id or save.info.campaign_id
         if not cid:
             return {"error": "这个存档没有战役信息（独立场景？）"}
-        index = default_campaign_index()
-        data = CampaignData(paths, index)
+        data = _campaign_data(paths)
 
         # 路线图：按**关卡**挑线路（U66）——
         #   ① 关卡在**历史线**里有 ⇒ 走历史线；
@@ -919,16 +1348,30 @@ def api_campaign_detail(save_id: str) -> dict:
         # ⚠️ 以前是「按会议找 + 路线按 sorted 遍历」⇒ `"fantasy" < "historical"`
         #    ⇒ **幻想线永远先命中** ⇒ 走历史线的存档显示的是幻想线的关卡。
         cur = pos.conference_id
-        chosen_route = index.pick_route(cid, cur, pos.scenario_id)
-        confs = index.conferences(cid, chosen_route)
+        chosen_route = data.index.pick_route(cid, cur, pos.scenario_id)
+        confs = data.index.conferences(cid, chosen_route)
         cur_idx = next((i for i, c in enumerate(confs) if c.id == cur), -1)
 
+        # U74：场景名跟着界面语言（内置索引里是**写死的中文**）
+        _tr2 = None
+        try:
+            from save_modifier_core.locale import TranslationStore
+            _tr2 = TranslationStore(paths, locale=data_language())
+        except Exception:
+            _tr2 = None
         route = []
         for i, c in enumerate(confs):
+            _scenes = []
+            for s in c.scenes:
+                _nm = s.name
+                if _tr2 is not None:
+                    _v = _localize_name(_tr2, cid, sid=str(s.id))
+                    if _v:
+                        _nm = _v
+                _scenes.append({"id": s.id, "name": _nm, "variant": s.variant})
             route.append({
-                "id": c.id, "text": c.text,
-                "scenes": [{"id": s.id, "name": s.name, "variant": s.variant}
-                           for s in c.scenes],
+                "id": c.id, "text": tr_error(c.text),
+                "scenes": _scenes,
                 "done": i < cur_idx,
                 "now": i == cur_idx,
             })
@@ -940,8 +1383,9 @@ def api_campaign_detail(save_id: str) -> dict:
                 roster = _jsonable(r)
                 # 名册单位的 name_brief 是**本地化键** ⇒ 翻成中文（§5.7）
                 try:
-                    from save_modifier_core import locale as _locale2
-                    _tr2 = _locale2.default()
+                    from save_modifier_core.locale import TranslationStore as _TS
+                    from save_modifier_core.paths import CorePaths as _CP2
+                    _tr2 = _TS(_CP2.discover(), locale=data_language())
                     for _u in (roster.get("units") or []):
                         _u["name_cn"] = (_tr2.get(str(_u.get("name_brief") or ""), "")
                                           or str(_u.get("name_brief") or ""))
@@ -1090,6 +1534,8 @@ class _Handler(BaseHTTPRequestHandler):
             pass
 
     def _json(self, obj, code=200):
+        # ⚠️ **显示层翻译**（U74）：界面是英文时，把报错/警告/摘要翻成英文
+        obj = _tr_payload(obj)
         self._send(code, json.dumps(obj, ensure_ascii=False).encode("utf-8"),
                    "application/json; charset=utf-8")
 
@@ -1137,6 +1583,8 @@ class _Handler(BaseHTTPRequestHandler):
                     self._json(api_fs_list((q.get("dir") or [""])[0]))
                 elif path == "/api/settings":
                     self._json(api_settings())
+                elif path == "/api/i18n":
+                    self._json(api_i18n())
                 else:
                     self._json({"error": "未知接口"}, 404)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务
@@ -1204,6 +1652,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(_jsonable(api_import_save(payload)))
             elif path == "/api/settings":
                 self._json(_jsonable(api_settings_set(payload)))
+            elif path == "/api/settings/lang":
+                self._json(_jsonable(api_language_set(payload)))
             else:
                 self._json({"ok": False, "errors": ["未知接口"]}, 404)
         except ValueError as exc:

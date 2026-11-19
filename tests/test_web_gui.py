@@ -1587,7 +1587,8 @@ class TestU53ToolbarAndBattleFilter(unittest.TestCase):
         self.assertIn("UONLY", self.html)
         self.assertIn("VIEW.battle_unit_ids", self.html)
         self.assertIn("VIEW.in_battle", self.html)
-        self.assertIn('${inBattle?"":"disabled"}', self.html)
+        # U74：整段模板被包成 L2() ⇒ 表达式本身还在，只是没有 ${} 了
+        self.assertIn('inBattle?"":"disabled"', self.html)
 
     def test_units_columns_are_wider_without_the_gap(self):
         """列表列加宽（0.6fr → 0.64fr）。
@@ -1702,7 +1703,8 @@ class TestU50ToolbarAndStrength(unittest.TestCase):
 
     def test_strength_card_has_only_the_blood_bar(self):
         """U54：兵力卡**只有血量条**（数字区删掉）。"""
-        self.assertIn('id="sp_blood_${u.id}"', self.html)
+        # U74：模板被包成 L2() ⇒ id 变成占位符 `id="sp_blood_{8}"`
+        self.assertIn('id="sp_blood_', self.html)
         self.assertNotIn('id="sp_tot_${u.id}"', self.html)
         self.assertNotIn('id="sp_act_${u.id}"', self.html)
         self.assertNotIn('id="sp_sup_${u.id}"', self.html)
@@ -1724,8 +1726,9 @@ class TestU50ToolbarAndStrength(unittest.TestCase):
 
     def test_pending_list_shows_player_facing_numbers(self):
         """待应用清单显示玩家看到的量，写盘仍是 `act_st` / `sup_st`。"""
-        self.assertIn("`单位 ${u.id} 活跃兵力`", self.html)
-        self.assertIn("`单位 ${u.id} 被压制兵力`", self.html)
+        # U74：文案进了 i18n 词表（键里用 {0} 占位）
+        self.assertIn('L2("单位 {0} 活跃兵力"', self.html)
+        self.assertIn('L2("单位 {0} 被压制兵力"', self.html)
 
 
 # =====================================================================
@@ -1772,7 +1775,8 @@ class TestU49LayoutAndLegality(unittest.TestCase):
         # U54：兵力卡**删掉数值区**，改成一条血量条 + 一行颜色含义说明
         # ⇒ 两张卡都是「标签 / 内容 / 提示」三行
         self.assertEqual(self.html.count('class="hintline"'), 2)
-        self.assertIn('class="blood${bloodDirty?', self.html)
+        # U74：class 变成占位符 `class="blood{7}"`
+        self.assertIn('class="blood{', self.html)
         self.assertNotIn('id="sp_tot_${u.id}"', self.html)
         self.assertIn(".stat .v .spin,.stat .v .numin{height:34px", self.html)
         self.assertIn("min-height:34px", self.html)
@@ -1826,7 +1830,7 @@ class TestSameSpecialistMounting(unittest.TestCase):
 
     def test_pool_shows_how_many_more_can_be_mounted(self):
         """tooltip 要写清「已挂 N 个 / 还能再挂 M 个 / 槽位已满」。"""
-        self.assertIn('"已挂 "+n+" 个，还能再挂 "+(cap-used)+" 个"', self.html)
+        self.assertIn('L("已挂 ")+n+L(" 个，还能再挂 ")+(cap-used)+L(" 个")', self.html)
         self.assertIn("特种兵槽已满", self.html)
 
     def test_pending_add_uses_a_unique_key(self):
@@ -1838,7 +1842,7 @@ class TestSameSpecialistMounting(unittest.TestCase):
         """卸载按 idx 定位（点哪张卸哪张）。"""
         self.assertIn("function removeSpec(unitId, specType, idx)", self.html)
         self.assertIn("unit_spec_remove:${unitId}:${specType}:${s.idx}", self.html)
-        self.assertTrue('（第 "+nth+"/"+same.length+" 个' in self.html)
+        self.assertTrue('L("点击卸下这个特种兵（第 ")+nth+"/"+same.length+L(" 个 · 槽位 ")' in self.html)
 
 
 # =====================================================================
@@ -2045,7 +2049,7 @@ class TestU61TheaterInfiniteHint(unittest.TestCase):
 
     def test_the_hint_only_shows_for_infinite_assets(self):
         """提示只给「无限」的那些项显示（有限的不用显示）。"""
-        self.assertIn("${inf ? `<div class=\"talt\">「无限」= 每回合恢复", self.html)
+        self.assertIn('<div class=\"talt\">「无限」= 每回合恢复', self.html)
 
 
 # =====================================================================
@@ -2108,10 +2112,11 @@ class TestU63AvatarCentering(unittest.TestCase):
         """列表行与详情抬头都用 `avaImg`（而不是普通 imgTag）。"""
         self.assertIn("function avaImg(type, alt, box)", self.html)
         # U65 起两处头像框尺寸不同（列表 58 / 详情 84），分别断言
+        # U74：整行模板被包成 L2() ⇒ 外层 div 变成占位符，改按 avaImg 调用计数
         self.assertEqual(self.html.count(
-            "<div class=\"ava\">${avaImg(u.type, unitCn(u.type), AVA_BOX_LIST)}</div>"), 1)
+            "avaImg(u.type, unitCn(u.type), AVA_BOX_LIST)"), 1)
         self.assertEqual(self.html.count(
-            "<div class=\"ava\">${avaImg(u.type, unitCn(u.type), AVA_BOX_DETAIL)}</div>"), 1)
+            "avaImg(u.type, unitCn(u.type), AVA_BOX_DETAIL)"), 1)
 
 
 # =====================================================================
@@ -2136,7 +2141,8 @@ class TestU64LevelPicker(unittest.TestCase):
 
     def test_level_buttons_show_the_hand_limit(self):
         """每个难度按钮上标着它的**手牌上限**。"""
-        self.assertIn("<span class=\"lvlim\">${l.deck_limit} 张</span>", self.html)
+        # U74：模板被包成 L2() ⇒ 变成 `<span class="lvlim">{5} 张</span>`
+        self.assertIn('<span class=\"lvlim\">{5} 张</span>', self.html)
 
     def test_over_limit_levels_are_disabled(self):
         """手里牌数超过某难度的上限 ⇒ 那个按钮置灰并说明原因。"""
@@ -2191,7 +2197,8 @@ class TestU65UnitBloodPartialRefresh(unittest.TestCase):
 
     def test_row_carries_uid(self):
         """列表行带 `data-uid` ⇒ 局部刷新能精确定位到那一行。"""
-        self.assertIn("class=\"urow ${u.id===SEL.units?'sel':''}\" data-uid=\"${u.id}\"", self.html)
+        # U74：模板被包成 L2() ⇒ 变成 `class="urow {0}" data-uid="{1}"`
+        self.assertIn('class=\"urow {0}\" data-uid=\"{1}\"', self.html)
 
     def test_pips_helper_is_shared(self):
         """列表行与详情卡共用同一份段格条逻辑。"""

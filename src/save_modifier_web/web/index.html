@@ -922,6 +922,7 @@ tr.oldrow{opacity:.6}
     <button class="save" id="hSave" onclick="openSaveMenu()"><span class="nm">—</span></button>
     <span class="hint">改动会先备份原存档</span>
     <span class="sp"></span>
+    <button class="btn" id="btnLang" onclick="openLangMenu()">中文</button>
     <button class="btn" onclick="doUndo()">↶ 撤销</button>
     <button class="btn pri" id="btnApply" onclick="doApply()">应用更改<span class="badge-n" id="hPending">0</span></button>
   </div>
@@ -958,10 +959,97 @@ const TOKEN = QS.get("t") || "";
 const OPEN_ID = QS.get("open") || "";
 const OPEN_PAGE = QS.get("page") || "";
 let SAVES = [], VIEW = null, PAGE = "overview";
+
+/* ===================================================================
+   i18n（U74）—— 界面语言：**跟随游戏**，但可手动改；只做中 / 英。
+   ------------------------------------------------------------------
+   * `L("中文")`   —— 静态文案（源码里已全部包好）
+   * `L2("中文{0}", 参数)` —— 带参数的模板（键里用 {0} 占位）
+   * 静态 HTML 里的中文（文本节点 / title 等属性）⇒ 由 MutationObserver
+     按**整段精确匹配**翻译（动态拼接的都在源码里包好了）
+   =================================================================== */
+let LANG = "chi";        /* 当前界面语言：chi | en */
+let I18N = {};           /* 中文 → 英文（来自 /api/i18n） */
+
+function L(zh){
+  if(LANG !== "en") return zh;
+  const v = I18N[zh];
+  return (v === undefined || v === "") ? zh : v;
+}
+function L2(key){
+  let s = key;
+  if(LANG === "en"){
+    const v = I18N[key];
+    if(v !== undefined && v !== "") s = v;
+  }
+  const args = Array.prototype.slice.call(arguments, 1);
+  args.forEach(function(a, i){
+    s = s.split("{" + i + "}").join(a);
+  });
+  return s;
+}
+async function loadI18n(){
+  const r = await fetch("/api/i18n", {headers:{"X-Token":TOKEN}});
+  const d = await r.json();
+  I18N = d.ui || {};
+  LANG = d.language || "chi";
+}
+/* 静态 HTML 的中文：文本节点 + 常用属性，按整段精确匹配翻译 */
+function trNode(node){
+  if(!node) return;
+  if(node.nodeType === 3){
+    if(LANG !== "en") return;
+    const t = node.nodeValue.trim();
+    if(t && I18N[t]) node.nodeValue = node.nodeValue.replace(t, I18N[t]);
+    return;
+  }
+  if(node.nodeType !== 1) return;
+  ["title","placeholder","data-tip","alt"].forEach(function(a){
+    const v = node.getAttribute && node.getAttribute(a);
+    if(v && I18N[v]) node.setAttribute(a, I18N[v]);
+  });
+  for(let i=0;i<node.childNodes.length;i++) trNode(node.childNodes[i]);
+}
+function startTr(){
+  if(LANG !== "en") return;
+  /* ⚠️ observer 只看**新增**节点 ⇒ 初始 HTML（启动页那些静态文案）要自己扫一遍 */
+  trNode(document.body);
+  if(!window.MutationObserver) return;
+  const mo = new MutationObserver(function(muts){
+    for(let i=0;i<muts.length;i++)
+      for(let j=0;j<muts[i].addedNodes.length;j++) trNode(muts[i].addedNodes[j]);
+  });
+  mo.observe(document.body, {childList:true, subtree:true});
+}
+/* 语言菜单：跟随游戏 / 中文 / English */
+function openLangMenu(){
+  const cur = LANG;
+  openModal(`<div class="mh">${L("界面语言")}</div>
+    <div class="mb"><div class="menu">
+      <div class="mi" onclick="setUiLang('auto')"><b>${L("跟随游戏")}</b>
+        <span>${L("游戏现在用什么语言，界面就用什么语言（默认）")}</span></div>
+      <div class="mi" onclick="setUiLang('chi')"><b>${L("中文")}</b>
+        <span>${L("界面与单位/特种兵的名字都用中文")}</span></div>
+      <div class="mi" onclick="setUiLang('en')"><b>English</b>
+        <span>${L("界面与单位/特种兵的名字都用英文")}</span></div>
+    </div>
+    <div class="fine">${L("当前：")}<b>${cur === "en" ? "English" : L("中文")}</b></div></div>
+    <div class="mf"><button class="btn" onclick="closeModal()">关闭</button></div>`,
+    {cls:"menu"});
+}
+async function setUiLang(lang){
+  const r = await post("/api/settings/lang", {lang: lang});
+  if(!r.data.ok){ alert((r.data.errors||[]).join("；")); return; }
+  closeModal();
+  location.reload();
+}
+
 let UQUERY = "", UHQFILTER = "", UONLY = false;   /* UONLY = 只看当前场景激活的单位 */
 let HQSTATE = {};
 let MODAL = null;      /* 模态框的状态（U40） */
 
+/* ⚠️ **U74：这里存中文，用的时候再 `L()`** ——
+   模块级常量会在 `loadI18n()` **之前**求值 ⇒ 里面调 `L()` 永远拿不到英文。 */
 const FEATURE_CN = {units:"单位", hqs:"总部", hand:"手牌", shelf:"货架",
   store:"商店", theater_assets:"战区资产", restore_hand:"恢复上次会议牌局"};
 const PAGE_CN = {overview:"概览", units:"单位", hqs:"总部", cards:"卡牌",
@@ -983,7 +1071,7 @@ document.addEventListener("wheel", function(e){
 window.onerror = function(msg, src, line){
   const r = document.getElementById("rows");
   if(r) r.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">`
-    + `JS 错误：${esc(String(msg))}（第 ${line} 行）</td></tr>`;
+    + L2("JS 错误：{0}（第 {1} 行）</td></tr>", esc(String(msg)), line);
   return false;
 };
 
@@ -1018,12 +1106,15 @@ function paintHeader(){
   if(!el || !VIEW) return;
   const save = VIEW.save||{};
   const inBattle = theaterEditable();
+  /* U74：语言按钮上的字也跟着切 */
+  const lb = document.getElementById("btnLang");
+  if(lb) lb.textContent = (LANG === "en") ? "EN" : L("中文");
   /* U67：当前存档是个**按钮** —— 点开是菜单（切换存档 / 另存为 / 放弃改动）。 */
   const imported = String(VIEW._save_id||"").indexOf("modifier_imports") >= 0;
-  el.innerHTML = `<span class="nm">${esc(save.display_name||save.file_name||save.save_id||"—")}</span>
-    ${imported?'<span class="badge">导入副本</span>':""}
-    ${inBattle?'<span class="badge battle">战斗中</span>':""}
-    <span class="caret">▾</span>`;
+  el.innerHTML = L2(`<span class="nm">{0}</span>
+    {1}
+    {2}
+    <span class="caret">▾</span>`, esc(save.display_name||save.file_name||save.save_id||"—"), imported?L('<span class="badge">导入副本</span>'):"", inBattle?L('<span class="badge battle">战斗中</span>'):"");
 }
 function paintRail(){
   if(!VIEW) return;
@@ -1040,15 +1131,15 @@ function paintRail(){
        战斗里一个资产都没有时也要能进去**添加**（U45）。 */
     const ok = theaterEditable();
     nav.classList.toggle("dis", !ok);
-    why.textContent = ok ? "" : "不在战斗中";
+    why.textContent = ok ? "" : L("不在战斗中");
   }
   const ru = document.getElementById("railUndo");
   if(ru){
     const u = USTACK||{};
     const n = u.count||0;
     const last = (u.stack||[])[0];
-    ru.innerHTML = `撤销栈 <b>${n}</b> 条` +
-      (last?`<br>最近：${esc(last.summary||((last.entries||[]).join("、")))}`:"");
+    ru.innerHTML = L2("撤销栈 <b>{0}</b> 条", n) +
+      (last?L2("<br>最近：{0}", esc(last.summary||((last.entries||[]).join("、")))):"");
   }
 }
 
@@ -1077,7 +1168,7 @@ function paintPending(){
   if(hp) hp.textContent = PENDING.length;
   const hd = document.getElementById("hDirty");
   if(hd) hd.textContent = PENDING.length
-      ? `有 ${PENDING.length} 条未应用的改动` : "就绪 · 未改动磁盘";
+      ? L2("有 {0} 条未应用的改动", PENDING.length) : L("就绪 · 未改动磁盘");
   const ba = document.getElementById("btnApply");
   if(ba) ba.disabled = !PENDING.length;
 }
@@ -1121,7 +1212,7 @@ function bindTun(){
     const f = el.dataset.f;
     const base = f==="prestige" ? (VIEW.prestige||0) : (VIEW.score||0);
     el.value = base;
-    document.getElementById("o_"+f).textContent = "原值 " + base;
+    document.getElementById("o_"+f).textContent = L("原值 ") + base;
 
     /* U54：声望 / 分数**只允许直接输入**，不再有滚轮（用户拍板） */
 
@@ -1130,11 +1221,11 @@ function bindTun(){
       const v = Number(raw);
       const [lo, hi] = TUN_RANGE[f] || [0, null];
       let bad = null;
-      if(raw==="") bad = "不能为空";
-      else if(!/^-?\d+$/.test(raw)) bad = "必须是整数";
-      else if(!Number.isSafeInteger(v)) bad = "数字太大了";
-      else if(v < lo) bad = "不能小于 " + lo;
-      else if(hi!==null && v > hi) bad = "不能大于 " + hi;
+      if(raw==="") bad = L("不能为空");
+      else if(!/^-?\d+$/.test(raw)) bad = L("必须是整数");
+      else if(!Number.isSafeInteger(v)) bad = L("数字太大了");
+      else if(v < lo) bad = L("不能小于 ") + lo;
+      else if(hi!==null && v > hi) bad = L("不能大于 ") + hi;
       el.classList.toggle("bad", !!bad);
       el.title = bad || "";
       if(bad){                              /* 非法值 ⇒ 不入待应用 */
@@ -1146,7 +1237,7 @@ function bindTun(){
       if(v === base){
         dropPendingKind("progress", f);
       } else {
-        setPending("progress", f, params, `${f==="prestige"?"声望":"分数"} ${base} → ${v}`);
+        setPending("progress", f, params, L2("{0} {1} → {2}", f==="prestige"?L("声望"):L("分数"), base, v));
       }
       paintPending();
     }
@@ -1313,7 +1404,7 @@ function bindSpin(el, opts){
   const base = opts.base;
   const cur0 = (opts.cur===undefined) ? base : opts.cur;
   /* U52：滚轮控件要**一眼看得出能改** ⇒ 悬停给一句说明 */
-  el.title = opts.tip || "滚轮 ±1（也可按住上下拖）";
+  el.title = opts.tip || L("滚轮 ±1（也可按住上下拖）");
   function show(v){
     el.textContent = v;
     el.classList.toggle("dirty", v!==base);
@@ -1340,11 +1431,11 @@ function bindNumIn(el, opts){
     const raw = String(el.value??"").trim();
     const v = Number(raw);
     let bad = null;
-    if(raw==="") bad = "不能为空";
-    else if(!/^-?\d+$/.test(raw)) bad = "必须是整数";
-    else if(!Number.isSafeInteger(v)) bad = "数字太大了";
-    else if(opts.min!==undefined && opts.min!==null && v<opts.min) bad = "不能小于 " + opts.min;
-    else if(opts.max!==undefined && opts.max!==null && v>opts.max) bad = "不能大于 " + opts.max;
+    if(raw==="") bad = L("不能为空");
+    else if(!/^-?\d+$/.test(raw)) bad = L("必须是整数");
+    else if(!Number.isSafeInteger(v)) bad = L("数字太大了");
+    else if(opts.min!==undefined && opts.min!==null && v<opts.min) bad = L("不能小于 ") + opts.min;
+    else if(opts.max!==undefined && opts.max!==null && v>opts.max) bad = L("不能大于 ") + opts.max;
     el.classList.toggle("bad", !!bad);
     el.title = bad || "";
     if(bad){ dropPendingKind(opts.kind, opts.key); return; }
@@ -1416,25 +1507,25 @@ function unitRowHTML(u){
   const badges = specs.slice(0,3).map(s=>
     `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>`).join("");
   const hq = (VIEW.hqs||[]).find(h=>h.id===u.hq_id);
-  return `<div class="urow ${u.id===SEL.units?'sel':''}" data-uid="${u.id}" onclick="pickUnit(${u.id})">
-    <div class="ava">${avaImg(u.type, unitCn(u.type), AVA_BOX_LIST)}</div>
+  return L2(`<div class="urow {0}" data-uid="{1}" onclick="pickUnit({2})">
+    <div class="ava">{3}</div>
     <div class="umin">
-      <div class="uname">${esc(unitCn(u.type))}
-        <span class="full">${esc(u.type||"")}</span></div>
-      <div class="umeta">${esc(u.name_cn||u.name_brief||u.name_full||("单位 "+u.id))}
-        ${hq?(" · 总部 "+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):""}
-        ${u.xp!==null&&u.xp!==undefined?(" · 经验 "+u.xp):""}
-        ${u.entr?(" · 被压制 "+u.entr):""}</div>
-      <div class="pips">${pips}</div>
+      <div class="uname">{4}
+        <span class="full">{5}</span></div>
+      <div class="umeta">{6}
+        {7}
+        {8}
+        {9}</div>
+      <div class="pips">{10}</div>
     </div>
-    <div class="ubadges">${badges}</div>
-  </div>`;
+    <div class="ubadges">{11}</div>
+  </div>`, u.id===SEL.units?'sel':'', u.id, u.id, avaImg(u.type, unitCn(u.type), AVA_BOX_LIST), esc(unitCn(u.type)), esc(u.type||""), esc(u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id)), hq?(L(" · 总部 ")+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):"", u.xp!==null&&u.xp!==undefined?(L(" · 经验 ")+u.xp):"", u.entr?(L(" · 被压制 ")+u.entr):"", pips, badges);
 }
 
 function pickUnit(id){ SEL.units = id; show("units"); }
 
 function unitDetailHTML(u){
-  if(!u) return `<div class="placeholder"><div class="big">没有单位</div></div>`;
+  if(!u) return L(`<div class="placeholder"><div class="big">没有单位</div></div>`);
   const ut = (CATALOG&&CATALOG.unit_types[u.type])||{};
   const specs = projectedSpecs(u);
   const xp  = pendingVal("unit_field", uKey(u.id,"xp"), u.xp||0);
@@ -1453,23 +1544,23 @@ function unitDetailHTML(u){
        否则两张一模一样的卡，玩家不知道点哪张卸哪个。 */
     const same = specs.filter(x=>x.type===s.type);
     const nth = same.indexOf(s)+1;
-    const slotNo = (s.idx>=0) ? (s.idx+1) : "待写入";
+    const slotNo = (s.idx>=0) ? (s.idx+1) : L("待写入");
     const tip = same.length>1
-      ? ("点击卸下这个特种兵（第 "+nth+"/"+same.length+" 个 · 槽位 "+slotNo+"）")
-      : ("点击卸下这个特种兵（槽位 "+slotNo+"）");
-    return `<div class="slot" onclick="removeSpec(${u.id},${esc(JSON.stringify(s.type))},${s.idx})" title="${esc(tip)}">
-      <span class="sq">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>
+      ? (L("点击卸下这个特种兵（第 ")+nth+"/"+same.length+L(" 个 · 槽位 ")+slotNo+"）")
+      : (L("点击卸下这个特种兵（槽位 ")+slotNo+"）");
+    return L2(`<div class="slot" onclick="removeSpec({0},{1},{2})" title="{3}">
+      <span class="sq">{4}</span>
       <span class="slotinfo">
-        <span class="slotname">${esc(specCn(s.type))}</span>
-        <span class="slotflags">${flag||'<span class="none">无特性</span>'}</span>
+        <span class="slotname">{5}</span>
+        <span class="slotflags">{6}</span>
       </span>
       <span class="slotstats">
-        <span class="st"><i>攻</i><b>${st.attack??"—"}</b></span>
-        <span class="st"><i>防</i><b>${st.defense??"—"}</b></span>
-        <span class="st"><i>装</i><b>${st.armor??"—"}</b></span>
-        <span class="st"><i>炮</i><b>${st.artillery??"—"}</b></span>
-      </span></div>`;
-  }).join("") : `<div class="slot empty">还没有挂特种兵</div>`;
+        <span class="st"><i>攻</i><b>{7}</b></span>
+        <span class="st"><i>防</i><b>{8}</b></span>
+        <span class="st"><i>装</i><b>{9}</b></span>
+        <span class="st"><i>炮</i><b>{10}</b></span>
+      </span></div>`, u.id, esc(JSON.stringify(s.type)), s.idx, esc(tip), imgTag(specTex(s.type), specCn(s.type), "spico"), esc(specCn(s.type)), flag||L('<span class="none">无特性</span>'), st.attack??"—", st.defense??"—", st.armor??"—", st.artillery??"—");
+  }).join("") : L(`<div class="slot empty">还没有挂特种兵</div>`);
 
   const pool = (PICK && PICK.specialists_for_unit) || {candidates:[], scope:"none"};
   let poolHTML;
@@ -1484,41 +1575,41 @@ function unitDetailHTML(u){
       const n = specs.filter(s=>s.type===t).length;
       const full = used >= cap;
       const why = full
-        ? ("特种兵槽已满（"+used+" / "+cap+"）—— 先卸一个才能再挂")
-        : (n ? ("已挂 "+n+" 个，还能再挂 "+(cap-used)+" 个") : "点击挂到这个单位");
+        ? (L("特种兵槽已满（")+used+" / "+cap+L("）—— 先卸一个才能再挂"))
+        : (n ? (L("已挂 ")+n+L(" 个，还能再挂 ")+(cap-used)+L(" 个")) : L("点击挂到这个单位"));
       const tip = specTipHTML(t, why).replace(/"/g,"&quot;");
       return `<div class="pcell ${full?'blocked':''}" data-tip="${esc(tip)}"
         onclick="${full?'void 0':('addSpec('+u.id+','+esc(JSON.stringify(t))+')')}">
         ${imgTag(specTex(t), specCn(t), "spico")}${n?`<span class="dup">${n}</span>`:""}</div>`;
-    }).join("") : `<div style="padding:12px;color:var(--muted);font-size:12px">没有可用候选</div>`;
+    }).join("") : L(`<div style="padding:12px;color:var(--muted);font-size:12px">没有可用候选</div>`);
   }
 
-  const scopeTip = {campaign:"战役默认池 ∩ 游戏规则",
-                    no_campaign:"找不到战役包 ⇒ 只按游戏规则",
-                    empty_intersection:"该单位与战役池无交集 ⇒ 只按游戏规则",
+  const scopeTip = {campaign:L("战役默认池 ∩ 游戏规则"),
+                    no_campaign:L("找不到战役包 ⇒ 只按游戏规则"),
+                    empty_intersection:L("该单位与战役池无交集 ⇒ 只按游戏规则"),
                     none:"—"}[pool.scope] || pool.scope;
 
-  return `<div class="dhead">
-    <div class="ava">${avaImg(u.type, unitCn(u.type), AVA_BOX_DETAIL)}</div>
+  return L2(`<div class="dhead">
+    <div class="ava">{0}</div>
     <div class="idblk">
-      <div class="dtitle" id="dtitle_${u.id}">${esc(u.name_cn||u.name_brief||u.name_full||("单位 "+u.id))}
-        <span class="edit" onclick="renameUnit(${u.id})">改名</span></div>
-      <div class="dsub">${esc(u.type||"—")} · 编制只读 · ${esc(natCn(ut.nationality))}</div>
+      <div class="dtitle" id="dtitle_{1}">{2}
+        <span class="edit" onclick="renameUnit({3})">改名</span></div>
+      <div class="dsub">{4} · 编制只读 · {5}</div>
     </div>
     <div class="vsep"></div>
     <div class="stats">
       <div class="stat">
-        <div class="lb"><span>兵力</span><span class="capw">上限 ${max||"—"}</span></div>
-        <div class="blood${bloodDirty?' dirty':''}" id="sp_blood_${u.id}"
+        <div class="lb"><span>兵力</span><span class="capw">上限 {6}</span></div>
+        <div class="blood{7}" id="sp_blood_{8}"
           data-tip="<b>血量条</b> · 滚轮 = 调<b>活跃</b>兵力<br>Alt+滚轮 = 调<b>压制</b>兵力（两者之和不变）<br>实 = 活跃 · 淡 = 被压制">
-          <div class="bar">${pips}</div>
+          <div class="bar">{9}</div>
         </div>
         <div class="hintline">实 = 活跃 · 淡 = 被压制</div>
       </div>
       <div class="stat">
         <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
-        <div class="v"><input class="numin" id="in_xp_${u.id}" type="text" inputmode="numeric"
-          autocomplete="off" value="${xp}"></div>
+        <div class="v"><input class="numin" id="in_xp_{10}" type="text" inputmode="numeric"
+          autocomplete="off" value="{11}"></div>
         <div class="hintline">范围 0 – 400（schema 硬范围）</div>
       </div>
     </div>
@@ -1527,19 +1618,19 @@ function unitDetailHTML(u){
   <div class="specbox">
     <div class="sbhead">
       <span class="sbt">特种兵</span>
-      <span class="sbm">已挂 <b>${specs.length}</b> / 上限 ${u.max_spec||ut.max_spec||3}</span>
+      <span class="sbm">已挂 <b>{12}</b> / 上限 {13}</span>
       <span class="sbsep"></span>
-      <span class="sbm">候选口径：${esc(scopeTip)}</span>
+      <span class="sbm">候选口径：{14}</span>
       <span class="sp"></span>
-      <label class="chk"><input type="checkbox" id="allcb" ${SEL.fullPool?'checked':''}
+      <label class="chk"><input type="checkbox" id="allcb" {15}
         onchange="toggleFullPool()">显示全部</label>
       <span class="sbhint">点图标挂上 · 点已挂的卸下 · <b>同一种可以挂多个</b> · 悬停看数值</span>
     </div>
     <div class="specsplit">
-      <div class="specslots">${slots}</div>
-      <div class="specpool"><div class="poolflat">${poolHTML}</div></div>
+      <div class="specslots">{16}</div>
+      <div class="specpool"><div class="poolflat">{17}</div></div>
     </div>
-  </div>`;
+  </div>`, avaImg(u.type, unitCn(u.type), AVA_BOX_DETAIL), u.id, esc(u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id)), u.id, esc(u.type||"—"), esc(natCn(ut.nationality)), max||"—", bloodDirty?' dirty':'', u.id, pips, u.id, xp, specs.length, u.max_spec||ut.max_spec||3, esc(scopeTip), SEL.fullPool?'checked':'', slots, poolHTML);
 }
 
 function pageUnits(w){
@@ -1566,31 +1657,31 @@ function pageUnits(w){
      否则属性提前闭合，提示文字会被当成正文渲染出来（U53 实测踩到）。
      ⇒ 照别处的做法把 `"` 转成 `&quot;`（getAttribute 取回来时浏览器会解码）。 */
   const battleTip = (inBattle
-    ? `<span class="tn">仅当前场景激活的单位</span><span class="tr">只看当前战斗场景里已激活的单位（名单里 ${battleIds.size} 个）</span>`
-    : `<span class="tn">仅当前场景激活的单位</span><span class="tr">该存档不在战斗中，没有战斗名单可对照</span>`).replace(/"/g, "&quot;");
-  w.innerHTML = `<div class="toolbar toolbar-top">
-      <input class="inp" id="uq" placeholder="搜索单位 / 类型 / 编号…" value="${esc(UQUERY||"")}"
+    ? L2("<span class=\"tn\">仅当前场景激活的单位</span><span class=\"tr\">只看当前战斗场景里已激活的单位（名单里 {0} 个）</span>", battleIds.size)
+    : L(`<span class="tn">仅当前场景激活的单位</span><span class="tr">该存档不在战斗中，没有战斗名单可对照</span>`)).replace(/"/g, "&quot;");
+  w.innerHTML = L2(`<div class="toolbar toolbar-top">
+      <input class="inp" id="uq" placeholder="搜索单位 / 类型 / 编号…" value="{0}"
              style="flex:1 1 150px;min-width:100px">
       <select class="sel" id="uhq" style="flex:0 1 auto;max-width:280px"><option value="">全部总部</option>
-        ${hqs.map(h=>`<option value="${h.id}" ${String(h.id)===hqf?'selected':''}>${
-          esc(h.name_cn||h.name_brief||h.name_full||("总部 "+h.id))}</option>`).join("")}
+        {1}
       </select>
-      <label class="chk${inBattle?"":" dis"}" data-tip="${battleTip}">
-        <input type="checkbox" id="ubattle" ${UONLY?"checked":""} ${inBattle?"":"disabled"}>仅当前场景激活</label>
+      <label class="chk{2}" data-tip="{3}">
+        <input type="checkbox" id="ubattle" {4} {5}>仅当前场景激活</label>
       <span class="sp"></span>
-      <span class="tbcount">显示 ${list.length} / 共 ${units.length} 个</span>
+      <span class="tbcount">显示 {6} / 共 {7} 个</span>
     </div>
     <div class="cols cols-units cols-fill">
-    <div class="panel"><h3>单位 · 共 ${units.length} 个</h3>
+    <div class="panel"><h3>单位 · 共 {8} 个</h3>
       <div class="pbody">
-        <div class="rows">${list.map(unitRowHTML).join("") ||
-          `<div class="placeholder"><div class="big">没有匹配的单位</div>
-            换个关键词，或把「总部」筛选清空。</div>`}</div>
+        <div class="rows">{9}</div>
       </div></div>
     <div class="panel"><h3>单位 · 详情</h3>
-      <div class="detail" id="udetail">${unitDetailHTML(cur)}</div>
+      <div class="detail" id="udetail">{10}</div>
     </div>
-    </div>`;
+    </div>`, esc(UQUERY||""), hqs.map(h=>L2("<option value=\"{0}\" {1}>{2}</option>", h.id, String(h.id)===hqf?'selected':'', 
+          esc(h.name_cn||h.name_brief||h.name_full||(L("总部 ")+h.id)))).join(""), inBattle?"":" dis", battleTip, UONLY?"checked":"", inBattle?"":"disabled", list.length, units.length, units.length, list.map(unitRowHTML).join("") ||
+          L(`<div class="placeholder"><div class="big">没有匹配的单位</div>
+            换个关键词，或把「总部」筛选清空。</div>`), unitDetailHTML(cur));
 
   const uq = document.getElementById("uq");
   if(uq) uq.addEventListener("input", function(){
@@ -1678,9 +1769,9 @@ function bindUnitControls(u){
       }
       if(a===a0 && s===s0) return;
       if(a!==a0) queueEdit("unit_field", uKey(u.id,"act_st"),
-        {unit_id:u.id, field:"act_st", value:a}, baseAct, a, `单位 ${u.id} 活跃兵力`);
+        {unit_id:u.id, field:"act_st", value:a}, baseAct, a, L2("单位 {0} 活跃兵力", u.id));
       if(s!==s0) queueEdit("unit_field", uKey(u.id,"sup_st"),
-        {unit_id:u.id, field:"sup_st", value:s}, baseSup, s, `单位 ${u.id} 被压制兵力`);
+        {unit_id:u.id, field:"sup_st", value:s}, baseSup, s, L2("单位 {0} 被压制兵力", u.id));
       SEL.units = u.id;
       refreshUnitBlood(u, a, s);     /* U65：局部更新，不重绘整页 */
     }, {passive:false});
@@ -1690,7 +1781,7 @@ function bindUnitControls(u){
     params:{unit_id:u.id, field:"xp", value:xp},
     onChange(v){
       queueEdit("unit_field", uKey(u.id,"xp"),
-        {unit_id:u.id, field:"xp", value:v}, u.xp||0, v, `单位 ${u.id} 经验`);
+        {unit_id:u.id, field:"xp", value:v}, u.xp||0, v, L2("单位 {0} 经验", u.id));
     }});
 }
 
@@ -1698,9 +1789,9 @@ function renameUnit(id){
   const u = (VIEW.units||[]).find(x=>x.id===id); if(!u) return;
   const el = document.getElementById("dtitle_"+id); if(!el) return;
   const cur = pendingVal("unit_field", uKey(id,"name_brief"), u.name_cn||u.name_brief||"");
-  el.innerHTML = `<input class="inp" id="rn_${id}" value="${esc(cur)}" style="width:220px;font-size:15px">
-    <button class="btn pri" onclick="commitRename(${id})">确定</button>
-    <button class="btn" onclick="show('units')">取消</button>`;
+  el.innerHTML = L2(`<input class="inp" id="rn_{0}" value="{1}" style="width:220px;font-size:15px">
+    <button class="btn pri" onclick="commitRename({2})">确定</button>
+    <button class="btn" onclick="show('units')">取消</button>`, id, esc(cur), id);
   const i = document.getElementById("rn_"+id);
   if(i){ i.focus(); i.select(); }
 }
@@ -1710,7 +1801,7 @@ function commitRename(id){
   const v = el.value.trim();
   if(v) queueEdit("unit_field", uKey(id,"name_brief"),
     {unit_id:id, field:"name_brief", value:v},
-    u.name_cn||u.name_brief||"", v, `单位 ${id} 改名`);
+    u.name_cn||u.name_brief||"", v, L2("单位 {0} 改名", id));
   show("units");
 }
 
@@ -1725,11 +1816,11 @@ function addSpec(unitId, specType){
     const chk = specAttachCheck(specType, u.type);
     if(!chk.ok){
       /* U55：底栏删了 ⇒ 提示改成**弹窗**（原来写在抽屉里的 errBox）。 */
-      openModal(`<div class="mh">✕ 不能挂这个特种兵</div>
-        <div class="mb"><div class="erow">${esc(chk.why)}</div>
+      openModal(L2(`<div class="mh">✕ 不能挂这个特种兵</div>
+        <div class="mb"><div class="erow">{0}</div>
         <div class="fine">按游戏自己的规则：<b>阵营必须相同</b>，且
         <b>国籍相同</b>或<b>单位国籍的 parent_nationality</b>匹配（规范 §7.3.2）。</div></div>
-        <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`,
+        <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`, esc(chk.why)),
         {cls:"err"});
       return;
     }
@@ -1737,7 +1828,7 @@ function addSpec(unitId, specType){
   const seq = ++SPECSEQ;
   setPending("unit_spec_add", `unit_spec_add:${unitId}:${specType}:${seq}`,
     {unit_id:unitId, spec_type:specType, seq:seq},
-    `单位 ${unitId} 加特种 ${specCn(specType)}`);
+    L2("单位 {0} 加特种 {1}", unitId, specCn(specType)));
   show("units");
 }
 /* U48：卸哪一个 ⇒ 必须按 **idx** 定位（同一类型可能挂着好几个） */
@@ -1755,7 +1846,7 @@ function removeSpec(unitId, specType, idx){
   }
   setPending("unit_spec_remove", `unit_spec_remove:${unitId}:${specType}:${s.idx}`,
     {unit_id:unitId, spec_type:specType, idx:s.idx},
-    `单位 ${unitId} 卸特种 ${specCn(specType)}（槽位 ${s.idx}）`);
+    L2("单位 {0} 卸特种 {1}（槽位 {2}）", unitId, specCn(specType), s.idx));
   show("units");
 }
 
@@ -1764,8 +1855,8 @@ function removeSpec(unitId, specType, idx){
    总部页（U35）
    =================================================================== */
 const BRANCHES = ["engineering", "force_pool", "intel", "logistics", "operations"];
-const BRANCH_CN = {engineering:"工程", force_pool:"兵库", intel:"情报",
-  logistics:"后勤", operations:"作战"};
+const BRANCH_CN = {engineering:L("工程"), force_pool:L("兵库"), intel:L("情报"),
+  logistics:L("后勤"), operations:L("作战")};
 const TRUCK_RANGE = [5, 8, 10, 11, 12];
 const hqKey = (id, field) => `hq_field:${id}:${field}`;
 const hqBrKey = (id, br) => `hq_branch_level:${id}:${br}`;
@@ -1799,11 +1890,11 @@ function hqRowHTML(h){
   const xp = pendingVal("hq_field", hqKey(h.id,"xp"), h.xp||0);
   const xt = pendingVal("hq_field", hqKey(h.id,"xp_target"), h.xp_target||0);
   const pct = xt ? Math.max(0, Math.min(100, Math.round(xp*100/xt))) : 0;
-  return `<div class="hqrow ${h.id===SEL.hqs?'on':''}" onclick="pickHq(${h.id})">
-    <div class="nm"><b>${esc(h.name_cn||h.name_brief||("总部 "+h.id))}</b>
-      <span>CP ${cp}/${mx} · 经验 ${xp}/${xt||"—"}</span>
-      <div class="expbar"><i style="width:${pct}%"></i></div></div>
-  </div>`;
+  return L2(`<div class="hqrow {0}" onclick="pickHq({1})">
+    <div class="nm"><b>{2}</b>
+      <span>CP {3}/{4} · 经验 {5}/{6}</span>
+      <div class="expbar"><i style="width:{7}%"></i></div></div>
+  </div>`, h.id===SEL.hqs?'on':'', h.id, esc(h.name_cn||h.name_brief||(L("总部 ")+h.id)), cp, mx, xp, xt||"—", pct);
 }
 function pickHq(id){ SEL.hqs = id; show("hqs"); }
 function pickHqTab(t){ SEL.hqTab = t; show("hqs"); }
@@ -1819,15 +1910,15 @@ function hqSkillHTML(h, br, it){
   const brLevel = pendingVal("hq_branch_level", hqBrKey(h.id,br),
     ((h.branch_levels||{})[br]||{}).level||0);
   const locked = (it.level||1) > brLevel;
-  return `<div class="sk ${locked?'locked':''}" title="${esc(cn)} · CP 消耗 ${it.cost??0}${
-    avail!==null&&avail!==undefined ? (" · 专精 "+used+"/"+avail) : " · 没有技能点"}"
-    ${locked ? "（未解锁）" : "（点击：专精次数 +1，到顶后回到 0）"}"
-    onclick="${locked?'void 0':('hqSpecialize('+h.id+','+esc(JSON.stringify(br))+','+esc(JSON.stringify(act))+','+used+','+(avail===null||avail===undefined?-1:avail)+')')}">
-    ${imgTag("hq_upgrade/hq_upgrade_"+act+"_on.png", cn)}
-    <span class="cost">${it.cost??0}</span>
-    ${dots.length?`<span class="dots">${dots.join("")}</span>`:""}
-    <span class="nm">${esc(cn)}</span>
-  </div>`;
+  return L2(`<div class="sk {0}" title="{1} · CP 消耗 {2}{3}"
+    {4}"
+    onclick="{5}">
+    {6}
+    <span class="cost">{7}</span>
+    {8}
+    <span class="nm">{9}</span>
+  </div>`, locked?'locked':'', esc(cn), it.cost??0, 
+    avail!==null&&avail!==undefined ? (L(" · 专精 ")+used+"/"+avail) : L(" · 没有技能点"), locked ? L("（未解锁）") : L("（点击：专精次数 +1，到顶后回到 0）"), locked?'void 0':('hqSpecialize('+h.id+','+esc(JSON.stringify(br))+','+esc(JSON.stringify(act))+','+used+','+(avail===null||avail===undefined?-1:avail)+')'), imgTag("hq_upgrade/hq_upgrade_"+act+"_on.png", cn), it.cost??0, dots.length?`<span class="dots">${dots.join("")}</span>`:"", esc(cn));
 }
 
 function hqMatrixHTML(h){
@@ -1842,27 +1933,27 @@ function hqMatrixHTML(h){
       if(!items.length) return `<div class="mx-cell na">—</div>`;
       return `<div class="mx-cell">${items.map(it=>hqSkillHTML(h,br,it)).join("")}</div>`;
     }).join("");
-    return `<div class="mx-row">
+    return L2(`<div class="mx-row">
       <div class="mx-branch">
-        <div class="bn">${esc(BRANCH_CN[br]||br)}</div>
-        <div class="lvctl"><button onclick="hqBranchLevel(${h.id},'${br}',-1)">−</button>
-          <b>${lvl}</b>
-          <button onclick="hqBranchLevel(${h.id},'${br}',1)">+</button></div>
+        <div class="bn">{0}</div>
+        <div class="lvctl"><button onclick="hqBranchLevel({1},'{2}',-1)">−</button>
+          <b>{3}</b>
+          <button onclick="hqBranchLevel({4},'{5}',1)">+</button></div>
         <div class="supctl">压制
-          <button onclick="hqSuppress(${h.id},'${br}',-1)">−</button>
-          <b class="${sup?'on':''}">${sup}</b>
-          <button onclick="hqSuppress(${h.id},'${br}',1)">+</button></div>
-      </div>${cells}</div>`;
+          <button onclick="hqSuppress({6},'{7}',-1)">−</button>
+          <b class="{8}">{9}</b>
+          <button onclick="hqSuppress({10},'{11}',1)">+</button></div>
+      </div>{12}</div>`, esc(BRANCH_CN[br]||br), h.id, br, lvl, h.id, br, h.id, br, sup?'on':'', sup, h.id, br, cells);
   }).join("");
-  return `<div class="matrix">
+  return L2(`<div class="matrix">
     <div class="mx-head"><div class="h-branch">分支 / 等级</div><div>1 级</div>
-      <div>2 级</div><div>3 级</div></div>${rows}</div>`;
+      <div>2 级</div><div>3 级</div></div>{0}</div>`, rows);
 }
 
 function hqPoolHTML(h){
   const pool = projectedPool(h);
-  if(!pool.length) return `<div class="fpool"><div class="fptitle">兵库</div>
-    <div style="padding:10px 11px;color:var(--muted);font-size:12px">兵库是空的</div></div>`;
+  if(!pool.length) return L(`<div class="fpool"><div class="fptitle">兵库</div>
+    <div style="padding:10px 11px;color:var(--muted);font-size:12px">兵库是空的</div></div>`);
   /* 按延迟分组（游戏是分批上线的） */
   const groups = {};
   pool.forEach((e,i)=>{
@@ -1872,40 +1963,40 @@ function hqPoolHTML(h){
   const delays = Object.keys(groups).map(Number).sort((a,b)=>a-b);
   let body = "";
   delays.forEach(d=>{
-    body += `<tr class="fdelay"><td colspan="6">延迟 <b>${d}</b> 回合 —— 这一批要等 ${d} 个回合才能部署</td></tr>`;
+    body += L2("<tr class=\"fdelay\"><td colspan=\"6\">延迟 <b>{0}</b> 回合 —— 这一批要等 {1} 个回合才能部署</td></tr>", d, d);
     groups[d].forEach(([i,e])=>{
       const isSpec = !!e.spec;
       const nm = isSpec ? specCn(e.spec) : hqEquipCn(e.equipment);
       const st = isSpec ? ((CATALOG&&CATALOG.spec_types[e.spec])||{}) : {};
       const q = pendingVal("hq_force_pool", hqPoolKey(h.id,i), e.quantity||0);
       const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("") : "";
-      const tip = isSpec ? specTipHTML(e.spec, "延迟 "+d+" 回合 · 数量 "+(e.quantity||0)).replace(/"/g,"&quot;")
-        : esc(hqEquipCn(e.equipment)+" · 延迟 "+d+" 回合");
-      body += `<tr>
-        <td class="l"><div class="thumb" data-tip="${tip}">${isSpec?imgTag(specTex(e.spec), nm, "spico")
-          :imgTag("steps/step.png", nm)}</div></td>
-        <td class="l name">${esc(nm)}
-          ${isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:""}</td>
-        <td class="dim">${esc(natCn(e.nationality))}</td>
-        <td class="dim">${isSpec?esc(st.attack??"—"):"—"} / ${isSpec?esc(st.defense??"—"):"—"} /
-          ${isSpec?esc(st.armor??"—"):"—"}</td>
-        <td class="tags">${tags}</td>
-        <td><span class="spin" id="fp_q_${h.id}_${i}"></span></td>
-        <td><span class="rm" onclick="hqPoolRemove(${h.id},${i})">移除</span></td>
-      </tr>`;
+      const tip = isSpec ? specTipHTML(e.spec, L("延迟 ")+d+L(" 回合 · 数量 ")+(e.quantity||0)).replace(/"/g,"&quot;")
+        : esc(hqEquipCn(e.equipment)+L(" · 延迟 ")+d+L(" 回合"));
+      body += L2(`<tr>
+        <td class="l"><div class="thumb" data-tip="{0}">{1}</div></td>
+        <td class="l name">{2}
+          {3}</td>
+        <td class="dim">{4}</td>
+        <td class="dim">{5} / {6} /
+          {7}</td>
+        <td class="tags">{8}</td>
+        <td><span class="spin" id="fp_q_{9}_{10}"></span></td>
+        <td><span class="rm" onclick="hqPoolRemove({11},{12})">移除</span></td>
+      </tr>`, tip, isSpec?imgTag(specTex(e.spec), nm, "spico")
+          :imgTag("steps/step.png", nm), esc(nm), isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:"", esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", tags, h.id, i, h.id, i);
     });
   });
-  return `<div class="fpool">
-    <div class="fptitle">兵库 · 共 ${pool.length} 条
+  return L2(`<div class="fpool">
+    <div class="fptitle">兵库 · 共 {0} 条
       <span style="font-weight:400;font-size:11.5px;color:var(--muted)">
         同一个总部里，同样的条目 + 同样的延迟不许并存（延迟不同可以共存）</span>
       <button class="btn" style="margin-left:auto;padding:3px 10px;font-size:12px"
-        onclick="toggleHqPicker(${h.id})">${SEL.hqPicker===h.id?"收起":"加条目"}</button>
+        onclick="toggleHqPicker({1})">{2}</button>
     </div>
     <table class="fptab">
       <thead><tr><th class="l">图</th><th class="l">名称</th><th>国籍</th>
         <th>攻 / 防 / 装</th><th>特性</th><th>数量</th><th></th></tr></thead>
-      <tbody>${body}</tbody></table></div>`;
+      <tbody>{3}</tbody></table></div>`, pool.length, h.id, SEL.hqPicker===h.id?L("收起"):L("加条目"), body);
 }
 
 /* 加条目：特种兵选择器（U22 的 .pcell 网格） */
@@ -1913,7 +2004,7 @@ function hqPoolHTML(h){
 function toggleHqPicker(id){ openHqPoolModal(id); }
 
 function hqDetailHTML(h){
-  if(!h) return `<div class="placeholder"><div class="big">没有总部</div></div>`;
+  if(!h) return L(`<div class="placeholder"><div class="big">没有总部</div></div>`);
   const cp = pendingVal("hq_field", hqKey(h.id,"cp"), h.cp||0);
   const mx = pendingVal("hq_field", hqKey(h.id,"max_cp"), h.max_cp||0);
   const sup = pendingVal("hq_field", hqKey(h.id,"supply"), h.supply||0);
@@ -1927,33 +2018,33 @@ function hqDetailHTML(h){
     const on = i<=tr;
     const src = "hq_upgrade/truck_"+i+(on?"_on":"_off")+".png";
     const hov = "hq_upgrade/truck_"+i+"_hover.png";
-    trucks.push(`<div class="trk ${on?'on':''}" title="点第 ${i} 个 ⇒ 卡车数 = ${i}（补给作用范围 ${TRUCK_RANGE[i-1]} 格）"
-      onclick="hqTrucks(${h.id},${i})"
-      onmouseover="this.querySelector('img').src='${surf(hov)}'"
-      onmouseout="this.querySelector('img').src='${surf(src)}'">
-      <img src="${surf(src)}" alt="补给卡车 ${i}"></div>`);
+    trucks.push(L2(`<div class="trk {0}" title="点第 {1} 个 ⇒ 卡车数 = {2}（补给作用范围 {3} 格）"
+      onclick="hqTrucks({4},{5})"
+      onmouseover="this.querySelector('img').src='{6}'"
+      onmouseout="this.querySelector('img').src='{7}'">
+      <img src="{8}" alt="补给卡车 {9}"></div>`, on?'on':'', i, i, TRUCK_RANGE[i-1], h.id, i, surf(hov), surf(src), surf(src), i));
   }
-  return `<div class="hqhead">
+  return L2(`<div class="hqhead">
     <div class="idblk">
-      <div class="dtitle" id="htitle_${h.id}">${esc(h.name_cn||h.name_brief||("总部 "+h.id))}
-        <span class="edit" onclick="renameHq(${h.id})">改名</span></div>
-      <div class="dsub">将领：${esc(hqGeneralCn(h.general))}</div>
+      <div class="dtitle" id="htitle_{0}">{1}
+        <span class="edit" onclick="renameHq({2})">改名</span></div>
+      <div class="dsub">将领：{3}</div>
     </div>
     <div class="vsep"></div>
     <div class="hqcards">
       <div class="stat">
         <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
-        <div class="v"><input class="numin" id="h_xp_${h.id}" type="text" inputmode="numeric"
-          autocomplete="off" value="${xp}"></div>
+        <div class="v"><input class="numin" id="h_xp_{4}" type="text" inputmode="numeric"
+          autocomplete="off" value="{5}"></div>
         <div class="cphint">目标
-          <input class="numin" id="h_xt_${h.id}" type="text" inputmode="numeric"
-            autocomplete="off" value="${xt}"></div>
+          <input class="numin" id="h_xt_{6}" type="text" inputmode="numeric"
+            autocomplete="off" value="{7}"></div>
       </div>
       <div class="stat">
         <div class="lb"><span>总部 CP</span><span class="hintw">滚轮 ±1</span></div>
-        <div class="v"><span class="spin" id="h_cp_${h.id}"></span><small>/</small>
-          <span class="spin" id="h_mcp_${h.id}"></span></div>
-        <div class="cphint">补给 <span class="spin" id="h_sup_${h.id}"></span>
+        <div class="v"><span class="spin" id="h_cp_{8}"></span><small>/</small>
+          <span class="spin" id="h_mcp_{9}"></span></div>
+        <div class="cphint">补给 <span class="spin" id="h_sup_{10}"></span>
           （游戏范围 0–3）</div>
       </div>
     </div>
@@ -1961,31 +2052,31 @@ function hqDetailHTML(h){
 
   <div class="trucks">
     <span class="tl">补给卡车</span>
-    ${trucks.join("")}
-    <span class="cnt">当前 <b>${tr?tr:"—（存档没记）"}</b> 辆 · 作用范围
-      <b>${tr?TRUCK_RANGE[tr-1]:"—"}</b> 格</span>
+    {11}
+    <span class="cnt">当前 <b>{12}</b> 辆 · 作用范围
+      <b>{13}</b> 格</span>
   </div>
 
   <div class="hqtabs">
-    <div class="tb ${SEL.hqTab!=="fp"?'on':''}" onclick="pickHqTab('mx')">升级矩阵</div>
-    <div class="tb ${SEL.hqTab==="fp"?'on':''}" onclick="pickHqTab('fp')">兵库
-      <span class="n">${projectedPool(h).length}</span></div>
+    <div class="tb {14}" onclick="pickHqTab('mx')">升级矩阵</div>
+    <div class="tb {15}" onclick="pickHqTab('fp')">兵库
+      <span class="n">{16}</span></div>
   </div>
-  ${SEL.hqTab==="fp" ? hqPoolHTML(h) : hqMatrixHTML(h)}`;
+  {17}`, h.id, esc(h.name_cn||h.name_brief||(L("总部 ")+h.id)), h.id, esc(hqGeneralCn(h.general)), h.id, xp, h.id, xt, h.id, h.id, h.id, trucks.join(""), tr?tr:L("—（存档没记）"), tr?TRUCK_RANGE[tr-1]:"—", SEL.hqTab!=="fp"?'on':'', SEL.hqTab==="fp"?'on':'', projectedPool(h).length, SEL.hqTab==="fp" ? hqPoolHTML(h) : hqMatrixHTML(h));
 }
 
 function pageHqs(w){
   const hqs = VIEW.hqs||[];
   let cur = hqs.find(h=>h.id===SEL.hqs);
   if(!cur){ cur = hqs[0]; SEL.hqs = cur ? cur.id : null; }
-  w.innerHTML = `<div class="cols cols-fill">
-    <div class="panel"><h3>总部 · 共 ${hqs.length} 个</h3>
-      <div class="pbody"><div class="hqlist">${hqs.map(hqRowHTML).join("") ||
-        `<div class="placeholder"><div class="big">这个存档没有总部</div>
-          总部写在根 <code>hqs.yml</code> 里；战役存档才有。</div>`}</div></div></div>
+  w.innerHTML = L2(`<div class="cols cols-fill">
+    <div class="panel"><h3>总部 · 共 {0} 个</h3>
+      <div class="pbody"><div class="hqlist">{1}</div></div></div>
     <div class="panel"><h3>总部 · 详情</h3>
-      <div class="detail">${hqDetailHTML(cur)}</div></div>
-  </div>`;
+      <div class="detail">{2}</div></div>
+  </div>`, hqs.length, hqs.map(hqRowHTML).join("") ||
+        L(`<div class="placeholder"><div class="big">这个存档没有总部</div>
+          总部写在根 <code>hqs.yml</code> 里；战役存档才有。</div>`), hqDetailHTML(cur));
   if(cur) bindHqControls(cur);
 }
 
@@ -1996,7 +2087,7 @@ function bindHqControls(h){
     if(!el) return;
     bindSpin(el, {base:(base===undefined?cur:base), cur, min, max, onChange(v){
       queueEdit("hq_field", hqKey(h.id, field),
-        {hq_id:h.id, field, value:v}, (base===undefined?cur:base), v, `总部 ${h.id} ${label}`);
+        {hq_id:h.id, field, value:v}, (base===undefined?cur:base), v, L2("总部 {0} {1}", h.id, label));
       SEL.hqs = h.id; show("hqs");
     }});
   };
@@ -2004,19 +2095,19 @@ function bindHqControls(h){
   const mxc = pendingVal("hq_field", hqKey(h.id,"max_cp"), h.max_cp||0);
   const spc = pendingVal("hq_field", hqKey(h.id,"supply"), h.supply||0);
   spin("h_cp_"+h.id, "cp", cpc, 0, 9, "CP", h.cp||0);
-  spin("h_mcp_"+h.id, "max_cp", mxc, 3, 9, "CP 上限", h.max_cp||0);
-  spin("h_sup_"+h.id, "supply", spc, 0, 3, "补给", h.supply||0);
+  spin("h_mcp_"+h.id, "max_cp", mxc, 3, 9, L("CP 上限"), h.max_cp||0);
+  spin("h_sup_"+h.id, "supply", spc, 0, 3, L("补给"), h.supply||0);
 
   const xpEl = document.getElementById("h_xp_"+h.id);
   if(xpEl) bindNumIn(xpEl, {base:h.xp||0, cur:pendingVal("hq_field", hqKey(h.id,"xp"), h.xp||0), min:0, max:null,
     kind:"hq_field", key:hqKey(h.id,"xp"), params:{hq_id:h.id, field:"xp", value:xpEl.value},
     onChange(v){ queueEdit("hq_field", hqKey(h.id,"xp"),
-      {hq_id:h.id, field:"xp", value:v}, h.xp||0, v, `总部 ${h.id} 经验`); }});
+      {hq_id:h.id, field:"xp", value:v}, h.xp||0, v, L2("总部 {0} 经验", h.id)); }});
   const xtEl = document.getElementById("h_xt_"+h.id);
   if(xtEl) bindNumIn(xtEl, {base:h.xp_target||0, cur:pendingVal("hq_field", hqKey(h.id,"xp_target"), h.xp_target||0), min:0, max:null,
     kind:"hq_field", key:hqKey(h.id,"xp_target"), params:{hq_id:h.id, field:"xp_target", value:xtEl.value},
     onChange(v){ queueEdit("hq_field", hqKey(h.id,"xp_target"),
-      {hq_id:h.id, field:"xp_target", value:v}, h.xp_target||0, v, `总部 ${h.id} 经验目标`); }});
+      {hq_id:h.id, field:"xp_target", value:v}, h.xp_target||0, v, L2("总部 {0} 经验目标", h.id)); }});
 
   /* 兵库数量（每条一个滚轮 ±1 控件） */
   const pool = projectedPool(h);
@@ -2027,7 +2118,7 @@ function bindHqControls(h){
       onChange(v){
         queueEdit("hq_force_pool", hqPoolKey(h.id,i),
           {hq_id:h.id, index:i, quantity:v}, e.quantity||0, v,
-          `总部 ${h.id} 兵库第 ${i+1} 条数量`);
+          L2("总部 {0} 兵库第 {1} 条数量", h.id, i+1));
         SEL.hqs = h.id; show("hqs");
       }});
   });
@@ -2037,9 +2128,9 @@ function renameHq(id){
   const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
   const el = document.getElementById("htitle_"+id); if(!el) return;
   const cur = pendingVal("hq_field", hqKey(id,"name_brief"), h.name_cn||h.name_brief||"");
-  el.innerHTML = `<input class="inp" id="hrn_${id}" value="${esc(cur)}" style="width:200px;font-size:15px">
-    <button class="btn pri" onclick="commitRenameHq(${id})">确定</button>
-    <button class="btn" onclick="show('hqs')">取消</button>`;
+  el.innerHTML = L2(`<input class="inp" id="hrn_{0}" value="{1}" style="width:200px;font-size:15px">
+    <button class="btn pri" onclick="commitRenameHq({2})">确定</button>
+    <button class="btn" onclick="show('hqs')">取消</button>`, id, esc(cur), id);
   const i = document.getElementById("hrn_"+id);
   if(i){ i.focus(); i.select(); }
 }
@@ -2049,7 +2140,7 @@ function commitRenameHq(id){
   const v = el.value.trim();
   if(v) queueEdit("hq_field", hqKey(id,"name_brief"),
     {hq_id:id, field:"name_brief", value:v},
-    h.name_cn||h.name_brief||"", v, `总部 ${id} 改名`);
+    h.name_cn||h.name_brief||"", v, L2("总部 {0} 改名", id));
   show("hqs");
 }
 
@@ -2057,7 +2148,7 @@ function hqTrucks(id, n){
   const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
   const base = pendingVal("hq_trucks", `hq_trucks:${id}`, h.trucks||0);
   queueEdit("hq_trucks", `hq_trucks:${id}`,
-    {hq_id:id, trucks:n}, base, n, `总部 ${id} 补给卡车`);
+    {hq_id:id, trucks:n}, base, n, L2("总部 {0} 补给卡车", id));
   show("hqs");
 }
 
@@ -2068,7 +2159,7 @@ function hqBranchLevel(id, br, d){
   let v = cur + d;
   if(v<0) v=0; if(v>3) v=3;
   queueEdit("hq_branch_level", hqBrKey(id,br),
-    {hq_id:id, branch:br, level:v}, node.level||0, v, `总部 ${id} ${BRANCH_CN[br]||br} 等级`);
+    {hq_id:id, branch:br, level:v}, node.level||0, v, L2("总部 {0} {1} 等级", id, BRANCH_CN[br]||br));
   show("hqs");
 }
 function hqSuppress(id, br, d){
@@ -2080,7 +2171,7 @@ function hqSuppress(id, br, d){
   if(v<0) v=0; if(v>3-lvl) v=3-lvl;      /* 等级 + 压制 ≤ 3 */
   queueEdit("hq_branch_level", hqBrKey(id,br)+":sup",
     {hq_id:id, branch:br, level:lvl, suppressed:v}, node.suppressed||0, v,
-    `总部 ${id} ${BRANCH_CN[br]||br} 被压制等级`);
+    L2("总部 {0} {1} 被压制等级", id, BRANCH_CN[br]||br));
   show("hqs");
 }
 function hqSpecialize(id, br, act, used, avail){
@@ -2091,14 +2182,14 @@ function hqSpecialize(id, br, act, used, avail){
   const it = items[0]||{};
   queueEdit("hq_branch_sp", hqSpKey(id,br,act),
     {hq_id:id, branch:br, action:act, sp_used:v}, it.sp_used||0, v,
-    `总部 ${id} ${hqSkillCn(act)} 专精`);
+    L2("总部 {0} {1} 专精", id, hqSkillCn(act)));
   show("hqs");
 }
 function hqPoolAdd(id, specType){
   const st = (CATALOG&&CATALOG.spec_types[specType])||{};
   const entry = {spec: specType, nationality: st.nationality||"", quantity:1, delay:0};
   setPending("hq_force_pool_add", `hq_force_pool_add:${id}:${specType}`,
-    {hq_id:id, entry}, `总部 ${id} 兵库加 ${specCn(specType)}`);
+    {hq_id:id, entry}, L2("总部 {0} 兵库加 {1}", id, specCn(specType)));
   show("hqs");
 }
 function hqPoolRemove(id, index){
@@ -2107,7 +2198,7 @@ function hqPoolRemove(id, index){
   const e = pool[index]||{};
   const nm = e.spec ? specCn(e.spec) : hqEquipCn(e.equipment);
   setPending("hq_force_pool_remove", `hq_force_pool_remove:${id}:${index}`,
-    {hq_id:id, index}, `总部 ${id} 兵库移除 ${nm}`);
+    {hq_id:id, index}, L2("总部 {0} 兵库移除 {1}", id, nm));
   show("hqs");
 }
 
@@ -2148,20 +2239,20 @@ function projectedCards(list, kind){
 
 function cardTileHTML(c, kind){
   const free = c.is_free;
-  return `<div class="hcard">
-    <div class="ci">${imgTag(cardImg(c.card_type), cardCn(c.card_type))}</div>
-    <div class="cp"><b>${esc(cardCn(c.card_type))}</b>${free?" · 免费":""}</div>
-    <div class="cp" style="margin-top:1px">${esc(cardInfo(c.card_type).subtitle||"")}</div>
+  return L2(`<div class="hcard">
+    <div class="ci">{0}</div>
+    <div class="cp"><b>{1}</b>{2}</div>
+    <div class="cp" style="margin-top:1px">{3}</div>
     <div class="acts">
-      <button class="btn rm" onclick="${kind==="hand"
-        ? ("cardRemove("+c.position+")") : ("cardStoreRemove("+c.position+")")}">
-        ${kind==="hand"?"移除":"下架"}</button>
-      <button class="btn rm" onclick="${kind==="hand"
-        ? ("cardSetFree("+c.position+","+(c.is_free?"false":"true")+")")
-        : ("cardStoreSetFree("+c.position+","+(c.is_free?"false":"true")+")")}">
-        ${c.is_free?"改收费":"改免费"}</button>
+      <button class="btn rm" onclick="{4}">
+        {5}</button>
+      <button class="btn rm" onclick="{6}">
+        {7}</button>
     </div>
-  </div>`;
+  </div>`, imgTag(cardImg(c.card_type), cardCn(c.card_type)), esc(cardCn(c.card_type)), free?L(" · 免费"):"", esc(cardInfo(c.card_type).subtitle||""), kind==="hand"
+        ? ("cardRemove("+c.position+")") : ("cardStoreRemove("+c.position+")"), kind==="hand"?L("移除"):L("下架"), kind==="hand"
+        ? ("cardSetFree("+c.position+","+(c.is_free?"false":"true")+")")
+        : ("cardStoreSetFree("+c.position+","+(c.is_free?"false":"true")+")"), c.is_free?L("改收费"):L("改免费"));
 }
 
 /* 卡牌选择器现在走**模态框**（U40b） */
@@ -2174,33 +2265,33 @@ function cardAdd(type){
   const limit = VIEW.hand_limit || 5;      /* ⚠️ 上限跟难度走（classic 只有 4 张） */
   let pos = null;
   for(let p=1;p<=limit;p++){ if(!used.has(p)){ pos=p; break; } }
-  if(pos===null){ SEL.cardErr = "手牌已满 —— 先删一张再添加"; show("cards"); return; }
+  if(pos===null){ SEL.cardErr = L("手牌已满 —— 先删一张再添加"); show("cards"); return; }
   setPending("card_add", `card_add:${pos}`,
-    {card_type:type, position:pos, is_free:false}, `手牌加 ${cardCn(type)}（槽位 ${pos}）`);
+    {card_type:type, position:pos, is_free:false}, L2("手牌加 {0}（槽位 {1}）", cardCn(type), pos));
   SEL.cardPicker = null;
   show("cards");
 }
 function cardRemove(position){
   const c = (VIEW.hand||[]).find(x=>x.position===position);
   setPending("card_remove", `card_remove:${position}`,
-    {position}, `手牌移除 ${c?cardCn(c.card_type):("槽位 "+position)}`);
+    {position}, L2("手牌移除 {0}", c?cardCn(c.card_type):(L("槽位 ")+position)));
   show("cards");
 }
 function cardStoreAdd(position, type){
   setPending("card_store_add", `card_store_add:${position}`,
-    {position, card_type:type, is_free:false}, `上架 ${cardCn(type)}（槽位 ${position}）`);
+    {position, card_type:type, is_free:false}, L2("上架 {0}（槽位 {1}）", cardCn(type), position));
   SEL.cardPicker = null;
   show("cards");
 }
 function cardStoreRemove(position){
   const c = (VIEW.shelf||[]).find(x=>x.position===position);
   setPending("card_store_remove", `card_store_remove:${position}`,
-    {position}, `下架 ${c?cardCn(c.card_type):("槽位 "+position)}`);
+    {position}, L2("下架 {0}", c?cardCn(c.card_type):(L("槽位 ")+position)));
   show("cards");
 }
 function cardStoreSet(position, type){
   setPending("card_store_set", `card_store_set:${position}`,
-    {position, card_type:type}, `货架槽位 ${position} 换成 ${cardCn(type)}`);
+    {position, card_type:type}, L2("货架槽位 {0} 换成 {1}", position, cardCn(type)));
   SEL.cardPicker = null;
   show("cards");
 }
@@ -2211,49 +2302,49 @@ function pageCards(w){
   const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
   const handHTML = hand.length
     ? hand.map(c=>cardTileHTML(c,"hand")).join("")
-    : `<div class="placeholder"><div class="big">手里没有牌</div>
+    : L(`<div class="placeholder"><div class="big">手里没有牌</div>
         手牌是<b>你手里已经拿到的牌</b>（会议阶段才发牌）——
-        用下面的「加一张到手牌」可以直接放一张进来。</div>`;
+        用下面的「加一张到手牌」可以直接放一张进来。</div>`);
   const shelfLimit = VIEW.shelf_limit || 5;
   const shelfSlots = Array.from({length:shelfLimit}, (_,i)=>i+1).map(pos=>{
     const c = shelf.find(x=>x.position===pos);
     if(c) return cardTileHTML(c,"shelf");
-    return `<div class="slotempty" onclick="openCardPicker('shelf',${pos})">
-      第 ${pos} 格 · <span style="font-size:10.5px">点此上架</span></div>`;
+    return L2(`<div class="slotempty" onclick="openCardPicker('shelf',{0})">
+      第 {1} 格 · <span style="font-size:10.5px">点此上架</span></div>`, pos, pos);
   }).join("");
-  w.innerHTML = `<div class="cols-half" style="display:grid;gap:14px">
-    <div class="panel"><h3>手牌 · ${hand.length} 张</h3>
+  w.innerHTML = L2(`<div class="cols-half" style="display:grid;gap:14px">
+    <div class="panel"><h3>手牌 · {0} 张</h3>
       <div class="pbody">
-        <div class="hand">${handHTML}</div>
+        <div class="hand">{1}</div>
         <div class="costs">
-          <span>会议 <b>${esc(wl.conference||"—")}</b></span>
-          <span>难度 <b>${esc(VIEW.level||"—")}</b></span>
-          <span>声望 <b>${VIEW.prestige??"—"}</b></span>
-          <span>手牌上限 <b>${VIEW.hand_limit||5}</b> 张（难度 ${esc(VIEW.level||"—")}）</span>
-          <span>白名单可加的卡：<b>${(wl.allowed||[]).length}</b> 种</span>
-          <span>被屏蔽：<b>${Object.keys(wl.blocked||{}).length}</b> 种</span>
-          <span>当前会议：<b>${esc(wl.conference||"—")}</b></span>
+          <span>会议 <b>{2}</b></span>
+          <span>难度 <b>{3}</b></span>
+          <span>声望 <b>{4}</b></span>
+          <span>手牌上限 <b>{5}</b> 张（难度 {6}）</span>
+          <span>白名单可加的卡：<b>{7}</b> 种</span>
+          <span>被屏蔽：<b>{8}</b> 种</span>
+          <span>当前会议：<b>{9}</b></span>
           <button class="btn" style="margin-left:auto;padding:3px 10px;font-size:12px"
             onclick="openCardPicker('hand',0)">加一张到手牌</button>
           <button class="btn" style="padding:3px 10px;font-size:12px"
             onclick="restoreHand()">恢复上次会议牌局</button>
         </div>
-        ${SEL.cardErr?`<div class="err">${esc(SEL.cardErr)}</div>`:""}
+        {10}
         <div class="note">手牌是<b>你手里已经拿到的牌</b>；货架是<b>这一场会议可以买的牌</b>。
           两者的 is_free 只是 tooltip 文案与卡背贴图，**没有玩法影响**（§7.5.2）。</div>
       </div></div>
-    <div class="panel"><h3>卡牌商店货架 · ${shelf.length} / ${shelfLimit}</h3>
+    <div class="panel"><h3>卡牌商店货架 · {11} / {12}</h3>
       <div class="pbody">
-        <div class="hand">${shelfSlots}</div>
+        <div class="hand">{13}</div>
         <div class="costs">
           <span>货架只管<b>这一场会议</b> —— 进入新会议时游戏会按权重重掷</span>
         </div>
       </div></div>
-  </div>`;
+  </div>`, hand.length, handHTML, esc(wl.conference||"—"), esc(VIEW.level||"—"), VIEW.prestige??"—", VIEW.hand_limit||5, esc(VIEW.level||"—"), (wl.allowed||[]).length, Object.keys(wl.blocked||{}).length, esc(wl.conference||"—"), SEL.cardErr?`<div class="err">${esc(SEL.cardErr)}</div>`:"", shelf.length, shelfLimit, shelfSlots);
 }
 
 function restoreHand(){
-  setPending("hand_restore", "hand_restore", {}, "恢复上次会议的牌局");
+  setPending("hand_restore", "hand_restore", {}, L("恢复上次会议的牌局"));
   show("cards");
 }
 
@@ -2295,9 +2386,9 @@ function pageStore(w){
     rows.forEach(r=>{ if(r.e.front===f.front && !f.subs.some(s=>s.sub===r.e.sub)) f.subs.push({sub:r.e.sub}); });
   });
   if(!fronts.length){
-    w.innerHTML = `<div class="panel"><h3>商店</h3><div class="placeholder">
+    w.innerHTML = L(`<div class="panel"><h3>商店</h3><div class="placeholder">
       <div class="big">这个存档没有商店数据</div>
-      商店（store.yml）只在战役存档里有。</div></div>`;
+      商店（store.yml）只在战役存档里有。</div></div>`);
     return;
   }
   if(!SEL.storeFront || !fronts.some(f=>f.front===SEL.storeFront)) SEL.storeFront = fronts[0].front;
@@ -2307,8 +2398,8 @@ function pageStore(w){
   const fcn = (VIEW.front_names)||{};
   const tabs = fronts.map(f=>`<div class="tb ${f.front===SEL.storeFront?'on':''}"
     onclick="pickStoreFront('${f.front}')" title="${esc(f.front)}">${esc(fcn[f.front]||f.front)}</div>`).join("");
-  const subtabs = cur.subs.map(s=>`<div class="tb ${s.sub===SEL.storeSub?'on':''}"
-    onclick="pickStoreSub('${s.sub}')">${esc(s.sub==="elite_store"?"精英商店":"普通商店")}</div>`).join("");
+  const subtabs = cur.subs.map(s=>L2(`<div class="tb {0}"
+    onclick="pickStoreSub('{1}')">{2}</div>`, s.sub===SEL.storeSub?'on':'', s.sub, esc(s.sub==="elite_store"?L("精英商店"):L("普通商店")))).join("");
   const items = rows.filter(r=>r.e.front===SEL.storeFront && r.e.sub===SEL.storeSub);
   const body = items.map(({e,index})=>{
     const isSpec = !!e.spec;
@@ -2318,38 +2409,38 @@ function pageStore(w){
     const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("") : "";
     const tex = isSpec ? specTex(e.spec) : "steps/step.png";
     const texCls = isSpec ? "spico" : "";
-    return `<tr>
-      <td><div class="thumb">${imgTag(tex, storeEntryCn(e), texCls)}</div></td>
-      <td>${esc(storeEntryCn(e))}<div style="color:var(--muted);font-size:10.5px">${esc(e.spec||e.equipment||"")}</div></td>
-      <td class="dim">${esc(natCn(e.nationality))}</td>
-      <td class="dim">${isSpec?esc(st.attack??"—"):"—"} / ${isSpec?esc(st.defense??"—"):"—"} /
-        ${isSpec?esc(st.armor??"—"):"—"} / ${isSpec?esc(st.artillery??"—"):"—"}</td>
-      <td class="tags">${tags}</td>
-      <td class="num"><input class="numin" id="st_p_${e.front}_${e.sub}_${index}" type="text"
-        inputmode="numeric" autocomplete="off" value="${price}"></td>
-      <td class="num"><span class="spin" id="st_q_${e.front}_${e.sub}_${index}"></span></td>
-      <td><span class="rm" onclick="storeRemove('${e.front}','${e.sub}',${index})">下架</span></td>
-    </tr>`;
+    return L2(`<tr>
+      <td><div class="thumb">{0}</div></td>
+      <td>{1}<div style="color:var(--muted);font-size:10.5px">{2}</div></td>
+      <td class="dim">{3}</td>
+      <td class="dim">{4} / {5} /
+        {6} / {7}</td>
+      <td class="tags">{8}</td>
+      <td class="num"><input class="numin" id="st_p_{9}_{10}_{11}" type="text"
+        inputmode="numeric" autocomplete="off" value="{12}"></td>
+      <td class="num"><span class="spin" id="st_q_{13}_{14}_{15}"></span></td>
+      <td><span class="rm" onclick="storeRemove('{16}','{17}',{18})">下架</span></td>
+    </tr>`, imgTag(tex, storeEntryCn(e), texCls), esc(storeEntryCn(e)), esc(e.spec||e.equipment||""), esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", isSpec?esc(st.artillery??"—"):"—", tags, e.front, e.sub, index, price, e.front, e.sub, index, e.front, e.sub, index);
   }).join("");
 
-  w.innerHTML = `<div class="panel"><h3>商店</h3><div class="pbody">
-    <div class="tabs">${tabs}</div>
-    <div class="tabs">${subtabs}</div>
+  w.innerHTML = L2(`<div class="panel"><h3>商店</h3><div class="pbody">
+    <div class="tabs">{0}</div>
+    <div class="tabs">{1}</div>
     <div class="storegrp">
-      <div class="storetitle">${esc(fcn[SEL.storeFront]||SEL.storeFront)} / ${esc(SEL.storeSub==="elite_store"?"精英商店":"普通商店")}
-        · ${items.length} 条
-        <button class="btn" onclick="toggleStorePicker()">${SEL.storePicker?"收起":"上架新商品"}</button></div>
+      <div class="storetitle">{2} / {3}
+        · {4} 条
+        <button class="btn" onclick="toggleStorePicker()">{5}</button></div>
       <table class="spec-tbl">
         <thead><tr><th>图</th><th>商品</th><th>国籍</th><th>攻 / 防 / 装 / 炮</th>
           <th>特性</th><th style="text-align:right">价格</th>
           <th style="text-align:right">库存</th><th></th></tr></thead>
-        <tbody>${body || `<tr><td colspan="8" class="dim">这个商店是空的</td></tr>`}</tbody>
+        <tbody>{6}</tbody>
       </table>
     </div>
     <div class="note">同一个 <b>(战线, 子商店)</b> 里<b>任何重复条目都不许</b>
       （价格库存不同也算重复）；要改已有条目就直接改那一行。<br>
       <b>库存不能填 0</b> —— 游戏没有「售罄」标记，下架请用「下架」按钮删条目。</div>
-  </div></div>`;
+  </div></div>`, tabs, subtabs, esc(fcn[SEL.storeFront]||SEL.storeFront), esc(SEL.storeSub==="elite_store"?L("精英商店"):L("普通商店")), items.length, SEL.storePicker?L("收起"):L("上架新商品"), body || L(`<tr><td colspan="8" class="dim">这个商店是空的</td></tr>`));
 
   items.forEach(({e,index})=>{
     const pEl = document.getElementById("st_p_"+e.front+"_"+e.sub+"_"+index);
@@ -2358,13 +2449,13 @@ function pageStore(w){
       params:{front:e.front, sub:e.sub, index, field:"price", value:pEl.value},
       onChange(v){ queueEdit("store_set", storeKey(e.front,e.sub,index,"price"),
         {front:e.front, sub:e.sub, index, field:"price", value:v}, e.price||0, v,
-        `商店 ${e.front}/${e.sub} 第 ${index+1} 条价格`); }});
+        L2("商店 {0}/{1} 第 {2} 条价格", e.front, e.sub, index+1)); }});
     const qEl = document.getElementById("st_q_"+e.front+"_"+e.sub+"_"+index);
     if(qEl) bindSpin(qEl, {base:e.quantity||0, cur:pendingVal("store_set", storeKey(e.front,e.sub,index,"quantity"), e.quantity||0),
       min:1, max:null, onChange(v){
         queueEdit("store_set", storeKey(e.front,e.sub,index,"quantity"),
           {front:e.front, sub:e.sub, index, field:"quantity", value:v}, e.quantity||0, v,
-          `商店 ${e.front}/${e.sub} 第 ${index+1} 条库存`);
+          L2("商店 {0}/{1} 第 {2} 条库存", e.front, e.sub, index+1));
         show("store");
       }});
   });
@@ -2382,21 +2473,21 @@ function storeAddSpec(t){
   const entry = {spec:t, nationality:st.nationality||"", price:10, quantity:1};
   setPending("store_add", `store_add:${SEL.storeFront}:${SEL.storeSub}:${t}`,
     {front:SEL.storeFront, sub:SEL.storeSub, entry},
-    `上架 ${specCn(t)}（${SEL.storeFront}/${SEL.storeSub}）`);
+    L2("上架 {0}（{1}/{2}）", specCn(t), SEL.storeFront, SEL.storeSub));
   show("store");
 }
 function storeAddEquip(eq, nat){
   const entry = {equipment:eq, nationality:nat, price:10, quantity:1};
   setPending("store_add", `store_add:${SEL.storeFront}:${SEL.storeSub}:${eq}:${nat}`,
     {front:SEL.storeFront, sub:SEL.storeSub, entry},
-    `上架 ${hqEquipCn(eq)}（${SEL.storeFront}/${SEL.storeSub}）`);
+    L2("上架 {0}（{1}/{2}）", hqEquipCn(eq), SEL.storeFront, SEL.storeSub));
   show("store");
 }
 function storeRemove(front, sub, index){
   const rows = projectedStore();
   const r = rows.find(x=>x.e.front===front && x.e.sub===sub && x.index===index);
   setPending("store_remove", `store_remove:${front}:${sub}:${index}`,
-    {front, sub, index}, `下架 ${r?storeEntryCn(r.e):("第 "+(index+1)+" 条")}`);
+    {front, sub, index}, L2("下架 {0}", r?storeEntryCn(r.e):(L("第 ")+(index+1)+L(" 条"))));
   show("store");
 }
 
@@ -2454,10 +2545,10 @@ function theaterSet(asset, field, value){
   params[field] = value;
   const base = a[field];
   queueEdit("theater_asset", theaterKey(asset), params, base, value,
-    `战区资产 ${theaterCn(asset)} ${theaterFieldCn(field)}`);
+    L2("战区资产 {0} {1}", theaterCn(asset), theaterFieldCn(field)));
   show("theater");
 }
-const theaterFieldCn = {to_use:"当前可用", uses_total:"本场景剩余", uses_turn:"每回合恢复"};
+const theaterFieldCn = {to_use:L("当前可用"), uses_total:L("本场景剩余"), uses_turn:L("每回合恢复")};
 
 /* ---------- 难度（U64） ---------- */
 function levelList(){
@@ -2472,31 +2563,31 @@ function curLevel(){
 function levelPickerHTML(){
   const list = levelList();
   if(!list.length){
-    return `<div class="fine">游戏目录里没读到难度列表 —— 难度是游戏自己的设定，
-      中文名由游戏的 locale 提供（id_difficulty_*）。</div>`;
+    return L(`<div class="fine">游戏目录里没读到难度列表 —— 难度是游戏自己的设定，
+      中文名由游戏的 locale 提供（id_difficulty_*）。</div>`);
   }
   const cur = curLevel();
   const nHand = ((VIEW && VIEW.hand) || []).length;
   const btns = list.map(l=>{
     const dis = nHand > l.deck_limit;
     const tip = dis
-      ? `手里有 ${nHand} 张牌，${l.cn}最多只能放 ${l.deck_limit} 张 —— 请先删手牌`
-      : `${l.cn}：手牌上限 ${l.deck_limit} 张`;
-    return `<button class="lvbtn${l.id===cur?" on":""}"${dis?" disabled":""}
-      onclick="setLevel('${l.id}')" title="${esc(tip)}">${esc(l.cn)}
-      <span class="lvlim">${l.deck_limit} 张</span></button>`;
+      ? L2("手里有 {0} 张牌，{1}最多只能放 {2} 张 —— 请先删手牌", nHand, l.cn, l.deck_limit)
+      : L2("{0}：手牌上限 {1} 张", l.cn, l.deck_limit);
+    return L2(`<button class="lvbtn{0}"{1}
+      onclick="setLevel('{2}')" title="{3}">{4}
+      <span class="lvlim">{5} 张</span></button>`, l.id===cur?" on":"", dis?" disabled":"", l.id, esc(tip), esc(l.cn), l.deck_limit);
   }).join("");
   const curInfo = list.find(l=>l.id===cur);
-  return `<div class="lvrow">${btns}</div>
-    <div class="fine">当前「${esc(curInfo?curInfo.cn:(cur||"—"))}」
-      · 手牌上限 ${curInfo?curInfo.deck_limit:"—"} 张 · 手里 ${nHand} 张。<br>
+  return L2(`<div class="lvrow">{0}</div>
+    <div class="fine">当前「{1}」
+      · 手牌上限 {2} 张 · 手里 {3} 张。<br>
       难度还决定<b>以后</b>开的新会议：免费卡数 / 折扣卡数 / AI 强度，
-      以及「重置会议」时重建的 HQ 卡车与步兵阶梯 —— 现有手牌与货架<b>不会</b>被改动。</div>`;
+      以及「重置会议」时重建的 HQ 卡车与步兵阶梯 —— 现有手牌与货架<b>不会</b>被改动。</div>`, btns, esc(curInfo?curInfo.cn:(cur||"—")), curInfo?curInfo.deck_limit:"—", nHand);
 }
 function setLevel(lv){
   const base = (VIEW && VIEW.level) || "";
   if(lv === base) return;
-  queueEdit("level", "level", {value:lv}, base, lv, "难度");
+  queueEdit("level", "level", {value:lv}, base, lv, L("难度"));
   show("overview");
 }
 function pageTheater(w){
@@ -2504,10 +2595,10 @@ function pageTheater(w){
   const meta = (VIEW&&VIEW.theater_meta)||{};
   const editable = theaterEditable();
   if(!uni.length){
-    w.innerHTML = `<div class="panel"><h3>战区资产</h3><div class="placeholder">
+    w.innerHTML = L(`<div class="panel"><h3>战区资产</h3><div class="placeholder">
       <div class="big">没有读到战区资产候选</div>
       战区资产的名单来自游戏自己的常量（<code>constants.theater_asset_types</code>）——
-      没找到游戏包就列不出来。</div></div>`;
+      没找到游戏包就列不出来。</div></div>`);
     return;
   }
   const onCount = uni.filter(u=>theaterInCurrent(u.asset)).length;
@@ -2518,60 +2609,60 @@ function pageTheater(w){
     const tot = cur.uses_total;
     const inf = (tot===null||tot===undefined);
     let badge;
-    if(theaterPend("theater_asset_remove", asset)) badge = `<span class="tbadge warn">待删除</span>`;
-    else if(on && !u.scenario) badge = `<span class="tbadge new">新增</span>`;
-    else if(u.scenario) badge = `<span class="tbadge">场景自带</span>`;
-    else badge = `<span class="tbadge dim">场景没有</span>`;
+    if(theaterPend("theater_asset_remove", asset)) badge = L(`<span class="tbadge warn">待删除</span>`);
+    else if(on && !u.scenario) badge = L(`<span class="tbadge new">新增</span>`);
+    else if(u.scenario) badge = L(`<span class="tbadge">场景自带</span>`);
+    else badge = L(`<span class="tbadge dim">场景没有</span>`);
     const head = `<div class="thead"><span class="tn">${esc(theaterCn(asset))}</span>${badge}</div>`;
     if(!on){
-      return `<div class="titem off">
-        ${imgTag(theaterTex(asset), theaterCn(asset))}
+      return L2(`<div class="titem off">
+        {0}
         <div class="tbody">
-          ${head}
-          <div class="talt">这个场景<b>当前没有</b>这项战区资产${u.scenario
-            ? "（场景定义里有，多半是已经用完 / 被删了）" : "（场景本来就没有）"}。</div>
-          ${u.in_other ? `<div class="talt">后面第 ${(VIEW.theater_meta.phase_count||2)>1
-            ? "2" : "2"} 阶段里有这项（那边不生效）。</div>` : ""}
+          {1}
+          <div class="talt">这个场景<b>当前没有</b>这项战区资产{2}。</div>
+          {3}
           <div class="tact">
-            <button class="btn pri" ${editable?"":"disabled"}
-              onclick="openTheaterAddModal('${asset}')">${editable?"添加这一项":"不在战斗中"}</button>
+            <button class="btn pri" {4}
+              onclick="openTheaterAddModal('{5}')">{6}</button>
           </div>
-        </div></div>`;
+        </div></div>`, imgTag(theaterTex(asset), theaterCn(asset)), head, u.scenario
+            ? L("（场景定义里有，多半是已经用完 / 被删了）") : L("（场景本来就没有）"), u.in_other ? L2("<div class=\"talt\">后面第 {0} 阶段里有这项（那边不生效）。</div>", (VIEW.theater_meta.phase_count||2)>1
+            ? "2" : "2") : "", editable?"":"disabled", asset, editable?L("添加这一项"):L("不在战斗中"));
     }
-    return `<div class="titem">
-      ${imgTag(theaterTex(asset), theaterCn(asset))}
+    return L2(`<div class="titem">
+      {0}
       <div class="tbody">
-        ${head}
+        {1}
         <div class="trow">当前可用
-          <span class="xnum"><span class="spin" id="th_tu_${asset}"></span></span></div>
+          <span class="xnum"><span class="spin" id="th_tu_{2}"></span></span></div>
         <div class="trow">本场景剩余
-          <span class="xnum">${inf
-            ? `<span class="num inf" id="th_tot_inf_${asset}">无限</span>`
-            : `<input class="numin" id="th_tot_${asset}" type="text" inputmode="numeric" autocomplete="off" value="${tot}">`}
+          <span class="xnum">{3}
             <button class="btn" style="padding:0 6px;font-size:10.5px;margin-left:4px"
-              onclick="theaterToggleTotal('${asset}')">${inf?"设成数字":"改成无限"}</button></span></div>
+              onclick="theaterToggleTotal('{4}')">{5}</button></span></div>
         <div class="trow">每回合恢复
-          <span class="xnum"><span class="spin" id="th_ut_${asset}"></span></span></div>
-        ${inf ? `<div class="talt">「无限」= 每回合恢复 ${cur.uses_turn} 次、<b>只恢复到 ${cur.uses_turn} 次</b> —— 上一回合没用完的<b>不会累积</b>
-          （游戏按 min(每回合恢复, 本场景剩余) 恢复；这是游戏自己的规则，不是显示问题）。</div>` : ""}
-        ${(!inf && cur.to_use>cur.uses_total)
-          ? `<div class="twarn">当前可用 ${cur.to_use} 次 大于 本场景剩余 ${cur.uses_total} 次 ⇒ 游戏读档会失败</div>`:""}
-        ${(!inf && cur.uses_turn>cur.uses_total)
-          ? `<div class="twarn">每回合恢复 ${cur.uses_turn} 次 大于 本场景剩余 ${cur.uses_total} 次 ——
-             实际每回合只能用 ${cur.uses_total} 次</div>`:""}
-        ${(!inf && cur.to_use > Math.min(cur.uses_turn, cur.uses_total))
-          ? `<div class="twarn">当前可用 ${cur.to_use} 次 大于 回合开始后的有效值
-             ${Math.min(cur.uses_turn, cur.uses_total)} 次 —— 回合开始会重置为
-             ${Math.min(cur.uses_turn, cur.uses_total)} 次</div>`:""}
+          <span class="xnum"><span class="spin" id="th_ut_{6}"></span></span></div>
+        {7}
+        {8}
+        {9}
+        {10}
         <div class="tact">
-          <button class="btn" ${editable?"":"disabled"}
-            onclick="theaterRemove('${asset}')">删除这一项</button>
+          <button class="btn" {11}
+            onclick="theaterRemove('{12}')">删除这一项</button>
           <span class="talt">删的是整项（不是把次数清零）</span>
         </div>
-      </div></div>`;
+      </div></div>`, imgTag(theaterTex(asset), theaterCn(asset)), head, asset, inf
+            ? L2("<span class=\"num inf\" id=\"th_tot_inf_{0}\">无限</span>", asset)
+            : `<input class="numin" id="th_tot_${asset}" type="text" inputmode="numeric" autocomplete="off" value="${tot}">`, asset, inf?L("设成数字"):L("改成无限"), asset, inf ? L2(`<div class="talt">「无限」= 每回合恢复 {0} 次、<b>只恢复到 {1} 次</b> —— 上一回合没用完的<b>不会累积</b>
+          （游戏按 min(每回合恢复, 本场景剩余) 恢复；这是游戏自己的规则，不是显示问题）。</div>`, cur.uses_turn, cur.uses_turn) : "", (!inf && cur.to_use>cur.uses_total)
+          ? L2("<div class=\"twarn\">当前可用 {0} 次 大于 本场景剩余 {1} 次 ⇒ 游戏读档会失败</div>", cur.to_use, cur.uses_total):"", (!inf && cur.uses_turn>cur.uses_total)
+          ? L2(`<div class="twarn">每回合恢复 {0} 次 大于 本场景剩余 {1} 次 ——
+             实际每回合只能用 {2} 次</div>`, cur.uses_turn, cur.uses_total, cur.uses_total):"", (!inf && cur.to_use > Math.min(cur.uses_turn, cur.uses_total))
+          ? L2(`<div class="twarn">当前可用 {0} 次 大于 回合开始后的有效值
+             {1} 次 —— 回合开始会重置为
+             {2} 次</div>`, cur.to_use, Math.min(cur.uses_turn, cur.uses_total), Math.min(cur.uses_turn, cur.uses_total)):"", editable?"":"disabled", asset);
   }).join("");
-  w.innerHTML = `<div class="panel"><h3>战区资产 · 候选 ${uni.length} 种（当前战斗里有 ${onCount} 种）</h3>
-    <div class="pbody"><div class="tgrid">${cards}</div>
+  w.innerHTML = L2(`<div class="panel"><h3>战区资产 · 候选 {0} 种（当前战斗里有 {1} 种）</h3>
+    <div class="pbody"><div class="tgrid">{2}</div>
       <div class="note">候选全集 = <b>游戏那 7 种</b>（<code>constants.theater_asset_types</code>）——
         存档里没有的也列出来，可以<b>添加</b>；有的可以<b>删除</b>。<br>
         战区资产是<b>唯一的 L3 写入例外</b>（写的是
@@ -2581,7 +2672,7 @@ function pageTheater(w){
         <b>本场景剩余 = 无限</b> 时，每回合恢复多少就永远有多少。<br>
         标 <b>新增</b> 的 = 场景本来没有、被加进来的（无中生有）；删掉的项会整个消失，
         游戏里那个按钮也就没了。</div>
-    </div></div>`;
+    </div></div>`, uni.length, onCount, cards);
 
   uni.forEach(u=>{
     const asset = u.asset;
@@ -2611,9 +2702,9 @@ function theaterToggleTotal(asset){
 /* ---------- 删除一项（删整项，不是清零） ---------- */
 function theaterRemove(asset){
   const cur = theaterCur(asset);
-  const tot = (cur.uses_total===null||cur.uses_total===undefined) ? "无限" : cur.uses_total;
+  const tot = (cur.uses_total===null||cur.uses_total===undefined) ? L("无限") : cur.uses_total;
   setPending("theater_asset_remove", theaterDelKey(asset), {asset:asset},
-    `删除战区资产 ${theaterCn(asset)}（当前可用 ${cur.to_use}，本场景剩余 ${tot}）`);
+    L2("删除战区资产 {0}（当前可用 {1}，本场景剩余 {2}）", theaterCn(asset), cur.to_use, tot));
   show("theater");
 }
 
@@ -2631,7 +2722,7 @@ function renderTheaterAddModal(){
   const M = MODAL; if(!M) return;
   const u = ((VIEW&&VIEW.theater_universe)||[]).find(x=>x.asset===M.asset) || {};
   const inf = (M.uses_total===null||M.uses_total===undefined);
-  openModal(`<div class="mh">添加战区资产 · ${esc(theaterCn(M.asset))}
+  openModal(L2(`<div class="mh">添加战区资产 · {0}
       <span class="ro">存进 games/&lt;场景&gt;/main.yml</span></div>
     <div class="mb">
       <div class="mrow"><span class="lb">每回合恢复</span>
@@ -2639,26 +2730,26 @@ function renderTheaterAddModal(){
         <span class="hint">滚轮 ±1 · 正整数（≥ 1）</span></div>
       <div class="mrow"><span class="lb">本场景剩余</span>
         <span class="numrow">
-          ${inf?`<span class="num inf">无限</span>`
-            : `<input class="numin" id="mp_tot" type="text" inputmode="numeric" autocomplete="off" value="${M.uses_total}" style="width:72px">`}
-          <button class="btn" onclick="theaterAddToggleTotal()">${inf?"设成数字":"改成无限"}</button>
+          {1}
+          <button class="btn" onclick="theaterAddToggleTotal()">{2}</button>
         </span>
-        <span class="hint">${inf?"无限 = 这场战斗随便用":"整场战斗一共能用几次"}</span></div>
-      <div class="modnote">${u.scenario
-        ? `这个场景<b>本来就有</b>这项战区资产（场景定义：每回合恢复 ${u.scenario_uses_turn}，
-           本场景剩余 ${u.scenario_uses_total===null||u.scenario_uses_total===undefined
-             ? "无限" : u.scenario_uses_total}），现在存档里没有 —— 多半是已经用完了。`
-        : `⚠️ <b>这个场景本来就没有</b>这项战区资产（无中生有）。<br>
-           数据上安全（游戏只认这 7 种，贴图和中文名都齐全，游戏里会正常出现这个按钮），
-           但<b>能不能用得起来要看地图</b> —— 比如「炮舰轰炸」要有海岸目标、
-           「空中补给」要有己方部队在补给中。`}
+        <span class="hint">{3}</span></div>
+      <div class="modnote">{4}
         <br><br>
         新加的资产<b>只对当前 phase 生效</b>；场景自己的定义不动，
         下一场战斗会按场景重新初始化。<br>
         新增时会把 5 个字段<b>一次写全并保持自洽</b>，不会出现「次数全是 0」的死条目。</div>
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="theaterAddConfirm()">添加</button></div>`,
+      <button class="btn pri" onclick="theaterAddConfirm()">添加</button></div>`, esc(theaterCn(M.asset)), inf?L(`<span class="num inf">无限</span>`)
+            : `<input class="numin" id="mp_tot" type="text" inputmode="numeric" autocomplete="off" value="${M.uses_total}" style="width:72px">`, inf?L("设成数字"):L("改成无限"), inf?L("无限 = 这场战斗随便用"):L("整场战斗一共能用几次"), u.scenario
+        ? L2(`这个场景<b>本来就有</b>这项战区资产（场景定义：每回合恢复 {0}，
+           本场景剩余 {1}），现在存档里没有 —— 多半是已经用完了。`, u.scenario_uses_turn, u.scenario_uses_total===null||u.scenario_uses_total===undefined
+             ? L("无限") : u.scenario_uses_total)
+        : L(`⚠️ <b>这个场景本来就没有</b>这项战区资产（无中生有）。<br>
+           数据上安全（游戏只认这 7 种，贴图和中文名都齐全，游戏里会正常出现这个按钮），
+           但<b>能不能用得起来要看地图</b> —— 比如「炮舰轰炸」要有海岸目标、
+           「空中补给」要有己方部队在补给中。`)),
     {onOpen:function(){
       bindModalSpin("mp_tut", ()=>MODAL.uses_turn, v=>MODAL.uses_turn=v, 1, 99);
       const pe = document.getElementById("mp_tot");
@@ -2674,12 +2765,12 @@ function theaterAddConfirm(){
   let tot = M.uses_total;
   if(tot!==null && tot!==undefined){
     tot = parseInt(tot,10);
-    if(isNaN(tot)){ alertModal("「本场景剩余」要填整数，或点「改成无限」"); return; }
-    if(tot < 1){ alertModal("「本场景剩余」不能是 0 —— 0 会让这个资产永远用不了"); return; }
+    if(isNaN(tot)){ alertModal(L("「本场景剩余」要填整数，或点「改成无限」")); return; }
+    if(tot < 1){ alertModal(L("「本场景剩余」不能是 0 —— 0 会让这个资产永远用不了")); return; }
   } else tot = null;
   setPending("theater_asset_add", theaterAddKey(M.asset),
     {asset:M.asset, uses_total:tot, uses_turn:ut},
-    `添加战区资产 ${theaterCn(M.asset)}（每回合恢复 ${ut}，本场景剩余 ${tot===null?"无限":tot}）`);
+    L2("添加战区资产 {0}（每回合恢复 {1}，本场景剩余 {2}）", theaterCn(M.asset), ut, tot===null?L("无限"):tot));
   closeModal();
 }
 
@@ -2690,16 +2781,16 @@ function pageCampaign(w){
   const cp = VIEW.campaign_position || {};
   if(!CDETAIL) loadCampaignDetail().then(()=>{ if(PAGE==="campaign") show("campaign"); });
   const scenes = cp.available_scenes || [];
-  const pos = `<div class="cpos">
-    <b>${esc(cp.campaign_name||cp.campaign_id||"—")}</b>
+  const pos = L2(`<div class="cpos">
+    <b>{0}</b>
     <span class="sep"></span>
-    <span>${esc(cp.conference_text||cp.conference_id||"—")}</span>
-    ${cp.front?`<span class="sep"></span><span>战线 ${esc(cp.front_name||cp.front)}</span>`:""}
-    ${cp.scenario_id?`<span class="sep"></span><span>场景 ${esc(cp.scenario_name||cp.scenario_id)}</span>`:""}
+    <span>{1}</span>
+    {2}
+    {3}
     <span class="sp" style="flex:1"></span>
-    <span class="mut">已激活战线：${(cp.active_fronts||[]).map(f=>((CDETAIL&&CDETAIL.front_names)||{})[f]||f).join(" / ")||"—"}</span>
-    ${cp.variant?`<span class="ro">${esc(cp.variant)}</span>`:""}
-  </div>`;
+    <span class="mut">已激活战线：{4}</span>
+    {5}
+  </div>`, esc(cp.campaign_name||cp.campaign_id||"—"), esc(cp.conference_text||cp.conference_id||"—"), cp.front?L2("<span class=\"sep\"></span><span>战线 {0}</span>", esc(cp.front_name||cp.front)):"", cp.scenario_id?L2("<span class=\"sep\"></span><span>场景 {0}</span>", esc(cp.scenario_name||cp.scenario_id)):"", (cp.active_fronts||[]).map(f=>((CDETAIL&&CDETAIL.front_names)||{})[f]||f).join(" / ")||"—", cp.variant?`<span class="ro">${esc(cp.variant)}</span>`:"");
   const sceneRows = scenes.map(s=>`<tr>
       <td>${esc(s.name||s.id)}</td>
       <td class="dim">${esc(s.id)}</td>
@@ -2712,35 +2803,35 @@ function pageCampaign(w){
       <td class="n">${(h.force_pool||[]).length}</td>
     </tr>`).join("");
   const routeName = (CDETAIL&&CDETAIL.route_name)||"historical";
-  w.innerHTML = `<div class="panel"><h3>战役位置</h3><div class="pbody">
-      ${pos}
+  w.innerHTML = L2(`<div class="panel"><h3>战役位置</h3><div class="pbody">
+      {0}
       <div class="storegrp" style="margin-top:12px">
-        <div class="storetitle">路线图 · ${esc(cp.campaign_name||cp.campaign_id||"")}</div>
-        ${routeHTML()}
+        <div class="storetitle">路线图 · {1}</div>
+        {2}
       </div>
       <div class="cols-wide" style="display:grid;gap:14px;margin-top:12px">
-        <div class="storegrp"><div class="storetitle">这场会议的可选场景 · ${scenes.length} 个</div>
+        <div class="storegrp"><div class="storetitle">这场会议的可选场景 · {3} 个</div>
           <table class="rlist"><thead><tr><th>名称</th><th>场景 id</th><th>变体</th></tr></thead>
-            <tbody>${sceneRows || `<tr><td colspan="3" class="dim">（没有索引到可选场景）</td></tr>`}</tbody>
+            <tbody>{4}</tbody>
           </table></div>
-        <div class="storegrp"><div class="storetitle">总部 · ${(VIEW.hqs||[]).length} 个</div>
+        <div class="storegrp"><div class="storetitle">总部 · {5} 个</div>
           <table class="rlist"><thead><tr><th>名称</th><th>CP</th><th>经验</th><th>兵库</th></tr></thead>
-            <tbody>${hqs}</tbody></table></div>
+            <tbody>{6}</tbody></table></div>
       </div>
       <div class="storegrp" style="margin-top:12px">
-        <div class="storetitle">场景名册 · ${esc(cp.scenario_name||cp.scenario_id||"—")}</div>
-        <div style="padding:0 12px 12px">${rosterHTML()}</div>
+        <div class="storetitle">场景名册 · {7}</div>
+        <div style="padding:0 12px 12px">{8}</div>
       </div>
       <div class="storegrp" style="margin-top:12px">
-        <div class="storetitle">这场会议的商店 · ${esc(cp.front_name||cp.front||"—")}战线
-          · ${esc(cp.conference_text||cp.conference_id||"—")}</div>
-        ${conferenceStoreHTML()}
+        <div class="storetitle">这场会议的商店 · {9}战线
+          · {10}</div>
+        {11}
       </div>
       <div class="note">这一页是<b>只读</b>的 —— 战役推进是游戏自己的逻辑，
         修改器只告诉你「现在在哪儿、能打哪几场」（§7.8）。<br>
         ⚠️ <b>名册与会议商店来自游戏包</b>（战役包默认配置）——
         <b>不是玩家存档</b>：单位不一定存活 / 一定继承 / 一定登场。</div>
-  </div></div>`;
+  </div></div>`, pos, esc(cp.campaign_name||cp.campaign_id||""), routeHTML(), scenes.length, sceneRows || L(`<tr><td colspan="3" class="dim">（没有索引到可选场景）</td></tr>`), (VIEW.hqs||[]).length, hqs, esc(cp.scenario_name||cp.scenario_id||"—"), rosterHTML(), esc(cp.front_name||cp.front||"—"), esc(cp.conference_text||cp.conference_id||"—"), conferenceStoreHTML());
 }
 
 
@@ -2782,19 +2873,19 @@ function openConfirm(mode, info){
   const files = planFiles(info.changes);
   let title, body, foot;
   if(mode==="error"){
-    title = `✕ 无法应用：${(info.errors||[]).length} 处错误`;
-    body = `<div>${(info.errors||[]).map(e=>`<div class="erow">✕ ${esc(e)}</div>`).join("")}</div>
-      <div class="fine">硬拦：<b>plan.errors</b> 非空时按钮禁用 —— <b>原存档不会被写入</b>。</div>`;
-    foot = `<button class="btn" onclick="closeModal()">返回修改</button>
-      <button class="btn pri" disabled>应用更改</button>`;
+    title = L2("✕ 无法应用：{0} 处错误", (info.errors||[]).length);
+    body = L2(`<div>{0}</div>
+      <div class="fine">硬拦：<b>plan.errors</b> 非空时按钮禁用 —— <b>原存档不会被写入</b>。</div>`, (info.errors||[]).map(e=>`<div class="erow">✕ ${esc(e)}</div>`).join(""));
+    foot = L(`<button class="btn" onclick="closeModal()">返回修改</button>
+      <button class="btn pri" disabled>应用更改</button>`);
   } else if(mode==="warn"){
-    title = `⚠ 有 ${(info.warnings||[]).length} 条软警告`;
-    body = `<div>${(info.warnings||[]).map(w=>`<div class="wrow">⚠ ${esc(w)}</div>`).join("")}</div>
-      <div class="fine">软警告：照写，只是提醒。</div>`;
-    foot = `<button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="reallyApply()">仍然应用</button>`;
+    title = L2("⚠ 有 {0} 条软警告", (info.warnings||[]).length);
+    body = L2(`<div>{0}</div>
+      <div class="fine">软警告：照写，只是提醒。</div>`, (info.warnings||[]).map(w=>`<div class="wrow">⚠ ${esc(w)}</div>`).join(""));
+    foot = L(`<button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="reallyApply()">仍然应用</button>`);
   } else {
-    title = `⚠ 应用 ${files.length} 处改动？`;
+    title = L2("⚠ 应用 {0} 处改动？", files.length);
     /* U55：待应用**明细**（逐条）在这里 —— 底栏不再常驻展开。
        明细用普通字符串拼好再拼进来（别写成嵌套反引号）。 */
     let detail = "";
@@ -2805,18 +2896,18 @@ function openConfirm(mode, info){
              + '<span style="font-family:var(--mono);color:var(--accent-dark);font-weight:600">'
              + esc(p.label) + '</span>'
              + '<span style="margin-left:auto;color:var(--danger);cursor:pointer;font-size:12px"'
-             + ' onclick="dropPendingFromModal(' + i + ')">移除</span></li>';
+             + ' onclick="dropPendingFromModal(' + i + L(')">移除</span></li>');
       }).join("");
-      detail = '<div class="plist"><div class="ph">待应用明细（' + PENDING.length + ' 条）</div>'
+      detail = L('<div class="plist"><div class="ph">待应用明细（') + PENDING.length + L(' 条）</div>')
              + items + '</div>';
     }
-    body = detail + `<div>将改动存档 <b>${esc(info.save_name||VIEW.save&&VIEW.save.name||"")}</b> 里的：</div>
-      <div class="elist">${files.map(f=>`<div><span class="f">${esc(f.entry)}</span>${
-        f.notes.length?`<span class="d">${esc(f.notes.join("；"))}</span>`:""}</div>`).join("")}</div>
-      <div class="fine">写回前会自动备份：<b>${esc(info.backup||"（原文件保留为 _BACKUP）")}</b>
-        （同名已存在则递增为 <b>_BACKUP_2</b>）· 改动后仍可一键撤销。</div>`;
-    foot = `<button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="reallyApply()">应用更改</button>`;
+    body = detail + L2(`<div>将改动存档 <b>{0}</b> 里的：</div>
+      <div class="elist">{1}</div>
+      <div class="fine">写回前会自动备份：<b>{2}</b>
+        （同名已存在则递增为 <b>_BACKUP_2</b>）· 改动后仍可一键撤销。</div>`, esc(info.save_name||VIEW.save&&VIEW.save.name||""), files.map(f=>`<div><span class="f">${esc(f.entry)}</span>${
+        f.notes.length?`<span class="d">${esc(f.notes.join("；"))}</span>`:""}</div>`).join(""), esc(info.backup||L("（原文件保留为 _BACKUP）")));
+    foot = L(`<button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="reallyApply()">应用更改</button>`);
   }
   openModal(`<div class="mh">${title}</div><div class="mb">${body}</div><div class="mf">${foot}</div>`,
             {cls: mode==="error" ? "err" : (mode==="warn" ? "warn" : "")});
@@ -2838,8 +2929,8 @@ function spickMatch(it, q){
 function spickCellsHTML(items, onPick, q){
   const list = (items||[]).filter(it=>spickMatch(it, q));
   if(!list.length){
-    return `<div style="padding:14px;color:var(--muted);font-size:12px">
-      ${q?("没有匹配「"+esc(q)+"」的条目"):"没有可选的条目"}</div>`;
+    return L2(`<div style="padding:14px;color:var(--muted);font-size:12px">
+      {0}</div>`, q?(L("没有匹配「")+esc(q)+L("」的条目")):L("没有可选的条目"));
   }
   return list.map(it=>`<div class="pcell ${it.blocked?'blocked':''} ${it.sel?'on':''}"
     title="${esc(it.title||it.name)}" onclick="${it.blocked?'void 0':onPick.replace("@ID", esc(JSON.stringify(it.id)))}">
@@ -2861,7 +2952,7 @@ function bindSpickSearch(items, onPick, footFn){
       const sel = (items||[]).find(i=>i.id===(MODAL&&MODAL.sel));
       foot.innerHTML = spickMatch(sel, q)
         ? footFn(sel)
-        : `<div class="slot empty" style="justify-content:center">还没选</div>`;
+        : L(`<div class="slot empty" style="justify-content:center">还没选</div>`);
     }
   };
   qi.addEventListener("input", apply);
@@ -2869,23 +2960,23 @@ function bindSpickSearch(items, onPick, footFn){
 }
 /* 详情卡（复用 .slot 样式，但去掉「点击=卸下」的语义） */
 function spickCardHTML(it){
-  if(!it) return `<div class="slot empty" style="justify-content:center">还没选</div>`;
+  if(!it) return L(`<div class="slot empty" style="justify-content:center">还没选</div>`);
   const tags = (it.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("");
-  return `<div class="slot spcard">
-    <span class="sq">${imgTag(it.tex, it.name)}</span>
-    <span class="slotinfo"><span class="slotname">${esc(it.name)}</span>
-      <span class="slotflags">${tags||'<span class="none">无特性</span>'}</span></span>
+  return L2(`<div class="slot spcard">
+    <span class="sq">{0}</span>
+    <span class="slotinfo"><span class="slotname">{1}</span>
+      <span class="slotflags">{2}</span></span>
     <span class="slotstats">
-      <span class="st"><i>攻</i><b>${it.attack??"—"}</b></span>
-      <span class="st"><i>防</i><b>${it.defense??"—"}</b></span>
-      <span class="st"><i>装</i><b>${it.armor??"—"}</b></span>
-      <span class="st"><i>炮</i><b>${it.artillery??"—"}</b></span>
-    </span></div>`;
+      <span class="st"><i>攻</i><b>{3}</b></span>
+      <span class="st"><i>防</i><b>{4}</b></span>
+      <span class="st"><i>装</i><b>{5}</b></span>
+      <span class="st"><i>炮</i><b>{6}</b></span>
+    </span></div>`, imgTag(it.tex, it.name), esc(it.name), tags||L('<span class="none">无特性</span>'), it.attack??"—", it.defense??"—", it.armor??"—", it.artillery??"—");
 }
 function natRowHTML(it){
   if(!it) return "";
-  return `<div class="spnat" style="margin-top:8px">国籍 <b>${esc(it.nat||"—")}</b>
-    <span class="auto">跟着特种兵自动 · 不用手选</span></div>`;
+  return L2(`<div class="spnat" style="margin-top:8px">国籍 <b>{0}</b>
+    <span class="auto">跟着特种兵自动 · 不用手选</span></div>`, esc(it.nat||"—"));
 }
 /* 模态框里的滚轮 ±1 数字 */
 function bindModalSpin(id, get, set, min, max){
@@ -2907,7 +2998,7 @@ function hqPoolItems(h){
     const dup = have.filter(e=>e.spec===t).length;
     return {id:t, name:specCn(t), tex:specTex(t), nat:natCn(st.nationality),
       attack:st.attack, defense:st.defense, armor:st.armor, artillery:st.artillery,
-      flags:st.flags||[], blocked:false, dup:dup?("已有 "+dup):"",
+      flags:st.flags||[], blocked:false, dup:dup?(L("已有 ")+dup):"",
       title:specCn(t)+" · "+natCn(st.nationality)};
   });
 }
@@ -2928,33 +3019,16 @@ function renderHqPoolModal(){
   const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[]};
   const equipTypes = uni.equipment || ["infantry", "armor"];
   const equipNats = uni.nationality || [];
-  openModal(`<div class="mh">给「${esc(h.name_cn||h.name_brief||h.id)}」加一条
+  openModal(L2(`<div class="mh">给「{0}」加一条
       <span class="ro">存进 hqs.yml</span></div>
     <div class="mb">
       <div class="mrow"><span class="lb">条目类型</span>
         <span class="numrow">
-          <button class="btn ${M.mode==="spec"?"pri":""}" onclick="hqPoolMode('spec')">特种兵</button>
-          <button class="btn ${M.mode==="equip"?"pri":""}" onclick="hqPoolMode('equip')">兵种</button>
+          <button class="btn {1}" onclick="hqPoolMode('spec')">特种兵</button>
+          <button class="btn {2}" onclick="hqPoolMode('equip')">兵种</button>
         </span>
-        <span class="hint">特种兵 ${items.length} 种 · 兵种 2 种</span></div>
-      ${M.mode==="spec" ? `<div class="spick">
-        <div class="sphd"><span class="spt">选一个特种兵</span>
-          <input class="inp" id="spick_q" type="text" autocomplete="off"
-            placeholder="搜索特种兵 / 国籍 / 特性…" value="${esc(M.q||"")}">
-          <span class="spc">战役池 ${items.length} 种</span></div>
-        <div class="spgrid" id="spick_grid">${cells}</div>
-        <div class="spfoot" id="spick_foot">${spickCardHTML(sel)}${natRowHTML(sel)}</div>
-      </div>` : `<div class="mrow"><span class="lb">兵种</span>
-        <select class="sel" onchange="hqPoolEquip('${esc(M.equipType||"infantry")}','this.value')">
-          ${(equipTypes||[]).map(eq=>`<option value="${eq}" ${
-            eq===(M.equipType||"infantry")?'selected':''}>${esc(hqEquipCn(eq))}</option>`).join("")}
-        </select></div>
-        <div class="mrow"><span class="lb">国籍</span>
-        <select class="sel" onchange="hqPoolEquip('${esc(M.equipType||"infantry")}','this.value')">
-          ${(equipNats||[]).map(nt=>`<option value="${esc(nt)}" ${
-            nt===(M.equipNat||"german")?'selected':''}>${esc(natCn(nt))}</option>`).join("")}
-        </select>
-        <span class="hint">兵种的国籍要**手选**（特种兵是自动跟着类型走的）</span></div>`}
+        <span class="hint">特种兵 {3} 种 · 兵种 2 种</span></div>
+      {4}
       <div class="mrow"><span class="lb">数量</span>
         <span class="spin" id="mp_q"></span>
         <span class="hint">滚轮 ±1 · 非负整数</span></div>
@@ -2967,7 +3041,24 @@ function renderHqPoolModal(){
         （延迟 X 回合 = 部队要等 X 个回合才能部署，是游戏合法机制）。</div>
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="hqPoolConfirm()">添加</button></div>`,
+      <button class="btn pri" onclick="hqPoolConfirm()">添加</button></div>`, esc(h.name_cn||h.name_brief||h.id), M.mode==="spec"?"pri":"", M.mode==="equip"?"pri":"", items.length, M.mode==="spec" ? L2(`<div class="spick">
+        <div class="sphd"><span class="spt">选一个特种兵</span>
+          <input class="inp" id="spick_q" type="text" autocomplete="off"
+            placeholder="搜索特种兵 / 国籍 / 特性…" value="{0}">
+          <span class="spc">战役池 {1} 种</span></div>
+        <div class="spgrid" id="spick_grid">{2}</div>
+        <div class="spfoot" id="spick_foot">{3}{4}</div>
+      </div>`, esc(M.q||""), items.length, cells, spickCardHTML(sel), natRowHTML(sel)) : L2(`<div class="mrow"><span class="lb">兵种</span>
+        <select class="sel" onchange="hqPoolEquip('{0}','this.value')">
+          {1}
+        </select></div>
+        <div class="mrow"><span class="lb">国籍</span>
+        <select class="sel" onchange="hqPoolEquip('{2}','this.value')">
+          {3}
+        </select>
+        <span class="hint">兵种的国籍要**手选**（特种兵是自动跟着类型走的）</span></div>`, esc(M.equipType||"infantry"), (equipTypes||[]).map(eq=>`<option value="${eq}" ${
+            eq===(M.equipType||"infantry")?'selected':''}>${esc(hqEquipCn(eq))}</option>`).join(""), esc(M.equipType||"infantry"), (equipNats||[]).map(nt=>`<option value="${esc(nt)}" ${
+            nt===(M.equipNat||"german")?'selected':''}>${esc(natCn(nt))}</option>`).join(""))),
     {onOpen:function(){
       bindModalSpin("mp_q", ()=>MODAL.quantity, v=>MODAL.quantity=v, 0, 99);
       bindModalSpin("mp_d", ()=>MODAL.delay, v=>MODAL.delay=v, 0, 99);
@@ -2987,7 +3078,7 @@ function hqPoolConfirm(){
   const h = (VIEW.hqs||[]).find(x=>x.id===M.hqId);
   let entry = null;
   if(M.mode==="spec"){
-    if(!M.sel){ alertModal("请先选一个特种兵"); return; }
+    if(!M.sel){ alertModal(L("请先选一个特种兵")); return; }
     const st = (CATALOG&&CATALOG.spec_types[M.sel])||{};
     entry = {spec:M.sel, nationality:st.nationality||"", quantity:M.quantity, delay:M.delay};
   } else {
@@ -2996,7 +3087,7 @@ function hqPoolConfirm(){
   }
   const nm = M.mode==="spec" ? specCn(M.sel) : hqEquipCn(M.equipType||"infantry");
   setPending("hq_force_pool_add", `hq_force_pool_add:${M.hqId}:${M.mode}:${M.sel||M.equipType||""}`,
-    {hq_id:M.hqId, entry}, `总部 ${M.hqId} 兵库加 ${nm} × ${M.quantity}`);
+    {hq_id:M.hqId, entry}, L2("总部 {0} 兵库加 {1} × {2}", M.hqId, nm, M.quantity));
   closeModal();
 }
 
@@ -3020,25 +3111,19 @@ function renderCardPickerModal(){
   });
   const sel = items.find(i=>i.id===M.sel);
   const isHand = M.mode==="hand";
-  openModal(`<div class="mh">${isHand?"加一张到手牌":"换掉位置 "+M.position+" 的卡"}
-      <span class="ro">${isHand?"cards.yml":"main.yml · card_store"}</span></div>
+  openModal(L2(`<div class="mh">{0}
+      <span class="ro">{1}</span></div>
     <div class="mb">
       <div class="modnote">只列本存档本会议商店**本来就能抽到的卡** ——
-        玩家阵营 ${esc(wl.player_faction||"—")}，共 ${(wl.allowed||[]).length} 种
-        （其余 ${Object.keys(wl.blocked||{}).length} 种被屏蔽）。</div>
+        玩家阵营 {2}，共 {3} 种
+        （其余 {4} 种被屏蔽）。</div>
       <div class="spick">
         <div class="sphd"><span class="spt">选一张卡</span>
           <input class="inp" id="spick_q" type="text" autocomplete="off"
-            placeholder="搜索卡牌…" value="${esc(M.q||"")}">
-          <span class="spc">${types.length} 种 · 可上架 ${(wl.allowed||[]).length} 种</span></div>
-        <div class="spgrid" id="spick_grid">${spickCellsHTML(items, "cardPick(@ID)", M.q||"")}</div>
-        <div class="spfoot" id="spick_foot">${sel?`<div class="slot spcard">
-          <span class="sq">${imgTag(sel.tex, sel.name)}</span>
-          <span class="slotinfo"><span class="slotname">${esc(sel.name)}</span>
-            <span class="slotflags">${sel.sub?`<span class="ftag">${esc(sel.sub)}</span>`:
-              '<span class="none">—</span>'}</span></span>
-          <span class="slotstats"><span class="st"><i>费</i><b>${sel.cost??"—"}</b></span></span>
-        </div>`:`<div class="slot empty" style="justify-content:center">还没选</div>`}</div>
+            placeholder="搜索卡牌…" value="{5}">
+          <span class="spc">{6} 种 · 可上架 {7} 种</span></div>
+        <div class="spgrid" id="spick_grid">{8}</div>
+        <div class="spfoot" id="spick_foot">{9}</div>
       </div>
       <div class="modnote">抽卡权重 15/6/3 三档（<b>easy</b> / <b>normal</b> / <b>classic+hard</b>）
         → 会议覆盖 <code>card_probabilities</code> → 前线缩放 <code>card_probability_scales</code>。<br>
@@ -3046,20 +3131,26 @@ function renderCardPickerModal(){
         用卡时游戏会崩。</div>
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="cardPickConfirm()">${isHand?"加到手牌":"换牌"}</button></div>`,
+      <button class="btn pri" onclick="cardPickConfirm()">{10}</button></div>`, isHand?L("加一张到手牌"):L("换掉位置 ")+M.position+L(" 的卡"), isHand?"cards.yml":"main.yml · card_store", esc(wl.player_faction||"—"), (wl.allowed||[]).length, Object.keys(wl.blocked||{}).length, esc(M.q||""), types.length, (wl.allowed||[]).length, spickCellsHTML(items, "cardPick(@ID)", M.q||""), sel?L2(`<div class="slot spcard">
+          <span class="sq">{0}</span>
+          <span class="slotinfo"><span class="slotname">{1}</span>
+            <span class="slotflags">{2}</span></span>
+          <span class="slotstats"><span class="st"><i>费</i><b>{3}</b></span></span>
+        </div>`, imgTag(sel.tex, sel.name), esc(sel.name), sel.sub?`<span class="ftag">${esc(sel.sub)}</span>`:
+              '<span class="none">—</span>', sel.cost??"—"):L(`<div class="slot empty" style="justify-content:center">还没选</div>`), isHand?L("加到手牌"):L("换牌")),
     {onOpen:function(){
-      bindSpickSearch(items, "cardPick(@ID)", (s2)=>s2?`<div class="slot spcard">
-          <span class="sq">${imgTag(s2.tex, s2.name)}</span>
-          <span class="slotinfo"><span class="slotname">${esc(s2.name)}</span>
-            <span class="slotflags">${s2.sub?`<span class="ftag">${esc(s2.sub)}</span>`:
-              '<span class="none">—</span>'}</span></span>
-          <span class="slotstats"><span class="st"><i>费</i><b>${s2.cost??"—"}</b></span></span>
-        </div>`:`<div class="slot empty" style="justify-content:center">还没选</div>`);
+      bindSpickSearch(items, "cardPick(@ID)", (s2)=>s2?L2(`<div class="slot spcard">
+          <span class="sq">{0}</span>
+          <span class="slotinfo"><span class="slotname">{1}</span>
+            <span class="slotflags">{2}</span></span>
+          <span class="slotstats"><span class="st"><i>费</i><b>{3}</b></span></span>
+        </div>`, imgTag(s2.tex, s2.name), esc(s2.name), s2.sub?`<span class="ftag">${esc(s2.sub)}</span>`:
+              '<span class="none">—</span>', s2.cost??"—"):L(`<div class="slot empty" style="justify-content:center">还没选</div>`));
     }});
 }
 function cardPick(id){ MODAL.sel = id; renderCardPickerModal(); }
 function cardPickConfirm(){
-  const M = MODAL; if(!M || !M.sel){ alertModal("请先选一张卡"); return; }
+  const M = MODAL; if(!M || !M.sel){ alertModal(L("请先选一张卡")); return; }
   if(M.mode==="hand") cardAdd(M.sel);
   else cardStoreSet(M.position, M.sel);
   closeModal();
@@ -3079,7 +3170,7 @@ function storeAddItems(){
     const dup = have.filter(e=>e.spec===t).length;
     return {id:t, name:specCn(t), tex:specTex(t), nat:natCn(st.nationality),
       attack:st.attack, defense:st.defense, armor:st.armor, artillery:st.artillery,
-      flags:st.flags||[], blocked:false, dup:dup?("已有 "+dup):"",
+      flags:st.flags||[], blocked:false, dup:dup?(L("已有 ")+dup):"",
       title:specCn(t)+" · "+natCn(st.nationality)};
   });
   const equips = [];
@@ -3087,7 +3178,7 @@ function storeAddItems(){
     (uni.nationality||[]).forEach(nat=>{
       const dup = have.filter(e=>e.equipment===eq && e.nationality===nat).length;
       equips.push({id:eq+"@"+nat, eq:eq, nat:nat, name:hqEquipCn(eq), tex:"steps/step.png",
-        natName:natCn(nat), blocked:false, dup:dup?("已有 "+dup):"",
+        natName:natCn(nat), blocked:false, dup:dup?(L("已有 ")+dup):"",
         title:hqEquipCn(eq)+" · "+natCn(nat)});
     });
   });
@@ -3098,31 +3189,26 @@ function renderStoreAddModal(){
   const it = storeAddItems();
   const list = M.mode==="spec" ? it.specs : it.equips;
   const sel = list.find(i=>i.id===M.sel);
-  openModal(`<div class="mh">上架新商品
+  openModal(L2(`<div class="mh">上架新商品
       <span class="ro">存进 store.yml</span></div>
     <div class="mb">
       <div class="mrow"><span class="lb">商品类型</span>
         <span class="numrow">
-          <button class="btn ${M.mode==="spec"?"pri":""}" onclick="storeAddMode('spec')">特种兵</button>
-          <button class="btn ${M.mode==="equip"?"pri":""}" onclick="storeAddMode('equip')">兵种</button>
+          <button class="btn {0}" onclick="storeAddMode('spec')">特种兵</button>
+          <button class="btn {1}" onclick="storeAddMode('equip')">兵种</button>
         </span>
-        <span class="hint">特种兵 ${it.specs.length} 种 · 兵种 ${it.equips.length} 种</span></div>
+        <span class="hint">特种兵 {2} 种 · 兵种 {3} 种</span></div>
       <div class="spick">
         <div class="sphd"><span class="spt">选一个商品</span>
           <input class="inp" id="spick_q" type="text" autocomplete="off"
-            placeholder="搜索商品 / 国籍…" value="${esc(M.q||"")}">
-          <span class="spc">${list.length} 种</span></div>
-        <div class="spgrid" id="spick_grid">${spickCellsHTML(list, "storeAddPick(@ID)", M.q||"")}</div>
-        <div class="spfoot" id="spick_foot">${M.mode==="spec" ? spickCardHTML(sel)+natRowHTML(sel)
-          : (sel?`<div class="slot spcard"><span class="sq">${imgTag(sel.tex, sel.name)}</span>
-             <span class="slotinfo"><span class="slotname">${esc(sel.name)}</span>
-             <span class="slotflags"><span class="none">兵种</span></span></span>
-             </div><div class="spnat" style="margin-top:8px">国籍 <b>${esc(sel.natName||"—")}</b></div>`
-             : `<div class="slot empty" style="justify-content:center">还没选</div>`)}</div>
+            placeholder="搜索商品 / 国籍…" value="{4}">
+          <span class="spc">{5} 种</span></div>
+        <div class="spgrid" id="spick_grid">{6}</div>
+        <div class="spfoot" id="spick_foot">{7}</div>
       </div>
       <div class="mrow"><span class="lb">价格</span>
         <input class="numin" id="mp_price" type="text" inputmode="numeric" autocomplete="off"
-          value="${M.price}" style="width:72px">
+          value="{8}" style="width:72px">
         <span class="hint">任意非负整数（0 = 免费）</span></div>
       <div class="mrow"><span class="lb">库存</span>
         <span class="spin" id="mp_qty"></span>
@@ -3134,25 +3220,30 @@ function renderStoreAddModal(){
         <b>库存不能填 0</b> —— 游戏没有「售罄」标记，下架请用「下架」删条目。</div>
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="storeAddConfirm()">上架</button></div>`,
+      <button class="btn pri" onclick="storeAddConfirm()">上架</button></div>`, M.mode==="spec"?"pri":"", M.mode==="equip"?"pri":"", it.specs.length, it.equips.length, esc(M.q||""), list.length, spickCellsHTML(list, "storeAddPick(@ID)", M.q||""), M.mode==="spec" ? spickCardHTML(sel)+natRowHTML(sel)
+          : (sel?L2(`<div class="slot spcard"><span class="sq">{0}</span>
+             <span class="slotinfo"><span class="slotname">{1}</span>
+             <span class="slotflags"><span class="none">兵种</span></span></span>
+             </div><div class="spnat" style="margin-top:8px">国籍 <b>{2}</b></div>`, imgTag(sel.tex, sel.name), esc(sel.name), esc(sel.natName||"—"))
+             : L(`<div class="slot empty" style="justify-content:center">还没选</div>`)), M.price),
     {onOpen:function(){
       const pe = document.getElementById("mp_price");
       if(pe) pe.addEventListener("input", function(){ MODAL.price = parseInt(this.value,10)||0; });
       bindModalSpin("mp_qty", ()=>MODAL.quantity, v=>MODAL.quantity=v, 1, 99);
       bindSpickSearch(list, "storeAddPick(@ID)", (s2)=>M.mode==="spec"
         ? spickCardHTML(s2)+natRowHTML(s2)
-        : (s2?`<div class="slot spcard"><span class="sq">${imgTag(s2.tex, s2.name)}</span>
-             <span class="slotinfo"><span class="slotname">${esc(s2.name)}</span>
+        : (s2?L2(`<div class="slot spcard"><span class="sq">{0}</span>
+             <span class="slotinfo"><span class="slotname">{1}</span>
              <span class="slotflags"><span class="none">兵种</span></span></span>
-             </div><div class="spnat" style="margin-top:8px">国籍 <b>${esc(s2.natName||"—")}</b></div>`
-             : `<div class="slot empty" style="justify-content:center">还没选</div>`));
+             </div><div class="spnat" style="margin-top:8px">国籍 <b>{2}</b></div>`, imgTag(s2.tex, s2.name), esc(s2.name), esc(s2.natName||"—"))
+             : L(`<div class="slot empty" style="justify-content:center">还没选</div>`)));
     }});
 }
 function storeAddMode(m){ MODAL.mode = m; MODAL.sel = null; renderStoreAddModal(); }
 function storeAddPick(id){ MODAL.sel = id; renderStoreAddModal(); }
 function storeAddConfirm(){
   const M = MODAL; if(!M) return;
-  if(!M.sel){ alertModal("请先选一个商品"); return; }
+  if(!M.sel){ alertModal(L("请先选一个商品")); return; }
   const price = Math.max(0, parseInt(M.price,10)||0);
   const quantity = Math.max(1, M.quantity||1);
   let entry = null, nm = "";
@@ -3167,15 +3258,15 @@ function storeAddConfirm(){
   }
   setPending("store_add", `store_add:${SEL.storeFront}:${SEL.storeSub}:${M.mode}:${M.sel}`,
     {front:SEL.storeFront, sub:SEL.storeSub, entry},
-    `上架 ${nm}（${SEL.storeFront}/${SEL.storeSub}，价格 ${price}，库存 ${quantity}）`);
+    L2("上架 {0}（{1}/{2}，价格 {3}，库存 {4}）", nm, SEL.storeFront, SEL.storeSub, price, quantity));
   closeModal();
 }
 
 /* 小提示（替代 alert —— 弹窗太丑） */
 function alertModal(msg){
-  openModal(`<div class="mh">⚠ ${esc(msg)}</div>
+  openModal(L2(`<div class="mh">⚠ {0}</div>
     <div class="mb"><div class="fine">这一步还差一步。</div></div>
-    <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`);
+    <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`, esc(msg)));
 }
 
 
@@ -3202,21 +3293,21 @@ async function loadUndoStack(){
 function routeHTML(){
   const d = CDETAIL||{};
   const route = d.route||[];
-  if(!route.length) return `<div style="padding:10px;color:var(--muted);font-size:12px">
-    没有索引到这条战役的会议路线</div>`;
-  return `<div class="route">${route.map(c=>`<div class="rmeet ${c.done?'done':''} ${c.now?'now':''}">
+  if(!route.length) return L(`<div style="padding:10px;color:var(--muted);font-size:12px">
+    没有索引到这条战役的会议路线</div>`);
+  return L2("<div class=\"route\">{0}</div>", route.map(c=>L2(`<div class="rmeet {0} {1}">
     <div class="line"></div><div class="dot"></div>
-    <div class="mt">${esc(c.text||c.id||"")}</div>
-    <div class="sc">${(c.scenes||[]).map(s=>`<div><b>${esc(s.name||s.id)}</b>${
-      s.variant&&s.variant!=="base"?"（变体）":""}</div>`).join("")}</div>
-  </div>`).join("")}</div>`;
+    <div class="mt">{2}</div>
+    <div class="sc">{3}</div>
+  </div>`, c.done?'done':'', c.now?'now':'', esc(c.text||c.id||""), (c.scenes||[]).map(s=>L2("<div><b>{0}</b>{1}</div>", esc(s.name||s.id), 
+      s.variant&&s.variant!=="base"?L("（变体）"):"")).join(""))).join(""));
 }
 
 /* ---------- 场景名册（游戏包默认配置，**不是玩家存档**） ---------- */
 function rosterHTML(){
   const r = (CDETAIL&&CDETAIL.roster)||null;
-  if(!r) return `<div style="padding:10px;color:var(--muted);font-size:12px">
-    这个存档不在战斗里 ⇒ 没有场景名册</div>`;
+  if(!r) return L(`<div style="padding:10px;color:var(--muted);font-size:12px">
+    这个存档不在战斗里 ⇒ 没有场景名册</div>`);
   const hqName = {};
   (r.hqs||[]).forEach(h=>hqName[h.id] = h.name_cn||h.name_brief||h.id);
   const units = (r.units||[]).map(u=>{
@@ -3224,30 +3315,30 @@ function rosterHTML(){
     const specs = (u.specs||[]).map(s=>`<span class="spimg"><img class="spico"
       src="${surf(specTex(s.type))}" alt="${esc(specCn(s.type))}"
       title="${esc(specCn(s.type))}"></span>`).join("");
-    return `<tr>
-      <td>${esc(u.name_cn||u.name_brief||("单位 "+u.id))}</td>
-      <td class="dim">${esc(hqName[u.hq_id]||u.hq_id||"—")}</td>
-      <td class="n">${st||"—"}</td>
-      <td class="n">${u.entr!==undefined?u.entr:"—"}</td>
-      <td class="n">${u.xp!==undefined?u.xp:"—"}</td>
-      <td>${specs||"—"}</td>
-    </tr>`;
+    return L2(`<tr>
+      <td>{0}</td>
+      <td class="dim">{1}</td>
+      <td class="n">{2}</td>
+      <td class="n">{3}</td>
+      <td class="n">{4}</td>
+      <td>{5}</td>
+    </tr>`, esc(u.name_cn||u.name_brief||(L("单位 ")+u.id)), esc(hqName[u.hq_id]||u.hq_id||"—"), st||"—", u.entr!==undefined?u.entr:"—", u.xp!==undefined?u.xp:"—", specs||"—");
   }).join("");
-  return `<div class="note" style="margin:0 0 10px">
-    地图 ${esc(r.map_name||"—")} │ 开局 ${esc(r.start||"—")} │ ${esc(r.base_num_turns??"—")} 回合
-    │ 参战顺序 ${(r.turn_seq||[]).join(" → ")||"—"}
-    │ 单位 ${(r.units||[]).length}（在途 ${(r.enroute_units||[]).length}）│ HQ ${(r.hqs||[]).length}
+  return L2(`<div class="note" style="margin:0 0 10px">
+    地图 {0} │ 开局 {1} │ {2} 回合
+    │ 参战顺序 {3}
+    │ 单位 {4}（在途 {5}）│ HQ {6}
     <span style="color:var(--danger)"> ⚠ 游戏包默认配置，不是玩家存档</span></div>
     <table class="rlist"><thead><tr><th>单位</th><th>总部</th><th>兵力</th>
       <th>压制</th><th>XP</th><th>特种兵</th></tr></thead>
-      <tbody>${units||`<tr><td colspan="6" class="dim">（没有名册）</td></tr>`}</tbody></table>`;
+      <tbody>{7}</tbody></table>`, esc(r.map_name||"—"), esc(r.start||"—"), esc(r.base_num_turns??"—"), (r.turn_seq||[]).join(" → ")||"—", (r.units||[]).length, (r.enroute_units||[]).length, (r.hqs||[]).length, units||L(`<tr><td colspan="6" class="dim">（没有名册）</td></tr>`));
 }
 
 /* ---------- 这场会议的商店（游戏包默认） ---------- */
 function conferenceStoreHTML(){
   const st = (CDETAIL&&CDETAIL.store)||null;
-  if(!st) return `<div style="padding:10px;color:var(--muted);font-size:12px">
-    没有这场会议的商店清单</div>`;
+  if(!st) return L(`<div style="padding:10px;color:var(--muted);font-size:12px">
+    没有这场会议的商店清单</div>`);
   const row = e=>{
     const isSpec = !!e.spec;
     const nm = isSpec ? specCn(e.spec) : hqEquipCn(e.equipment);
@@ -3260,27 +3351,27 @@ function conferenceStoreHTML(){
   };
   const items = (st.items||[]).map(row).join("");
   const elite = (st.elite_items||[]).map(row).join("");
-  return `<div class="cstore">${items||`<div class="dim">（空）</div>`}</div>
-    ${elite?`<div class="storetitle" style="padding-left:0">精英商店</div>
-      <div class="cstore">${elite}</div>`:""}`;
+  return L2(`<div class="cstore">{0}</div>
+    {1}`, items||L(`<div class="dim">（空）</div>`), elite?L2(`<div class="storetitle" style="padding-left:0">精英商店</div>
+      <div class="cstore">{0}</div>`, elite):"");
 }
 
 /* ---------- 概览页：备份与撤销栈 ---------- */
 function backupStackHTML(){
   const u = USTACK||{};
   /* U56：三栏 —— 标签 | 主内容 | 右侧小字（名字过长省略号截断，hover 有全文） */
-  const bks = (u.backups||[]).map(b=>`<div class="bkrow">
+  const bks = (u.backups||[]).map(b=>L2(`<div class="bkrow">
     <span class="bt">备份</span>
-    <span class="bn" title="${esc(b.name)}">${esc(b.name)}</span>
-    <span class="bm">${esc(b.mtime||"")} · ${esc(b.size||"")}</span></div>`).join("");
+    <span class="bn" title="{0}">{1}</span>
+    <span class="bm">{2} · {3}</span></div>`, esc(b.name), esc(b.name), esc(b.mtime||""), esc(b.size||""))).join("");
   const st = (u.stack||[]).map((r,i)=>{
     const sum = r.summary||((r.entries||[]).join("、"));
-    return `<div class="bkrow">
-    <span class="bt">撤销 ${i+1}</span>
-    <span class="bn" title="${esc(sum)}">${esc(sum)}</span>
-    <span class="bm">${esc((r.time||"").replace("T"," "))}</span></div>`;
+    return L2(`<div class="bkrow">
+    <span class="bt">撤销 {0}</span>
+    <span class="bn" title="{1}">{2}</span>
+    <span class="bm">{3}</span></div>`, i+1, esc(sum), esc(sum), esc((r.time||"").replace("T"," ")));
   }).join("");
-  if(!bks && !st) return `<div class="bkempty">还没有备份，也没有撤销记录</div>`;
+  if(!bks && !st) return L(`<div class="bkempty">还没有备份，也没有撤销记录</div>`);
   return bks + st;
 }
 
@@ -3290,7 +3381,7 @@ function cardSetFree(position, free){
   const key = `card_set:${position}`;
   queueEdit("card_set", key,
     {position:position, field:"is_free", value:!!free}, c?(c.is_free?true:false):false, !!free,
-    `手牌槽位 ${position} 改成${free?"免费":"收费"}`);
+    L2("手牌槽位 {0} 改成{1}", position, free?L("免费"):L("收费")));
   show("cards");
 }
 function cardStoreSetFree(position, free){
@@ -3298,7 +3389,7 @@ function cardStoreSetFree(position, free){
   const key = `card_store_set:${position}:is_free`;
   queueEdit("card_store_set", key,
     {position:position, is_free:!!free}, c?(c.is_free?true:false):false, !!free,
-    `货架槽位 ${position} 改成${free?"免费":"收费"}`);
+    L2("货架槽位 {0} 改成{1}", position, free?L("免费"):L("收费")));
   show("cards");
 }
 
@@ -3330,10 +3421,10 @@ function initTip(){
 function specTipHTML(t, extra){
   const st = (CATALOG&&CATALOG.spec_types[t])||{};
   const tags = (st.flags||[]).map(f=>`<span class="tag">${esc(flagCn(f))}</span>`).join("");
-  return `<span class="tn">${esc(specCn(t))}</span>
-    <span class="tr">攻 ${st.attack??"—"} · 防 ${st.defense??"—"} · 装 ${st.armor??"—"} · 炮 ${st.artillery??"—"}</span>
-    <br><span class="tr">国籍 ${esc(natCn(st.nationality))}</span>
-    ${tags?`<br>${tags}`:""}${extra?`<br><span class="tr">${extra}</span>`:""}`;
+  return L2(`<span class="tn">{0}</span>
+    <span class="tr">攻 {1} · 防 {2} · 装 {3} · 炮 {4}</span>
+    <br><span class="tr">国籍 {5}</span>
+    {6}{7}`, esc(specCn(t)), st.attack??"—", st.defense??"—", st.armor??"—", st.artillery??"—", esc(natCn(st.nationality)), tags?`<br>${tags}`:"", extra?`<br><span class="tr">${extra}</span>`:"");
 }
 
 /* ---------- 备选池：全量视图（按阵营 + 国籍分组，可折叠） ---------- */
@@ -3345,16 +3436,16 @@ function specAttachCheck(specName, unitType){
   const cat = CATALOG||{};
   const sp = (cat.spec_types||{})[specName];
   const ut = (cat.unit_types||{})[unitType];
-  if(!sp || !ut) return {ok:false, why:"类型未知"};
+  if(!sp || !ut) return {ok:false, why:L("类型未知")};
   if(sp.faction !== ut.faction)
-    return {ok:false, why:"不可挂：阵营不同（"+natCn(sp.nationality)+" / "+natCn(ut.nationality)+"）"};
+    return {ok:false, why:L("不可挂：阵营不同（")+natCn(sp.nationality)+" / "+natCn(ut.nationality)+"）"};
   if(sp.nationality === ut.nationality) return {ok:true, why:""};
   const nat = (cat.nationalities||{})[ut.nationality]||{};
   if(nat.parent === sp.nationality) return {ok:true, why:""};
   const parentTxt = nat.parent
-    ? ("「"+natCn(ut.nationality)+"」的父国籍是「"+natCn(nat.parent)+"」")
-    : ("「"+natCn(ut.nationality)+"」没有父国籍");
-  return {ok:false, why:"不可挂："+parentTxt+"，只能挂同国籍或父国籍的特种兵"};
+    ? ("「"+natCn(ut.nationality)+L("」的父国籍是「")+natCn(nat.parent)+"」")
+    : ("「"+natCn(ut.nationality)+L("」没有父国籍"));
+  return {ok:false, why:L("不可挂：")+parentTxt+L("，只能挂同国籍或父国籍的特种兵")};
 }
 function specCanAttach(specName, unitType){
   return specAttachCheck(specName, unitType).ok;
@@ -3392,8 +3483,8 @@ function fullPoolHTML(u, selected){
       if(cb!==ca) return cb-ca;
       return (cat.nationalities[b]||{}).cn > (cat.nationalities[a]||{}).cn ? 1 : -1;
     });
-    out += `<div class="facband"><span>${esc(f==="allies"?"盟军":f==="axis"?"轴心":f==="soviet"?"苏联":f)}</span>
-      <span class="fline"></span><span>${list.length} 种</span></div>`;
+    out += L2(`<div class="facband"><span>{0}</span>
+      <span class="fline"></span><span>{1} 种</span></div>`, esc(f==="allies"?L("盟军"):f==="axis"?L("轴心"):f==="soviet"?L("苏联"):f), list.length);
     natKeys.forEach(n=>{
       const items = nats[n].map(t=>{
         const chk = specAttachCheck(t,u.type);
@@ -3402,8 +3493,8 @@ function fullPoolHTML(u, selected){
         const cnt = selected.filter(s=>s.type===t).length;
         const full = used >= cap;
         const why = !can ? chk.why
-                : full ? ("特种兵槽已满（"+used+" / "+cap+"）")
-                : (cnt ? ("已挂 "+cnt+" 个，还能再挂 "+(cap-used)+" 个") : "点击挂到这个单位");
+                : full ? (L("特种兵槽已满（")+used+" / "+cap+"）")
+                : (cnt ? (L("已挂 ")+cnt+L(" 个，还能再挂 ")+(cap-used)+L(" 个")) : L("点击挂到这个单位"));
         const tip = esc(specTipHTML(t, why)).replace(/"/g, "&quot;");
         return `<div class="pcell ${can&&!full?'':'blocked'}"
           data-tip="${tip}"
@@ -3413,12 +3504,12 @@ function fullPoolHTML(u, selected){
       const canN = nats[n].filter(t=>specCanAttach(t,u.type)).length;
       /* U49：全量视图的各国分组**默认折叠** —— 375 种全铺开没法看 */
       const open = poolGroupOpen(n);
-      out += `<div class="grphead${open?'':' closed'}"
-        onclick="togglePoolGroup('${esc(n)}')">
-        <span class="caret">▼</span>${esc(natCn(n))}
-        <span class="gcount">· ${nats[n].length} 种</span>
-        <span class="gcan">可挂 ${canN}</span></div>
-        <div class="grpbody" ${open?'':'style="display:none"'}>${items}</div>`;
+      out += L2(`<div class="grphead{0}"
+        onclick="togglePoolGroup('{1}')">
+        <span class="caret">▼</span>{2}
+        <span class="gcount">· {3} 种</span>
+        <span class="gcan">可挂 {4}</span></div>
+        <div class="grpbody" {5}>{6}</div>`, open?'':' closed', esc(n), esc(natCn(n)), nats[n].length, canN, open?'':'style="display:none"', items);
     });
   });
   return out;
@@ -3473,22 +3564,22 @@ async function reallyApply(){
     const warnHTML = warns.map(function(w){
       return '<div>⚠ ' + esc(w) + '</div>';
     }).join("");
-    openModal('<div class="mh">✓ 已应用</div>'
+    openModal(L('<div class="mh">✓ 已应用</div>')
       + '<div class="mb">'
-      + '<div>改动已写入存档'
+      + L('<div>改动已写入存档')
       + (d.summary ? '：' + esc(String(d.summary)) : '') + '。</div>'
       + (warns.length ? '<div class="wrow">' + warnHTML + '</div>' : '')
-      + '<div class="fine">写回前已自动备份原存档（<b>' + esc(d.backup||"—")
-      + '</b>）· 仍可一键撤销。</div>'
+      + L('<div class="fine">写回前已自动备份原存档（<b>') + esc(d.backup||"—")
+      + L('</b>）· 仍可一键撤销。</div>')
       + '</div>'
-      + '<div class="mf"><button class="btn pri" onclick="closeModal()">好</button></div>', {});
+      + L('<div class="mf"><button class="btn pri" onclick="closeModal()">好</button></div>'), {});
   } else {
     const errHTML = (d.errors||[]).map(function(e){
       return '<div class="erow">✕ ' + esc(e) + '</div>';
     }).join("");
-    openModal('<div class="mh">✕ 应用失败</div>'
+    openModal(L('<div class="mh">✕ 应用失败</div>')
       + '<div class="mb">' + errHTML + '</div>'
-      + '<div class="mf"><button class="btn pri" onclick="closeModal()">返回</button></div>',
+      + L('<div class="mf"><button class="btn pri" onclick="closeModal()">返回</button></div>'),
       {cls:"err"});
   }
 }
@@ -3501,9 +3592,9 @@ async function doUndo(){
     const uerr = (d.errors||[]).map(function(e){
       return '<div class="erow">✕ ' + esc(e) + '</div>';
     }).join("");
-    openModal('<div class="mh">✕ 撤销失败</div>'
+    openModal(L('<div class="mh">✕ 撤销失败</div>')
       + '<div class="mb">' + uerr + '</div>'
-      + '<div class="mf"><button class="btn pri" onclick="closeModal()">返回</button></div>',
+      + L('<div class="mf"><button class="btn pri" onclick="closeModal()">返回</button></div>'),
       {cls:"err"});
   }
 }
@@ -3516,7 +3607,7 @@ async function doUndo(){
    =================================================================== */
 async function importSaveFile(f){
   if(!/\.usg$/i.test(f.name||"")){
-    alert("只认 .usg 存档文件（你拖进来的是「" + f.name + "」）");
+    alert(L("只认 .usg 存档文件（你拖进来的是「") + f.name + "」）");
     return;
   }
   try{
@@ -3528,10 +3619,10 @@ async function importSaveFile(f){
       bin += String.fromCharCode.apply(null, bytes.subarray(i, i+CH));
     const r = await post("/api/import-save", {name:f.name, data:btoa(bin)});
     const d = r.data;
-    if(!d.ok){ alert("导入失败：" + (d.errors||[]).join("；")); return; }
+    if(!d.ok){ alert(L("导入失败：") + (d.errors||[]).join("；")); return; }
     await openSave(d.save_id);
   }catch(e){
-    alert("导入失败：" + (e.message||e));
+    alert(L("导入失败：") + (e.message||e));
   }
 }
 function bindDropZone(){
@@ -3572,10 +3663,10 @@ const FS = {mode:"open", dir:"", parent:"", name:"", roots:[], dirs:[],
 function openSaveMenu(){
   const cur = (VIEW&&VIEW.save)||{};
   const n = PENDING.length;
-  openModal(`<div class="mh">当前存档</div>
+  openModal(L2(`<div class="mh">当前存档</div>
     <div class="mb">
-      <div class="curbox"><b>${esc(cur.display_name||cur.file_name||"—")}</b>
-        <span class="fine">${esc(cur.path||(VIEW&&VIEW._save_id)||"")}</span></div>
+      <div class="curbox"><b>{0}</b>
+        <span class="fine">{1}</span></div>
       <div class="menu">
         <div class="mi" onclick="doSwitchSave()"><b>切换到其他存档…</b>
           <span>回到存档列表重新挑一个 —— <b>不用退出修改器</b></span></div>
@@ -3584,14 +3675,14 @@ function openSaveMenu(){
         <div class="mi" onclick="doSaveAs(false)"><b>导出当前副本…</b>
           <span>复制当前磁盘上的存档（已应用的状态）到别的位置</span></div>
         <div class="mi" onclick="doReloadCurrent()"><b>放弃改动并重新读取</b>
-          <span>丢弃 ${n} 条未应用的改动，回到磁盘上的状态</span></div>
+          <span>丢弃 {2} 条未应用的改动，回到磁盘上的状态</span></div>
         <div class="mi" onclick="pickGameDir()"><b>游戏本体目录：<span id="menuGameDir">…</span></b>
           <span>特种兵 / 卡牌 / 战役数据都从游戏包里读 —— 换电脑或非 Steam 安装时在这里指定</span></div>
       </div>
-      ${n?`<div class="fine">⚠ 当前有 <b>${n}</b> 条<b>未应用</b>的改动 ——
-        切换存档 / 重新读取会丢弃它们；「另存为」则会把它们一起写进新文件。</div>`:""}
+      {3}
     </div>
-    <div class="mf"><button class="btn" onclick="closeModal()">关闭</button></div>`,
+    <div class="mf"><button class="btn" onclick="closeModal()">关闭</button></div>`, esc(cur.display_name||cur.file_name||"—"), esc(cur.path||(VIEW&&VIEW._save_id)||""), n, n?L2(`<div class="fine">⚠ 当前有 <b>{0}</b> 条<b>未应用</b>的改动 ——
+        切换存档 / 重新读取会丢弃它们；「另存为」则会把它们一起写进新文件。</div>`, n):""),
     {cls:"menu"});
 }
 
@@ -3600,13 +3691,13 @@ function doSwitchSave(){
   if(PENDING.length){
     const items = PENDING.slice(0,8).map(p=>
       '<li class="pending"><span class="d">'+esc(p.label)+'</span></li>').join("");
-    openModal(`<div class="mh">有 ${PENDING.length} 条未应用的改动</div>
+    openModal(L2(`<div class="mh">有 {0} 条未应用的改动</div>
       <div class="mb"><div>切换存档会<b>丢弃</b>这些改动：</div>
-        <div class="plist">${items}${PENDING.length>8?
-          '<li class="pending"><span class="d">…还有 '+(PENDING.length-8)+' 条</span></li>':""}</div>
+        <div class="plist">{1}{2}</div>
         <div class="fine">想留着它们？先「应用更改」，或者用「另存为」写一个新文件。</div></div>
       <div class="mf"><button class="btn" onclick="openSaveMenu()">返回</button>
-        <button class="btn pri" onclick="doSwitchSaveForce()">放弃改动并切换</button></div>`);
+        <button class="btn pri" onclick="doSwitchSaveForce()">放弃改动并切换</button></div>`, PENDING.length, items, PENDING.length>8?
+          L('<li class="pending"><span class="d">…还有 ')+(PENDING.length-8)+L(' 条</span></li>'):""));
     return;
   }
   doSwitchSaveForce();
@@ -3624,10 +3715,10 @@ function doSwitchSaveForce(){
 function doReloadCurrent(){
   if(!VIEW || !VIEW._save_id) return;
   if(PENDING.length){
-    openModal(`<div class="mh">有 ${PENDING.length} 条未应用的改动</div>
+    openModal(L2(`<div class="mh">有 {0} 条未应用的改动</div>
       <div class="mb"><div>重新读取会<b>丢弃</b>这些改动（回到磁盘上的状态）。</div></div>
       <div class="mf"><button class="btn" onclick="openSaveMenu()">返回</button>
-        <button class="btn pri" onclick="doReloadCurrentForce()">放弃并重新读取</button></div>`);
+        <button class="btn pri" onclick="doReloadCurrentForce()">放弃并重新读取</button></div>`, PENDING.length));
     return;
   }
   doReloadCurrentForce();
@@ -3642,34 +3733,34 @@ async function doReloadCurrentForce(){
 async function doSaveAs(withEdits){
   const edits = withEdits ? pendingEdits() : [];
   if(withEdits && !edits.length){
-    openModal(`<div class="mh">没有待应用的改动</div>
+    openModal(L(`<div class="mh">没有待应用的改动</div>
       <div class="mb"><div>当前没有未应用的改动 —— 用「导出当前副本…」即可。</div></div>
-      <div class="mf"><button class="btn" onclick="closeModal()">好</button></div>`);
+      <div class="mf"><button class="btn" onclick="closeModal()">好</button></div>`));
     return;
   }
   const cur = (VIEW&&VIEW.save)||{};
   const base = String(cur.file_name||cur.name||"save").replace(/\.usg$/i,"");
   openFilePicker({
     mode:"save",
-    title: withEdits ? "另存为…（含待应用改动）" : "导出当前副本…",
-    defName: base + (withEdits ? "_改" : "_副本"),
+    title: withEdits ? L("另存为…（含待应用改动）") : L("导出当前副本…"),
+    defName: base + (withEdits ? L("_改") : L("_副本")),
     onPick: async (dir, name)=>{
       const dest = dir + "\\" + name;
       const r = await post("/api/save-as",
         {save_id: VIEW._save_id, dest: dest, edits: edits});
       const d = r.data;
       if(!d.ok){
-        openModal(`<div class="mh">✕ 另存失败</div>
-          <div class="mb">${(d.errors||[]).map(e=>'<div class="erow">✕ '+esc(e)+'</div>').join("")}</div>
-          <div class="mf"><button class="btn" onclick="closeModal()">返回</button></div>`,
+        openModal(L2(`<div class="mh">✕ 另存失败</div>
+          <div class="mb">{0}</div>
+          <div class="mf"><button class="btn" onclick="closeModal()">返回</button></div>`, (d.errors||[]).map(e=>'<div class="erow">✕ '+esc(e)+'</div>').join("")),
           {cls:"err"});
         return;
       }
-      openModal(`<div class="mh">✓ 已另存</div>
-        <div class="mb"><div>新存档：<b>${esc(d.path||dest)}</b></div>
+      openModal(L2(`<div class="mh">✓ 已另存</div>
+        <div class="mb"><div>新存档：<b>{0}</b></div>
           <div class="fine">原存档 <b>没有</b>被改动 —— 另存为只是复制一份出来。
-          ${withEdits?"这次另存<b>包含</b>了待应用改动。":""}</div></div>
-        <div class="mf"><button class="btn pri" onclick="closeModal()">好</button></div>`);
+          {1}</div></div>
+        <div class="mf"><button class="btn pri" onclick="closeModal()">好</button></div>`, esc(d.path||dest), withEdits?L("这次另存<b>包含</b>了待应用改动。"):""));
     }
   });
 }
@@ -3682,9 +3773,9 @@ function openFilePicker(opts){
   FS.name = opts.defName || "";
   FS.dir = opts.dir || "";
   FS.picked = -1;
-  openModal(`<div class="mh">${esc(opts.title||"选择文件")}</div>
+  openModal(L2(`<div class="mh">{0}</div>
     <div class="mb"><div class="fb">
-      <div class="fbrow"><input id="fbPath" placeholder="目录路径" value="${esc(FS.dir)}">
+      <div class="fbrow"><input id="fbPath" placeholder="目录路径" value="{1}">
         <button class="btn" onclick="fbGo()">转到</button>
         <button class="btn" onclick="fbUp()">上一级</button></div>
       <div class="fbroots" id="fbRoots"></div>
@@ -3692,15 +3783,15 @@ function openFilePicker(opts){
         <div class="fbcol"><div class="fbt">目录</div><div id="fbDirs"></div></div>
         <div class="fbcol"><div class="fbt">存档文件（.usg）</div><div id="fbFiles"></div></div>
       </div>
-      ${FS.mode==="save"?`<div class="fbrow">
-        <span style="width:60px;flex:none;color:var(--muted);font-size:12.5px">文件名</span>
-        <input id="fbName" value="${esc(FS.name)}"></div>`:""}
+      {2}
       <div class="fbrow hint" id="fbHint"></div>
     </div></div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="fbPick()">${
-        FS.mode==="save" ? "另存到这里"
-        : (FS.mode==="dir" ? "用这个目录" : "打开这个存档")}</button></div>`,
+      <button class="btn pri" onclick="fbPick()">{3}</button></div>`, esc(opts.title||L("选择文件")), esc(FS.dir), FS.mode==="save"?L2(`<div class="fbrow">
+        <span style="width:60px;flex:none;color:var(--muted);font-size:12.5px">文件名</span>
+        <input id="fbName" value="{0}"></div>`, esc(FS.name)):"", 
+        FS.mode==="save" ? L("另存到这里")
+        : (FS.mode==="dir" ? L("用这个目录") : L("打开这个存档"))),
     {cls:"wide"});
   fbGo(FS.dir);
 }
@@ -3716,8 +3807,8 @@ async function fbGo(dir){
   const fbox = document.getElementById("fbFiles");
   const hint = document.getElementById("fbHint");
   if(!d.ok){
-    if(dbox) dbox.innerHTML = `<div class="fbrow" style="color:var(--danger)">${
-      esc(d.error||"读不到这个目录")}</div>`;
+    if(dbox) dbox.innerHTML = L2("<div class=\"fbrow\" style=\"color:var(--danger)\">{0}</div>", 
+      esc(d.error||L("读不到这个目录")));
     if(fbox) fbox.innerHTML = "";
     if(hint) hint.textContent = "";
     return;
@@ -3729,17 +3820,17 @@ async function fbGo(dir){
   if(roots) roots.innerHTML = FS.roots.map((r,i)=>
     `<span class="chip" onclick="fbRoot(${i})">${esc(r.label)}</span>`).join("");
   if(dbox) dbox.innerHTML = (FS.parent ?
-      `<div class="fbrow" onclick="fbUp()">…（上一级）</div>` : "") +
+      L(`<div class="fbrow" onclick="fbUp()">…（上一级）</div>`) : "") +
     FS.dirs.map((x,i)=>`<div class="fbrow" onclick="fbDir(${i})">${esc(x.name)}</div>`).join("");
   if(fbox) fbox.innerHTML = FS.files.map((x,i)=>
     `<div class="fbrow" id="fbFile${i}" onclick="fbFile(${i})">
       <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</span>
       <span class="s">${esc(x.size||"")}</span></div>`).join("");
   if(hint) hint.textContent = FS.mode==="save"
-    ? "选好目录，在上面填文件名 —— 同名文件不会被覆盖。"
+    ? L("选好目录，在上面填文件名 —— 同名文件不会被覆盖。")
     : (FS.mode==="dir"
-        ? "选到**游戏本体目录**（里面有 _packages 或 lib/uoc2），再点「用这个目录」。"
-        : "选一个存档文件打开。");
+        ? L("选到**游戏本体目录**（里面有 _packages 或 lib/uoc2），再点「用这个目录」。")
+        : L("选一个存档文件打开。"));
 }
 function fbRoot(i){ const r = FS.roots[i]; if(r) fbGo(r.path); }
 function fbDir(i){ const d = FS.dirs[i]; if(d) fbGo(d.path); }
@@ -3760,12 +3851,12 @@ function fbPick(){
   if(FS.mode==="save"){
     const nameEl = document.getElementById("fbName");
     const name = ((nameEl && nameEl.value) || "").trim();
-    if(!name){ alert("请先填文件名"); return; }
+    if(!name){ alert(L("请先填文件名")); return; }
     closeModal();
     if(cb) cb(FS.dir, name);
     return;
   }
-  if(FS.picked < 0 || !FS.files[FS.picked]){ alert("请先选一个存档文件"); return; }
+  if(FS.picked < 0 || !FS.files[FS.picked]){ alert(L("请先选一个存档文件")); return; }
   const f = FS.files[FS.picked];
   closeModal();
   if(cb) cb(f.path);
@@ -3794,27 +3885,27 @@ async function loadSettings(){
       const dis = s.disabled_packages||[];
       const ws = s.workshop_packages||[];
       const wsZip = ws.filter(w=>w.kind==="zip").length;
-      box.innerHTML = `<span>✓ 游戏本体：<span class="gp">${esc(s.game_dir)}</span></span>
-        <span>（${(s.packages||[]).length} 个包 · 特种兵 / 卡牌 / 战役数据都从这里读）</span>
-        ${ws.length?`<span title="${esc(ws.map(w=>w.item+" / "+w.pkg+"（"+w.kind+"）").join("\n"))}">
-          🎨 创意工坊 ${ws.length} 个 mod 包${wsZip?`（其中 ${wsZip} 个还在创意工坊里没装进游戏目录，已作为参考数据并入）`:""}</span>`:""}
-        ${dis.length?`<span title="${esc(dis.map(d=>d.path+" ← "+d.rule.join("/")).join("\n"))}">
-          ⚠ ${dis.length} 个 mod 被游戏禁用（not_moddable）· 修改器也不读</span>`:""}
-        <button class="btn" onclick="pickGameDir()">换一个</button>`;
+      box.innerHTML = L2(`<span>✓ 游戏本体：<span class="gp">{0}</span></span>
+        <span>（{1} 个包 · 特种兵 / 卡牌 / 战役数据都从这里读）</span>
+        {2}
+        {3}
+        <button class="btn" onclick="pickGameDir()">换一个</button>`, esc(s.game_dir), (s.packages||[]).length, ws.length?L2(`<span title="{0}">
+          🎨 创意工坊 {1} 个 mod 包{2}</span>`, esc(ws.map(w=>w.item+" / "+w.pkg+"（"+w.kind+"）").join("\n")), ws.length, wsZip?L2("（其中 {0} 个还在创意工坊里没装进游戏目录，已作为参考数据并入）", wsZip):""):"", dis.length?L2(`<span title="{0}">
+          ⚠ {1} 个 mod 被游戏禁用（not_moddable）· 修改器也不读</span>`, esc(dis.map(d=>d.path+" ← "+d.rule.join("/")).join("\n")), dis.length):"");
     }else{
       box.className = "gamedir bad";
-      box.innerHTML = `<span>⚠ <b>没找到游戏本体目录</b> ——
+      box.innerHTML = L(`<span>⚠ <b>没找到游戏本体目录</b> ——
         特种兵中文名、贴图、战役名册、商店默认值会缺失（存档本身仍能改）</span>
-        <button class="btn pri" onclick="pickGameDir()">手动指定游戏目录…</button>`;
+        <button class="btn pri" onclick="pickGameDir()">手动指定游戏目录…</button>`);
     }
   }
-  if(label) label.textContent = (s && s.found) ? (s.game_dir||"已找到") : "未找到";
+  if(label) label.textContent = (s && s.found) ? (s.game_dir||L("已找到")) : L("未找到");
 }
 async function pickGameDir(){
   openFilePicker({
     mode:"dir",
     dir: (SETTINGS && SETTINGS.game_dir) || "",
-    title:"选游戏本体目录（里面应该有 _packages 或 lib/uoc2）",
+    title:L("选游戏本体目录（里面应该有 _packages 或 lib/uoc2）"),
     onPick: async (dir)=>{
       const r = await post("/api/settings", {game_dir: dir});
       if(!r.data.ok){
@@ -3844,8 +3935,8 @@ function paint(){
   const isOld = s => !!s.archived;
   const list = all.filter(s=>!isOld(s));
   const olds = all.filter(isOld);
-  document.getElementById("cnt").textContent = list.length + " 个存档" +
-    (olds.length?(" · " + olds.length + " 个归档存档"):"");
+  document.getElementById("cnt").textContent = list.length + L(" 个存档") +
+    (olds.length?(" · " + olds.length + L(" 个归档存档")):"");
   /* U68：区分两种「空」——
      ① 一个存档都没有（`SAVES` 空）⇒ 给「打开其他位置 / 拖进来」的出口；
      ② 有存档但搜索没匹配上 ⇒ 仍是原来的「没有匹配的存档」。 */
@@ -3874,7 +3965,6 @@ function paint(){
 document.getElementById("q").addEventListener("input", paint);
 initTip();
 bindDropZone();          /* U68：拖 .usg 进这一页 ⇒ 导入成副本 */
-loadSettings();          /* U69：显示游戏本体目录（没找到就提示手动指定） */
 
 function esc(s){ return String(s??"").replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -3885,7 +3975,7 @@ async function openSave(sid){
   } catch(e) {
     const r = document.getElementById("rows");
     if(r) r.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">`
-      + `读取存档失败：${esc(e.message)}</td></tr>`;
+      + L2("读取存档失败：{0}</td></tr>", esc(e.message));
     throw e;
   }
   document.getElementById("splash").style.display = "none";
@@ -3899,10 +3989,10 @@ async function openSave(sid){
   paintHeader();
   paintRail();
   document.getElementById("status").innerHTML =
-    `能力位：${(VIEW._features||[]).filter(f=>f.ok).length}/${(VIEW._features||[]).length} 可用` +
-    ` · 声望 <b class="ok">${VIEW.prestige??"—"}</b> · 分数 <b>${VIEW.score??"—"}</b>` +
-    ` · 单位 <b>${(VIEW.units||[]).length}</b> · 总部 <b>${(VIEW.hqs||[]).length}</b>` +
-    `<span style="margin-left:auto" id="hDirty">${PENDING.length?"有未应用的改动":"就绪 · 未改动磁盘"}</span>`;
+    L2("能力位：{0}/{1} 可用", (VIEW._features||[]).filter(f=>f.ok).length, (VIEW._features||[]).length) +
+    L2(" · 声望 <b class=\"ok\">{0}</b> · 分数 <b>{1}</b>", VIEW.prestige??"—", VIEW.score??"—") +
+    L2(" · 单位 <b>{0}</b> · 总部 <b>{1}</b>", (VIEW.units||[]).length, (VIEW.hqs||[]).length) +
+    L2("<span style=\"margin-left:auto\" id=\"hDirty\">{0}</span>", PENDING.length?L("有未应用的改动"):L("就绪 · 未改动磁盘"));
   show(PAGE);
 }
 
@@ -3918,31 +4008,31 @@ function show(p){
     x.classList.toggle("on", x.dataset.p===p));
   /* U47：目录还没到位 ⇒ 先给「加载中」，别渲染半成品 */
   if(NEEDS_CATALOG[p] && !CATALOG){
-    w.innerHTML = `<div class="panel"><h3>${PAGE_CN[p]||p}</h3><div class="placeholder">
+    w.innerHTML = L2(`<div class="panel"><h3>{0}</h3><div class="placeholder">
       <div class="big">正在加载游戏目录…</div>
-      特种兵 / 单位 / 卡牌的中文名与贴图都来自游戏包，第一次要读一遍目录。</div></div>`;
+      特种兵 / 单位 / 卡牌的中文名与贴图都来自游戏包，第一次要读一遍目录。</div></div>`, L(PAGE_CN[p])||p);
     return;
   }
   if(NEEDS_CATALOG[p] && CATALOG._error){
-    w.innerHTML = `<div class="panel"><h3>${PAGE_CN[p]||p}</h3><div class="placeholder">
+    w.innerHTML = L2(`<div class="panel"><h3>{0}</h3><div class="placeholder">
       <div class="big">游戏目录读不到</div>
       这一页要读游戏包里的类型表与本地化文件。<br>
-      <span style="font-family:var(--mono);font-size:11px">${esc(CATALOG._error)}</span></div></div>`;
+      <span style="font-family:var(--mono);font-size:11px">{1}</span></div></div>`, PAGE_CN[p]||p, esc(CATALOG._error));
     return;
   }
   if(p==="overview"){
     if(!USTACK) loadUndoStack().then(()=>{ if(PAGE==="overview") show("overview"); });
     const caps = (VIEW._features||[]).map(f=>`
       <div class="capcard ${f.ok?'ok':'off'}">
-        <div class="h">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</div>
+        <div class="h">${L(FEATURE_CN[f.name])||f.name} ${f.ok?'✓':'✗'}</div>
         ${f.ok?"":`<div class="r">${esc(f.reason)}</div>`}
       </div>`).join("");
     /* U56：两栏面板 —— 左「能力位体检 + 战役进度」，右「备份与撤销栈 + 说明」。
        宽度有上限、位置固定 ⇒ 放大窗口时不再「卡片乱飞」。 */
-    w.innerHTML = `<div class="ovwrap">
+    w.innerHTML = L2(`<div class="ovwrap">
       <div class="ovcol">
         <div class="panel"><h3>能力位体检</h3>
-          <div class="pbody"><div class="capgrid">${caps}</div></div></div>
+          <div class="pbody"><div class="capgrid">{0}</div></div></div>
         <div class="panel"><h3>战役进度（可直接输入）</h3>
           <div class="pbody"><div class="tungrid">
             <div class="tun">
@@ -3959,11 +4049,11 @@ function show(p){
                 <span class="old" id="o_score"></span></div></div>
           </div></div></div>
         <div class="panel"><h3>难度</h3>
-          <div class="pbody">${levelPickerHTML()}</div></div>
+          <div class="pbody">{1}</div></div>
       </div>
       <div class="ovcol">
         <div class="panel"><h3>备份与撤销栈</h3>
-          <div class="pbody">${backupStackHTML()}</div></div>
+          <div class="pbody">{2}</div></div>
         <div class="panel"><h3>关于这个修改器</h3>
           <div class="pbody"><div class="note" style="margin:0">
             <b>这一版能做什么</b>：读存档、列能力位、<b>改战役进度</b>（改完进「待应用」，
@@ -3972,7 +4062,7 @@ function show(p){
             <b>战区资产</b>要存档正在战斗里才有内容（它是唯一的 L3 写入例外）。
           </div></div></div>
       </div>
-    </div>`;
+    </div>`, caps, levelPickerHTML(), backupStackHTML());
     bindTun();
     paintPending();
     return;
@@ -3985,29 +4075,32 @@ function show(p){
     /* ⚠️ 守卫用「在不在战斗中」，不是「当前 phase 有没有资产」——
        战斗里一个资产都没有时也要能进去**添加**（U45）。 */
     if(!theaterEditable()){
-      w.innerHTML = `<div class="panel"><h3>战区资产</h3><div class="placeholder">
+      w.innerHTML = L(`<div class="panel"><h3>战区资产</h3><div class="placeholder">
         <div class="big">当前不在战斗中</div>
         战区资产是**战斗中的**东西（存档里的 <code>games/&lt;场景&gt;/main.yml</code>）——
-        不在战斗里就没有这一页的内容。</div></div>`;
+        不在战斗里就没有这一页的内容。</div></div>`);
       return;
     }
     pageTheater(w); return;
   }
   if(p==="campaign"){ pageCampaign(w); return; }
-  w.innerHTML = `<div class="panel"><h3>${PAGE_CN[p]||p}</h3>
+  w.innerHTML = L2(`<div class="panel"><h3>{0}</h3>
     <div class="placeholder"><div class="big">这一页还没做</div>
-    等 GUI 微调需求提完，按最终视觉稿一次性实现（避免返工）。</div></div>`;
+    等 GUI 微调需求提完，按最终视觉稿一次性实现（避免返工）。</div></div>`, L(PAGE_CN[p])||p);
 }
 
-reload().catch(e => {
-  document.getElementById("rows").innerHTML =
-    `<tr><td colspan="5" style="color:var(--danger)">加载失败：${esc(e.message)}</td></tr>`;
+/* ⚠️ **词表必须先到位**（U74）：`loadSettings()` 里有 `L2(...)`，
+   词表没加载时查不到 ⇒ 那一块会永远停在中文 ⇒ 挪到 `loadI18n()` 之后。 */
+loadI18n().then(()=>{ startTr(); loadSettings(); return reload(); }).catch(e => {
+  const r = document.getElementById("rows");
+  if(r) r.innerHTML =
+    L2("<tr><td colspan=\"5\" style=\"color:var(--danger)\">加载失败：{0}</td></tr>", esc(e.message));
 }).then(() => {
   /* 深链接：?open=<save_id> 直接进主界面 */
   if(OPEN_ID) return openSave(OPEN_ID).catch(e => {
     const r = document.getElementById("rows");
     if(r) r.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">`
-      + `打开存档失败：${esc(e.message)}</td></tr>`;
+      + L2("打开存档失败：{0}</td></tr>", esc(e.message));
   });
 });
 </script>
