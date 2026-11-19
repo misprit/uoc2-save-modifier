@@ -279,3 +279,39 @@ class TestForcePoolDuplicate(SpecPoolTestBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# =====================================================================
+# U48：同一种特种兵可以挂多个（游戏规则没有「不能重复」这一条）
+# =====================================================================
+
+
+class TestSameSpecialistTwice(SpecPoolTestBase):
+    """同一个单位挂**两个同样的**特种兵 —— 规则允许（§7.3.2）。"""
+
+    def test_same_specialist_can_be_mounted_twice(self):
+        """挂两个一样的 ⇒ 落盘是两个**独立槽位**。"""
+        plan, res = self.commit([Edit.unit_spec_add(2, "ger_arty_40"),
+                                 Edit.unit_spec_add(2, "ger_arty_40")])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        with zipfile.ZipFile(self.save_path) as zf:
+            units = yaml.safe_load(zf.read("units.yml"))
+        specs = next(u for u in units if u["id"] == 2)["specs"]
+        self.assertEqual(len(specs), 2)
+        self.assertTrue(all(s["type"] == "ger_arty_40" for s in specs))
+        self.assertEqual(sorted(s["idx"] for s in specs), [0, 1])
+
+    def test_remove_one_of_two_same_specialists(self):
+        """按 idx 卸 ⇒ 只卸那一个，另一个还在。"""
+        plan, res = self.commit([Edit.unit_spec_add(2, "ger_arty_40"),
+                                 Edit.unit_spec_add(2, "ger_arty_40")])
+        self.assertTrue(res.ok, res.errors)
+        plan2, res2 = self.commit([Edit.unit_spec_remove(2, "ger_arty_40", idx=1)])
+        self.assertTrue(plan2.ok, plan2.errors)
+        self.assertTrue(res2.ok, res2.errors)
+        with zipfile.ZipFile(self.save_path) as zf:
+            units = yaml.safe_load(zf.read("units.yml"))
+        specs = next(u for u in units if u["id"] == 2)["specs"]
+        self.assertEqual(len(specs), 1)
+        self.assertEqual(specs[0]["idx"], 0)

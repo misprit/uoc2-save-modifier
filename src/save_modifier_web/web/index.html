@@ -309,6 +309,9 @@ table.spec-tbl .thumb img.spico,.fptab .thumb img.spico{
 .grpbody{display:flex;flex-wrap:wrap;gap:6px;padding:9px 12px}
 .pcell{position:relative;width:42px;height:42px;border-radius:6px;background:var(--stage);
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;cursor:pointer}
+/* U48：角标「已挂 N 个」（同一种特种兵可以挂多个） */
+.pcell .dup{position:absolute;right:0;bottom:0;font-size:9px;line-height:1;padding:2px 4px;
+  border-radius:3px 0 5px 0;background:var(--accent-dark);color:#fff;font-family:var(--mono)}
 .pcell:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(36,91,143,.2)}
 .pcell.blocked{opacity:.35;filter:grayscale(.9);cursor:not-allowed}
 .pcell.blocked:hover{border-color:var(--stage-edge);box-shadow:none}
@@ -1107,8 +1110,12 @@ function projectedSpecs(u){
   const specs = (u.specs||[]).map(s => Object.assign({}, s));
   PENDING.forEach(p=>{
     if(p.kind==="unit_spec_add" && p.params.unit_id===u.id){
-      if(!specs.some(s=>s.type===p.params.spec_type))
-        specs.push({idx:specs.length, type:p.params.spec_type, active:true, captured:false});
+      /* ⚠️ U48：**同一种特种兵可以挂多个**（游戏规则只有「阵营 + 国籍 + 容量」
+         三条，没有「不能重复」这一条 —— 规范 §7.3.2）⇒ 每次待应用的 add
+         都要 push 一个，不能因为「已经有同类型」就跳过。
+         临时 idx 用**负数**，避免与存档里的真实 idx（0..2）撞。 */
+      specs.push({idx:-1-specs.length, type:p.params.spec_type,
+                  active:true, captured:false, _pending:true, _key:p.key});
     }
     if(p.kind==="unit_spec_remove" && p.params.unit_id===u.id){
       const i = specs.findIndex(s => s.type===p.params.spec_type &&
@@ -1166,7 +1173,15 @@ function unitDetailHTML(u){
   const slots = specs.length ? specs.map(s=>{
     const st = (CATALOG&&CATALOG.spec_types[s.type])||{};
     const flag = (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("");
-    return `<div class="slot" onclick="removeSpec(${u.id},${esc(JSON.stringify(s.type))})" title="点击卸下这个特种兵">
+    /* U48：同类型可能挂着好几个 ⇒ 槽位卡要标出「第几个」，
+       否则两张一模一样的卡，玩家不知道点哪张卸哪个。 */
+    const same = specs.filter(x=>x.type===s.type);
+    const nth = same.indexOf(s)+1;
+    const slotNo = (s.idx>=0) ? (s.idx+1) : "待写入";
+    const tip = same.length>1
+      ? ("点击卸下这个特种兵（第 "+nth+"/"+same.length+" 个 · 槽位 "+slotNo+"）")
+      : ("点击卸下这个特种兵（槽位 "+slotNo+"）");
+    return `<div class="slot" onclick="removeSpec(${u.id},${esc(JSON.stringify(s.type))},${s.idx})" title="${esc(tip)}">
       <span class="sq">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>
       <span class="slotinfo">
         <span class="slotname">${esc(specCn(s.type))}</span>
@@ -1185,13 +1200,20 @@ function unitDetailHTML(u){
   if(SEL.fullPool){
     poolHTML = fullPoolHTML(u, specs);
   } else {
+    /* U48：同一种特种兵**可以挂多个** ⇒ 已挂的不再灰掉，
+       改成角标「已挂 N 个」；只有**槽位满了**才不让再挂。 */
+    const cap = u.max_spec || ut.max_spec || 3;
+    const used = specs.length;
     poolHTML = pool.candidates.length ? pool.candidates.map(t=>{
-      const st = (CATALOG&&CATALOG.spec_types[t])||{};
-      const has = specs.some(s=>s.type===t);
-      const tip = specTipHTML(t, has?"已经挂上了":"点击挂到这个单位").replace(/"/g,"&quot;");
-      return `<div class="pcell ${has?'blocked':''}" data-tip="${esc(tip)}"
-        onclick="${has?'void 0':('addSpec('+u.id+','+esc(JSON.stringify(t))+')')}">
-        ${imgTag(specTex(t), specCn(t), "spico")}</div>`;
+      const n = specs.filter(s=>s.type===t).length;
+      const full = used >= cap;
+      const why = full
+        ? ("特种兵槽已满（"+used+" / "+cap+"）—— 先卸一个才能再挂")
+        : (n ? ("已挂 "+n+" 个，还能再挂 "+(cap-used)+" 个") : "点击挂到这个单位");
+      const tip = specTipHTML(t, why).replace(/"/g,"&quot;");
+      return `<div class="pcell ${full?'blocked':''}" data-tip="${esc(tip)}"
+        onclick="${full?'void 0':('addSpec('+u.id+','+esc(JSON.stringify(t))+')')}">
+        ${imgTag(specTex(t), specCn(t), "spico")}${n?`<span class="dup">${n}</span>`:""}</div>`;
     }).join("") : `<div style="padding:12px;color:var(--muted);font-size:12px">没有可用候选</div>`;
   }
 
@@ -1237,7 +1259,7 @@ function unitDetailHTML(u){
       <span class="sp"></span>
       <label class="chk"><input type="checkbox" id="allcb" ${SEL.fullPool?'checked':''}
         onchange="toggleFullPool()">显示全部</label>
-      <span class="sbhint">点图标挂上 · 点已挂的卸下 · 悬停看数值</span>
+      <span class="sbhint">点图标挂上 · 点已挂的卸下 · <b>同一种可以挂多个</b> · 悬停看数值</span>
     </div>
     <div class="specsplit">
       <div class="specslots">${slots}</div>
@@ -1346,18 +1368,32 @@ function commitRename(id){
   show("units");
 }
 
+/* U48：同一种特种兵可以挂**多个** ⇒ 待应用的 key 必须带序号，
+   否则第二次点同一个种会**覆盖**第一条（setPending 是同 key 替换语义）。 */
+let SPECSEQ = 0;
 function addSpec(unitId, specType){
-  setPending("unit_spec_add", `unit_spec_add:${unitId}:${specType}`,
-    {unit_id:unitId, spec_type:specType},
+  const seq = ++SPECSEQ;
+  setPending("unit_spec_add", `unit_spec_add:${unitId}:${specType}:${seq}`,
+    {unit_id:unitId, spec_type:specType, seq:seq},
     `单位 ${unitId} 加特种 ${specCn(specType)}`);
   show("units");
 }
-function removeSpec(unitId, specType){
+/* U48：卸哪一个 ⇒ 必须按 **idx** 定位（同一类型可能挂着好几个） */
+function removeSpec(unitId, specType, idx){
   const u = (VIEW.units||[]).find(x=>x.id===unitId);
-  const s = (u&&projectedSpecs(u).find(x=>x.type===specType))||null;
-  setPending("unit_spec_remove", `unit_spec_remove:${unitId}:${specType}`,
-    {unit_id:unitId, spec_type:specType, idx: s ? s.idx : null},
-    `单位 ${unitId} 卸特种 ${specCn(specType)}`);
+  const all = u ? projectedSpecs(u) : [];
+  const s = all.find(x=>x.type===specType &&
+    (idx===undefined || idx===null || x.idx===idx));
+  if(!s) return;
+  if(s._pending){
+    /* 还没写盘的新增 ⇒ 撤掉那条待应用就行，不必发 remove 编辑 */
+    dropPendingKind("unit_spec_add", s._key);
+    show("units");
+    return;
+  }
+  setPending("unit_spec_remove", `unit_spec_remove:${unitId}:${specType}:${s.idx}`,
+    {unit_id:unitId, spec_type:specType, idx:s.idx},
+    `单位 ${unitId} 卸特种 ${specCn(specType)}（槽位 ${s.idx}）`);
   show("units");
 }
 
@@ -2889,6 +2925,9 @@ function specCanAttach(specName, unitType){
 function fullPoolHTML(u, selected){
   const cat = CATALOG||{};
   const all = Object.keys(cat.spec_types||{});
+  /* U48：槽位上限（`min(3, max_spec)`）—— 满了才不让再挂 */
+  const cap = u.max_spec || ((cat.unit_types||{})[u.type]||{}).max_spec || 3;
+  const used = selected.length;
   /* 按阵营分组 */
   const facs = {};
   all.forEach(t=>{
@@ -2921,15 +2960,18 @@ function fullPoolHTML(u, selected){
     natKeys.forEach(n=>{
       const items = nats[n].map(t=>{
         const can = specCanAttach(t,u.type);
-        const has = selected.some(s=>s.type===t);
+        /* U48：同一种可以挂多个 ⇒ 已挂的不灰掉，角标显示「已挂 N 个」 */
+        const cnt = selected.filter(s=>s.type===t).length;
+        const full = used >= cap;
         const myNat = ((cat.unit_types||{})[u.type]||{}).nationality;
-        const why = can ? "点击挂到这个单位"
-          : ("不可挂：国籍 " + natCn(n) + " ≠ " + natCn(myNat));
+        const why = !can ? ("不可挂：国籍 " + natCn(n) + " ≠ " + natCn(myNat))
+                : full ? ("特种兵槽已满（"+used+" / "+cap+"）")
+                : (cnt ? ("已挂 "+cnt+" 个，还能再挂 "+(cap-used)+" 个") : "点击挂到这个单位");
         const tip = esc(specTipHTML(t, why)).replace(/"/g, "&quot;");
-        return `<div class="pcell ${can?'':'blocked'} ${has?'on':''}"
+        return `<div class="pcell ${can&&!full?'':'blocked'}"
           data-tip="${tip}"
-          onclick="${can&&!has ? ('addSpec('+u.id+','+esc(JSON.stringify(t))+')') : 'void 0'}">
-          ${imgTag(specTex(t), specCn(t), "spico")}</div>`;
+          onclick="${can&&!full ? ('addSpec('+u.id+','+esc(JSON.stringify(t))+')') : 'void 0'}">
+          ${imgTag(specTex(t), specCn(t), "spico")}${cnt?`<span class="dup">${cnt}</span>`:""}</div>`;
       }).join("");
       const canN = nats[n].filter(t=>specCanAttach(t,u.type)).length;
       out += `<div class="grphead${SEL.poolClosed&&SEL.poolClosed[n]?' closed':''}"

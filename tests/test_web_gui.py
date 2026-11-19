@@ -1463,3 +1463,40 @@ class TestUiDialogsAndNames(unittest.TestCase):
         """目录到位前不渲染半成品（否则先闪一遍 type id + 空图标）。"""
         self.assertIn("const NEEDS_CATALOG", self.html)
         self.assertIn("正在加载游戏目录", self.html)
+
+
+# =====================================================================
+# U48：同一种特种兵可以挂多个（前端不许把已挂过的种灰掉）
+# =====================================================================
+
+
+class TestSameSpecialistMounting(unittest.TestCase):
+    """U48 —— 游戏规则允许同一种挂多个，前端必须照办。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_pool_does_not_gray_out_mounted_specialists(self):
+        """候选池里已挂的种**不能**再按 type 判灰。"""
+        self.assertNotIn("const has = specs.some(s=>s.type===t);", self.html)
+        self.assertNotIn("const has = selected.some(s=>s.type===t);", self.html)
+        self.assertIn('${n?`<span class="dup">${n}</span>`:""}', self.html)
+
+    def test_pool_shows_how_many_more_can_be_mounted(self):
+        """tooltip 要写清「已挂 N 个 / 还能再挂 M 个 / 槽位已满」。"""
+        self.assertIn('"已挂 "+n+" 个，还能再挂 "+(cap-used)+" 个"', self.html)
+        self.assertIn("特种兵槽已满", self.html)
+
+    def test_pending_add_uses_a_unique_key(self):
+        """待应用的 key 必须带序号，否则同种第二次会**覆盖**第一条。"""
+        self.assertIn("let SPECSEQ = 0;", self.html)
+        self.assertIn("unit_spec_add:${unitId}:${specType}:${seq}", self.html)
+
+    def test_remove_spec_targets_the_right_slot(self):
+        """卸载按 idx 定位（点哪张卸哪张）。"""
+        self.assertIn("function removeSpec(unitId, specType, idx)", self.html)
+        self.assertIn("unit_spec_remove:${unitId}:${specType}:${s.idx}", self.html)
+        self.assertTrue('（第 "+nth+"/"+same.length+" 个' in self.html)
