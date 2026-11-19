@@ -2106,8 +2106,12 @@ class TestU63AvatarCentering(unittest.TestCase):
 
     def test_both_avatar_places_use_the_fitting_helper(self):
         """列表行与详情抬头都用 `avaImg`（而不是普通 imgTag）。"""
-        self.assertIn("function avaImg(type, alt)", self.html)
-        self.assertEqual(self.html.count("<div class=\"ava\">${avaImg(u.type, unitCn(u.type))}</div>"), 2)
+        self.assertIn("function avaImg(type, alt, box)", self.html)
+        # U65 起两处头像框尺寸不同（列表 58 / 详情 84），分别断言
+        self.assertEqual(self.html.count(
+            "<div class=\"ava\">${avaImg(u.type, unitCn(u.type), AVA_BOX_LIST)}</div>"), 1)
+        self.assertEqual(self.html.count(
+            "<div class=\"ava\">${avaImg(u.type, unitCn(u.type), AVA_BOX_DETAIL)}</div>"), 1)
 
 
 # =====================================================================
@@ -2142,3 +2146,64 @@ class TestU64LevelPicker(unittest.TestCase):
     def test_level_edit_uses_the_level_kind(self):
         """写盘用核心库新加的 `level` 编辑类型。"""
         self.assertIn('queueEdit("level", "level", {value:lv}', self.html)
+
+# =====================================================================
+# U65：调血量 —— 只更新血量条，不整页重绘
+# =====================================================================
+
+
+class TestU65UnitBloodPartialRefresh(unittest.TestCase):
+    """U65 —— 调血量时**不再整页重绘**。
+
+    旧实现：滚轮调血量最后调 `show("units")` ⇒ 整页 `innerHTML` 重写
+    ⇒ 几百个头像 `<img>` 全部重建 ⇒ ① 每个头像「先 hidden、onload 后再定位」
+    ⇒ 闪一下；② 重建 + 重解码 ⇒ 明显卡。
+    新实现：**局部更新**（详情卡血量条 + 列表该行段格条），头像**不再重建**。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def _wheel_block(self):
+        """滚轮处理函数体（`barEl.addEventListener("wheel"` 到 `{passive:false}`）。"""
+        i = self.html.index('barEl.addEventListener("wheel"')
+        j = self.html.index("{passive:false}", i)
+        return self.html[i:j]
+
+    def test_wheel_does_not_repaint_the_whole_page(self):
+        """调血量后**不得**再 `show("units")`（整页重绘 = 闪 + 卡）。"""
+        self.assertNotIn('show("units")', self._wheel_block())
+
+    def test_wheel_calls_the_partial_refresh(self):
+        """滚轮处理改为调 `refreshUnitBlood`（局部更新）。"""
+        self.assertIn("refreshUnitBlood(u, a, s);", self._wheel_block())
+
+    def test_refresh_updates_detail_bar_and_row_pips_only(self):
+        """局部刷新只动两处：详情卡 `.bar` 和列表该行 `.pips`。"""
+        self.assertIn("function refreshUnitBlood(u, a, s)", self.html)
+        self.assertIn('const bar = document.getElementById("sp_blood_"+u.id);', self.html)
+        self.assertIn('bar.querySelector(".bar")', self.html)
+        self.assertIn('document.querySelector(`.urow[data-uid="${u.id}"] .pips`)', self.html)
+        self.assertIn("paintPending();", self.html)
+
+    def test_row_carries_uid(self):
+        """列表行带 `data-uid` ⇒ 局部刷新能精确定位到那一行。"""
+        self.assertIn("class=\"urow ${u.id===SEL.units?'sel':''}\" data-uid=\"${u.id}\"", self.html)
+
+    def test_pips_helper_is_shared(self):
+        """列表行与详情卡共用同一份段格条逻辑。"""
+        self.assertIn("function bloodPipsHTML(act, sup, max)", self.html)
+        self.assertEqual(self.html.count("bloodPipsHTML(act, sup, max)"), 3)
+
+    def test_avatar_position_is_inlined_at_build_time(self):
+        """头像定位**在生成时就写进 style**（内容框已知 ⇒ 首帧就位 ⇒ 重绘不闪不跳）。"""
+        self.assertIn("function avaStyle(type, box)", self.html)
+        self.assertIn("const AVA_BOX_LIST = 58, AVA_BOX_DETAIL = 84;", self.html)
+        self.assertIn("transform:translate(${tx}px,${ty}px) scale(${k})", self.html)
+
+    def test_bbox_cache_carries_image_size(self):
+        """内容框缓存里补上原图宽高（内联定位需要）。"""
+        self.assertIn("return {x0:x0, y0:y0, x1:x1, y1:y1, w:W, h:H};", self.html)

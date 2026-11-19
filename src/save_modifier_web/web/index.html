@@ -1106,11 +1106,24 @@ function imgTag(p, alt, cls){
    原始大图是横幅、主体偏右偏下（629 张实测内容中心 x 中位 0.59 / y 中位 0.60），
    直接 contain 进方框 ⇒ 人物不在正中、还被压小。
    ⇒ 运行时量一次 alpha 内容框，把内容 contain 到方框正中；按类型缓存。 */
-const AVA_BBOX = {};                 /* type -> {x0,y0,x1,y1} 或 null（量不出来） */
-function avaImg(type, alt){
+const AVA_BBOX = {};                 /* type -> {x0,y0,x1,y1,w,h} 或 null（量不出来） */
+/* U65：头像框的边长 —— **必须与 CSS 一致**（`.ava` 58px / `.dhead .ava` 84px）。 */
+const AVA_BOX_LIST = 58, AVA_BOX_DETAIL = 84;
+/** U65：内容框已知 ⇒ **生成时就写好定位**（首帧就位 ⇒ 整页重绘时不再闪、不跳）。 */
+function avaStyle(type, box){
+  const bb = AVA_BBOX[type];
+  if(!bb || !box) return ' style="visibility:hidden"';
+  const k = Math.min(box/(bb.x1-bb.x0+1), box/(bb.y1-bb.y0+1));
+  const tx = box/2 - (bb.x0+bb.x1+1)/2*k;
+  const ty = box/2 - (bb.y0+bb.y1+1)/2*k;
+  return ` style="position:absolute;left:0;top:0;max-width:none;max-height:none;` +
+         `width:${bb.w}px;height:${bb.h}px;transform-origin:0 0;` +
+         `transform:translate(${tx}px,${ty}px) scale(${k})"`;
+}
+function avaImg(type, alt, box){
   if(!type) return "";
   return `<img src="${surf(unitTex(type))}" alt="${esc(alt||"")}" data-t="${esc(type)}"
-    loading="lazy" style="visibility:hidden"
+    loading="lazy"${avaStyle(type, box)}
     onload="avaFit(this)" onerror="this.style.visibility='visible'">`;
 }
 function avaBBox(img){
@@ -1135,7 +1148,7 @@ function avaBBox(img){
   if(x1 < 0) return null;
   /* 几乎铺满整张 ⇒ 没有透明信息可用 ⇒ 当作量不出来 */
   if((x1-x0+1) > W*0.98 && (y1-y0+1) > H*0.98) return null;
-  return {x0:x0, y0:y0, x1:x1, y1:y1};
+  return {x0:x0, y0:y0, x1:x1, y1:y1, w:W, h:H};
 }
 function avaFit(img){
   const box = img && img.parentElement;
@@ -1312,22 +1325,27 @@ function projectedSpecs(u){
   return specs;
 }
 
+/* U65：血量条的段格条（列表行与详情卡共用一份逻辑） */
+function bloodPipsHTML(act, sup, max){
+  const out = [];
+  for(let i=0;i<Math.max(max||0, act+sup);i++){
+    const cls = i<act ? "on" : (i<act+sup ? "sup" : "");
+    out.push(`<span class="pip ${cls}"></span>`);
+  }
+  return out.join("");
+}
 function unitRowHTML(u){
   const ut = (CATALOG&&CATALOG.unit_types[u.type])||{};
   const specs = projectedSpecs(u);
   const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
   const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
   const max = u.max_st || ut.max_st || 0;
-  const pips = [];
-  for(let i=0;i<Math.max(max, act+sup);i++){
-    const cls = i<act ? "on" : (i<act+sup ? "sup" : "");
-    pips.push(`<span class="pip ${cls}"></span>`);
-  }
+  const pips = bloodPipsHTML(act, sup, max);
   const badges = specs.slice(0,3).map(s=>
     `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>`).join("");
   const hq = (VIEW.hqs||[]).find(h=>h.id===u.hq_id);
-  return `<div class="urow ${u.id===SEL.units?'sel':''}" onclick="pickUnit(${u.id})">
-    <div class="ava">${avaImg(u.type, unitCn(u.type))}</div>
+  return `<div class="urow ${u.id===SEL.units?'sel':''}" data-uid="${u.id}" onclick="pickUnit(${u.id})">
+    <div class="ava">${avaImg(u.type, unitCn(u.type), AVA_BOX_LIST)}</div>
     <div class="umin">
       <div class="uname">${esc(unitCn(u.type))}
         <span class="full">${esc(u.type||"")}</span></div>
@@ -1335,7 +1353,7 @@ function unitRowHTML(u){
         ${hq?(" · 总部 "+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):""}
         ${u.xp!==null&&u.xp!==undefined?(" · 经验 "+u.xp):""}
         ${u.entr?(" · 被压制 "+u.entr):""}</div>
-      <div class="pips">${pips.join("")}</div>
+      <div class="pips">${pips}</div>
     </div>
     <div class="ubadges">${badges}</div>
   </div>`;
@@ -1355,11 +1373,7 @@ function unitDetailHTML(u){
   const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
   const tot = act + sup;
   const bloodDirty = (act!==(u.act_st||0)) || (sup!==(u.sup_st||0));
-  const pips = [];
-  for(let i=0;i<Math.max(max, tot);i++){
-    const cls = i<act ? "on" : (i<tot ? "sup" : "");
-    pips.push(`<span class="pip ${cls}"></span>`);
-  }
+  const pips = bloodPipsHTML(act, sup, max);
   const slots = specs.length ? specs.map(s=>{
     const st = (CATALOG&&CATALOG.spec_types[s.type])||{};
     const flag = (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("");
@@ -1413,7 +1427,7 @@ function unitDetailHTML(u){
                     none:"—"}[pool.scope] || pool.scope;
 
   return `<div class="dhead">
-    <div class="ava">${avaImg(u.type, unitCn(u.type))}</div>
+    <div class="ava">${avaImg(u.type, unitCn(u.type), AVA_BOX_DETAIL)}</div>
     <div class="idblk">
       <div class="dtitle" id="dtitle_${u.id}">${esc(u.name_cn||u.name_brief||u.name_full||("单位 "+u.id))}
         <span class="edit" onclick="renameUnit(${u.id})">改名</span></div>
@@ -1425,7 +1439,7 @@ function unitDetailHTML(u){
         <div class="lb"><span>兵力</span><span class="capw">上限 ${max||"—"}</span></div>
         <div class="blood${bloodDirty?' dirty':''}" id="sp_blood_${u.id}"
           data-tip="<b>血量条</b> · 滚轮 = 调<b>活跃</b>兵力<br>Alt+滚轮 = 调<b>压制</b>兵力（两者之和不变）<br>实 = 活跃 · 淡 = 被压制 · 空 = 还差">
-          <div class="bar">${pips.join("")}</div>
+          <div class="bar">${pips}</div>
         </div>
         <div class="hintline">实 = 活跃 · 淡 = 被压制 · 空 = 还差</div>
       </div>
@@ -1529,6 +1543,23 @@ function pageUnits(w){
   }
 }
 
+/* U65：血量变化后**只更新受影响的两处**（详情卡血量条 + 列表该行段格条）。
+   以前是 `show("units")` ⇒ 整页 innerHTML 重写 ⇒ 几百个头像全部重建
+   ⇒ 每个头像闪一下、而且明显卡。 */
+function refreshUnitBlood(u, a, s){
+  const ut = (CATALOG&&CATALOG.unit_types[u.type])||{};
+  const max = u.max_st || ut.max_st || 0;
+  const pips = bloodPipsHTML(a, s, max);
+  const bar = document.getElementById("sp_blood_"+u.id);
+  if(bar){
+    const b = bar.querySelector(".bar");
+    if(b) b.innerHTML = pips;
+    bar.classList.toggle("dirty", (a!==(u.act_st||0)) || (s!==(u.sup_st||0)));
+  }
+  const row = document.querySelector(`.urow[data-uid="${u.id}"] .pips`);
+  if(row) row.innerHTML = pips;
+  paintPending();
+}
 function bindUnitControls(u){
   const barEl = document.getElementById("sp_blood_"+u.id);
   const xpEl  = document.getElementById("in_xp_"+u.id);
@@ -1578,7 +1609,8 @@ function bindUnitControls(u){
         {unit_id:u.id, field:"act_st", value:a}, baseAct, a, `单位 ${u.id} 活跃兵力`);
       if(s!==s0) queueEdit("unit_field", uKey(u.id,"sup_st"),
         {unit_id:u.id, field:"sup_st", value:s}, baseSup, s, `单位 ${u.id} 被压制兵力`);
-      SEL.units = u.id; show("units");
+      SEL.units = u.id;
+      refreshUnitBlood(u, a, s);     /* U65：局部更新，不重绘整页 */
     }, {passive:false});
   }
   if(xpEl) bindNumIn(xpEl, {base:u.xp||0, cur:xp, min:0, max:400,
