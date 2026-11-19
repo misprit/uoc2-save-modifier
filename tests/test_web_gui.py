@@ -377,10 +377,15 @@ class TestNumericControls(unittest.TestCase):
         """Ctrl+滚轮 = Edge 页面缩放 ⇒ 必须全局 preventDefault。"""
         self.assertIn("if(e.ctrlKey) e.preventDefault();", self.html)
 
-    def test_wheel_requires_alt_key(self):
-        """调值必须按住 Alt —— 普通滚轮不改值（防手滑）。"""
-        self.assertIn("if(!ev.altKey) return;", self.html)
-        self.assertIn("function altWheel(el, fn)", self.html)
+    def test_wheel_works_without_alt_key(self):
+        """U54：**滚轮默认生效**，不再需要 Alt（用户实测「alt+滚轮简直反人类」）。
+
+        ⚠️ 全局**唯一**保留 Alt 的是**血量条**（普通滚轮 = 调活跃、Alt+滚轮 = 调压制）。
+        """
+        self.assertIn("function wheelBind(el, fn)", self.html)
+        self.assertNotIn("function altWheel(el, fn)", self.html)
+        self.assertNotIn("if(!ev.altKey) return;", self.html)
+        self.assertIn("if(ev.altKey){", self.html)
 
     def test_big_numbers_are_editable_inputs(self):
         """大数字（声望/分数）= 可直接编辑的输入框。"""
@@ -389,7 +394,7 @@ class TestNumericControls(unittest.TestCase):
         self.assertIn("el.value = base;", self.html)
 
     def test_hint_text_mentions_alt_wheel(self):
-        self.assertIn("Alt+滚轮 ±1", self.html)
+        self.assertIn("滚轮 ±1", self.html)
         self.assertNotIn("回车或点别处生效", self.html)
 
     def test_no_bare_wheel_wording_left(self):
@@ -1460,6 +1465,45 @@ class TestUiDialogsAndNames(unittest.TestCase):
 
 
 # =====================================================================
+# U54：血量条单一入口 / 全局移除 Alt+滚轮 / 活跃+压制 >= 1
+# =====================================================================
+
+
+class TestU54BloodBarAndWheel(unittest.TestCase):
+    """U54 —— 数字区删掉；滚轮默认生效（血量条除外）；活跃+压制 >= 1。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_no_alt_wheel_outside_the_blood_bar(self):
+        """**除血量条外**没有 Alt 依赖了。"""
+        self.assertNotIn("altWheel(", self.html)
+        self.assertNotIn("function altWheel", self.html)
+        self.assertEqual(self.html.count("if(ev.altKey){"), 1)
+
+    def test_prestige_and_score_have_no_wheel(self):
+        """概览的声望 / 分数**只允许直接输入**（不再有滚轮）。"""
+        self.assertIn("战役进度（可直接输入）", self.html)
+        self.assertNotIn("可直接输入 · 滚轮", self.html)
+
+    def test_blood_bar_keeps_total_at_least_one(self):
+        """**活跃 + 压制 >= 1**（避免游戏内 bug）。"""
+        self.assertIn("if(a+s<1) a = Math.max(0, 1-s);", self.html)
+
+    def test_blood_bar_shows_the_unit_type_max(self):
+        """上限按**单位类型**取（不是常数 7）—— 来自 `Catalog.max_st(type)`。"""
+        self.assertIn("const max = u.max_st || ut.max_st || 0;", self.html)
+
+    def test_active_wheel_drops_suppressed_when_over_max(self):
+        """普通滚轮把活跃推过上限时，**消减压制**补上。"""
+        self.assertIn("const over = a+s-max;", self.html)
+        self.assertIn("if(over>0) s = Math.max(0, s-over);", self.html)
+
+
+# =====================================================================
 # U53：单位页工具条横跨整页 + 「仅当前场景激活」筛选 + 列表列加宽
 # =====================================================================
 
@@ -1577,7 +1621,7 @@ class TestU52TypographyScale(unittest.TestCase):
 
     def test_wheel_control_has_hint(self):
         """滚轮控件悬停给提示（「第一反应就是这里可以改」）。"""
-        self.assertIn("Alt+滚轮 ±1（也可按住上下拖）", self.html)
+        self.assertIn("滚轮 ±1（也可按住上下拖）", self.html)
 
 
 # =====================================================================
@@ -1608,27 +1652,31 @@ class TestU50ToolbarAndStrength(unittest.TestCase):
                       self.html)
         self.assertIn("max-width:100%", self._rule(self.html, ".sel"))
 
-    def test_strength_card_has_tot_and_blood_bar(self):
-        """兵力卡 = 数值区（当前血量）+ 血量条（滚轮调压制）。"""
-        self.assertIn('id="sp_tot_${u.id}"', self.html)
+    def test_strength_card_has_only_the_blood_bar(self):
+        """U54：兵力卡**只有血量条**（数字区删掉）。"""
         self.assertIn('id="sp_blood_${u.id}"', self.html)
+        self.assertNotIn('id="sp_tot_${u.id}"', self.html)
         self.assertNotIn('id="sp_act_${u.id}"', self.html)
         self.assertNotIn('id="sp_sup_${u.id}"', self.html)
 
-    def test_blood_bar_wheel_adjusts_suppressed_only(self):
-        """血量条上 Alt+滚轮 = 调 `sup_st`（`act_st` 不变，tot 跟着变）。"""
-        self.assertIn("altWheel(barEl", self.html)
+    def test_blood_bar_wheel_has_two_modes(self):
+        """U54：血量条 = **普通滚轮调活跃** + **Alt+滚轮调压制**（全局唯一保留 Alt 的控件）。"""
+        self.assertIn('if(ev.altKey){', self.html)
+        self.assertIn('field:"act_st"', self.html)
         self.assertIn('field:"sup_st"', self.html)
-        self.assertIn("const cap = (max>0) ? (max - actCur) : Infinity;", self.html)
+        # Alt 分支：两者之和不变（压制 +1 ⇒ 活跃 −1）
+        self.assertIn("if(d>0){ if(a<1) return; s+=1; a-=1; }", self.html)
+        self.assertIn("else    { if(s<1) return; s-=1; a+=1; }", self.html)
 
-    def test_tot_spin_clamps_to_game_max(self):
-        """数字区夹取：tot ∈ [sup, max_st]（上限是游戏定死的）。"""
-        self.assertIn("min:sup, max:(max>0?max:null)", self.html)
+    def test_blood_bar_clamps_to_game_max(self):
+        """血量条夹取：活跃 + 压制 ≤ **上限**（上限按单位类型取，不是常数 7）。"""
+        self.assertIn("if(a>max) a=max;", self.html)
+        self.assertIn("const over = a+s-max;", self.html)
+        self.assertIn("if(over>0) s = Math.max(0, s-over);", self.html)
 
     def test_pending_list_shows_player_facing_numbers(self):
         """待应用清单显示玩家看到的量，写盘仍是 `act_st` / `sup_st`。"""
-        self.assertIn("dispBase, dispValue", self.html)
-        self.assertIn("`单位 ${u.id} 当前血量`", self.html)
+        self.assertIn("`单位 ${u.id} 活跃兵力`", self.html)
         self.assertIn("`单位 ${u.id} 被压制兵力`", self.html)
 
 
@@ -1673,8 +1721,11 @@ class TestU49LayoutAndLegality(unittest.TestCase):
         U50：兵力卡的第三行是**血量条**（U49 之前是提示行），
         经验卡的第三行仍是提示行 ⇒ 两张卡的行数与基线仍然对齐。
         """
-        self.assertEqual(self.html.count('class="hintline"'), 1)
+        # U54：兵力卡**删掉数值区**，改成一条血量条 + 一行颜色含义说明
+        # ⇒ 两张卡都是「标签 / 内容 / 提示」三行
+        self.assertEqual(self.html.count('class="hintline"'), 2)
         self.assertIn('class="blood${bloodDirty?', self.html)
+        self.assertNotIn('id="sp_tot_${u.id}"', self.html)
         self.assertIn(".stat .v .spin,.stat .v .numin{height:34px", self.html)
         self.assertIn("min-height:34px", self.html)
 

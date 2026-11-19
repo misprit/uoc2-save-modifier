@@ -150,11 +150,11 @@ table.list td.k{color:var(--muted)}
 .note{border:1px solid var(--border);border-radius:7px;background:var(--surface-alt);
   padding:10px 12px;font-size:12.5px;color:var(--muted);line-height:1.6}
 .note b{color:var(--text)}
-/* 数值控件（U32：大数字=输入框；滚轮统一用 Alt 键） */
+/* 数值控件（U54：大数字=输入框；小数字用滚轮 ±1） */
 .tun{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--surface-alt)}
 .tun:last-child{border-bottom:none}
 .tun .k{width:64px;color:var(--muted)}
-/* U32：数值控件 —— 大数字给输入框；小数字只给 Alt+滚轮 */
+/* U54：数值控件 —— 大数字给输入框；小数字只给滚轮 ±1 */
 .tun .num{width:112px;text-align:center;padding:6px 10px;border:1px dashed var(--border);
   border-radius:6px;background:var(--surface);font-family:var(--mono);
   font-weight:700;font-size:22px;color:var(--accent-dark);font-variant-numeric:tabular-nums;
@@ -252,15 +252,16 @@ table.list td.k{color:var(--muted)}
 .stat .v .spin,.stat .v .numin{height:34px;box-sizing:border-box;line-height:30px;flex:none}
 .stat .lb .capw{font-size:11.5px;color:var(--muted)}
 /* U50：血量条（段格条）**是控件不是装饰** ——
-   在它上面 Alt+滚轮 = 调「被压制的量」（规范 §6.1b：act_st 不变，
-   tot_st = act_st + sup_st 跟着变）。 */
+   U54：它是**唯一的调整入口**（数字区已删）：
+   普通滚轮 = 调**活跃**兵力（超上限就消减压制）；
+   Alt+滚轮 = 调**压制**兵力（两者之和不变）。 */
 .blood{margin-top:6px;cursor:ns-resize;border-radius:6px;transition:box-shadow .12s}
 .blood:hover{box-shadow:0 0 0 2px rgba(36,91,143,.18)}
 .blood.dirty .bar{border-color:var(--accent);background:var(--accent-light)}
 .blood .bar{display:flex;gap:4px;padding:4px 7px;border-radius:5px;
   border:1px solid var(--border);background:var(--surface)}
 .blood .bar .pip{width:19px;height:19px}
-/* U32：大数字用输入框、小数字用 Alt+滚轮 —— 两套控件 */
+/* U54：大数字用输入框、小数字用滚轮 ±1 —— 两套控件 */
 .numin{width:100px;text-align:center;padding:5px 9px;border:1px dashed var(--border);
   border-radius:6px;background:var(--surface);font-family:var(--mono);font-weight:700;
   font-size:22px;color:var(--accent-dark);font-variant-numeric:tabular-nums;outline:none}
@@ -803,9 +804,9 @@ if(OPEN_PAGE && PAGE_CN[OPEN_PAGE]) PAGE = OPEN_PAGE;
 /* U32：禁掉 Edge 的 **Ctrl+滚轮缩放** —— 浏览器默认行为，页面可以阻止。
    实测（2026-11-18 · 本机 Edge 157）：
      · Ctrl+滚轮 ⇒ 页面缩放（devicePixelRatio 变化）⇒ **全局禁掉**；
-     · Alt+滚轮  ⇒ **不缩放**（devicePixelRatio 全程 = 1）且事件照常到达页面
-                    ⇒ 用它来调数值；
-     · 普通滚轮 ⇒ 页面滚动，不改数值（防手滑改值）。 */
+     · 普通滚轮 ⇒ **不缩放**、事件照常到达页面
+                    ⇒ **U54 起直接用它调数值**（不再需要 Alt）；
+     · Alt+滚轮 ⇒ 只在**血量条**上用来区分「调压制」（全局唯一保留 Alt 的控件）。 */
 document.addEventListener("wheel", function(e){
   if(e.ctrlKey) e.preventDefault();
 }, {passive:false, capture:true});
@@ -926,19 +927,22 @@ function dropPending(i){
   if(VIEW) show(PAGE);
 }
 
-/* ---------- 数值控件（U32） ----------
-   大数字（三位以上：声望/分数/经验）= 可直接编辑的输入框（+ Alt+滚轮 ±1）
-   小数字（一般个位数：CP/卡车数/延迟/库存/战力步数）= 只给 Alt+滚轮 ±1
-   —— 滚轮键位统一用 Alt：Ctrl+滚轮 是 Edge 的页面缩放（全局已禁掉），
-      Alt+滚轮 实测不缩放且事件照常到达页面。 */
+/* ---------- 数值控件（U54） ----------
+   大数字（三位以上：经验）= 可直接编辑的输入框
+   小数字（一般个位数：CP/卡车数/延迟/库存/战力步数）= 只给滚轮 ±1
+   —— U54：**滚轮默认生效**（U32 的「必须按 Alt」约定作废：用户实测
+   「alt+滚轮简直反人类」）。Ctrl+滚轮 仍是 Edge 的页面缩放（全局已禁掉）。
+   ⚠️ **声望 / 分数只允许直接输入**（没有滚轮）。 */
 const TUN_RANGE = {prestige:[0, null], score:[0, null]};   /* null = 无上限 */
 
-/* Alt+滚轮 ±1（U32）
-   —— 普通滚轮**不改值**（照常滚页面，避免手滑误改）；
-   —— Alt+滚轮 才调值，并阻止页面跟着滚。 */
-function altWheel(el, fn){
+/* 滚轮 ±1（U54）
+   —— **普通滚轮直接生效**（U32 的「普通滚轮不改值、防手滑」约定**作废**：
+      用户实测「alt+滚轮简直反人类」）；
+   —— 阻止页面跟着滚。
+   ⚠️ **全局唯一保留 Alt 的是血量条**（普通滚轮 = 调活跃兵力、Alt+滚轮 = 调压制兵力），
+      它自己单独绑定（见 bindUnitControls）。 */
+function wheelBind(el, fn){
   el.addEventListener("wheel", function(ev){
-    if(!ev.altKey) return;
     ev.preventDefault();
     fn(ev.deltaY>0 ? -1 : 1);
   }, {passive:false});
@@ -951,16 +955,7 @@ function bindTun(){
     el.value = base;
     document.getElementById("o_"+f).textContent = "原值 " + base;
 
-    /* Alt+滚轮 ±1（带范围夹取）；普通滚轮不改值 */
-    altWheel(el, function(d){
-      const [lo, hi] = TUN_RANGE[f] || [0, null];
-      const cur = parseInt(el.value, 10);
-      let v = (isFinite(cur) ? cur : 0) + d;
-      if(lo!==null && v < lo) v = lo;
-      if(hi!==null && v > hi) v = hi;
-      el.value = v;
-      apply();
-    });
+    /* U54：声望 / 分数**只允许直接输入**，不再有滚轮（用户拍板） */
 
     function apply(){
       const raw = String(el.value??"").trim();
@@ -1067,16 +1062,16 @@ function dropPendingKind(kind, key){
 
 /* ---------- 通用数值控件 ----------
    大数字（三位以上）= 输入框（可直接编辑）
-   小数字（一般个位数）= Alt+滚轮 ±1（U32 用户拍板） */
+   小数字（一般个位数）= 滚轮 ±1（U32 用户拍板） */
 
-/* 小数字：Alt+滚轮 ±1，带范围夹取
+/* 小数字：滚轮 ±1，带范围夹取
    ⚠️ `base` = **存档原值**（比较与文案都用它）；
       `cur`  = 当前该显示的值（挂起了改动就显示挂起值，缺省 = base）。 */
 function bindSpin(el, opts){
   const base = opts.base;
   const cur0 = (opts.cur===undefined) ? base : opts.cur;
   /* U52：滚轮控件要**一眼看得出能改** ⇒ 悬停给一句说明 */
-  el.title = opts.tip || "Alt+滚轮 ±1（也可按住上下拖）";
+  el.title = opts.tip || "滚轮 ±1（也可按住上下拖）";
   function show(v){
     el.textContent = v;
     el.classList.toggle("dirty", v!==base);
@@ -1088,7 +1083,7 @@ function bindSpin(el, opts){
     show(v);
     opts.onChange(v);
   }
-  altWheel(el, function(d){
+  wheelBind(el, function(d){
     const cur = parseInt(String(el.textContent).replace(/\D/g,""), 10);
     commit((isFinite(cur)?cur:base) + d);
   });
@@ -1270,13 +1265,12 @@ function unitDetailHTML(u){
     <div class="vsep"></div>
     <div class="stats">
       <div class="stat">
-        <div class="lb"><span>兵力</span><span class="hintw">数字调血量 · 条上调压制</span></div>
-        <div class="v"><span class="spin" id="sp_tot_${u.id}"></span>
-          <small>当前血量 / 上限 ${max||"—"}</small></div>
+        <div class="lb"><span>兵力</span><span class="capw">上限 ${max||"—"}</span></div>
         <div class="blood${bloodDirty?' dirty':''}" id="sp_blood_${u.id}"
-          data-tip="<b>血量条</b> · 在上面 Alt+滚轮 = 调<b>被压制</b>的量<br>实 = 未被压制 · 淡 = 被压制 · 空 = 还差<br>当前：未压 ${act} · 被压 ${sup}（合计 ${tot}）">
+          data-tip="<b>血量条</b> · 滚轮 = 调<b>活跃</b>兵力<br>Alt+滚轮 = 调<b>压制</b>兵力（两者之和不变）<br>实 = 活跃 · 淡 = 被压制 · 空 = 还差">
           <div class="bar">${pips.join("")}</div>
         </div>
+        <div class="hintline">实 = 活跃 · 淡 = 被压制 · 空 = 还差</div>
       </div>
       <div class="stat">
         <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
@@ -1379,7 +1373,6 @@ function pageUnits(w){
 }
 
 function bindUnitControls(u){
-  const totEl = document.getElementById("sp_tot_"+u.id);
   const barEl = document.getElementById("sp_blood_"+u.id);
   const xpEl  = document.getElementById("in_xp_"+u.id);
   const baseAct = u.act_st||0, baseSup = u.sup_st||0;
@@ -1389,41 +1382,47 @@ function bindUnitControls(u){
   const ut  = (CATALOG&&CATALOG.unit_types[u.type])||{};
   const max = u.max_st || ut.max_st || 0;      /* 0 = 拿不到上限 ⇒ 不夹上界 */
 
-  /* ① 数字区 = **当前血量**（tot = 未被压制 + 被压制）—— Alt+滚轮 ±1 调它。
-        规范 §6.1b：sup_st 保持不变 ⇒ act_st = tot − sup_st；
-        夹取 tot ∈ [sup_st, max_st]（上限拿不到就不夹上界）。 */
-  if(totEl) bindSpin(totEl, {base:baseAct+baseSup, cur:act+sup,
-    min:sup, max:(max>0?max:null), onChange(v){
-    const s = pendingVal("unit_field", uKey(u.id,"sup_st"), baseSup);
-    let t = v;
-    if(t < s) t = s;
-    if(max>0 && t > max) t = max;
-    const a = t - s;
-    queueEdit("unit_field", uKey(u.id,"act_st"),
-      {unit_id:u.id, field:"act_st", value:a}, baseAct, a,
-      `单位 ${u.id} 当前血量`, baseAct+baseSup, t);
-    SEL.units = u.id; show("units");
-  }});
-
-  /* ② 血量条 = **被压制的量**（sup_st）—— 在条上 Alt+滚轮 ±1 调它。
-        规范 §6.1b：act_st 保持不变 ⇒ tot = act_st + sup_st 跟着变；
-        夹取 sup ∈ [0, max_st − act_st] ——
-        「上限是游戏定死的」⇒ 压制量只能吃「还差」那几格，不能把总血量顶过上限
-        （上限拿不到就不夹上界，只夹 ≥ 0）。 */
+  /* U54：**数字区删掉**，血量条成为唯一的调整入口（规范 §6.1c）。
+     ⚠️ **血量条是全局唯一保留 Alt 的控件**：
+        · **普通滚轮 = 调活跃兵力**（act_st）：+1 / −1；
+          超过上限（act+sup > max）就**消减压制兵力**补上
+          ——「上限是游戏定死的」（`max_st` 按**单位类型**取，不是常数 7）。
+        · **Alt+滚轮 = 调压制兵力**（sup_st）：**两者之和不变**，在活跃/压制之间搬运。
+        · **下限：活跃 + 压制 >= 1**（避免游戏内 bug —— 用户拍板）。
+        · 到顶 / 到底**静默不动**（不提示）。 */
   if(barEl){
-    const cur = pendingVal("unit_field", uKey(u.id,"sup_st"), baseSup);
-    const actCur = pendingVal("unit_field", uKey(u.id,"act_st"), baseAct);
-    const cap = (max>0) ? (max - actCur) : Infinity;
-    altWheel(barEl, function(d){
-      let v = cur + d;
-      if(v < 0) v = 0;
-      if(v > cap) v = cap;
-      if(v === cur) return;
-      queueEdit("unit_field", uKey(u.id,"sup_st"),
-        {unit_id:u.id, field:"sup_st", value:v}, baseSup, v,
-        `单位 ${u.id} 被压制兵力`, baseSup, v);
+    barEl.addEventListener("wheel", function(ev){
+      ev.preventDefault();
+      const d = ev.deltaY>0 ? -1 : 1;
+      const a0 = pendingVal("unit_field", uKey(u.id,"act_st"), baseAct);
+      const s0 = pendingVal("unit_field", uKey(u.id,"sup_st"), baseSup);
+      let a = a0, s = s0;
+      if(ev.altKey){
+        /* Alt+滚轮 = 调压制（两者之和不变） */
+        if(d>0){ if(a<1) return; s+=1; a-=1; }
+        else    { if(s<1) return; s-=1; a+=1; }
+      } else {
+        /* 普通滚轮 = 调活跃（超过上限就消减压制补上） */
+        if(d>0){
+          a+=1;
+          if(max>0){
+            if(a>max) a=max;
+            const over = a+s-max;
+            if(over>0) s = Math.max(0, s-over);
+          }
+        } else {
+          a-=1;
+          if(a<0) a=0;
+          if(a+s<1) a = Math.max(0, 1-s);      /* 下限：活跃 + 压制 >= 1 */
+        }
+      }
+      if(a===a0 && s===s0) return;
+      if(a!==a0) queueEdit("unit_field", uKey(u.id,"act_st"),
+        {unit_id:u.id, field:"act_st", value:a}, baseAct, a, `单位 ${u.id} 活跃兵力`);
+      if(s!==s0) queueEdit("unit_field", uKey(u.id,"sup_st"),
+        {unit_id:u.id, field:"sup_st", value:s}, baseSup, s, `单位 ${u.id} 被压制兵力`);
       SEL.units = u.id; show("units");
-    });
+    }, {passive:false});
   }
   if(xpEl) bindNumIn(xpEl, {base:u.xp||0, cur:xp, min:0, max:400,
     kind:"unit_field", key:uKey(u.id,"xp"),
@@ -1687,7 +1686,7 @@ function hqDetailHTML(h){
             autocomplete="off" value="${xt}" style="width:62px;font-size:13px"></div>
       </div>
       <div class="stat">
-        <div class="lb"><span>总部 CP</span><span class="hintw">Alt+滚轮 ±1</span></div>
+        <div class="lb"><span>总部 CP</span><span class="hintw">滚轮 ±1</span></div>
         <div class="v"><span class="spin" id="h_cp_${h.id}"></span><small>/</small>
           <span class="spin" id="h_mcp_${h.id}"></span></div>
         <div class="cphint">补给 <span class="spin" id="h_sup_${h.id}"></span>
@@ -1755,7 +1754,7 @@ function bindHqControls(h){
     onChange(v){ queueEdit("hq_field", hqKey(h.id,"xp_target"),
       {hq_id:h.id, field:"xp_target", value:v}, h.xp_target||0, v, `总部 ${h.id} 经验目标`); }});
 
-  /* 兵库数量（每条一个 Alt+滚轮控件） */
+  /* 兵库数量（每条一个滚轮 ±1 控件） */
   const pool = projectedPool(h);
   pool.forEach((e,i)=>{
     const el = document.getElementById("fp_q_"+h.id+"_"+i);
@@ -2331,7 +2330,7 @@ function renderTheaterAddModal(){
     <div class="mb">
       <div class="mrow"><span class="lb">每回合恢复</span>
         <span class="spin" id="mp_tut"></span>
-        <span class="hint">Alt+滚轮 ±1 · 正整数（≥ 1）</span></div>
+        <span class="hint">滚轮 ±1 · 正整数（≥ 1）</span></div>
       <div class="mrow"><span class="lb">本场景剩余</span>
         <span class="numrow">
           ${inf?`<span class="num inf">无限</span>`
@@ -2567,7 +2566,7 @@ function natRowHTML(it){
   return `<div class="spnat" style="margin-top:8px">国籍 <b>${esc(it.nat||"—")}</b>
     <span class="auto">跟着特种兵自动 · 不用手选</span></div>`;
 }
-/* 模态框里的 Alt+滚轮数字 */
+/* 模态框里的滚轮 ±1 数字 */
 function bindModalSpin(id, get, set, min, max){
   const el = document.getElementById(id);
   if(!el) return;
@@ -2637,10 +2636,10 @@ function renderHqPoolModal(){
         <span class="hint">兵种的国籍要**手选**（特种兵是自动跟着类型走的）</span></div>`}
       <div class="mrow"><span class="lb">数量</span>
         <span class="spin" id="mp_q"></span>
-        <span class="hint">Alt+滚轮 ±1 · 非负整数</span></div>
+        <span class="hint">滚轮 ±1 · 非负整数</span></div>
       <div class="mrow"><span class="lb">延迟</span>
         <span class="spin" id="mp_d"></span>
-        <span class="hint">Alt+滚轮 ±1 · 0 = 立即可用</span></div>
+        <span class="hint">滚轮 ±1 · 0 = 立即可用</span></div>
       <div class="modnote">条目的**国籍**要填国籍 id（uk / us / german …），不是阵营
         （allies / axis）—— 填错游戏读不出来。<br>
         同一个总部里，<b>同样的条目 + 同样的延迟不许并存</b>；延迟不同可以共存
@@ -2806,7 +2805,7 @@ function renderStoreAddModal(){
         <span class="hint">任意非负整数（0 = 免费）</span></div>
       <div class="mrow"><span class="lb">库存</span>
         <span class="spin" id="mp_qty"></span>
-        <span class="hint">Alt+滚轮 ±1 · 正整数（不能是 0）</span></div>
+        <span class="hint">滚轮 ±1 · 正整数（不能是 0）</span></div>
       <div class="modnote">商品必须是**游戏自己定义过**的（否则游戏拒收）；
         特种兵的**国籍自动跟着类型走**，兵种的国籍手选。<br>
         同一个 <b>(战线, 子商店)</b> 里<b>任何重复条目都不许</b>（价格库存不同也算重复）——
@@ -3261,18 +3260,18 @@ function show(p){
       <div class="pbody"><div class="capgrid">${caps}</div></div></div>
       <div class="panel"><h3>备份与撤销栈</h3>
         <div class="pbody">${backupStackHTML()}</div></div>
-      <div class="panel"><h3>战役进度（可直接输入 · Alt+滚轮 ±1）</h3>
+      <div class="panel"><h3>战役进度（可直接输入）</h3>
       <div class="pbody">
         <div class="tun"><span class="k">声望</span>
           <input class="num" id="n_prestige" data-f="prestige" type="text"
                  inputmode="numeric" autocomplete="off">
           <span class="old" id="o_prestige"></span>
-          <span class="hint">可直接输入 · Alt+滚轮 ±1</span></div>
+          <span class="hint">可直接输入</span></div>
         <div class="tun"><span class="k">分数</span>
           <input class="num" id="n_score" data-f="score" type="text"
                  inputmode="numeric" autocomplete="off">
           <span class="old" id="o_score"></span>
-          <span class="hint">可直接输入 · Alt+滚轮 ±1</span></div>
+          <span class="hint">可直接输入</span></div>
         <div class="note" style="margin-top:10px">
           <b>这一版能做什么</b>：读存档、列能力位、<b>改战役进度</b>（改完进「待应用」，
           点右上角「应用更改」才写盘，写前自动备份、可撤销）。<br>
