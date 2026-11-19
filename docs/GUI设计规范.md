@@ -4708,6 +4708,44 @@ zip 里的特种兵能读到 / zip 里的国籍能读到 / 已解压目录能认
 见 **`docs/发布形式方案.md`** —— 建议**方案 2**（整个目录进创意工坊 + 一个 30 KB 启动器 exe）：
 用户只点一个 exe；Steam 更新免费；启动器用系统自带 `csc.exe` 编译，零第三方工具链。
 
+#### 10.10.45 ★ 启动器 exe（U80）—— 用户只点一个文件
+
+> **【2026-11-19 · U80 用户拍板】**
+> 「就按照你推荐的目录加 30 KB 启动器的方案。那你做之前记得帮我署上名，
+> 名字是『烟柳边城 misprit』。」
+
+**成品形态**：一个目录 + 一个 exe ⇒ 用户**只点那一个 exe**。
+
+**启动器（`tools/launcher/Launcher.cs` ⇒ `build\统一指挥2存档修改器.exe`，9.5 KB）**
+
+| 环节 | 做法 |
+|---|---|
+| 编译 | **系统自带的 `csc.exe`**（`.NET Framework 4.x`，本机就有）⇒ **零第三方工具链**；`/target:winexe`（无黑窗口） |
+| 起服务 | 拉起随包的 `python\python.exe -m save_modifier_web.server --serve --no-browser`（**新增 `--no-browser`** ⇒ 浏览器归启动器管） |
+| 拿地址 | 从服务的 stdout 里读出带 token 的 `http://…`（ASCII 搜索 ⇒ 与控制台编码无关） |
+| 开窗口 | Edge `--app` 模式（独立窗口 + 复用 `%LOCALAPPDATA%\.uoc2\edge_profile`）；**没有 Edge 就退回默认浏览器**（界面本来就是纯 HTML） |
+| 关窗即退 | 启动器等 Edge 进程退出 ⇒ 关掉服务 ⇒ 与原来 `run_web.bat` 的行为一致 |
+| 单实例 | `%LOCALAPPDATA%\.uoc2\server.url` 记着当前地址；**已经在跑就只把窗口叫出来**，不重复起服务 |
+
+⚠️ **为什么不用 PyInstaller 打包整个应用**：它每次启动都要把 20 MB 运行时解包到
+`%TEMP%`（慢 1–3 秒），未签名的 onefile 更容易被杀软盯上；而启动器只是个壳，
+Python 本来就在包里 ⇒ **9.5 KB 的壳**就够。
+
+**署名「烟柳边城 misprit」**：启动器 exe 的版本信息（Company / Copyright）、
+`save_modifier_web/version.py` 的 `AUTHOR`、界面「关于」面板、使用说明、发布说明、
+日志启动头（`[author]`）—— 一处定义（`version.py`）到处引用。
+
+**体积（实测）**
+
+| 阶段 | zip | 解压 |
+|---|---|---|
+| U74 刚做完 | 16.0 MB | 35.3 MB |
+| U78 砍掉 Tcl/Tk | 12.7 MB | 26.8 MB |
+| **U79 砍掉用不上的运行时**（OpenSSL / sqlite / zstd …，实测省 8.79 MB） | **9.1 MB** | **约 18 MB** |
+
+⚠️ `libcrypto-3.dll`（4.99 MB）只有 `_hashlib.pyd` 用 ⇒ 砍掉后 `hashlib` **回退到内置
+`_sha256`**（实测 sha256 仍对 —— 撤销栈就靠它）。
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
