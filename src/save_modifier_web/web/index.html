@@ -227,16 +227,12 @@ table.list td.k{color:var(--muted)}
 .stat{background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:9px 11px}
 .stat .lb{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
 .stat .lb .hintw{color:var(--accent);font-size:10.5px}
-.stat .v{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--accent-dark);margin-top:2px}
+.stat .v{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--accent-dark);margin-top:2px;
+  min-height:26px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 .stat .v small{font-size:12px;color:var(--muted);font-weight:400}
-.blood{display:flex;align-items:center;gap:8px;margin-top:8px}
-.blood .bar{display:flex;gap:3px;padding:3px 5px;border-radius:5px;
-  border:1px solid var(--border);background:var(--surface)}
-.blood .bar .pip{width:13px;height:13px}
-.legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:6px;align-items:center;
-  flex-wrap:wrap}
-.legend i{display:inline-block;width:11px;height:8px;border-radius:2px;margin-right:5px;
-  vertical-align:middle}
+/* U49：兵力卡与经验卡的内容行**对齐** —— 两张卡的数值控件必须一样高
+   （`.spin` 与 `.numin` 统一 26px / 行高 22px），否则两卡的数字不在同一条基线上。 */
+.stat .v .spin,.stat .v .numin{height:26px;box-sizing:border-box;line-height:22px;flex:none}
 /* U32：大数字用输入框、小数字用 Alt+滚轮 —— 两套控件 */
 .numin{width:78px;text-align:center;padding:1px 6px;border:1px dashed var(--border);
   border-radius:6px;background:var(--surface);font-family:var(--mono);font-weight:700;
@@ -263,9 +259,11 @@ table.list td.k{color:var(--muted)}
 .sbhead .sbm{font-size:12px;color:var(--muted);white-space:nowrap}
 .sbhead .sp{flex:1}
 .sbhead .sbsep{width:1px;height:13px;background:var(--border);flex:none}
-.specsplit{display:flex;align-items:stretch;min-height:0}
+/* U49：备选池窗口**固定高度** —— 勾不勾「显示全部」窗口大小不许变；
+   两列各自内部滚动（之前高度跟着内容长，勾上「显示全部」就整块撑高）。 */
+.specsplit{display:flex;align-items:stretch;height:240px;min-height:0}
 .specslots{display:flex;flex-direction:column;gap:7px;padding:10px 12px;width:272px;flex:none;
-  border-right:1px solid var(--border);background:var(--surface)}
+  border-right:1px solid var(--border);background:var(--surface);overflow:auto;min-height:0}
 .slot{display:flex;align-items:center;gap:9px;padding:6px 10px 6px 6px;border:1px solid var(--border);
   border-radius:7px;background:var(--surface-alt);cursor:pointer}
 .slot:hover{border-color:var(--danger);background:var(--danger-light)}
@@ -299,7 +297,7 @@ table.spec-tbl .thumb img.spico,.fptab .thumb img.spico{
 .slot.empty:hover{border-color:var(--border);background:var(--surface)}
 .ftag{display:inline-block;font-size:10px;padding:0 5px;border-radius:3px;background:var(--surface);
   border:1px solid var(--border);color:var(--muted);font-family:var(--mono);white-space:nowrap}
-.specpool{display:block;max-height:340px;overflow:auto;flex:1;min-width:0}
+.specpool{display:block;height:100%;overflow:auto;flex:1;min-width:0}
 .poolflat{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px}
 .grphead{display:flex;align-items:center;gap:7px;padding:4px 12px;background:var(--surface-alt);
   border-top:1px solid var(--border);font-size:12px;font-weight:600;color:var(--accent-dark);
@@ -1161,15 +1159,8 @@ function unitDetailHTML(u){
   if(!u) return `<div class="placeholder"><div class="big">没有单位</div></div>`;
   const ut = (CATALOG&&CATALOG.unit_types[u.type])||{};
   const specs = projectedSpecs(u);
-  const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
-  const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
   const xp  = pendingVal("unit_field", uKey(u.id,"xp"), u.xp||0);
   const max = u.max_st || ut.max_st || 0;
-  const pips = [];
-  for(let i=0;i<Math.max(max, act+sup);i++){
-    const cls = i<act ? "on" : (i<act+sup ? "sup" : "");
-    pips.push(`<span class="pip ${cls}"></span>`);
-  }
   const slots = specs.length ? specs.map(s=>{
     const st = (CATALOG&&CATALOG.spec_types[s.type])||{};
     const flag = (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("");
@@ -1236,16 +1227,13 @@ function unitDetailHTML(u){
         <div class="v"><span class="spin" id="sp_act_${u.id}"></span>
           <small>现有</small> + <span class="spin" id="sp_sup_${u.id}"></span>
           <small>增援</small></div>
-        <div class="blood"><div class="bar">${pips.join("")}</div></div>
-        <div class="legend"><span><i style="background:var(--accent)"></i>现有</span>
-          <span><i style="background:var(--stage-sup)"></i>增援</span>
-          <span>上限 ${max||"—"}</span></div>
+        <div class="hintline">上限 ${max||"—"} · 现有 + 增援 = 总兵力</div>
       </div>
       <div class="stat">
         <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
         <div class="v"><input class="numin" id="in_xp_${u.id}" type="text" inputmode="numeric"
           autocomplete="off" value="${xp}"></div>
-        <div class="hintline">范围 0 – 400（游戏 schema 的硬范围）</div>
+        <div class="hintline">范围 0 – 400（schema 硬范围）</div>
       </div>
     </div>
   </div>
@@ -1372,6 +1360,19 @@ function commitRename(id){
    否则第二次点同一个种会**覆盖**第一条（setPending 是同 key 替换语义）。 */
 let SPECSEQ = 0;
 function addSpec(unitId, specType){
+  /* U49：前端也拦一道 —— 非法挂载（阵营不同 / 国籍不匹配且不是父国籍）
+     根本不该进「待应用」列表（核心库 `_unit_spec_add` 还有一道硬拦）。 */
+  const u = (VIEW.units||[]).find(x=>x.id===unitId);
+  if(u && u.type){
+    const chk = specAttachCheck(specType, u.type);
+    if(!chk.ok){
+      const eb = document.getElementById("errBox");
+      if(eb) eb.textContent = chk.why;
+      const sb = document.getElementById("status");
+      if(sb) sb.textContent = chk.why;
+      return;
+    }
+  }
   const seq = ++SPECSEQ;
   setPending("unit_spec_add", `unit_spec_add:${unitId}:${specType}:${seq}`,
     {unit_id:unitId, spec_type:specType, seq:seq},
@@ -2912,15 +2913,27 @@ function specTipHTML(t, extra){
 }
 
 /* ---------- 备选池：全量视图（按阵营 + 国籍分组，可折叠） ---------- */
-function specCanAttach(specName, unitType){
+/* U49：**方向必须是「单位国籍的 parent == 特种兵国籍」** —— 单向，不可反。
+   罗马尼亚人能用德军装备；德军用不了罗马尼亚装备。
+   ⚠ 之前写反了（拿「特种兵国籍」的 parent 去比）⇒ 德国单位能挂罗马尼亚装备。
+   规则见规范 §7.3.2（`e162` 字节码），核心库 `Catalog.spec_can_attach` 同源。 */
+function specAttachCheck(specName, unitType){
   const cat = CATALOG||{};
   const sp = (cat.spec_types||{})[specName];
   const ut = (cat.unit_types||{})[unitType];
-  if(!sp || !ut) return false;
-  if(sp.faction !== ut.faction) return false;
-  if(sp.nationality === ut.nationality) return true;
-  const nat = (cat.nationalities||{})[sp.nationality];
-  return !!(nat && nat.parent === ut.nationality);
+  if(!sp || !ut) return {ok:false, why:"类型未知"};
+  if(sp.faction !== ut.faction)
+    return {ok:false, why:"不可挂：阵营不同（"+natCn(sp.nationality)+" / "+natCn(ut.nationality)+"）"};
+  if(sp.nationality === ut.nationality) return {ok:true, why:""};
+  const nat = (cat.nationalities||{})[ut.nationality]||{};
+  if(nat.parent === sp.nationality) return {ok:true, why:""};
+  const parentTxt = nat.parent
+    ? ("「"+natCn(ut.nationality)+"」的父国籍是「"+natCn(nat.parent)+"」")
+    : ("「"+natCn(ut.nationality)+"」没有父国籍");
+  return {ok:false, why:"不可挂："+parentTxt+"，只能挂同国籍或父国籍的特种兵"};
+}
+function specCanAttach(specName, unitType){
+  return specAttachCheck(specName, unitType).ok;
 }
 function fullPoolHTML(u, selected){
   const cat = CATALOG||{};
@@ -2959,12 +2972,12 @@ function fullPoolHTML(u, selected){
       <span class="fline"></span><span>${list.length} 种</span></div>`;
     natKeys.forEach(n=>{
       const items = nats[n].map(t=>{
-        const can = specCanAttach(t,u.type);
+        const chk = specAttachCheck(t,u.type);
+        const can = chk.ok;
         /* U48：同一种可以挂多个 ⇒ 已挂的不灰掉，角标显示「已挂 N 个」 */
         const cnt = selected.filter(s=>s.type===t).length;
         const full = used >= cap;
-        const myNat = ((cat.unit_types||{})[u.type]||{}).nationality;
-        const why = !can ? ("不可挂：国籍 " + natCn(n) + " ≠ " + natCn(myNat))
+        const why = !can ? chk.why
                 : full ? ("特种兵槽已满（"+used+" / "+cap+"）")
                 : (cnt ? ("已挂 "+cnt+" 个，还能再挂 "+(cap-used)+" 个") : "点击挂到这个单位");
         const tip = esc(specTipHTML(t, why)).replace(/"/g, "&quot;");
@@ -2974,19 +2987,23 @@ function fullPoolHTML(u, selected){
           ${imgTag(specTex(t), specCn(t), "spico")}${cnt?`<span class="dup">${cnt}</span>`:""}</div>`;
       }).join("");
       const canN = nats[n].filter(t=>specCanAttach(t,u.type)).length;
-      out += `<div class="grphead${SEL.poolClosed&&SEL.poolClosed[n]?' closed':''}"
+      /* U49：全量视图的各国分组**默认折叠** —— 375 种全铺开没法看 */
+      const open = poolGroupOpen(n);
+      out += `<div class="grphead${open?'':' closed'}"
         onclick="togglePoolGroup('${esc(n)}')">
         <span class="caret">▼</span>${esc(natCn(n))}
         <span class="gcount">· ${nats[n].length} 种</span>
         <span class="gcan">可挂 ${canN}</span></div>
-        <div class="grpbody" ${SEL.poolClosed&&SEL.poolClosed[n]?'style="display:none"':""}>${items}</div>`;
+        <div class="grpbody" ${open?'':'style="display:none"'}>${items}</div>`;
     });
   });
   return out;
 }
+/* U49：分组默认**折叠** —— 只有用户点开的才展开（`SEL.poolOpen` 里记着） */
+function poolGroupOpen(nat){ return !!(SEL.poolOpen && SEL.poolOpen[nat]); }
 function togglePoolGroup(nat){
-  SEL.poolClosed = SEL.poolClosed||{};
-  SEL.poolClosed[nat] = !SEL.poolClosed[nat];
+  SEL.poolOpen = SEL.poolOpen||{};
+  SEL.poolOpen[nat] = !poolGroupOpen(nat);
   show("units");
 }
 function toggleFullPool(){ SEL.fullPool = !SEL.fullPool; show("units"); }

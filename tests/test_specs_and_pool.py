@@ -19,7 +19,7 @@ import yaml
 
 from save_modifier_core import Catalog, CorePaths, Edit, open_save
 
-from ._fixtures import make_save
+from ._fixtures import dump, make_save
 
 
 class SpecPoolTestBase(unittest.TestCase):
@@ -54,8 +54,14 @@ class TestAddSpec(SpecPoolTestBase):
             self.skipTest("本机没有游戏包")
 
     def test_add_spec_uses_free_slot(self):
-        """单位 1 已有 idx=0 的特种 ⇒ 新增应占 idx=1。"""
-        plan, res = self.commit([Edit.unit_spec_add(1, "ger_arty_40")])
+        """单位 1 已有 idx=0 的特种 ⇒ 新增应占 idx=1。
+
+        ⚠ **U49**：新增的特种必须是**合法挂载**（阵营相同 + 国籍相同或父国籍匹配）
+        ⇒ 这里用美籍的 `us_arty_42`（单位 1 是 `us_inf_42`）。
+        单位 1 已有的 `ger_arty_40` 是**历史遗留的非法挂载** ——
+        核心库**只读保留**（不主动改）、仍可卸载 ⇒ 见 `TestMountLegality`。
+        """
+        plan, res = self.commit([Edit.unit_spec_add(1, "us_arty_42")])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
         with zipfile.ZipFile(self.save_path) as zf:
@@ -63,7 +69,7 @@ class TestAddSpec(SpecPoolTestBase):
         specs = units[0]["specs"]
         self.assertEqual(len(specs), 2)
         self.assertEqual(specs[1]["idx"], 1)
-        self.assertEqual(specs[1]["type"], "ger_arty_40")
+        self.assertEqual(specs[1]["type"], "us_arty_42")
         self.assertTrue(specs[1]["active"])
         self.assertFalse(specs[1]["captured"])
 
@@ -97,6 +103,94 @@ class TestAddSpec(SpecPoolTestBase):
     def test_add_spec_to_unknown_unit(self):
         plan, _ = self.commit([Edit.unit_spec_add(999, "ger_arty_40")])
         self.assertFalse(plan.ok)
+
+
+class TestMountLegality(SpecPoolTestBase):
+    """U49：**挂载合法性** —— 阵营相同 + 国籍相同或**单位国籍的 parent_nationality** 匹配。
+
+    游戏自己的判定（`uoc2/state/entities/unit.pyc::_can_add_specialist_no_len`，
+    `e162` 字节码 / 规范 §7.3.2）**单向**：
+    **罗马尼亚人能用德军装备，德军用不了罗马尼亚装备**。
+
+    ⇒ 核心库 `_unit_spec_add` 必须**硬拦**（前端曾经把方向写反了，
+    德国单位能挂罗马尼亚装备）。
+    """
+
+    def setUp(self):
+        super().setUp()
+        for t in ("us_inf_42", "ger_inf_39", "rom_arm_41"):
+            if not self.catalog.has_unit_type(t):
+                self.skipTest("本机没有游戏包")
+        for t in ("ger_arty_40", "us_arty_42", "rom_armx_41"):
+            if not self.catalog.has_spec_type(t):
+                self.skipTest("本机没有游戏包")
+
+    def _save_with_romanian_unit(self):
+        """造一个含**罗马尼亚单位**（id=3，`rom_arm_41`）的存档。
+
+        罗马尼亚的 `parent_nationality` 是 `german` ⇒ 它**能**挂德军特种兵。
+        """
+        units = [
+            {"id": 1, "type": "us_inf_42", "name_brief": "id_us_inf_42_brief",
+             "name_full": None, "hq_id": 5, "xp": 10, "act_st": 4, "sup_st": 0,
+             "losses": 0, "ap": 1, "mp": 3, "entr": 0, "supply": 3,
+             "retreated": False, "hidden_defense": False,
+             "specs": [], "supplied_by": 0, "uv": [12, 34]},
+            {"id": 2, "type": "ger_inf_39", "name_brief": "我的警卫队",
+             "name_full": None, "hq_id": 5, "xp": 50, "act_st": 6, "sup_st": 1,
+             "losses": 2, "ap": 2, "mp": 2, "entr": 1, "supply": 2,
+             "retreated": False, "hidden_defense": False,
+             "specs": [], "supplied_by": 1, "uv": [13, 35]},
+            {"id": 3, "type": "rom_arm_41", "name_brief": "id_rom_arm_41_brief",
+             "name_full": None, "hq_id": 5, "xp": 0, "act_st": 4, "sup_st": 0,
+             "losses": 0, "ap": 1, "mp": 3, "entr": 0, "supply": 3,
+             "retreated": False, "hidden_defense": False,
+             "specs": [], "supplied_by": 0, "uv": [14, 36]},
+        ]
+        make_save(self.save_path, extra_entries={"units.yml": dump(units)})
+
+    def test_cross_faction_mount_is_blocked(self):
+        """德军装备挂到美国连队上 ⇒ 拒（阵营不同）。"""
+        plan, _ = self.commit([Edit.unit_spec_add(1, "ger_arty_40")])
+        self.assertFalse(plan.ok)
+        self.assertIn("不能挂到", plan.errors[0])
+        self.assertIn("阵营不同", plan.errors[0])
+
+    def test_other_nationality_mount_is_blocked(self):
+        """德国单位挂罗马尼亚装备 ⇒ 拒（德国没有父国籍，反向不成立）。"""
+        plan, _ = self.commit([Edit.unit_spec_add(2, "rom_armx_41")])
+        self.assertFalse(plan.ok)
+        self.assertIn("不能挂到", plan.errors[0])
+        self.assertIn("没有父国籍", plan.errors[0])
+
+    def test_parent_nationality_mount_is_allowed(self):
+        """**罗马尼亚单位可以挂德军装备**（罗马尼亚的父国籍是德国）。"""
+        self._save_with_romanian_unit()
+        plan, res = self.commit([Edit.unit_spec_add(3, "ger_arty_40")])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        with zipfile.ZipFile(self.save_path) as zf:
+            units = yaml.safe_load(zf.read("units.yml"))
+        rom = next(u for u in units if u["id"] == 3)
+        self.assertEqual([s["type"] for s in rom["specs"]], ["ger_arty_40"])
+
+    def test_parent_nationality_is_one_way(self):
+        """**反向不行** —— 德国单位挂不了罗马尼亚装备。"""
+        self._save_with_romanian_unit()
+        plan, _ = self.commit([Edit.unit_spec_add(2, "rom_armx_41")])
+        self.assertFalse(plan.ok)
+
+    def test_existing_illegal_mount_is_preserved_and_removable(self):
+        """历史遗留的非法挂载：**只读保留**（不主动改），但**仍可卸载**。"""
+        with zipfile.ZipFile(self.save_path) as zf:
+            before = yaml.safe_load(zf.read("units.yml"))
+        self.assertEqual(before[0]["specs"][0]["type"], "ger_arty_40")
+        plan, res = self.commit([Edit.unit_spec_remove(1, "ger_arty_40")])
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertTrue(res.ok, res.errors)
+        with zipfile.ZipFile(self.save_path) as zf:
+            after = yaml.safe_load(zf.read("units.yml"))
+        self.assertEqual(after[0]["specs"], [])
 
 
 class TestRemoveSpec(SpecPoolTestBase):

@@ -1466,6 +1466,69 @@ class TestUiDialogsAndNames(unittest.TestCase):
 
 
 # =====================================================================
+# U49：兵力卡精简 / 备选池固定尺寸 + 默认折叠 / 挂载合法性方向
+# =====================================================================
+
+
+class TestU49LayoutAndLegality(unittest.TestCase):
+    """U49 的三个改动 —— 用「读前端源码」的方式锁死。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    @staticmethod
+    def _rule(css, selector):
+        """取一条 CSS 规则的完整文本（含大括号）。"""
+        i = css.find(selector + "{")
+        if i < 0:
+            return ""
+        j = css.find("}", i)
+        return css[i:j + 1]
+
+    def test_detail_card_has_no_pip_bar_or_legend(self):
+        """单位详情兵力卡**不再**有段格条 + 图例（数字已经说清，冗余）。"""
+        self.assertNotIn('class="blood"', self.html)
+        self.assertNotIn('class="legend"', self.html)
+        self.assertNotIn(".blood{", self.html)
+        self.assertNotIn(".legend{", self.html)
+
+    def test_strength_and_xp_cards_line_up(self):
+        """兵力卡与经验卡都是「标签 / 数值 / 提示」三行，数值控件一样高。"""
+        self.assertEqual(self.html.count('class="hintline"'), 2)
+        self.assertIn(".stat .v .spin,.stat .v .numin{height:26px", self.html)
+        self.assertIn("min-height:26px", self.html)
+
+    def test_specialist_pool_window_has_fixed_height(self):
+        """备选池窗口**固定高度** —— 勾「显示全部」不许变大小。"""
+        self.assertIn("height:240px", self._rule(self.html, ".specsplit"))
+        self.assertIn("overflow:auto", self._rule(self.html, ".specslots"))
+        self.assertNotIn("max-height:340px", self._rule(self.html, ".specpool"))
+
+    def test_full_pool_groups_start_collapsed(self):
+        """375 种全量视图的各国分组**默认折叠**。"""
+        self.assertIn("function poolGroupOpen(", self.html)
+        self.assertIn("SEL.poolOpen", self.html)
+        self.assertNotIn("SEL.poolClosed", self.html)
+        self.assertIn("const open = poolGroupOpen(n);", self.html)
+
+    def test_attach_check_uses_unit_parent_nationality(self):
+        """挂载判定方向：**单位国籍的 parent == 特种兵国籍**（单向）。"""
+        self.assertIn("const nat = (cat.nationalities||{})[ut.nationality]||{};",
+                      self.html)
+        self.assertIn('if(nat.parent === sp.nationality) return {ok:true, why:""};',
+                      self.html)
+        self.assertNotIn("(cat.nationalities||{})[sp.nationality]", self.html)
+
+    def test_add_spec_is_guarded_in_frontend(self):
+        """前端点挂载时也拦一道非法挂载（核心库还有一道硬拦）。"""
+        self.assertIn("function addSpec(", self.html)
+        self.assertIn("const chk = specAttachCheck(specType, u.type);", self.html)
+
+
+# =====================================================================
 # U48：同一种特种兵可以挂多个（前端不许把已挂过的种灰掉）
 # =====================================================================
 

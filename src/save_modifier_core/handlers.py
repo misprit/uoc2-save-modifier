@@ -339,6 +339,37 @@ def _unit_spec_add(w, e: Edit) -> Outcome:
         oc.errors.append(f"存档里没有 id 为 {unit_id} 的单位")
         return oc
 
+    # U49：**挂载合法性硬拦** —— 照抄游戏自己的 `_can_add_specialist_no_len`
+    # （`e162` 字节码 / 规范 §7.3.2）：阵营必须相同；国籍相同，
+    # 或**单位国籍的 parent_nationality == 特种兵国籍**（**单向**：
+    # 罗马尼亚人能用德军装备，德军用不了罗马尼亚装备）。
+    # ⚠ 前端判定曾经写反（拿特种兵国籍的 parent 去比）⇒ 这里再兜一道底。
+    unit_type = unit.get("type")
+    # 存档 `units.yml` 顶层实测**没有** captured 字段（只有 `specs[].captured`）
+    # ⇒ 实测恒为 False；有的话按游戏逻辑（captured 跳过阵营/国籍检查）处理。
+    captured = bool(unit.get("captured"))
+    if not w.catalog.spec_can_attach(spec_type, unit_type, captured=captured):
+        sp = w.catalog.spec_type(spec_type)
+        ut = w.catalog.unit_type(unit_type)
+        if ut is None:
+            reason = f"单位类型 {unit_type!r} 不在游戏包的 unit_types 里"
+        elif sp is not None and ut.faction != sp.faction:
+            reason = (f"阵营不同（单位 {ut.faction!r} / 特种兵 {sp.faction!r}）")
+        else:
+            nat = w.catalog.nationality(ut.nationality or "")
+            parent = nat.parent_nationality if nat is not None else None
+            sp_nat = sp.nationality if sp is not None else None
+            if parent:
+                reason = (f"单位国籍 {ut.nationality!r} 的父国籍是 {parent!r}，"
+                          f"只能挂同国籍或父国籍的特种兵（当前是 {sp_nat!r}）")
+            else:
+                reason = (f"单位国籍 {ut.nationality!r} 没有父国籍，"
+                          f"只能挂同国籍的特种兵（当前是 {sp_nat!r}）")
+        oc.errors.append(
+            f"特种兵 {spec_type!r} 不能挂到 {unit_type!r} 上：{reason}"
+            "（规则见规范 §7.3.2：阵营相同 + 国籍相同或单位国籍的 parent_nationality 匹配）")
+        return oc
+
     specs = unit.setdefault("specs", [])
     cap = w.catalog.spec_cap(unit.get("type"))
     if len(specs) >= cap:
