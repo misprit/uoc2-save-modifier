@@ -149,6 +149,33 @@ def server_token() -> str:
     return server._Handler.token
 
 
+class TestNoDuplicateApiDefs(unittest.TestCase):
+    """⚠️ **同名 def 会覆盖前面那份** —— U69 的服务端补丁被跑了两遍，
+    `api_settings` 就有了两份，后一份把前一份的字段吃掉了
+    （U70 加的 `disabled_packages` 直接消失）。这里钉死。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.srv = io.open(os.path.join(root, "src", "save_modifier_web", "server.py"),
+                          encoding="utf-8").read()
+
+    def test_no_duplicate_top_level_defs(self):
+        import re
+        from collections import Counter
+        defs = re.findall(r"^def (\w+)", self.srv, re.M)
+        dups = {k: v for k, v in Counter(defs).items() if v > 1}
+        self.assertEqual(dups, {}, "服务端出现重复的顶层函数定义：%s" % dups)
+
+    def test_settings_api_is_declared_once(self):
+        self.assertEqual(self.srv.count("def api_settings("), 1)
+        self.assertEqual(self.srv.count("def api_settings_set("), 1)
+
+    def test_settings_route_is_declared_once_each(self):
+        self.assertEqual(self.srv.count('elif path == "/api/settings":'), 2,
+                         "应当只有一条 GET 与一条 POST")
+
+
 class TestU69Frontend(unittest.TestCase):
     """前端：游戏目录状态条 + 手动指定入口。"""
 
