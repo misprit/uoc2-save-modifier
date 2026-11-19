@@ -2022,3 +2022,27 @@ class TestU59CardsHorizontal(unittest.TestCase):
         """卡与空槽位都不许被 flex 压扁（压扁就会变形）。"""
         self.assertIn(".hcard{width:104px;flex:none}", self.html)
         self.assertIn(".slotempty{width:104px;height:124px;flex:none", self.html)
+
+
+# =====================================================================
+# U61：战区资产「无限」的语义提示
+# =====================================================================
+
+
+class TestU61TheaterInfiniteHint(unittest.TestCase):
+    """U61 —— 「无限」不是「无限次可用」，是「每回合恢复到 N 次」；UI 要说清楚。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_infinite_semantics_are_explained(self):
+        """「无限」= 每回合恢复 N 次、**只恢复到 N 次**、上一回合没用完的**不累积**。"""
+        self.assertIn("「无限」= 每回合恢复", self.html)
+        self.assertIn("不会累积", self.html)
+
+    def test_the_hint_only_shows_for_infinite_assets(self):
+        """提示只给「无限」的那些项显示（有限的不用显示）。"""
+        self.assertIn("${inf ? `<div class=\"talt\">「无限」= 每回合恢复", self.html)

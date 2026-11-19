@@ -2323,6 +2323,8 @@ function pageTheater(w){
               onclick="theaterToggleTotal('${asset}')">${inf?"设成数字":"改成无限"}</button></span></div>
         <div class="trow">每回合恢复
           <span class="xnum"><span class="spin" id="th_ut_${asset}"></span></span></div>
+        ${inf ? `<div class="talt">「无限」= 每回合恢复 ${cur.uses_turn} 次、<b>只恢复到 ${cur.uses_turn} 次</b> —— 上一回合没用完的<b>不会累积</b>
+          （游戏按 min(每回合恢复, 本场景剩余) 恢复；这是游戏自己的规则，不是显示问题）。</div>` : ""}
         ${(!inf && cur.to_use>cur.uses_total)
           ? `<div class="twarn">当前可用 ${cur.to_use} 次 大于 本场景剩余 ${cur.uses_total} 次 ⇒ 游戏读档会失败</div>`:""}
         ${(!inf && cur.uses_turn>cur.uses_total)
