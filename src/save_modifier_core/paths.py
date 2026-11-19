@@ -274,6 +274,85 @@ def _game_package_dirs(game_dir=None) -> list[Path]:
     return out
 
 
+#: UoC2 的 Steam App ID（创意工坊目录按它分）
+#:
+#: ⚠️ 实证：`steamapps/workshop/content/809230/` 里就是 UoC2 的创意工坊项目；
+#: UoC2 的 mod **不自动安装**（玩家手动把 zip 解压覆盖到游戏目录），
+#: 所以「已订阅但没装」的 mod 数据修改器也要能读（作为参考数据）。
+WORKSHOP_APP_ID = "809230"
+
+
+def workshop_root(app_id: str = WORKSHOP_APP_ID) -> list:
+    """Steam 标准创意工坊目录：`<库>/steamapps/workshop/content/<appid>`。"""
+    out = []
+    for lib in steam_libraries():
+        d = lib / "steamapps" / "workshop" / "content" / app_id
+        if d.is_dir():
+            out.append(d)
+    return out
+
+
+def workshop_items(app_id: str = WORKSHOP_APP_ID) -> list:
+    """创意工坊里的每个项目目录。"""
+    out = []
+    for root in workshop_root(app_id):
+        try:
+            for d in sorted(root.iterdir()):
+                if d.is_dir():
+                    out.append(d)
+        except OSError:
+            continue
+    return out
+
+
+def _zip_package_names(zip_path) -> list:
+    """zip 里的包名：`_packages/<包名>/…`，也认「根目录就是包」那种。"""
+    import zipfile
+    names = []
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            members = zf.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return names
+    for m in members:
+        parts = m.split("/")
+        if len(parts) >= 3 and parts[0] == "_packages" and parts[1] not in names:
+            names.append(parts[1])
+    for m in members:
+        parts = m.split("/")
+        if len(parts) >= 4 and parts[1:3] == ["data", "entity_types"] \
+                and parts[0] not in names:
+            names.append(parts[0])
+    return names
+
+
+def workshop_package_sources(app_id: str = WORKSHOP_APP_ID) -> list:
+    """创意工坊 mod 里的**包**（含 zip 里还没解压的）。
+
+    返回 `[{"kind": "dir"|"zip", "path": Path, "pkg": 包名, "item": 项目目录名}]`。
+    """
+    out = []
+    for item in workshop_items(app_id):
+        pk = item / "_packages"
+        if pk.is_dir():
+            try:
+                subs = sorted(x for x in pk.iterdir() if x.is_dir())
+            except OSError:
+                subs = []
+            for x in subs:
+                out.append({"kind": "dir", "path": x, "pkg": x.name,
+                            "item": item.name})
+        try:
+            zips = sorted(item.glob("*.zip"))
+        except OSError:
+            zips = []
+        for z in zips:
+            for name in _zip_package_names(z):
+                out.append({"kind": "zip", "path": z, "pkg": name,
+                            "item": item.name})
+    return out
+
+
 def not_moddable_rules(game_dir=None) -> list:
     """游戏根 `packages.yml` 的 `not_moddable` 规则。
 
@@ -438,6 +517,10 @@ class CorePaths:
         if gp is not None and gp.is_dir():
             out.append(gp)
         return out
+
+    def workshop_packages(self) -> list:
+        """创意工坊里的 mod 包（含 zip 里还没解压的）—— **只读，不落盘**。"""
+        return workshop_package_sources()
 
     def packages(self) -> list[Path]:
         """全部**包**目录（用户包在前）—— **与游戏同序**（U70）。

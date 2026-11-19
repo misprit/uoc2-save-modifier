@@ -35,6 +35,7 @@ GUI 要**照样显示**存档里的未知 type，只提示不拦截。
 
 from __future__ import annotations
 
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -243,6 +244,75 @@ class CardWhitelist:
         return sorted(self.blocked)
 
 
+
+
+class _ZipMember:
+    """**zip 里的一个文件**（创意工坊 mod 还没解压时也能读）。
+
+    接口和 `Path` 一样有 `read_bytes()` / `name` ⇒ catalog 不用改读取逻辑。
+    """
+
+    __slots__ = ("zip_path", "member")
+
+    def __init__(self, zip_path, member: str):
+        self.zip_path = Path(zip_path)
+        self.member = member
+
+    @property
+    def name(self) -> str:
+        return self.member.rsplit("/", 1)[-1]
+
+    def read_bytes(self) -> bytes:
+        with zipfile.ZipFile(self.zip_path, "r") as zf:
+            return zf.read(self.member)
+
+    def __repr__(self) -> str:                      # pragma: no cover
+        return "<zip %s!%s>" % (self.zip_path.name, self.member)
+
+
+def _zip_type_members(src: dict, kind: str) -> dict:
+    """从一个创意工坊 zip 包里抽出 `data/entity_types/<kind>/*.yml`。
+
+    `src` = `{"kind": "zip", "path": zip路径, "pkg": 包名}`。
+    """
+    out: dict = {}
+    sub = ENTITY_DIRS.get(kind)
+    if not sub:
+        return out
+    prefixes = ("_packages/%s/data/entity_types/%s/" % (src["pkg"], sub),
+                "%s/data/entity_types/%s/" % (src["pkg"], sub))
+    try:
+        with zipfile.ZipFile(src["path"], "r") as zf:
+            members = zf.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return out
+    for m in members:
+        for pre in prefixes:
+            if m.startswith(pre) and m.endswith(".yml"):
+                name = m[len(pre):-4]
+                if name and name not in out:
+                    out[name] = _ZipMember(src["path"], m)
+                break
+    return out
+
+
+def _zip_nationality_members(src: dict) -> dict:
+    """zip 包里的国籍表（`nationalities.yml` / `nationalities_2.yml`）。"""
+    out: dict = {}
+    prefixes = ("_packages/%s/data/entity_types/" % src["pkg"],
+                "%s/data/entity_types/" % src["pkg"])
+    try:
+        with zipfile.ZipFile(src["path"], "r") as zf:
+            members = zf.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return out
+    for m in members:
+        for pre in prefixes:
+            if m.startswith(pre) and m.rsplit("/", 1)[-1] in NATIONALITY_FILES:
+                out[m.rsplit("/", 1)[-1]] = _ZipMember(src["path"], m)
+                break
+    return out
+
 class Catalog:
     """游戏包的只读目录。
 
@@ -259,11 +329,22 @@ class Catalog:
         self.paths = paths or CorePaths.discover()
         self._indexes: dict[str, dict[str, Path]] = {}
         self._types: dict[tuple[str, str], dict] = {}
+        self._ws_sources: list | None = None
         self._fronts: dict[str, list[str]] = {}
         self._nats: dict[str, dict] | None = None
         self._camp_pool: dict[str, set[str]] = {}
 
     # ---- 索引 ----
+
+    @property
+    def workshop_sources(self) -> list:
+        """Steam 创意工坊里的 mod 包（**zip 里还没解压的也算**）—— U71。"""
+        if self._ws_sources is None:
+            try:
+                self._ws_sources = list(self.paths.workshop_packages())
+            except Exception:
+                self._ws_sources = []
+        return self._ws_sources
 
     def _index(self, kind: TypeKind) -> dict[str, Path]:
         """{类型名: 文件路径}，按「用户包 → 游戏包」优先级，先到先得。"""
@@ -285,6 +366,14 @@ class Catalog:
                     name = p.stem
                     if name not in idx:      # 先到先得 ⇒ 用户包优先
                         idx[name] = p
+            # U71：**Steam 创意工坊里的 mod**（还没解压进游戏目录的也算）
+            # ⇒ 它们的 `data/entity_types/…` 也要能读到。
+            # ⚠️ 优先级排在磁盘包**之后** ⇒ 游戏真正在用的数据永远优先，
+            #    创意工坊里没安装的 mod 只是「补充参考」。
+            for src in self.workshop_sources:
+                for name, member in _zip_type_members(src, kind).items():
+                    if name not in idx:
+                        idx[name] = member
         self._indexes[kind] = idx
         return idx
 
@@ -423,6 +512,18 @@ class Catalog:
                     continue
                 try:
                     data = yamlio.load(p.read_bytes())
+                except Exception:
+                    continue
+                if not isinstance(data, dict):
+                    continue
+                for k, v in data.items():
+                    if isinstance(v, dict) and k not in out:
+                        out[k] = v
+        # U71：创意工坊 mod（没解压进游戏目录的）里的国籍表也读进来
+        for src in self.workshop_sources:
+            for fn, member in _zip_nationality_members(src).items():
+                try:
+                    data = yamlio.load(member.read_bytes())
                 except Exception:
                     continue
                 if not isinstance(data, dict):

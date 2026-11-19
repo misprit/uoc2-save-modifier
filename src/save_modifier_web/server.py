@@ -780,6 +780,11 @@ def api_settings() -> dict:
         "packages": [str(p) for p in paths.packages()],
         # U70：被游戏**整包禁用**的 mod（not_moddable 规则命中）⇒ 修改器也不读
         "disabled_packages": [{"path": k, "rule": v} for k, v in disabled.items()],
+        # U71：Steam 创意工坊里的 mod 包（zip 里还没解压的也算 ⇒ 已并入参考数据）
+        "workshop_packages": [
+            {"kind": w["kind"], "pkg": w["pkg"], "item": w["item"],
+             "path": str(w["path"])}
+            for w in core_paths.workshop_package_sources()],
         "candidates": core_paths.game_dir_candidates(),
         "config_path": str(core_paths.config_path()),
     }

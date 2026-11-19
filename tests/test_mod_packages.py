@@ -16,6 +16,7 @@ import os
 import shutil
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 REPO_SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -24,6 +25,22 @@ if REPO_SRC not in os.sys.path:
     os.sys.path.insert(0, REPO_SRC)
 
 from save_modifier_core import paths as core_paths   # noqa: E402
+from save_modifier_core.catalog import Catalog        # noqa: E402
+from save_modifier_core.paths import CorePaths         # noqa: E402
+
+
+SPEC_YML = """faction: axis
+nationality: german
+name_brief: id_ger_test_spec_brief
+name_full: id_ger_test_spec_full
+attack: 3
+defense: 4
+armor: 1
+artillery: 2
+att_idx: 3
+dfe_idx: 2
+flags: [arty]
+"""
 
 
 def _write(path: Path, text: str):
@@ -134,3 +151,99 @@ not_moddable:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# =====================================================================
+# U71：Steam 标准创意工坊目录里的 mod 静态数据
+# =====================================================================
+
+
+class TestWorkshopMods(unittest.TestCase):
+    """U71 —— 创意工坊里的 mod（**还没解压进游戏目录**）也要能读。
+
+    用户要求：「把这个 Steam 标准的 Mod 文件夹下，玩家装的 Mod 里面的
+    类似特种兵这种静态的，我们修改器要用到的信息，你得纳入进来。
+    不然你声称你能够兼容其他 Mod 的数据，就是一个伪的宣称。」
+    """
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="wshop_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.lib = self.tmp / "SteamLibrary"
+        self.item = (self.lib / "steamapps" / "workshop" / "content" / "809230"
+                     / "12345")
+        self.item.mkdir(parents=True)
+        self.game = self.tmp / "Game"
+        (self.game / "_packages" / "base" / "data").mkdir(parents=True)
+        _write(self.game / "packages.yml", "addable: []\nnot_moddable: []\n")
+        self.appdata = self.tmp / "appdata"
+        (self.appdata / "_packages").mkdir(parents=True)
+
+    def _make_zip_mod(self, spec_name="ger_test_spec", body=None):
+        z = self.item / "my_mod-1.0.zip"
+        with zipfile.ZipFile(z, "w") as zf:
+            zf.writestr(
+                "_packages/mymod/data/entity_types/specialists/%s.yml" % spec_name,
+                body if body is not None else SPEC_YML)
+            zf.writestr("_packages/mymod/data/entity_types/nationalities.yml",
+                        "ger_test:\n  faction: axis\n  short: german\n")
+        return z
+
+    def _catalog(self):
+        return Catalog(CorePaths.discover(self.appdata, self.game))
+
+    def test_workshop_zip_package_is_found(self):
+        """创意工坊里还没解压的 zip ⇒ 也要被认成一个包。"""
+        self._make_zip_mod()
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            srcs = core_paths.workshop_package_sources()
+            names = [(x["kind"], x["pkg"]) for x in srcs]
+            self.assertIn(("zip", "mymod"), names)
+
+    def test_specialist_from_workshop_zip_is_readable(self):
+        """mod 里的**特种兵**（静态信息）能被读到 —— 这是修改器要用的东西。"""
+        self._make_zip_mod()
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            cat = self._catalog()
+            spec = cat.spec_type("ger_test_spec")
+            self.assertIsNotNone(spec, "创意工坊 mod 里的特种兵没读到")
+            self.assertEqual(spec.attack, 3)
+            self.assertEqual(spec.defense, 4)
+
+    def test_nationality_from_workshop_zip_is_readable(self):
+        self._make_zip_mod()
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            cat = self._catalog()
+            nat = cat.nationality("ger_test")
+            self.assertIsNotNone(nat, "创意工坊 mod 里的国籍没读到")
+            self.assertEqual(nat.faction, "axis")
+            self.assertEqual(nat.short, "german")
+
+    def test_extracted_workshop_folder_is_read(self):
+        """已解压的创意工坊 mod（`_packages/<包>/…` 目录）⇒ 直接当包用。"""
+        d = (self.item / "_packages" / "mymod" / "data" / "entity_types"
+             / "specialists")
+        _write(d / "ger_test_spec.yml", SPEC_YML)
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            srcs = core_paths.workshop_package_sources()
+            self.assertIn(("dir", "mymod"), [(x["kind"], x["pkg"]) for x in srcs])
+
+    def test_disk_packages_win_over_workshop_zip(self):
+        """⚠️ **磁盘包优先** —— 游戏真正在用的数据不能被「没安装的 mod」盖掉。"""
+        self._make_zip_mod(spec_name="ger_shared",
+                           body=SPEC_YML.replace("attack: 3", "attack: 9"))
+        _write(self.appdata / "_packages" / "mymod" / "data" / "entity_types"
+               / "specialists" / "ger_shared.yml",
+               SPEC_YML.replace("attack: 3", "attack: 1"))
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            cat = self._catalog()
+            spec = cat.spec_type("ger_shared")
+            self.assertIsNotNone(spec)
+            self.assertEqual(spec.attack, 1, "磁盘包应当赢过创意工坊里没安装的 zip")
+
+
