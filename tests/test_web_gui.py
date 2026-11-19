@@ -1578,7 +1578,7 @@ class TestU53ToolbarAndBattleFilter(unittest.TestCase):
     def test_toolbar_spans_the_whole_page(self):
         """工具条**横跨整页**（放在两栏之上）⇒ 搜索 + 总部 + 激活筛选**一行**。"""
         self.assertIn('class="toolbar toolbar-top"', self.html)
-        self.assertIn('class="cols cols-units"', self.html)
+        self.assertIn('class="cols cols-units cols-fill"', self.html)
 
     def test_battle_only_filter_exists(self):
         """「仅当前场景激活」筛选；**不在战斗里置灰**（按能力位 in_battle）。"""
@@ -1590,10 +1590,15 @@ class TestU53ToolbarAndBattleFilter(unittest.TestCase):
         self.assertIn('${inBattle?"":"disabled"}', self.html)
 
     def test_units_columns_are_wider_without_the_gap(self):
-        """列表列加宽（0.6fr → 0.64fr）+ 栏间不留那道空档（gap 0）。"""
+        """列表列加宽（0.6fr → 0.64fr）。
+
+        ⚠️ **U58 改了栏间隔**：U53 当初是 `gap:0`（为了「列表别被挤」），
+        U58 按用户口径「栏间隔 = 面板到边缘的间隔」改回 14px ——
+        面板 margin 归零后列表反而比原来还宽一点，视觉也统一了。"""
         rule = self._rule(self.html, ".cols-units")
         self.assertIn("0.64fr", rule)
-        self.assertIn("gap:0", rule)
+        self.assertIn("gap:14px", rule)
+        self.assertIn("margin:14px", rule)
 
     def test_data_tip_quotes_are_escaped(self):
         """`data-tip` 的值里**不能直接带双引号**（`class="tn"` 会把属性提前闭合
@@ -1943,3 +1948,52 @@ class TestU57HqPageTweaks(unittest.TestCase):
                       self.html)
         # 目标输入框不能再用内联尺寸（会盖掉 CSS 里的统一尺寸）
         self.assertNotIn('autocomplete="off" value="${xt}" style=', self.html)
+
+
+# =====================================================================
+# U58：单位页排版微调
+# =====================================================================
+
+
+class TestU58UnitsPageTweaks(unittest.TestCase):
+    """U58 —— 栏间隔统一、搜索栏留上边距、两栏撑满高度、详情标题不挤成竖排。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_units_column_gap_equals_edge_margin(self):
+        """单位页两栏：栏间隔 = 到边缘的间隔（14px）。"""
+        self.assertIn(".cols-units > .panel{margin:0}", self.html)
+        rule = self.html.split(".cols-units{")[1].split("}")[0]
+        self.assertIn("gap:14px", rule)
+        self.assertIn("margin:14px", rule)
+        self.assertNotIn("gap:0", rule)
+
+    def test_toolbar_has_top_margin(self):
+        """顶部工具条**上边距也要 14px**（原来 `margin:0 14px 12px` ⇒ 顶到边缘）。"""
+        self.assertIn(".toolbar-top{margin:14px 14px 12px}", self.html)
+        self.assertNotIn(".toolbar-top{margin:0 14px 12px}", self.html)
+
+    def test_units_panels_fill_the_height(self):
+        """两栏撑满可用高度 ⇒ 列表在卡内滚（能显示更多单位）。"""
+        self.assertIn('<div class="cols cols-units cols-fill">', self.html)
+        self.assertIn(".cols-fill .rows{max-height:none;height:100%;overflow:auto}", self.html)
+        self.assertNotIn(".rows{max-height:430px", self.html)
+
+    def test_specialist_area_grows_with_the_panel(self):
+        """详情卡里的特种兵区**跟着面板长高**（原来写死 240px ⇒ 下面空一大片）。"""
+        self.assertIn(".cols-fill #udetail{display:flex;flex-direction:column}", self.html)
+        self.assertIn(".cols-fill #udetail .specsplit{height:auto;flex:1;min-height:240px}",
+                      self.html)
+
+    def test_detail_title_is_not_squeezed_vertically(self):
+        """窄栏时详情标题不许被挤成竖排（「第21步兵师」一字一行）
+        ⇒ 数字卡整块换到第二行（容器查询按**栏宽**判，不按窗口宽）。"""
+        self.assertIn("container-type:inline-size", self.html)
+        head = self.html.split("\n.dhead{")[1].split("}")[0]
+        self.assertIn("flex-wrap:wrap", head)
+        self.assertIn("@container (max-width:760px)", self.html)
+        self.assertIn(".dhead .stats{flex:1 1 100%;width:auto}", self.html)

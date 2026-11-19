@@ -233,11 +233,16 @@ table.list td.k{color:var(--muted)}
 /* U53：单位页的工具条**横跨整页**（放在两栏之上）——
    搜索框 + 总部筛选 + 「仅当前场景激活」**一行**排得下，
    不用再窄了就换行。左右 14px 与下方面板对齐。 */
-.toolbar-top{margin:0 14px 12px}
+/* U58：顶部工具条**上边距也要 14px**（原来 0 ⇒ 顶到边缘，和左右不一致） */
+.toolbar-top{margin:14px 14px 12px}
 .toolbar .tbcount{font-size:12.5px;color:var(--muted);white-space:nowrap}
 /* U53：单位页两栏 —— 列表列加宽，栏间**不留那道空档**
    （gap 0 ⇒ 两个面板的 margin 相接 = 28px）。 */
-.cols-units{grid-template-columns:minmax(320px,0.64fr) minmax(430px,1.36fr);gap:0}
+/* U58：单位页两栏 —— 栏间隔与其它两栏页**统一**（14px，与边缘同宽）。
+   U53 当初把栏间隔去掉是为了「列表别被挤」，现在面板 margin 归零、
+   间距改由 grid 的 gap 负责 ⇒ 列表比原来还宽一点，视觉也统一了。 */
+.cols-units{grid-template-columns:minmax(320px,0.64fr) minmax(430px,1.36fr);gap:14px;margin:14px}
+.cols-units > .panel{margin:0}
 .chk.dis{opacity:.45;cursor:not-allowed}
 .chk.dis input{cursor:not-allowed}
 .sel{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 9px;font-size:14px;
@@ -250,7 +255,14 @@ table.list td.k{color:var(--muted)}
   box-shadow:0 1px 3px rgba(20,40,60,.12)}
 .tabs .tb .n{font-family:var(--mono);font-size:12px;opacity:.75;margin-left:4px}
 /* 单位行 */
-.rows{max-height:430px;overflow:auto}
+.rows{overflow:auto}
+/* U58：两栏撑满可用高度 ⇒ 列表在卡内滚（能显示更多单位） */
+.cols-fill .rows{max-height:none;height:100%;overflow:auto}
+/* U58：详情卡里的特种兵区**跟着长高**（原来是写死的 240px ⇒ 下面空一大片） */
+.cols-fill #udetail{display:flex;flex-direction:column}
+.cols-fill #udetail .dhead{flex:none}
+.cols-fill #udetail .specbox{flex:1;min-height:0;display:flex;flex-direction:column}
+.cols-fill #udetail .specsplit{height:auto;flex:1;min-height:240px}
 .urow{display:flex;align-items:center;gap:11px;padding:11px 14px;
   border-bottom:1px solid #f0f3f6;cursor:pointer}
 .urow:hover{background:var(--accent-light)}
@@ -273,11 +285,18 @@ table.list td.k{color:var(--muted)}
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;flex:none}
 /* 详情抬头 */
 .detail{padding:14px}
-.dhead{display:flex;gap:16px;align-items:stretch}
+/* U58：详情抬头 —— 窄栏时数字卡**整块换到第二行**，不许把标题挤成竖排
+   （原来 `.dhead` 不换行 + `.stats` 固定 440px ⇒ 栏宽不够时标题被压成
+    「第21步兵师」一字一行）。用**容器查询**按**栏宽**判，不按窗口宽。 */
+.dhead{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;container-type:inline-size}
 .dhead .ava{width:84px;height:84px;flex:none;align-self:center}
-.dhead .idblk{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.dhead .idblk{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;justify-content:center}
 .dhead .vsep{width:1px;background:var(--border);flex:none}
 .dhead .stats{flex:none;width:440px}
+@container (max-width:760px){
+  .dhead .vsep{display:none}
+  .dhead .stats{flex:1 1 100%;width:auto}
+}
 .dtitle{font-size:19px;font-weight:700;color:var(--accent-dark);display:flex;align-items:center;gap:8px;
   flex-wrap:wrap}
 .dtitle .edit{font-size:12.5px;color:var(--muted);font-weight:400;border:1px dashed var(--border);
@@ -1386,7 +1405,7 @@ function pageUnits(w){
       <span class="sp"></span>
       <span class="tbcount">显示 ${list.length} / 共 ${units.length} 个</span>
     </div>
-    <div class="cols cols-units">
+    <div class="cols cols-units cols-fill">
     <div class="panel"><h3>单位 · 共 ${units.length} 个</h3>
       <div class="pbody">
         <div class="rows">${list.map(unitRowHTML).join("") ||
