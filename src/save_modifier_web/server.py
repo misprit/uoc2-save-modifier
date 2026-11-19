@@ -773,10 +773,13 @@ def api_settings() -> dict:
     from save_modifier_core import paths as core_paths
 
     paths = CorePaths.discover()
+    disabled = core_paths.disabled_packages(paths.uoc2_appdata, paths.game_dir)
     return {
         "game_dir": str(paths.game_dir) if paths.game_dir else "",
         "found": bool(paths.game_dir),
         "packages": [str(p) for p in paths.packages()],
+        # U70：被游戏**整包禁用**的 mod（not_moddable 规则命中）⇒ 修改器也不读
+        "disabled_packages": [{"path": k, "rule": v} for k, v in disabled.items()],
         "candidates": core_paths.game_dir_candidates(),
         "config_path": str(core_paths.config_path()),
     }

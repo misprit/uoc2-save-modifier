@@ -250,6 +250,139 @@ def detect_game_dir() -> Path | None:
     return None
 
 
+def _game_package_dirs(game_dir=None) -> list[Path]:
+    """官方包目录（base / dlc1..dlc10）—— 数字序（dlc2 在 dlc10 前面）。"""
+    gd = Path(game_dir).expanduser() if game_dir else detect_game_dir()
+    if gd is None:
+        return []
+    gp = Path(gd) / "_packages"
+    if not gp.is_dir():
+        return []
+    try:
+        names = list(gp.iterdir())
+    except OSError:
+        return []
+    out = [d for d in names if d.is_dir()]
+
+    def key(p):
+        stem = p.name
+        if stem.startswith("dlc") and stem[3:].isdigit():
+            return (1, int(stem[3:]))
+        return (0, 0)
+
+    out.sort(key=key)
+    return out
+
+
+def not_moddable_rules(game_dir=None) -> list:
+    """游戏根 `packages.yml` 的 `not_moddable` 规则。
+
+    ⚠️ **游戏据此把整个 mod 包禁用**（不是只跳过那个文件）：
+    `paths.pyc::check_not_moddable` ⇒ 命中就把该包从包列表里剔掉，
+    并打一条 "MOD DISABLED (non-moddable content)" 的警告。
+
+    规则长这样（每段一段路径，`*` 匹配任意一段）：
+        ["*", "data", "entity_types", "nationalities.yml"]
+    """
+    gd = Path(game_dir).expanduser() if game_dir else detect_game_dir()
+    if gd is None:
+        return []
+    p = Path(gd) / "packages.yml"
+    try:
+        from . import yamlio
+        data = yamlio.load(p.read_bytes())
+    except Exception:
+        return []
+    rules = (data or {}).get("not_moddable") if isinstance(data, dict) else None
+    return list(rules) if isinstance(rules, list) else []
+
+
+def _rule_matches(rule, pkg: Path) -> bool:
+    """一条 `not_moddable` 规则是否命中这个包（包内存在匹配的文件）。"""
+    if not isinstance(rule, (list, tuple)) or len(rule) < 2:
+        return False
+    segs = [str(x) for x in rule[1:]]          # 第一段是包名通配（"*"）
+    if not segs:
+        return False
+    import fnmatch
+    cur = pkg
+    for seg in segs[:-1]:
+        if seg == "*":
+            if not cur.is_dir():
+                return False
+            try:
+                hits = [d for d in cur.iterdir() if d.is_dir()]
+            except OSError:
+                return False
+            if not hits:
+                return False
+            cur = hits[0]
+            continue
+        cur = cur / seg
+        if not cur.is_dir():
+            return False
+    last = segs[-1]
+    if last == "*":
+        return cur.is_dir()
+    try:
+        names = [f.name for f in cur.iterdir()]
+    except OSError:
+        return False
+    return any(fnmatch.fnmatch(n, last) for n in names)
+
+
+def package_dirs(appdata=None, game_dir=None) -> list[Path]:
+    """**包列表**（与游戏一致）：非官方包（用户 `_packages` 里的）→ 官方包。
+
+    ⚠️ 两条规矩（字节码依据 `paths.pyc::_build_package_list`）：
+    1. **容器内用 `listdir` 原序**（不是 sorted）—— 同名文件冲突时
+       选中的包必须和游戏一致；
+    2. 官方包名（base / dlc1..）出现在用户目录里时**跳过**（那是官方包，不是 mod）。
+    """
+    from .paths import CorePaths as _CP          # 自引用避免循环
+    paths = _CP.discover(appdata, game_dir)
+    out: list[Path] = []
+    game_names = {p.name for p in _game_package_dirs(paths.game_dir)}
+    for root in paths.package_roots():
+        if not root.is_dir():
+            continue
+        try:
+            names = list(root.iterdir())          # listdir 原序
+        except OSError:
+            continue
+        for d in names:
+            if not d.is_dir():
+                continue
+            if d.name in game_names:              # 官方包名 ⇒ 不算 mod
+                continue
+            if d not in out:
+                out.append(d)
+    for d in _game_package_dirs(paths.game_dir):
+        if d.is_dir() and d not in out:
+            out.append(d)
+    return out
+
+
+def disabled_packages(appdata=None, game_dir=None) -> dict:
+    """被游戏禁用的包（`not_moddable` 规则命中）⇒ {包路径: 命中的规则}。"""
+    rules = not_moddable_rules(game_dir)
+    if not rules:
+        return {}
+    paths = CorePaths.discover(appdata, game_dir)
+    game_dirs = {str(d) for d in _game_package_dirs(paths.game_dir)}
+    out = {}
+    for pkg in package_dirs(appdata, game_dir):
+        # ⚠️ 只查 **mod 包**：游戏的 `check_not_moddable` 只在 mod 目录里 glob，
+        #    官方包（base / dlcN）自己就带着那些文件 ⇒ 永远不禁用。
+        if str(pkg) in game_dirs:
+            continue
+        for rule in rules:
+            if _rule_matches(rule, Path(pkg)):
+                out[str(pkg)] = list(rule)
+                break
+    return out
+
+
 @dataclass(frozen=True)
 class CorePaths:
     """一组已定位的路径。"""
@@ -307,21 +440,21 @@ class CorePaths:
         return out
 
     def packages(self) -> list[Path]:
-        """全部**包**目录（用户包在前）。
+        """全部**包**目录（用户包在前）—— **与游戏同序**（U70）。
 
         ⚠️ `_packages/` 是**容器**，真正的包是它下面的子目录：
-        游戏侧是 `base` / `dlc1` … `dlc10`，用户侧是 mod 目录（如 `fall_blau_2`）。
-        每个包自己的数据在 `<包>/data/…`。
-        """
-        out: list[Path] = []
-        for root in self.package_roots():
-            try:
-                subs = sorted(p for p in root.iterdir() if p.is_dir())
-            except OSError:
-                continue
-            out.extend(subs)
-        return out
+        游戏侧是 `base` / `dlc1` / … / `dlc10`，用户侧是 mod 目录（如 `fall_blau_2`）。
 
+        ⚠️ **顺序 = 游戏的顺序**（U70）：非官方包 → 官方包；容器内用
+        `listdir` 原序（不是 sorted）⇒ 同名文件冲突时选中的包与游戏一致。
+
+        ⚠️ **被游戏禁用的包不出现**（U70）：游戏根 `packages.yml` 的
+        `not_moddable` 规则命中的包，游戏整个禁用 ⇒ 修改器也不读它
+        （否则会读到游戏里根本不加载的数据）。
+        """
+        dirs = package_dirs(self.uoc2_appdata, self.game_dir)
+        disabled = disabled_packages(self.uoc2_appdata, self.game_dir)
+        return [d for d in dirs if str(d) not in disabled]
     # 兼容旧名
     package_dirs = package_roots
 

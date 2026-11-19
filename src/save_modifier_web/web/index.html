@@ -3791,8 +3791,11 @@ async function loadSettings(){
   if(box){
     if(s && s.found){
       box.className = "gamedir";
+      const dis = s.disabled_packages||[];
       box.innerHTML = `<span>✓ 游戏本体：<span class="gp">${esc(s.game_dir)}</span></span>
         <span>（${(s.packages||[]).length} 个包 · 特种兵 / 卡牌 / 战役数据都从这里读）</span>
+        ${dis.length?`<span title="${esc(dis.map(d=>d.path+" ← "+d.rule.join("/")).join("\n"))}">
+          ⚠ ${dis.length} 个 mod 被游戏禁用（not_moddable）· 修改器也不读</span>`:""}
         <button class="btn" onclick="pickGameDir()">换一个</button>`;
     }else{
       box.className = "gamedir bad";
