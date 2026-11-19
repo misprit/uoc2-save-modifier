@@ -127,6 +127,11 @@ table.list td.k{color:var(--muted)}
 .rail .nav .ic{width:20px;text-align:center;color:var(--muted)}
 .rail .nav.on .ic{color:var(--accent)}
 .work{flex:1;min-width:0;display:flex;flex-direction:column;overflow:auto;padding-bottom:8px}
+/* U56：`.work` 是 column flex ⇒ 直接子项默认能压缩 ⇒ 内容超出视口时
+   **面板被压扁**（`.panel{overflow:hidden}` 顺手裁掉）而不是容器滚动
+   ⇒ 底部被截断、而且没有滚动条能拉到。⇒ 锁死子项不缩：高度按内容走，
+   超出由 `.work` 自己滚。 */
+.work > *{flex:none}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;
   margin:14px;overflow:hidden}
 .panel>h3{margin:0;padding:10px 14px;font-size:14px;font-weight:700;color:var(--accent-dark);
@@ -134,10 +139,30 @@ table.list td.k{color:var(--muted)}
 .pbody{padding:14px}
 .placeholder{padding:34px;text-align:center;color:var(--muted)}
 .placeholder .big{font-size:17px;color:var(--text);margin-bottom:6px}
-.capgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
-.capcard{border:1px solid var(--border);border-radius:7px;padding:10px 12px;background:var(--surface)}
+/* U56：概览页统一排版 —— 两栏面板；能力位卡片列数按**断点**定死。
+   （原来用 `auto-fill` ⇒ 窗口一放大，列数说变就变、卡片被拉得极宽
+     ⇒ 「位移和大小变化比较随意」。现在只在 1240 / 760 两个断点上换列。） */
+.ovwrap{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);
+  gap:14px;align-items:start;margin:14px}
+.ovcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ovcol > .panel{margin:0}
+@media (max-width:1040px){ .ovwrap{grid-template-columns:minmax(0,1fr)} }
+.capgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+/* 7 张卡：3 列时最后一张独占一行（3n+1）⇒ 不留孤零零的一张 */
+.capgrid > .capcard:last-child:nth-child(3n+1){grid-column:1/-1}
+@media (max-width:1240px){
+  .capgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .capgrid > .capcard:last-child:nth-child(3n+1){grid-column:auto}
+  .capgrid > .capcard:last-child:nth-child(2n+1){grid-column:1/-1}
+}
+@media (max-width:760px){
+  .capgrid{grid-template-columns:minmax(0,1fr)}
+  .capgrid > .capcard:last-child:nth-child(2n+1){grid-column:auto}
+}
+.capcard{border:1px solid var(--border);border-radius:7px;padding:10px 12px;background:var(--surface);
+  display:flex;flex-direction:column;min-height:58px}
 .capcard .h{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:4px}
-.capcard .r{font-size:12.5px;color:var(--danger)}
+.capcard .r{font-size:12.5px;color:var(--danger);margin-top:auto}
 .capcard.ok .h{color:var(--ok)}
 .capcard.off{border-color:#e8b3b2;background:var(--danger-light)}
 .capcard.off .h{color:var(--danger)}
@@ -152,9 +177,14 @@ table.list td.k{color:var(--muted)}
   padding:10px 12px;font-size:12.5px;color:var(--muted);line-height:1.6}
 .note b{color:var(--text)}
 /* 数值控件（U54：大数字=输入框；小数字用滚轮 ±1） */
-.tun{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--surface-alt)}
-.tun:last-child{border-bottom:none}
-.tun .k{width:64px;color:var(--muted)}
+/* U56：战役进度 —— 两行并排成「卡片」，外观和上面的能力位卡统一 */
+.tungrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:760px){ .tungrid{grid-template-columns:minmax(0,1fr)} }
+.tun{display:flex;flex-direction:column;gap:7px;padding:10px 12px;
+  border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.tun .thr{display:flex;align-items:baseline;gap:8px}
+.tun .tvr{display:flex;align-items:center;gap:10px}
+.tun .k{color:var(--muted)}
 /* U54：数值控件 —— 大数字给输入框；小数字只给滚轮 ±1 */
 .tun .num{width:112px;text-align:center;padding:6px 10px;border:1px dashed var(--border);
   border-radius:6px;background:var(--surface);font-family:var(--mono);
@@ -164,7 +194,7 @@ table.list td.k{color:var(--muted)}
 .tun .num:focus{border-color:var(--accent);background:var(--accent-light)}
 .tun .num.dirty{border-color:var(--accent);background:var(--accent-light)}
 .tun .num.bad{border-color:var(--danger);background:var(--danger-light);color:var(--danger)}
-.tun .hint{font-size:11.5px;color:var(--muted)}
+.tun .hint{margin-left:auto;font-size:11.5px;color:var(--muted)}
 .tun .old{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
 
 /* ===================================================================
@@ -464,9 +494,16 @@ table.spec-tbl .spin{font-size:16px;padding:4px 9px;min-width:40px}
   border:1px solid var(--stage-edge);border-radius:4px;object-fit:contain}
 .cstore .csrow .csn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cstore .csrow .csp{font-family:var(--mono);color:var(--accent-dark);font-weight:700}
-.bkrow{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:13px;color:var(--muted)}
-.bkrow b{font-family:var(--mono);color:var(--text);font-weight:600}
-.bkrow .n{margin-left:auto;font-size:12px}
+/* U56：备份/撤销行统一成三栏：标签 | 主内容（过长省略号截断）| 右侧小字
+   （原来大小被 `margin-left:auto` 甩到面板最右边，和名字隔了一整屏） */
+.bkrow{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;
+  padding:5px 0;font-size:13px;color:var(--muted);border-bottom:1px solid var(--surface-alt)}
+.bkrow:last-child{border-bottom:none}
+.bkrow .bt{font-size:12px;white-space:nowrap}
+.bkrow .bn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--mono);color:var(--text);font-weight:600}
+.bkrow .bm{font-size:11.5px;white-space:nowrap;text-align:right}
+.bkempty{font-size:13px;color:var(--muted);padding:4px 0}
 
 
 /* ---------------- 悬停浮层 .tip（U43 · 设计稿 §1） ---------------- */
@@ -2950,14 +2987,19 @@ function conferenceStoreHTML(){
 /* ---------- 概览页：备份与撤销栈 ---------- */
 function backupStackHTML(){
   const u = USTACK||{};
-  const bks = (u.backups||[]).map(b=>`<div class="bkrow">备份
-    <b>${esc(b.name)}</b><span>${esc(b.mtime)}</span>
-    <span class="n">${esc(b.size||"")}</span></div>`).join("");
-  const st = (u.stack||[]).map((r,i)=>`<div class="bkrow">撤销 ${i+1}
-    <b>${esc((r.time||"").replace("T"," "))}</b>
-    <span>${esc(r.summary||((r.entries||[]).join("、")))}</span></div>`).join("");
-  if(!bks && !st) return `<div class="bkrow" style="color:var(--muted)">
-    还没有备份，也没有撤销记录</div>`;
+  /* U56：三栏 —— 标签 | 主内容 | 右侧小字（名字过长省略号截断，hover 有全文） */
+  const bks = (u.backups||[]).map(b=>`<div class="bkrow">
+    <span class="bt">备份</span>
+    <span class="bn" title="${esc(b.name)}">${esc(b.name)}</span>
+    <span class="bm">${esc(b.mtime||"")} · ${esc(b.size||"")}</span></div>`).join("");
+  const st = (u.stack||[]).map((r,i)=>{
+    const sum = r.summary||((r.entries||[]).join("、"));
+    return `<div class="bkrow">
+    <span class="bt">撤销 ${i+1}</span>
+    <span class="bn" title="${esc(sum)}">${esc(sum)}</span>
+    <span class="bm">${esc((r.time||"").replace("T"," "))}</span></div>`;
+  }).join("");
+  if(!bks && !st) return `<div class="bkempty">还没有备份，也没有撤销记录</div>`;
   return bks + st;
 }
 
@@ -3284,30 +3326,40 @@ function show(p){
         <div class="h">${FEATURE_CN[f.name]||f.name} ${f.ok?'✓':'✗'}</div>
         ${f.ok?"":`<div class="r">${esc(f.reason)}</div>`}
       </div>`).join("");
-    w.innerHTML = `<div class="panel"><h3>概览 · 能力位体检</h3>
-      <div class="pbody"><div class="capgrid">${caps}</div></div></div>
-      <div class="panel"><h3>备份与撤销栈</h3>
-        <div class="pbody">${backupStackHTML()}</div></div>
-      <div class="panel"><h3>战役进度（可直接输入）</h3>
-      <div class="pbody">
-        <div class="tun"><span class="k">声望</span>
-          <input class="num" id="n_prestige" data-f="prestige" type="text"
-                 inputmode="numeric" autocomplete="off">
-          <span class="old" id="o_prestige"></span>
-          <span class="hint">可直接输入</span></div>
-        <div class="tun"><span class="k">分数</span>
-          <input class="num" id="n_score" data-f="score" type="text"
-                 inputmode="numeric" autocomplete="off">
-          <span class="old" id="o_score"></span>
-          <span class="hint">可直接输入</span></div>
-        <div class="note" style="margin-top:10px">
-          <b>这一版能做什么</b>：读存档、列能力位、<b>改战役进度</b>（改完进「待应用」，
-          点右上角「应用更改」才写盘，写前自动备份、可撤销）。<br>
-          <b>各页进度</b>：单位 ✅ · 总部 ✅ · 卡牌 ✅ · 商店 ✅ · 战区资产 ✅ · 战役 ✅（只读）。
-          <b>战区资产</b>要存档正在战斗里才有内容（它是唯一的 L3 写入例外）。
-        </div>
-      </div></div>
-      `;
+    /* U56：两栏面板 —— 左「能力位体检 + 战役进度」，右「备份与撤销栈 + 说明」。
+       宽度有上限、位置固定 ⇒ 放大窗口时不再「卡片乱飞」。 */
+    w.innerHTML = `<div class="ovwrap">
+      <div class="ovcol">
+        <div class="panel"><h3>能力位体检</h3>
+          <div class="pbody"><div class="capgrid">${caps}</div></div></div>
+        <div class="panel"><h3>战役进度（可直接输入）</h3>
+          <div class="pbody"><div class="tungrid">
+            <div class="tun">
+              <div class="thr"><span class="k">声望</span><span class="hint">可直接输入</span></div>
+              <div class="tvr">
+                <input class="num" id="n_prestige" data-f="prestige" type="text"
+                       inputmode="numeric" autocomplete="off">
+                <span class="old" id="o_prestige"></span></div></div>
+            <div class="tun">
+              <div class="thr"><span class="k">分数</span><span class="hint">可直接输入</span></div>
+              <div class="tvr">
+                <input class="num" id="n_score" data-f="score" type="text"
+                       inputmode="numeric" autocomplete="off">
+                <span class="old" id="o_score"></span></div></div>
+          </div></div></div>
+      </div>
+      <div class="ovcol">
+        <div class="panel"><h3>备份与撤销栈</h3>
+          <div class="pbody">${backupStackHTML()}</div></div>
+        <div class="panel"><h3>关于这个修改器</h3>
+          <div class="pbody"><div class="note" style="margin:0">
+            <b>这一版能做什么</b>：读存档、列能力位、<b>改战役进度</b>（改完进「待应用」，
+            点右上角「应用更改」才写盘，写前自动备份、可撤销）。<br>
+            <b>各页进度</b>：单位 ✅ · 总部 ✅ · 卡牌 ✅ · 商店 ✅ · 战区资产 ✅ · 战役 ✅（只读）。
+            <b>战区资产</b>要存档正在战斗里才有内容（它是唯一的 L3 写入例外）。
+          </div></div></div>
+      </div>
+    </div>`;
     bindTun();
     paintPending();
     return;

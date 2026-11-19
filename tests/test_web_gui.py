@@ -1834,3 +1834,67 @@ class TestSameSpecialistMounting(unittest.TestCase):
         self.assertIn("function removeSpec(unitId, specType, idx)", self.html)
         self.assertIn("unit_spec_remove:${unitId}:${specType}:${s.idx}", self.html)
         self.assertTrue('（第 "+nth+"/"+same.length+" 个' in self.html)
+
+
+# =====================================================================
+# U56：概览页排版统一 + 修「内容被截断、且滚不动」
+# =====================================================================
+
+
+class TestU56OverviewLayout(unittest.TestCase):
+    """U56 —— `.work` 子项锁死不缩（超出就滚，不再把面板压扁）；概览页两栏 + 定死列数。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_work_children_cannot_shrink(self):
+        """`.work` 是 column flex ⇒ 子项默认能压缩 ⇒ 面板被压扁 + overflow:hidden 裁掉
+        ⇒ 底部截断且没有滚动条。必须锁死 `flex:none`。"""
+        self.assertIn(".work > *{flex:none}", self.html)
+        self.assertIn(".work{flex:1;min-width:0;display:flex;flex-direction:column;overflow:auto",
+                      self.html)
+
+    def test_overview_uses_two_column_layout(self):
+        """概览页改成两栏面板（宽度有上限、位置固定）。"""
+        self.assertIn(".ovwrap{display:grid", self.html)
+        self.assertIn(".ovcol{display:flex;flex-direction:column", self.html)
+        self.assertIn('<div class="ovwrap">', self.html)
+        self.assertIn('<div class="ovcol">', self.html)
+
+    def test_capgrid_columns_are_fixed_not_autofill(self):
+        """能力位卡片列数**按断点定死** —— 不许再用 `auto-fill`
+        （auto-fill ⇒ 窗口一放大列数说变就变、卡片被拉得极宽 ⇒ 位移随意）。"""
+        rule = self.html.split(".capgrid{")[1].split("}")[0]
+        self.assertNotIn("auto-fill", rule)
+        self.assertIn("repeat(3,minmax(0,1fr))", rule)
+        self.assertIn("@media (max-width:1240px)", self.html)
+        self.assertIn("repeat(2,minmax(0,1fr))", self.html)
+
+    def test_last_capcard_spans_full_row(self):
+        """7 张卡：3 列 / 2 列时最后一张独占一行 ⇒ 不留孤零零的一张。"""
+        self.assertIn(".capgrid > .capcard:last-child:nth-child(3n+1){grid-column:1/-1}",
+                      self.html)
+        self.assertIn(".capgrid > .capcard:last-child:nth-child(2n+1){grid-column:1/-1}",
+                      self.html)
+
+    def test_value_cards_share_the_capcard_style(self):
+        """战役进度也做成「卡片」，外观和能力位卡统一。"""
+        self.assertIn(".tungrid{display:grid", self.html)
+        self.assertIn(".tun{display:flex;flex-direction:column", self.html)
+        self.assertIn("border:1px solid var(--border);border-radius:7px;background:var(--surface)",
+                      self.html)
+        self.assertIn('<div class="tungrid">', self.html)
+        self.assertNotIn(".tun:last-child{border-bottom:none}", self.html)
+
+    def test_backup_rows_are_unified_three_columns(self):
+        """备份/撤销行统一成三栏：标签 | 主内容（省略号截断）| 右侧小字。
+        原来大小被 `margin-left:auto` 甩到面板最右边，和名字隔了一整屏。"""
+        self.assertIn(".bkrow{display:grid;grid-template-columns:56px minmax(0,1fr) auto",
+                      self.html)
+        self.assertNotIn(".bkrow .n{margin-left:auto", self.html)
+        self.assertIn('<span class="bt">备份</span>', self.html)
+        self.assertIn('<span class="bn" title=', self.html)
+        self.assertIn('<span class="bm">', self.html)
