@@ -305,51 +305,93 @@ def workshop_items(app_id: str = WORKSHOP_APP_ID) -> list:
     return out
 
 
-def _zip_package_names(zip_path) -> list:
-    """zip 里的包名：`_packages/<包名>/…`，也认「根目录就是包」那种。"""
+#: 判定「一个目录/压缩包的根是不是一个**包**」的标志
+#:
+#: 依据：场景编辑器上传创意工坊时给的是**包路径**
+#: （`edit_ctrl.pyc::_update_workshop_item` ⇒ `set_item_content_dir(self._package_path)`）
+#: ⇒ 下载下来的内容就是**包的裸文件**。
+PACK_MARKERS = ("main.yml", "data", "scenarios", "campaigns", "entity_types",
+                "maps", "locale.yml")
+
+
+def _looks_like_package(names) -> bool:
+    """一组相对路径（目录或 zip 内）看起来像「一个包」吗？"""
+    tops = set()
+    for n in names:
+        parts = n.replace("\\", "/").split("/")
+        if parts and parts[0]:
+            tops.add(parts[0])
+    return any(t in PACK_MARKERS for t in tops)
+
+
+def _dir_package_sources(item) -> list:
+    """一个创意工坊项目**目录**里的包。"""
+    out = []
+    pk = item / "_packages"
+    if pk.is_dir():
+        try:
+            subs = sorted(x for x in pk.iterdir() if x.is_dir())
+        except OSError:
+            subs = []
+        for x in subs:
+            out.append({"kind": "dir", "path": x, "pkg": x.name,
+                        "prefix": "", "item": item.name})
+        if out:
+            return out
+    # 裸文件形态：项目目录**本身就是**一个包
+    try:
+        names = [str(x.relative_to(item)).replace("\\", "/")
+                 for x in item.rglob("*") if x.is_file()]
+    except OSError:
+        names = []
+    if _looks_like_package(names):
+        out.append({"kind": "dir", "path": item, "pkg": item.name,
+                    "prefix": "", "item": item.name})
+    return out
+
+
+def _zip_package_sources(zip_path, item_name) -> list:
+    """一个创意工坊项目里的 **zip** 里的包。"""
     import zipfile
-    names = []
+    out = []
     try:
         with zipfile.ZipFile(zip_path) as zf:
             members = zf.namelist()
     except (OSError, zipfile.BadZipFile):
-        return names
+        return out
+    # ① 包在 _packages/<包名>/ 下
+    pkgs = []
     for m in members:
-        parts = m.split("/")
-        if len(parts) >= 3 and parts[0] == "_packages" and parts[1] not in names:
-            names.append(parts[1])
-    for m in members:
-        parts = m.split("/")
-        if len(parts) >= 4 and parts[1:3] == ["data", "entity_types"] \
-                and parts[0] not in names:
-            names.append(parts[0])
-    return names
+        parts = m.replace("\\", "/").split("/")
+        if len(parts) >= 3 and parts[0] == "_packages" and parts[1] not in pkgs:
+            pkgs.append(parts[1])
+    for name in pkgs:
+        out.append({"kind": "zip", "path": zip_path, "pkg": name,
+                    "prefix": "_packages/%s/" % name, "item": item_name})
+    if out:
+        return out
+    # ② 压缩包**根本身**就是一个包
+    if _looks_like_package(members):
+        out.append({"kind": "zip", "path": zip_path,
+                    "pkg": Path(zip_path).stem, "prefix": "", "item": item_name})
+    return out
 
 
 def workshop_package_sources(app_id: str = WORKSHOP_APP_ID) -> list:
-    """创意工坊 mod 里的**包**（含 zip 里还没解压的）。
+    """创意工坊 mod 里的**包**（裸文件 / 子目录里的包 / 压缩包都认）。
 
-    返回 `[{"kind": "dir"|"zip", "path": Path, "pkg": 包名, "item": 项目目录名}]`。
+    返回 `[{"kind": "dir"|"zip", "path": Path, "pkg": 包名,
+    "prefix": 包内前缀, "item": 项目目录名}]`。
     """
     out = []
     for item in workshop_items(app_id):
-        pk = item / "_packages"
-        if pk.is_dir():
-            try:
-                subs = sorted(x for x in pk.iterdir() if x.is_dir())
-            except OSError:
-                subs = []
-            for x in subs:
-                out.append({"kind": "dir", "path": x, "pkg": x.name,
-                            "item": item.name})
+        out.extend(_dir_package_sources(item))
         try:
             zips = sorted(item.glob("*.zip"))
         except OSError:
             zips = []
         for z in zips:
-            for name in _zip_package_names(z):
-                out.append({"kind": "zip", "path": z, "pkg": name,
-                            "item": item.name})
+            out.extend(_zip_package_sources(z, item.name))
     return out
 
 

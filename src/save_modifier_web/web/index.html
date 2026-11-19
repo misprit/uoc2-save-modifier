@@ -3797,7 +3797,7 @@ async function loadSettings(){
       box.innerHTML = `<span>✓ 游戏本体：<span class="gp">${esc(s.game_dir)}</span></span>
         <span>（${(s.packages||[]).length} 个包 · 特种兵 / 卡牌 / 战役数据都从这里读）</span>
         ${ws.length?`<span title="${esc(ws.map(w=>w.item+" / "+w.pkg+"（"+w.kind+"）").join("\n"))}">
-          🎨 创意工坊 ${ws.length} 个 mod 包${wsZip?`（其中 ${wsZip} 个还没装进游戏目录，数据已并入参考）`:""}</span>`:""}
+          🎨 创意工坊 ${ws.length} 个 mod 包${wsZip?`（其中 ${wsZip} 个还在创意工坊里没装进游戏目录，已作为参考数据并入）`:""}</span>`:""}
         ${dis.length?`<span title="${esc(dis.map(d=>d.path+" ← "+d.rule.join("/")).join("\n"))}">
           ⚠ ${dis.length} 个 mod 被游戏禁用（not_moddable）· 修改器也不读</span>`:""}
         <button class="btn" onclick="pickGameDir()">换一个</button>`;

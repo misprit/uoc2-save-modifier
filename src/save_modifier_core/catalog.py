@@ -246,71 +246,104 @@ class CardWhitelist:
 
 
 
-class _ZipMember:
-    """**zip 里的一个文件**（创意工坊 mod 还没解压时也能读）。
+class _PkgSource:
+    """一个「包来源」：**目录** 或 **zip** 里的一个包（U73）。
 
-    接口和 `Path` 一样有 `read_bytes()` / `name` ⇒ catalog 不用改读取逻辑。
+    * `kind` —— `"dir"` / `"zip"`；
+    * `path` —— 目录 或 zip 路径；
+    * `prefix` —— **包内**路径前缀（`""` 表示包根就是容器本身）。
+
+    创意工坊的 mod 有三种形态，这里统一成一套读法：
+    裸文件（普通 mod）、`_packages/<包名>/`、压缩包。
     """
 
-    __slots__ = ("zip_path", "member")
+    __slots__ = ("kind", "path", "prefix")
 
-    def __init__(self, zip_path, member: str):
-        self.zip_path = Path(zip_path)
-        self.member = member
+    def __init__(self, kind: str, path, prefix: str = ""):
+        self.kind = kind
+        self.path = Path(path)
+        self.prefix = prefix or ""
+
+    def read_bytes(self, rel: str):
+        """读包里一个文件（相对**包根**）⇒ 读不到返回 None。"""
+        if self.kind == "dir":
+            try:
+                return (self.path / (self.prefix + rel)).read_bytes()
+            except OSError:
+                return None
+        try:
+            with zipfile.ZipFile(self.path, "r") as zf:
+                return zf.read(self.prefix + rel)
+        except (OSError, KeyError, zipfile.BadZipFile):
+            return None
+
+    def names(self, sub: str) -> list:
+        """包里某个子目录下的 `.yml` 文件名（不含目录部分）。"""
+        pre = self.prefix + sub
+        out: list = []
+        if self.kind == "dir":
+            base = self.path / (self.prefix + sub)
+            try:
+                for x in sorted(base.iterdir()):
+                    if x.is_file() and x.name.endswith(".yml"):
+                        out.append(x.name)
+            except OSError:
+                return out
+            return out
+        try:
+            with zipfile.ZipFile(self.path, "r") as zf:
+                for m in zf.namelist():
+                    if m.startswith(pre) and m.endswith(".yml"):
+                        rest = m[len(pre):]
+                        if rest and "/" not in rest:
+                            out.append(rest)
+        except (OSError, zipfile.BadZipFile):
+            return out
+        return out
+
+
+class _PkgFile:
+    """包里的一个文件（目录或 zip）—— 接口和 `Path` 一样有 `read_bytes()`。"""
+
+    __slots__ = ("src", "rel")
+
+    def __init__(self, src: _PkgSource, rel: str):
+        self.src = src
+        self.rel = rel
 
     @property
     def name(self) -> str:
-        return self.member.rsplit("/", 1)[-1]
+        return self.rel.rsplit("/", 1)[-1]
 
-    def read_bytes(self) -> bytes:
-        with zipfile.ZipFile(self.zip_path, "r") as zf:
-            return zf.read(self.member)
+    def read_bytes(self):
+        return self.src.read_bytes(self.rel)
 
     def __repr__(self) -> str:                      # pragma: no cover
-        return "<zip %s!%s>" % (self.zip_path.name, self.member)
+        return "<pkg %s!%s>" % (self.src.path.name, self.rel)
 
 
-def _zip_type_members(src: dict, kind: str) -> dict:
-    """从一个创意工坊 zip 包里抽出 `data/entity_types/<kind>/*.yml`。
-
-    `src` = `{"kind": "zip", "path": zip路径, "pkg": 包名}`。
-    """
+def _pkg_type_members(src: _PkgSource, kind: str) -> dict:
+    """包里的 `data/entity_types/<kind>/*.yml` ⇒ {类型名: 文件}。"""
     out: dict = {}
     sub = ENTITY_DIRS.get(kind)
     if not sub:
         return out
-    prefixes = ("_packages/%s/data/entity_types/%s/" % (src["pkg"], sub),
-                "%s/data/entity_types/%s/" % (src["pkg"], sub))
-    try:
-        with zipfile.ZipFile(src["path"], "r") as zf:
-            members = zf.namelist()
-    except (OSError, zipfile.BadZipFile):
-        return out
-    for m in members:
-        for pre in prefixes:
-            if m.startswith(pre) and m.endswith(".yml"):
-                name = m[len(pre):-4]
-                if name and name not in out:
-                    out[name] = _ZipMember(src["path"], m)
-                break
+    rel_dir = "data/entity_types/%s/" % sub
+    for name in src.names(rel_dir):
+        if not name.endswith(".yml"):
+            continue
+        key = name[:-4]
+        if key and key not in out:
+            out[key] = _PkgFile(src, rel_dir + name)
     return out
 
 
-def _zip_nationality_members(src: dict) -> dict:
-    """zip 包里的国籍表（`nationalities.yml` / `nationalities_2.yml`）。"""
+def _pkg_nationality_members(src: _PkgSource) -> dict:
+    """包里的国籍表（`nationalities.yml` / `nationalities_2.yml`）。"""
     out: dict = {}
-    prefixes = ("_packages/%s/data/entity_types/" % src["pkg"],
-                "%s/data/entity_types/" % src["pkg"])
-    try:
-        with zipfile.ZipFile(src["path"], "r") as zf:
-            members = zf.namelist()
-    except (OSError, zipfile.BadZipFile):
-        return out
-    for m in members:
-        for pre in prefixes:
-            if m.startswith(pre) and m.rsplit("/", 1)[-1] in NATIONALITY_FILES:
-                out[m.rsplit("/", 1)[-1]] = _ZipMember(src["path"], m)
-                break
+    for fn in NATIONALITY_FILES:
+        if fn in src.names("data/entity_types/"):
+            out[fn] = _PkgFile(src, "data/entity_types/" + fn)
     return out
 
 class Catalog:
@@ -341,7 +374,9 @@ class Catalog:
         """Steam 创意工坊里的 mod 包（**zip 里还没解压的也算**）—— U71。"""
         if self._ws_sources is None:
             try:
-                self._ws_sources = list(self.paths.workshop_packages())
+                self._ws_sources = [
+                    _PkgSource(w.get("kind", "dir"), w["path"], w.get("prefix", ""))
+                    for w in self.paths.workshop_packages()]
             except Exception:
                 self._ws_sources = []
         return self._ws_sources
@@ -371,7 +406,7 @@ class Catalog:
             # ⚠️ 优先级排在磁盘包**之后** ⇒ 游戏真正在用的数据永远优先，
             #    创意工坊里没安装的 mod 只是「补充参考」。
             for src in self.workshop_sources:
-                for name, member in _zip_type_members(src, kind).items():
+                for name, member in _pkg_type_members(src, kind).items():
                     if name not in idx:
                         idx[name] = member
         self._indexes[kind] = idx
@@ -521,7 +556,7 @@ class Catalog:
                         out[k] = v
         # U71：创意工坊 mod（没解压进游戏目录的）里的国籍表也读进来
         for src in self.workshop_sources:
-            for fn, member in _zip_nationality_members(src).items():
+            for fn, member in _pkg_nationality_members(src).items():
                 try:
                     data = yamlio.load(member.read_bytes())
                 except Exception:

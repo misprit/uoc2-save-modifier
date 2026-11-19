@@ -247,3 +247,97 @@ class TestWorkshopMods(unittest.TestCase):
             self.assertEqual(spec.attack, 1, "磁盘包应当赢过创意工坊里没安装的 zip")
 
 
+# =====================================================================
+# U73：创意工坊里的「裸文件包」（普通 mod 的实际形态）
+# =====================================================================
+
+
+class TestWorkshopBarePackage(unittest.TestCase):
+    """U73 —— 普通 mod 是**裸文件**（不需要解压）。
+
+    用户补充：「大部分 mod 里面都是裸的文件，比如说一个裸的特种兵信息是不需要解压的。
+    由于官方文件不允许正常的 mod 修改游戏引擎，所以我的这个特殊 mod 需要用手动替代的
+    方式来生效，但一般的 mod 是可以直接生效的。」
+
+    ⇒ 机制坐实：Steam 创意工坊只是**分发渠道**（场景编辑器把「包」上传上去，
+    `edit_ctrl.pyc::_update_workshop_item` ⇒ `set_item_content_dir(self._package_path)`）
+    ⇒ 下载到 `workshop/content/809230/<itemid>/` 的就是**包的裸文件**；
+    而普通 mod 生效靠的是游戏的**用户包机制**
+    （`%LOCALAPPDATA%\.uoc2\_packages\<名字>\` 的裸文件，游戏当包加载）。
+
+    ⇒ 修改器要认三种形态：**裸文件** / `_packages/<包名>/` / **压缩包**。
+    """
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="wsbare_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.lib = self.tmp / "SteamLibrary"
+        self.item = (self.lib / "steamapps" / "workshop" / "content" / "809230"
+                     / "777")
+        self.item.mkdir(parents=True)
+        self.game = self.tmp / "Game"
+        (self.game / "_packages" / "base" / "data").mkdir(parents=True)
+        _write(self.game / "packages.yml", "addable: []\nnot_moddable: []\n")
+        self.appdata = self.tmp / "appdata"
+        (self.appdata / "_packages").mkdir(parents=True)
+
+    def _catalog(self):
+        return Catalog(CorePaths.discover(self.appdata, self.game))
+
+    def test_bare_package_in_item_dir_is_read(self):
+        """**裸文件**：项目目录本身就是包 ⇒ 特种兵能被读到。"""
+        _write(self.item / "data" / "entity_types" / "specialists"
+               / "ger_bare_spec.yml", SPEC_YML)
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            cat = self._catalog()
+            spec = cat.spec_type("ger_bare_spec")
+            self.assertIsNotNone(spec, "裸文件包里的特种兵没读到")
+            self.assertEqual(spec.attack, 3)
+
+    def test_bare_package_needs_a_package_marker(self):
+        """不是包的东西（没有 main.yml / data / scenarios…）⇒ 不当包。"""
+        _write(self.item / "readme.txt", "hello")
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            srcs = core_paths.workshop_package_sources()
+            self.assertEqual([s for s in srcs if s["kind"] == "dir"], [])
+
+    def test_package_in_subdir_is_read(self):
+        """`_packages/<包名>/…` 形态 ⇒ 也能读到。"""
+        _write(self.item / "_packages" / "mymod" / "data" / "entity_types"
+               / "specialists" / "ger_sub_spec.yml", SPEC_YML)
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            cat = self._catalog()
+            spec = cat.spec_type("ger_sub_spec")
+            self.assertIsNotNone(spec, "子目录包里的特种兵没读到")
+            self.assertEqual(spec.defense, 4)
+
+    def test_zip_with_package_at_root_is_read(self):
+        """压缩包**根本身**是包 ⇒ 也能读到。"""
+        import zipfile
+        z = self.item / "my_mod.zip"
+        with zipfile.ZipFile(z, "w") as zf:
+            zf.writestr("data/entity_types/specialists/ger_zip_spec.yml", SPEC_YML)
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            cat = self._catalog()
+            spec = cat.spec_type("ger_zip_spec")
+            self.assertIsNotNone(spec, "压缩包（根是包）里的特种兵没读到")
+            self.assertEqual(spec.attack, 3)
+
+    def test_disk_packages_still_win(self):
+        """⚠️ 磁盘包优先（创意工坊里没安装的只是参考数据）。"""
+        _write(self.item / "data" / "entity_types" / "specialists"
+               / "ger_shared.yml", SPEC_YML.replace("attack: 3", "attack: 9"))
+        _write(self.appdata / "_packages" / "mymod" / "data" / "entity_types"
+               / "specialists" / "ger_shared.yml",
+               SPEC_YML.replace("attack: 3", "attack: 1"))
+        from unittest import mock
+        with mock.patch.object(core_paths, "steam_libraries", return_value=[self.lib]):
+            spec = self._catalog().spec_type("ger_shared")
+            self.assertIsNotNone(spec)
+            self.assertEqual(spec.attack, 1, "磁盘包应当赢过没安装的创意工坊 mod")
+
+
