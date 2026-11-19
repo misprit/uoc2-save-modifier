@@ -95,7 +95,9 @@
 ```python
 # ── 1) 列出存档 ──────────────────────────────────────────
 list_saves() -> list[SaveInfo]
-#     扫描 %LOCALAPPDATA%\.uoc2\save\{campaigns,games,Old Saves}，
+#     扫描 %LOCALAPPDATA%\.uoc2\save\ 下的**全部**存档。
+#     ⚠️ 游戏自己只读 campaigns 与 games 两个目录；根下其它目录是**玩家自建的
+#     归档区**（目录名叫什么都行）⇒ 修改器照样读，用 archived 标记区分。
 #     返回 id / 路径 / 战役名 / 场景名 / 最后修改时间 / 是否独立场景。
 
 # ── 2) 打开 ─────────────────────────────────────────────
@@ -188,7 +190,7 @@ catalog.spec_types() / catalog.fronts() / catalog.store_defaults()
 | 游戏数据目录 | `%LOCALAPPDATA%\.uoc2`（本机 `C:\Users\misprit\AppData\Local\.uoc2`） |
 | 战役存档目录 | `%LOCALAPPDATA%\.uoc2\save\campaigns\*.usg` |
 | 独立场景存档目录 | `%LOCALAPPDATA%\.uoc2\save\games\*.usg` |
-| 历史存档目录 | `%LOCALAPPDATA%\.uoc2\save\Old Saves\<战役>\<难度>\*.usg` |
+| 玩家归档目录（**游戏不认**） | `%LOCALAPPDATA%\.uoc2\save\<任意目录名>\*.usg`（修改器照样读；目录名不挑） |
 | 游戏原版包 | `<game>/_packages/{base,dlc1..dlc10}/`（base 必装，DLC 可选） |
 | 战役定义（剧本） | `<game>/_packages/base/data/campaigns/<campaign_id>.usc/` |
 | 实体类型定义 | `<game>/_packages/base/data/entity_types/{unit_types,hq_types,specialists,cards}/` |
