@@ -53,13 +53,18 @@ class TestReadApi(WebGuiTestBase):
     def test_saves_endpoint_lists_saves(self):
         data = self.get_json("/api/saves")
         self.assertIn("saves", data)
-        self.assertGreater(len(data["saves"]), 0)
+        if not data["saves"]:
+            # ⚠️ 这台机器上没有存档（外部测试者可能没玩过游戏）⇒ 跳过，
+            # **不能失败**（接口结构本身已经验过了）。
+            self.skipTest("这台机器上没有存档 ⇒ 无法验列表行的字段")
         row = data["saves"][0]
         for k in ("save_id", "name", "kind", "mtime", "size"):
             self.assertIn(k, row)
 
     def test_view_endpoint_returns_units_and_features(self):
         data = self.get_json("/api/saves")
+        if not data["saves"]:
+            self.skipTest("这台机器上没有存档 ⇒ 无法验 /api/view")
         sid = data["saves"][0]["save_id"]
         v = self.get_json("/api/view/" + urllib.request.quote(sid))
         self.assertIn("units", v)

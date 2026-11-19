@@ -67,6 +67,74 @@ PROFILE_DIR = Path(os.environ.get("LOCALAPPDATA") or str(Path.home())) \
     / ".uoc2" / "edge_profile"
 
 
+# ---------------------------------------------------------------- 日志
+#
+# ⚠️ **外部测试者出问题时要能报告** —— 浏览器窗口一关，console 窗口也跟着关
+# ⇒ 日志必须落到文件：`%LOCALAPPDATA%\.uoc2\modifier.log`
+# （token **打码**；超过 1MB 轮转一次）。
+
+_LOG_MAX = 1024 * 1024
+_TOKEN_RE = re.compile(r"([?&]t=)[^&\s\"]+")
+
+
+def _log_path():
+    """日志文件路径（取不到就返回 None ⇒ 不写日志）。"""
+    try:
+        from save_modifier_core.paths import CorePaths
+        return CorePaths.discover().uoc2_appdata / "modifier.log"
+    except Exception:
+        return None
+
+
+def _log(text):
+    """追加一行日志（失败就算了，绝不影响主流程）。"""
+    p = _log_path()
+    if p is None:
+        return
+    try:
+        if p.exists() and p.stat().st_size > _LOG_MAX:
+            data = p.read_bytes()[-(_LOG_MAX // 3):]
+            p.write_bytes(b"...[truncated]...\n" + data)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(str(text).rstrip() + "\n")
+    except Exception:
+        pass
+
+
+def _log_startup():
+    """启动头：版本 / 解释器 / 游戏目录 / 存档目录（给测试者贴给开发者用）。"""
+    import platform
+    import sys
+    __version__ = _version()
+    try:
+        from save_modifier_core.paths import CorePaths
+        paths = CorePaths.discover()
+        game_dir = str(paths.game_dir) if paths.game_dir else "(not found)"
+        save_root = str(paths.save_root)
+    except Exception:
+        game_dir = save_root = "(unknown)"
+    _log("=" * 60)
+    _log("[start] %s | v%s | python %s (%s)"
+         % (platform.platform(), __version__, sys.version.split()[0],
+            platform.machine()))
+    _log("[env] game dir = %s" % game_dir)
+    _log("[env] save root = %s" % save_root)
+    _log("[env] log = %s" % (_log_path(),))
+
+
+def _version() -> str:
+    """成品版本号（`save_modifier_web/version.py` 是唯一来源）。"""
+    try:
+        from .version import __version__
+        return __version__
+    except Exception:
+        try:
+            from save_modifier_web.version import __version__
+            return __version__
+        except Exception:
+            return "?"
+
+
 # ---------------------------------------------------------------- 小工具
 
 
@@ -932,6 +1000,9 @@ def api_settings() -> dict:
             for w in core_paths.workshop_package_sources()],
         "candidates": core_paths.game_dir_candidates(),
         "config_path": str(core_paths.config_path()),
+        # U75：版本号（测试者要能说清自己用的哪版）+ 日志文件（出问题贴给开发者）
+        "version": _version(),
+        "log_file": str(_log_path() or ""),
     }
 
 
@@ -1518,8 +1589,12 @@ class _Handler(BaseHTTPRequestHandler):
     # 路由里放 token
     token = ""
 
-    def log_message(self, fmt, *args):     # 安静点
-        pass
+    def log_message(self, fmt, *args):     # 不往 console 刷，落到文件
+        try:
+            line = fmt % args
+        except Exception:
+            line = str(fmt)
+        _log("[http] " + _TOKEN_RE.sub(r"\1***", line))
 
     # ---- 工具 ----
     def _send(self, code, body: bytes, ctype: str):
@@ -1588,6 +1663,9 @@ class _Handler(BaseHTTPRequestHandler):
                 else:
                     self._json({"error": "未知接口"}, 404)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务
+                import traceback
+                _log("[500] %s: %s" % (type(exc).__name__, exc))
+                _log(traceback.format_exc())
                 self._json({"error": "%s: %s" % (type(exc).__name__, exc)}, 500)
             return
 
@@ -1660,6 +1738,9 @@ class _Handler(BaseHTTPRequestHandler):
             # 请求体不合法（非法 kind / params 不是字典 …）⇒ 400，不是 500
             self._json({"ok": False, "errors": [str(exc)]}, 400)
         except Exception as exc:
+            import traceback
+            _log("[500] %s: %s" % (type(exc).__name__, exc))
+            _log(traceback.format_exc())
             self._json({"ok": False, "errors": ["%s: %s" % (type(exc).__name__, exc)]}, 500)
 
 
@@ -1680,6 +1761,10 @@ def run(serve_only: bool = False, no_window: bool = False) -> int:
     threading.Thread(target=_serve_forever, args=(httpd,), daemon=True).start()
     url = "http://127.0.0.1:%d/?t=%s" % (port, token)
     print("[OK ] GUI 服务已启动：%s" % url)
+    try:
+        _log_startup()
+    except Exception:
+        pass
 
     if no_window:
         print("（--no-window：只起服务，不拉窗口）")

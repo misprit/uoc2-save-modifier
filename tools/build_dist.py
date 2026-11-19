@@ -16,7 +16,8 @@ uoc2-save-modifier/
   tests/             自动化测试
   docs/              规范文档 + 证据脚本
   run.bat            双击启动（命令行外壳）
-  run_gui.bat        双击启动（图形界面）
+  run_web.bat        双击启动（★ 正式界面：本地 HTTP + 浏览器窗口）
+  run_gui.bat        双击启动（备用简版：Tk，无 Edge 时用）
   run_tests.bat      跑自检
   使用说明.txt
 ```
@@ -42,6 +43,8 @@ uoc2-save-modifier/
 
 from __future__ import annotations
 
+import io
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -49,7 +52,18 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO / "dist"
 PKG_NAME = "uoc2-save-modifier"
-VERSION = "1.0.0"
+def _product_version():
+    """成品版本号的**唯一来源** = `src/save_modifier_web/version.py`。
+
+    ⚠️ **不是**核心库的 `__version__`（那是「库」的版本 0.1.0）。
+    """
+    src = io.open(REPO / "src" / "save_modifier_web" / "version.py",
+                  encoding="utf-8").read()
+    m = re.search(r'^__version__\s*=\s*"([^"]+)"', src, re.M)
+    return m.group(1) if m else "0.0.0"
+
+
+VERSION = _product_version()
 OUT = OUT_DIR / f"{PKG_NAME}-v{VERSION}.zip"
 
 #: 整个目录打进去

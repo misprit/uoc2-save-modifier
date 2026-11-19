@@ -23,7 +23,9 @@ class TestPaths(unittest.TestCase):
     def test_discover_finds_save_root(self):
         paths = CorePaths.discover()
         self.assertTrue(paths.save_root.name == "save")
-        self.assertEqual(paths.save_root.parent.name, ".uoc2")
+        # ⚠️ **不硬编码 `.uoc2`** —— `UOC2_APPDATA` 可以指向任意目录
+        # （外部测试者的机器 / 隔离环境都会改它）⇒ 只断言**结构**。
+        self.assertEqual(paths.save_root, paths.uoc2_appdata / "save")
 
     def test_package_dirs_put_user_first(self):
         """用户包（mod）优先级高于游戏包 —— 只扫游戏包会漏掉 mod。"""

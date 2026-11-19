@@ -4063,6 +4063,11 @@ function show(p){
           </div></div></div>
       </div>
     </div>`, caps, levelPickerHTML(), backupStackHTML());
+    /* U75：版本号 + 日志路径 —— 外部测试者要能说清自己用的哪版，
+       出问题时把日志贴给开发者（浏览器窗口一关，console 就没了 ⇒ 日志落文件）。 */
+    w.innerHTML += L2(`<div class="fine" style="padding:8px 12px 0">{0} · <code>{1}</code></div>`,
+      L("版本") + " v" + ((SETTINGS && SETTINGS.version) || "?"),
+      esc((SETTINGS && SETTINGS.log_file) || ""));
     bindTun();
     paintPending();
     return;
