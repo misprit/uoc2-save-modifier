@@ -278,8 +278,10 @@ table.list td.k{color:var(--muted)}
   border-bottom:1px solid #f0f3f6;cursor:pointer}
 .urow:hover{background:var(--accent-light)}
 .urow.sel{background:var(--selection)}
+/* U63：头像框要当**定位参照**（JS 把内容按 contain 摆到正中） */
 .ava{width:58px;height:58px;border-radius:6px;background:var(--stage);
-  border:1px solid var(--stage-edge);flex:none;display:grid;place-items:center;overflow:hidden}
+  border:1px solid var(--stage-edge);flex:none;display:grid;place-items:center;
+  overflow:hidden;position:relative}
 .ava img{max-width:100%;max-height:100%;object-fit:contain}
 .umin{flex:1;min-width:0}
 .uname{font-size:15px;font-weight:600;display:flex;align-items:center;gap:7px;
@@ -1089,6 +1091,67 @@ function imgTag(p, alt, cls){
   /* `cls` = 额外 class（特种兵图标用 "spico" 走 200% 放大规则） */
   return `<img src="${surf(p)}" alt="${esc(alt||"")}"${cls?(' class="'+cls+'"'):""} loading="lazy">`;
 }
+/* ---------- 单位头像：按画面内容居中（U63） ----------
+   原始大图是横幅、主体偏右偏下（629 张实测内容中心 x 中位 0.59 / y 中位 0.60），
+   直接 contain 进方框 ⇒ 人物不在正中、还被压小。
+   ⇒ 运行时量一次 alpha 内容框，把内容 contain 到方框正中；按类型缓存。 */
+const AVA_BBOX = {};                 /* type -> {x0,y0,x1,y1} 或 null（量不出来） */
+function avaImg(type, alt){
+  if(!type) return "";
+  return `<img src="${surf(unitTex(type))}" alt="${esc(alt||"")}" data-t="${esc(type)}"
+    loading="lazy" style="visibility:hidden"
+    onload="avaFit(this)" onerror="this.style.visibility='visible'">`;
+}
+function avaBBox(img){
+  const W = img.naturalWidth, H = img.naturalHeight;
+  if(!W || !H) return null;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d", {willReadFrequently:true});
+  if(!ctx) return null;
+  try{ ctx.drawImage(img, 0, 0); }catch(e){ return null; }
+  let d;
+  try{ d = ctx.getImageData(0, 0, W, H).data; }catch(e){ return null; }
+  let x0=W, y0=H, x1=-1, y1=-1;
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      if(d[(y*W+x)*4+3] > 12){
+        if(x<x0)x0=x; if(x>x1)x1=x;
+        if(y<y0)y0=y; if(y>y1)y1=y;
+      }
+    }
+  }
+  if(x1 < 0) return null;
+  /* 几乎铺满整张 ⇒ 没有透明信息可用 ⇒ 当作量不出来 */
+  if((x1-x0+1) > W*0.98 && (y1-y0+1) > H*0.98) return null;
+  return {x0:x0, y0:y0, x1:x1, y1:y1};
+}
+function avaFit(img){
+  const box = img && img.parentElement;
+  if(!box) return;
+  img.style.visibility = "visible";
+  const type = img.getAttribute("data-t");
+  if(!type) return;
+  let bb = AVA_BBOX[type];
+  if(bb === undefined){
+    try{ bb = avaBBox(img); }catch(e){ bb = null; }
+    AVA_BBOX[type] = bb;
+  }
+  if(!bb) return;
+  const bw = box.clientWidth, bh = box.clientHeight;
+  if(!bw || !bh) return;
+  const cw = bb.x1-bb.x0+1, ch = bb.y1-bb.y0+1;
+  const k = Math.min(bw/cw, bh/ch);
+  const tx = bw/2 - (bb.x0+bb.x1+1)/2*k;
+  const ty = bh/2 - (bb.y0+bb.y1+1)/2*k;
+  img.style.position = "absolute";
+  img.style.left = "0px"; img.style.top = "0px";
+  img.style.maxWidth = "none"; img.style.maxHeight = "none";
+  img.style.width = img.naturalWidth + "px";
+  img.style.height = img.naturalHeight + "px";
+  img.style.transformOrigin = "0 0";
+  img.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
+}
 const unitTex  = t => "unit/" + t + "/sheet_L.png";
 const specTex  = t => "specialist/" + t + "/hq_action_icon.png";
 const specBig  = t => "specialist/" + t + "/sheet_large.png";
@@ -1253,7 +1316,7 @@ function unitRowHTML(u){
     `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>`).join("");
   const hq = (VIEW.hqs||[]).find(h=>h.id===u.hq_id);
   return `<div class="urow ${u.id===SEL.units?'sel':''}" onclick="pickUnit(${u.id})">
-    <div class="ava">${u.type ? imgTag(unitTex(u.type), unitCn(u.type)) : ""}</div>
+    <div class="ava">${avaImg(u.type, unitCn(u.type))}</div>
     <div class="umin">
       <div class="uname">${esc(unitCn(u.type))}
         <span class="full">${esc(u.type||"")}</span></div>
@@ -1339,7 +1402,7 @@ function unitDetailHTML(u){
                     none:"—"}[pool.scope] || pool.scope;
 
   return `<div class="dhead">
-    <div class="ava">${u.type ? imgTag(unitTex(u.type), unitCn(u.type)) : ""}</div>
+    <div class="ava">${avaImg(u.type, unitCn(u.type))}</div>
     <div class="idblk">
       <div class="dtitle" id="dtitle_${u.id}">${esc(u.name_cn||u.name_brief||u.name_full||("单位 "+u.id))}
         <span class="edit" onclick="renameUnit(${u.id})">改名</span></div>

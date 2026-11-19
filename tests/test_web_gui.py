@@ -2077,3 +2077,34 @@ class TestU62NavBadges(unittest.TestCase):
         """徽标是 CSS 画的（圆角方块 + 字母），不依赖素材。"""
         self.assertIn(".rail .nav .ic{width:22px;height:22px", self.html)
         self.assertIn("font:700 10.5px/20px var(--mono)", self.html)
+
+
+# =====================================================================
+# U63：单位头像按画面内容居中
+# =====================================================================
+
+
+class TestU63AvatarCentering(unittest.TestCase):
+    """U63 —— 大图是横幅、主体偏右偏下 ⇒ 用 alpha 内容框把内容摆到方框正中。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_avatar_box_is_a_positioning_context(self):
+        """头像框要能当定位参照。"""
+        self.assertIn("overflow:hidden;position:relative}", self.html)
+
+    def test_bbox_is_measured_and_cached(self):
+        """运行时量 alpha 内容框，按类型缓存（每个类型只量一次）。"""
+        self.assertIn("const AVA_BBOX = {};", self.html)
+        self.assertIn("function avaBBox(img)", self.html)
+        self.assertIn("function avaFit(img)", self.html)
+        self.assertIn("AVA_BBOX[type] = bb;", self.html)
+
+    def test_both_avatar_places_use_the_fitting_helper(self):
+        """列表行与详情抬头都用 `avaImg`（而不是普通 imgTag）。"""
+        self.assertIn("function avaImg(type, alt)", self.html)
+        self.assertEqual(self.html.count("<div class=\"ava\">${avaImg(u.type, unitCn(u.type))}</div>"), 2)
