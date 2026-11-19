@@ -767,6 +767,84 @@ def api_import_save(payload) -> dict:
             "bytes": len(data), "summary": "已导入副本 %s" % target.name}
 
 
+def api_settings() -> dict:
+    """当前设置：**游戏本体目录** + 包列表 + 探测候选（界面要能告诉玩家找过哪儿）。"""
+    from save_modifier_core import CorePaths
+    from save_modifier_core import paths as core_paths
+
+    paths = CorePaths.discover()
+    return {
+        "game_dir": str(paths.game_dir) if paths.game_dir else "",
+        "found": bool(paths.game_dir),
+        "packages": [str(p) for p in paths.packages()],
+        "candidates": core_paths.game_dir_candidates(),
+        "config_path": str(core_paths.config_path()),
+    }
+
+
+def api_settings_set(payload) -> dict:
+    """设置**游戏本体目录**（写设置文件）。
+
+    ⚠️ 只记一个路径 —— **不移动任何文件**；
+    ⚠️ 目录不像游戏本体（没有 `_packages` / `lib/uoc2`）⇒ 直接拒绝。
+    """
+    from save_modifier_core import CorePaths
+    from save_modifier_core import paths as core_paths
+
+    gd = ((payload or {}).get("game_dir") or "").strip()
+    if not gd:
+        return {"ok": False, "errors": ["没有指定目录"]}
+    try:
+        p = core_paths.set_game_dir(gd)
+    except ValueError as exc:
+        return {"ok": False, "errors": [str(exc)]}
+    except OSError as exc:
+        return {"ok": False, "errors": ["写设置失败：%s" % exc]}
+    paths = CorePaths.discover()
+    return {"ok": True, "game_dir": str(p),
+            "packages": [str(x) for x in paths.packages()],
+            "summary": "游戏本体目录已设为 %s" % p}
+
+
+def api_settings() -> dict:
+    """当前设置：**游戏本体目录** + 包列表 + 探测候选（界面要能告诉玩家找过哪儿）。"""
+    from save_modifier_core import CorePaths
+    from save_modifier_core import paths as core_paths
+
+    paths = CorePaths.discover()
+    return {
+        "game_dir": str(paths.game_dir) if paths.game_dir else "",
+        "found": bool(paths.game_dir),
+        "packages": [str(p) for p in paths.packages()],
+        "candidates": core_paths.game_dir_candidates(),
+        "config_path": str(core_paths.config_path()),
+    }
+
+
+def api_settings_set(payload) -> dict:
+    """设置**游戏本体目录**（写设置文件）。
+
+    ⚠️ 只记一个路径 —— **不移动任何文件**；
+    ⚠️ 目录不像游戏本体（没有 `_packages` / `lib/uoc2`）⇒ 直接拒绝。
+    """
+    from save_modifier_core import CorePaths
+    from save_modifier_core import paths as core_paths
+
+    gd = ((payload or {}).get("game_dir") or "").strip()
+    if not gd:
+        return {"ok": False, "errors": ["没有指定目录"]}
+    try:
+        p = core_paths.set_game_dir(gd)
+    except ValueError as exc:
+        return {"ok": False, "errors": [str(exc)]}
+    except OSError as exc:
+        return {"ok": False, "errors": ["写设置失败：%s" % exc]}
+    paths = CorePaths.discover()
+    return {"ok": True, "game_dir": str(p),
+            "packages": [str(x) for x in paths.packages()],
+            "summary": "游戏本体目录已设为 %s" % p}
+
+
 def api_save_as(payload) -> dict:
     """「另存为」—— 把存档（**可含待应用改动**）写成一个新的 .usg 文件。
 
@@ -1086,6 +1164,10 @@ class _Handler(BaseHTTPRequestHandler):
                 elif path == "/api/fs/list":
                     q = parse_qs(urlparse(self.path).query)
                     self._json(api_fs_list((q.get("dir") or [""])[0]))
+                elif path == "/api/settings":
+                    self._json(api_settings())
+                elif path == "/api/settings":
+                    self._json(api_settings())
                 else:
                     self._json({"error": "未知接口"}, 404)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务
@@ -1151,6 +1233,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(_jsonable(api_save_as(payload)))
             elif path == "/api/import-save":
                 self._json(_jsonable(api_import_save(payload)))
+            elif path == "/api/settings":
+                self._json(_jsonable(api_settings_set(payload)))
+            elif path == "/api/settings":
+                self._json(_jsonable(api_settings_set(payload)))
             else:
                 self._json({"ok": False, "errors": ["未知接口"]}, 404)
         except ValueError as exc:

@@ -83,6 +83,13 @@ button,input,select{font:inherit}
 .drop{border:2px dashed var(--border);border-radius:8px;padding:16px;margin-top:14px;
   text-align:center;color:var(--muted);font-size:13px}
 .drop.on{border-color:var(--accent);background:var(--accent-light);color:var(--accent-dark)}
+
+/* ---------------- U69：游戏本体目录 ---------------- */
+.gamedir{margin-top:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;
+  background:var(--surface);font-size:12.5px;color:var(--muted);display:flex;gap:10px;
+  align-items:center;flex-wrap:wrap}
+.gamedir.bad{border-color:#eec3c5;background:var(--danger-light);color:var(--danger)}
+.gamedir .gp{font-family:var(--mono);font-size:11.5px;color:var(--text)}
 .hdr .hint{font-size:12px;color:var(--muted)}
 .hdr .sp{flex:1}
 .badge{font-size:11.5px;padding:1px 7px;border-radius:20px;background:var(--accent-light);
@@ -895,6 +902,7 @@ tr.oldrow{opacity:.6}
           想改原文件请用上面的「打开其他位置的存档」）</div></div>
     </div>
   </div>
+  <div class="gamedir" id="gameDir"></div>
   <div class="warnbar" style="width:min(1180px,100%);margin-top:12px">
     ⚠ <b>改存档前请先退出游戏</b> —— 文件被占用时写回会失败。
   </div>
@@ -3176,6 +3184,7 @@ function alertModal(msg){
    =================================================================== */
 let CDETAIL = null;      /* /api/campaign-detail */
 let USTACK = null;       /* /api/undo-stack */
+let SETTINGS = null;     /* /api/settings —— 游戏本体目录等（U69） */
 
 async function loadCampaignDetail(){
   if(!VIEW) return;
@@ -3576,6 +3585,8 @@ function openSaveMenu(){
           <span>复制当前磁盘上的存档（已应用的状态）到别的位置</span></div>
         <div class="mi" onclick="doReloadCurrent()"><b>放弃改动并重新读取</b>
           <span>丢弃 ${n} 条未应用的改动，回到磁盘上的状态</span></div>
+        <div class="mi" onclick="pickGameDir()"><b>游戏本体目录：<span id="menuGameDir">…</span></b>
+          <span>特种兵 / 卡牌 / 战役数据都从游戏包里读 —— 换电脑或非 Steam 安装时在这里指定</span></div>
       </div>
       ${n?`<div class="fine">⚠ 当前有 <b>${n}</b> 条<b>未应用</b>的改动 ——
         切换存档 / 重新读取会丢弃它们；「另存为」则会把它们一起写进新文件。</div>`:""}
@@ -3688,7 +3699,8 @@ function openFilePicker(opts){
     </div></div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
       <button class="btn pri" onclick="fbPick()">${
-        FS.mode==="save" ? "另存到这里" : "打开这个存档"}</button></div>`,
+        FS.mode==="save" ? "另存到这里"
+        : (FS.mode==="dir" ? "用这个目录" : "打开这个存档")}</button></div>`,
     {cls:"wide"});
   fbGo(FS.dir);
 }
@@ -3725,7 +3737,9 @@ async function fbGo(dir){
       <span class="s">${esc(x.size||"")}</span></div>`).join("");
   if(hint) hint.textContent = FS.mode==="save"
     ? "选好目录，在上面填文件名 —— 同名文件不会被覆盖。"
-    : "选一个存档文件打开。";
+    : (FS.mode==="dir"
+        ? "选到**游戏本体目录**（里面有 _packages 或 lib/uoc2），再点「用这个目录」。"
+        : "选一个存档文件打开。");
 }
 function fbRoot(i){ const r = FS.roots[i]; if(r) fbGo(r.path); }
 function fbDir(i){ const d = FS.dirs[i]; if(d) fbGo(d.path); }
@@ -3738,6 +3752,11 @@ function fbFile(i){
 }
 function fbPick(){
   const cb = FS.onPick;
+  if(FS.mode==="dir"){
+    closeModal();
+    if(cb) cb(FS.dir);
+    return;
+  }
   if(FS.mode==="save"){
     const nameEl = document.getElementById("fbName");
     const name = ((nameEl && nameEl.value) || "").trim();
@@ -3755,6 +3774,52 @@ function fbPick(){
 /* 选中的路径 → 打开它（绝对路径也能当 save_id 用，核心库认） */
 async function openPickedPath(p){
   await openSave(p);
+}
+
+/* ===================================================================
+   U69：游戏本体目录（换电脑 / 非 Steam 安装时能手动指定）
+   ------------------------------------------------------------------
+   修改器的大量数据来自**游戏包**（特种兵、单位类型、卡牌贴图、
+   战役名册、商店默认值）⇒ 找不到游戏目录就等于「半个修改器」。
+   =================================================================== */
+async function loadSettings(){
+  const box = document.getElementById("gameDir");
+  let s = null;
+  try{ s = await api("/api/settings"); }catch(e){ s = null; }
+  SETTINGS = s;
+  const label = document.getElementById("menuGameDir");
+  if(box){
+    if(s && s.found){
+      box.className = "gamedir";
+      box.innerHTML = `<span>✓ 游戏本体：<span class="gp">${esc(s.game_dir)}</span></span>
+        <span>（${(s.packages||[]).length} 个包 · 特种兵 / 卡牌 / 战役数据都从这里读）</span>
+        <button class="btn" onclick="pickGameDir()">换一个</button>`;
+    }else{
+      box.className = "gamedir bad";
+      box.innerHTML = `<span>⚠ <b>没找到游戏本体目录</b> ——
+        特种兵中文名、贴图、战役名册、商店默认值会缺失（存档本身仍能改）</span>
+        <button class="btn pri" onclick="pickGameDir()">手动指定游戏目录…</button>`;
+    }
+  }
+  if(label) label.textContent = (s && s.found) ? (s.game_dir||"已找到") : "未找到";
+}
+async function pickGameDir(){
+  openFilePicker({
+    mode:"dir",
+    dir: (SETTINGS && SETTINGS.game_dir) || "",
+    title:"选游戏本体目录（里面应该有 _packages 或 lib/uoc2）",
+    onPick: async (dir)=>{
+      const r = await post("/api/settings", {game_dir: dir});
+      if(!r.data.ok){
+        alert((r.data.errors||[]).join("；"));
+        return;
+      }
+      CATALOG = null;                 /* 目录缓存要清掉 —— 换目录后类型表变了 */
+      PICKCACHE = {};
+      await loadCatalog().catch(()=>{});
+      await loadSettings();
+      if(VIEW) await openSave(VIEW._save_id);
+    }});
 }
 
 /* ---------------- 启动页 ---------------- */
@@ -3801,6 +3866,7 @@ function paint(){
 document.getElementById("q").addEventListener("input", paint);
 initTip();
 bindDropZone();          /* U68：拖 .usg 进这一页 ⇒ 导入成副本 */
+loadSettings();          /* U69：显示游戏本体目录（没找到就提示手动指定） */
 
 function esc(s){ return String(s??"").replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
