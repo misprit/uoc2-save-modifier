@@ -1357,7 +1357,10 @@ class TestUiDetailsPresent(unittest.TestCase):
 
 
 class TestSpecialistIconScale(unittest.TestCase):
-    """**纯界面层**的规则 ⇒ 用「读前端源码」的方式锁死（app + 视觉稿一起查）。
+    """**纯界面层**的规则 ⇒ 用「读前端源码」的方式锁死（**只查 app**）。
+
+    ⚠️ **2026-11-19 起**：GUI 视觉稿已冻结，**不再与实现比对**（§5.1kk）⇒
+    这里原本「app + 视觉稿一起查」的断言改成**只查 app**。
 
     依据：游戏贴图 `specialist/<类型>/hq_action_icon.png` 是 **160×160 画布**，
     而图形只占 **60×69**（实测 378/378 个完全一致 ⇒ 只占边长的 40%）
@@ -1370,8 +1373,6 @@ class TestSpecialistIconScale(unittest.TestCase):
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
                                        "index.html"), encoding="utf-8").read()
-        cls.vis = io.open(os.path.join(root, "docs", "GUI视觉稿.html"),
-                          encoding="utf-8").read()
 
     @staticmethod
     def _rule(css, selector):
@@ -1384,41 +1385,34 @@ class TestSpecialistIconScale(unittest.TestCase):
 
     def test_specialist_icon_is_scaled_200_percent(self):
         """特种兵图标放大 200%（`.ubadge` / `.pcell` / `.slot .sq` 三个容器）。"""
-        for css, tag in ((self.html, "app"), (self.vis, "视觉稿")):
-            self.assertIn(".ubadge img,.pcell img,.slot .sq img{", css, tag)
-            rule = self._rule(css, ".ubadge img,.pcell img,.slot .sq img")
-            self.assertIn("width:200%", rule, tag)
-            self.assertIn("height:200%", rule, tag)
+        self.assertIn(".ubadge img,.pcell img,.slot .sq img{", self.html)
+        rule = self._rule(self.html, ".ubadge img,.pcell img,.slot .sq img")
+        self.assertIn("width:200%", rule)
+        self.assertIn("height:200%", rule)
 
     def test_specialist_imgs_carry_the_scale_class(self):
         """特种兵图标要带 `.spico`（混装图标的表格里只有特种兵能放大）。"""
-        for css, tag in ((self.html, "app"), (self.vis, "视觉稿")):
-            self.assertIn("spico", css, tag)
+        self.assertIn("spico", self.html)
         # app：名册兵牌 / 详情卡已挂 / 备选池 三处都要带
         self.assertIn('imgTag(specTex(s.type), specCn(s.type), "spico")', self.html)
         self.assertIn('imgTag(specTex(t), specCn(t), "spico")', self.html)
 
     def test_detail_card_icon_has_no_box(self):
         """详情卡里**已挂特种兵**的图标不再套方框底（卡片本身就是一体）。"""
-        for css, tag in ((self.html, "app"), (self.vis, "视觉稿")):
-            rule = self._rule(css, ".slot .sq")
-            self.assertTrue(rule, tag)
-            self.assertNotIn("background:var(--stage)", rule, tag)
-            self.assertNotIn("var(--stage-edge)", rule, tag)
+        rule = self._rule(self.html, ".slot .sq")
+        self.assertTrue(rule)
+        self.assertNotIn("background:var(--stage)", rule)
+        self.assertNotIn("var(--stage-edge)", rule)
 
     def test_roster_has_no_specialist_count(self):
         """名册右侧**不再显示「已挂 N 个」**（看一眼就知道，写数字是冗余的）。"""
         self.assertNotIn("ucount", self.html)
-        self.assertNotIn("ucount", self.vis)
-        self.assertNotIn("${cnt}", self.vis)
-        self.assertNotIn("${badges}${cnt}", self.vis)
 
     def test_mixed_tables_only_scale_specialists(self):
         """兵种图标（`steps/step.png`，不是正方形）**不能**套 200% 规则。"""
-        for css, tag in ((self.html, "app"), (self.vis, "视觉稿")):
-            rule = self._rule(css, "table.spec-tbl .thumb img")
-            self.assertIn("max-width:100%", rule, tag)
-            self.assertIn("img.spico", css, tag)
+        rule = self._rule(self.html, "table.spec-tbl .thumb img")
+        self.assertIn("max-width:100%", rule)
+        self.assertIn("img.spico", self.html)
 
 
 # =====================================================================
