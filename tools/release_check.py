@@ -56,7 +56,7 @@ def step_git():
 MUST_IN_ZIP = [
     "uoc2-save-modifier/run.bat",
     "uoc2-save-modifier/run_web.bat",
-    "uoc2-save-modifier/run_gui.bat",
+    "uoc2-save-modifier/统一指挥2存档修改器.exe",   # U80 启动器（放包根）
     "uoc2-save-modifier/run_tests.bat",
     "uoc2-save-modifier/使用说明.txt",
     "uoc2-save-modifier/src/save_modifier_core/__init__.py",
