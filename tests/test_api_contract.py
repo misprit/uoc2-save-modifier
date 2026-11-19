@@ -159,10 +159,14 @@ class TestEditKinds(unittest.TestCase):
     ⚠️ 2026-11-18 再 +2 种（U45）：`theater_asset_add`（往当前 phase 组加一项
     战区资产）、`theater_asset_remove`（从当前 phase 组删一项）——
     战区资产从此**全量候选可编辑**（存档没有的也能加）。
+
+    ⚠️ 2026-11-19 再 +1 种（U64）：`level`（改难度，根 `main.yml`）——
+    难度决定**手牌上限**，手牌超限时必须拦住（让玩家先删手牌）。
     """
 
     EXPECTED = {
-        "progress", "unit_field", "unit_spec_add", "unit_spec_remove",
+        "progress", "level",
+        "unit_field", "unit_spec_add", "unit_spec_remove",
         "hq_force_pool", "hq_field", "hq_trucks", "hq_branch_level",
         "hq_branch_suppressed", "hq_branch_sp",
         "hq_force_pool_add",
@@ -181,7 +185,7 @@ class TestEditKinds(unittest.TestCase):
             Edit("no_such_kind", {})
 
     def test_factories_exist(self):
-        for name in ("progress", "unit_field", "unit_spec_add",
+        for name in ("progress", "level", "unit_field", "unit_spec_add",
                      "unit_spec_remove", "hq_force_pool", "hq_field",
                      "hq_trucks", "hq_branch_level", "hq_branch_suppressed",
                      "hq_branch_sp", "hq_force_pool_add",
