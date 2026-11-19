@@ -70,6 +70,10 @@ OUT = OUT_DIR / f"{PKG_NAME}-v{VERSION}.zip"
 #:    正式界面是 Web 版（本地 HTTP + Edge）⇒ 不带，**省 4.55 MB**。
 INCLUDE_DIRS = ("python", "src", "tests", "docs")
 
+#: 启动器 exe（U80）—— 编译产物，**放包根**（用户就点它）
+LAUNCHER_NAME = "统一指挥2存档修改器.exe"
+LAUNCHER_SRC = "build/" + LAUNCHER_NAME
+
 #: 单个文件打进去
 #:
 #: ⚠️ **不含 `run_gui.bat`**（U78）—— 那是 Tk 备用简版的入口；
@@ -97,6 +101,23 @@ SKIP_DIRS_ROOT = {"data"}
 #: * `tests/test_gui_smoke.py`（Tk 界面的冒烟测试）。
 SKIP_PATHS = (
     "lib",
+    # U79：**用不上的运行时**（实测省 8.79 MB）
+    #   * `libcrypto-3.dll` 只有 `_hashlib.pyd` 用 ⇒ 砍了 hashlib 回退到内置
+    #     `_sha256`（实测 sha256 仍对；撤销栈就靠它）
+    #   * `libssl-3.dll` / `_ssl.pyd`：只起本地 HTTP，不用 TLS
+    #   * `sqlite3.dll` / `_sqlite3.pyd`：不用 sqlite
+    #   * `python.cat`：调试符号目录；`_zstd.pyd`：我们的 zip 用 zlib
+    "python/libcrypto-3.dll",
+    "python/libssl-3.dll",
+    "python/_ssl.pyd",
+    "python/sqlite3.dll",
+    "python/_sqlite3.pyd",
+    "python/python.cat",
+    "python/_zstd.pyd",
+    "python/_remote_debugging.pyd",
+    "python/_wmi.pyd",
+    "python/_multiprocessing.pyd",
+    "python/_queue.pyd",
     "python/_tkinter.pyd",
     "python/tcl86t.dll",
     "python/tk86t.dll",
@@ -163,10 +184,26 @@ def collect() -> list[tuple[Path, str]]:
             out.append((p, f"{PKG_NAME}/{f}"))
         else:
             print(f"  ! 跳过不存在的文件：{f}")
+    # 启动器（放**包根** ⇒ 用户一眼看到）
+    lp = REPO / LAUNCHER_SRC
+    if lp.is_file():
+        out.append((lp, f"{PKG_NAME}/{LAUNCHER_NAME}"))
+    else:
+        print(f"  ! 没有启动器 exe（先跑 tools/build_launcher.py）：{LAUNCHER_SRC}")
     return out
 
 
 def main() -> int:
+    # 启动器：没有就现编一个（用系统自带的 csc.exe，零第三方工具链）
+    if not (REPO / LAUNCHER_SRC).is_file():
+        import subprocess
+        r = subprocess.run([str(REPO / "python" / "python.exe"),
+                            str(REPO / "tools" / "build_launcher.py")],
+                           cwd=REPO, capture_output=True)
+        msg = (r.stdout.decode("utf-8", "replace")
+               + r.stderr.decode("utf-8", "replace")).strip()
+        if msg:
+            print(msg)
     items = collect()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -215,6 +252,7 @@ def main() -> int:
         f"{PKG_NAME}/使用说明.txt",
         f"{PKG_NAME}/src/save_modifier_web/web/i18n.json",
         f"{PKG_NAME}/src/save_modifier_web/version.py",
+        f"{PKG_NAME}/{LAUNCHER_NAME}",
     ]
     missing = [m for m in must if m not in names]
     if missing:
@@ -222,8 +260,8 @@ def main() -> int:
         for m in missing:
             print("   ", m)
         return 1
-    print("自检 OK：run.bat / run_web.bat / 核心库 / Web GUI / locale / 战役索引 / "
-          "i18n 词表 / PyYAML / 使用说明 都在包里")
+    print("自检 OK：启动器 exe / run.bat / run_web.bat / 核心库 / Web GUI / locale / "
+          "战役索引 / i18n 词表 / PyYAML / 使用说明 都在包里")
     return 0
 
 

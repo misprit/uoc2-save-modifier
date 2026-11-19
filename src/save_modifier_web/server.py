@@ -120,6 +120,11 @@ def _log_startup():
     _log("[env] game dir = %s" % game_dir)
     _log("[env] save root = %s" % save_root)
     _log("[env] log = %s" % (_log_path(),))
+    try:
+        from save_modifier_web.version import AUTHOR
+        _log("[author] %s" % AUTHOR)
+    except Exception:
+        pass
 
 
 def _version() -> str:
@@ -1751,7 +1756,8 @@ def _serve_forever(httpd):
     httpd.serve_forever(poll_interval=0.3)
 
 
-def run(serve_only: bool = False, no_window: bool = False) -> int:
+def run(serve_only: bool = False, no_window: bool = False,
+        no_browser: bool = False) -> int:
     """起服务 + 拉起 Edge 独立窗口；窗口关掉 ⇒ 服务一起退。"""
     token = secrets.token_urlsafe(16)
     _Handler.token = token
@@ -1776,12 +1782,17 @@ def run(serve_only: bool = False, no_window: bool = False) -> int:
         return 0
 
     if serve_only:
-        print("（--serve：自己开浏览器）")
-        try:
-            import webbrowser
-            webbrowser.open(url)
-        except Exception:
-            pass
+        if no_browser:
+            # U80：启动器 exe 会自己开浏览器（能管 Edge --app / 默认浏览器，
+            # 也能实现「关窗即退」与单实例）⇒ 服务端**不要**碰浏览器。
+            print("（--no-browser：只起服务，浏览器交给启动器）")
+        else:
+            print("（--serve：自己开浏览器）")
+            try:
+                import webbrowser
+                webbrowser.open(url)
+            except Exception:
+                pass
         try:
             while True:
                 time.sleep(1)
@@ -1878,7 +1889,8 @@ def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if "--check" in argv:
         return check()
-    return run(serve_only="--serve" in argv, no_window="--no-window" in argv)
+    return run(serve_only="--serve" in argv, no_window="--no-window" in argv,
+               no_browser="--no-browser" in argv)
 
 
 if __name__ == "__main__":

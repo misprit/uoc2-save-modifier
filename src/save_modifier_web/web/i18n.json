@@ -678,7 +678,6 @@
   "<div class=\"panel\"><h3>{0}</h3><div class=\"placeholder\">\n      <div class=\"big\">正在加载游戏目录…</div>\n      特种兵 / 单位 / 卡牌的中文名与贴图都来自游戏包，第一次要读一遍目录。</div></div>": "<div class=\"panel\"><h3>{0}</h3><div class=\"placeholder\">\n      <div class=\"big\">Loading the game folder…</div>\n      The names and images of special forces / units / cards all come from the game packages; the first load has to read through the folder.</div></div>",
   "<div class=\"panel\"><h3>战区资产</h3><div class=\"placeholder\">\n        <div class=\"big\">当前不在战斗中</div>\n        战区资产是**战斗中的**东西（存档里的 <code>games/&lt;场景&gt;/main.yml</code>）——\n        不在战斗里就没有这一页的内容。</div></div>": "<div class=\"panel\"><h3>Theater assets</h3><div class=\"placeholder\">\n        <div class=\"big\">Not in a battle right now</div>\n        Theater assets are an **in-battle** thing (the save's <code>games/&lt;scenario&gt;/main.yml</code>) —\n        outside a battle this page has no content.</div></div>",
   "版本": "version",
-  "<div class=\"fine\" style=\"padding:8px 12px 0\">{0} · <code>{1}</code></div>": "<div class=\"fine\" style=\"padding:8px 12px 0\">{0} · <code>{1}</code></div>",
   "<span class=\"badge\">导入副本</span>": "<span class=\"badge\">Imported copy</span>",
   "<span class=\"badge battle\">战斗中</span>": "<span class=\"badge battle\">In battle</span>",
   "<span class=\"none\">无特性</span>": "<span class=\"none\">No traits</span>",
@@ -697,7 +696,9 @@
   " 条</span></li>": " more</span></li>",
   "：": ": ",
   "。": ".",
-  "改动已写入存档": "Changes were written to the save"
+  "改动已写入存档": "Changes were written to the save",
+  "<div class=\"fine\" style=\"padding:8px 12px 0\">{0} · {1} · <code>{2}</code></div>": "<div class=\"fine\" style=\"padding:8px 12px 0\">{0} · {1} · <code>{2}</code></div>",
+  "作者": "by"
  },
  "errors": {
   "**取消专精**（{old_used} → {sp_used}）—— 该技能发动时的 CP 消耗会涨回去": "**Specialisation removed** ({old_used} → {sp_used}) — the CP cost of activating that skill goes back up",

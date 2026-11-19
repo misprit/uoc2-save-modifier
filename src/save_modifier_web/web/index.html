@@ -968,6 +968,7 @@ let SAVES = [], VIEW = null, PAGE = "overview";
    * 静态 HTML 里的中文（文本节点 / title 等属性）⇒ 由 MutationObserver
      按**整段精确匹配**翻译（动态拼接的都在源码里包好了）
    =================================================================== */
+const AUTHOR = "烟柳边城 misprit";   /* U80：作者署名 */
 let LANG = "chi";        /* 当前界面语言：chi | en */
 let I18N = {};           /* 中文 → 英文（来自 /api/i18n） */
 
@@ -4065,8 +4066,9 @@ function show(p){
     </div>`, caps, levelPickerHTML(), backupStackHTML());
     /* U75：版本号 + 日志路径 —— 外部测试者要能说清自己用的哪版，
        出问题时把日志贴给开发者（浏览器窗口一关，console 就没了 ⇒ 日志落文件）。 */
-    w.innerHTML += L2(`<div class="fine" style="padding:8px 12px 0">{0} · <code>{1}</code></div>`,
+    w.innerHTML += L2(`<div class="fine" style="padding:8px 12px 0">{0} · {1} · <code>{2}</code></div>`,
       L("版本") + " v" + ((SETTINGS && SETTINGS.version) || "?"),
+      L("作者") + " " + AUTHOR,
       esc((SETTINGS && SETTINGS.log_file) || ""));
     bindTun();
     paintPending();
