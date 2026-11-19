@@ -685,18 +685,14 @@ def api_campaign_detail(save_id: str) -> dict:
         index = default_campaign_index()
         data = CampaignData(paths, index)
 
-        # 路线图：挑**包含当前会议**的那条路线
+        # 路线图：按**关卡**挑线路（U66）——
+        #   ① 关卡在**历史线**里有 ⇒ 走历史线；
+        #   ② 历史线里没有 ⇒ 去别的线路找这个关卡，用**找到的第一个**。
+        # ⚠️ 以前是「按会议找 + 路线按 sorted 遍历」⇒ `"fantasy" < "historical"`
+        #    ⇒ **幻想线永远先命中** ⇒ 走历史线的存档显示的是幻想线的关卡。
         cur = pos.conference_id
-        routes = list(index.routes(cid))
-        chosen_route, confs = None, ()
-        for r in routes:
-            cs = index.conferences(cid, r)
-            if any(c.id == cur for c in cs):
-                chosen_route, confs = r, cs
-                break
-        if chosen_route is None:
-            chosen_route = routes[0] if routes else "historical"
-            confs = index.conferences(cid, chosen_route)
+        chosen_route = index.pick_route(cid, cur, pos.scenario_id)
+        confs = index.conferences(cid, chosen_route)
         cur_idx = next((i for i, c in enumerate(confs) if c.id == cur), -1)
 
         route = []

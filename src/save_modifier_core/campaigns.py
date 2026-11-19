@@ -177,6 +177,39 @@ class CampaignIndex:
         c = self.campaign(campaign_id)
         return sorted(((c or {}).get("routes") or {}).keys())
 
+    def route_order(self, campaign_id: str) -> list[str]:
+        """路线**查找顺序** —— **历史线优先**（用户口径，U66），其余按字母序。
+
+        ⚠️ 以前直接用 `routes()`（= **sorted**）⇒ `"fantasy" < "historical"`
+        ⇒ 跨路线查找时**幻想线永远先命中** ⇒ 走历史线的存档会显示**幻想线**的关卡
+        （实测 `Stalingrad.usg` 正在打 `road_to_stalingrad`，它只在历史线上）。
+        """
+        routes = list(self.routes(campaign_id))
+        if "historical" in routes:
+            return ["historical"] + [r for r in routes if r != "historical"]
+        return routes
+
+    def pick_route(self, campaign_id: str, conference_id: str | None = None,
+                   scenario_id: str | None = None) -> str:
+        """按**关卡**挑线路（用户口径，U66）：
+
+        ① 关卡在**历史线**里有 ⇒ 走历史线；
+        ② 历史线里没有 ⇒ 去别的线路找这个关卡，**用找到的第一个**；
+        ③ 找不到关卡（存档不在战斗里 / 这个场景不在任何线路）⇒
+           退回「这个会议在哪条线上」，再不行就用第一条（历史线）。
+        """
+        order = self.route_order(campaign_id)
+        if scenario_id:
+            for r in order:
+                for c in self.conferences(campaign_id, r):
+                    if any(s.id == scenario_id for s in c.scenes):
+                        return r
+        if conference_id:
+            for r in order:
+                if any(c.id == conference_id for c in self.conferences(campaign_id, r)):
+                    return r
+        return order[0] if order else "historical"
+
     def conferences(self, campaign_id: str, route: str = "historical") -> tuple[Conference, ...]:
         """某条路线上的会议列表。"""
         c = self.campaign(campaign_id) or {}
@@ -194,8 +227,14 @@ class CampaignIndex:
 
     def find_conference(self, campaign_id: str, conference_id: str,
                         route: str = "historical") -> Conference | None:
-        """按会议 ID 找会议（跨所有路线找，找不到返回 None）。"""
-        for r in self.routes(campaign_id):
+        """按会议 ID 找会议（找不到返回 None）。
+
+        ⚠️ **查找顺序 = 历史线优先**（U66）：`route` 是「优先路线」，
+        它里面没有这个会议时，再按 `route_order()` 继续找，**找到的第一个**就用。
+        """
+        order = self.route_order(campaign_id)
+        seq = ([route] if route and route in order else []) + [r for r in order if r != route]
+        for r in seq:
             for c in self.conferences(campaign_id, r):
                 if c.id == conference_id:
                     return c
@@ -208,8 +247,8 @@ class CampaignIndex:
         return c.scenes if c else ()
 
     def find_scenario(self, campaign_id: str, scenario_id: str) -> Scenario | None:
-        """按场景 ID 找场景（跨所有路线）。"""
-        for r in self.routes(campaign_id):
+        """按场景 ID 找场景（**历史线优先**，U66）。"""
+        for r in self.route_order(campaign_id):
             for c in self.conferences(campaign_id, r):
                 for s in c.scenes:
                     if s.id == scenario_id:

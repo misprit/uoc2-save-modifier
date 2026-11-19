@@ -14,6 +14,8 @@
 **索引测试不跳过**（索引是内置的）。
 """
 
+import io
+import os
 import unittest
 from pathlib import Path
 
@@ -202,6 +204,81 @@ class TestCampaignDataAgainstGame(unittest.TestCase):
                         bad.append((cid, c.id))
         self.assertEqual(bad, [], "索引里有游戏包不存在的会议")
 
+
+# =====================================================================
+# U66：战役路线 —— 历史线优先
+# =====================================================================
+
+
+class TestU66RouteOrder(unittest.TestCase):
+    """U66 —— 战役路线图按**历史线优先**挑线路。
+
+    口径（用户）：关卡在历史线里有 ⇒ 走历史线；历史线里没有 ⇒ 去找别的线路
+    并显示别的线路；匹配上多个的 ⇒ 用找到的第一个。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.idx = camp_mod.default_campaign_index()
+
+    def test_routes_sorted_would_pick_fantasy_first(self):
+        """前提：`routes()` = sorted ⇒ `"fantasy" < "historical"` ⇒ 旧逻辑必然选错。"""
+        rs = self.idx.routes("stalingrad")
+        self.assertIn("fantasy", rs)
+        self.assertIn("historical", rs)
+        self.assertLess(rs.index("fantasy"), rs.index("historical"))
+
+    def test_route_order_puts_historical_first(self):
+        """查找顺序 = 历史线优先，其余字母序。"""
+        order = self.idx.route_order("stalingrad")
+        self.assertEqual(order[0], "historical")
+        self.assertEqual(sorted(order), sorted(self.idx.routes("stalingrad")))
+
+    def test_pick_route_by_scenario_prefers_historical(self):
+        """实测存档 `Stalingrad.usg` 正在打 `road_to_stalingrad` ⇒ 必须落在历史线。"""
+        self.assertEqual(
+            self.idx.pick_route("stalingrad", "c_42_07", "road_to_stalingrad"),
+            "historical")
+
+    def test_pick_route_falls_back_to_another_route(self):
+        """历史线里没有这个关卡 ⇒ 去别的线路找，并显示那条线路。"""
+        self.assertEqual(
+            self.idx.pick_route("stalingrad", "c_42_07", "kalach"), "fantasy")
+        self.assertEqual(
+            self.idx.pick_route("stalingrad", "c_43_02", "3rd_rostov"), "relief")
+
+    def test_pick_route_falls_back_to_conference(self):
+        """没有关卡（存档不在战斗中）⇒ 退回按会议找；再不行用第一条。"""
+        self.assertEqual(self.idx.pick_route("stalingrad", "c_42_07", None),
+                         "historical")
+        self.assertEqual(self.idx.pick_route("stalingrad", "c_42_09", None),
+                         "historical")
+        self.assertEqual(self.idx.pick_route("stalingrad", None, None),
+                         "historical")
+
+    def test_find_conference_prefers_historical(self):
+        """按会议找也走历史线优先（三个路线都有 c_42_07，内容不同）。"""
+        conf = self.idx.find_conference("stalingrad", "c_42_07")
+        self.assertIsNotNone(conf)
+        ids = [s.id for s in conf.scenes]
+        self.assertIn("road_to_stalingrad", ids)
+        self.assertNotIn("kalach", ids)
+
+    def test_find_scenario_prefers_historical(self):
+        """按场景找同样历史线优先。"""
+        sc = self.idx.find_scenario("stalingrad", "fischreiher")
+        self.assertIsNotNone(sc)
+        self.assertEqual(sc.id, "fischreiher")
+        # 幻想线专属场景照样能查到（只是历史线没有它）
+        self.assertIsNotNone(self.idx.find_scenario("stalingrad", "kalach"))
+
+    def test_server_uses_pick_route(self):
+        """服务端路线图必须走 `pick_route`（不要再自己 sorted 遍历）。"""
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with io.open(os.path.join(root, "src", "save_modifier_web", "server.py"),
+                     encoding="utf-8") as fh:
+            srv = fh.read()
+        self.assertIn("index.pick_route(cid, cur, pos.scenario_id)", srv)
 
 if __name__ == "__main__":
     unittest.main()
