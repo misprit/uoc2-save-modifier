@@ -1460,6 +1460,66 @@ class TestUiDialogsAndNames(unittest.TestCase):
 
 
 # =====================================================================
+# U52：字号整体放大 + 滚轮区显著放大 + 注释小字保持原样
+# =====================================================================
+
+
+class TestU52TypographyScale(unittest.TestCase):
+    """U52 —— 界面整体放大，但「注释用的小字」保持原样。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    @staticmethod
+    def _rule(css, selector):
+        """按「**选择器列表完全相等**」取一条 CSS 规则（含大括号）。
+
+        ⚠️ 不能用 `css.find(sel + "{")` —— 组合规则会抢先命中
+        （`.stat .v .spin,.stat .v .numin{` 里也有 `.numin{`），
+        前置断言也挡不住（第二项前面是**空格**不是逗号）。
+        ⇒ 直接扫规则、比较归一化后的选择器列表。
+        """
+        import re
+        want = ",".join(x.strip() for x in selector.split(","))
+        for m in re.finditer(r"([^{}]+)\{([^}]*)\}", css):
+            sel = re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S)
+            got = ",".join(x.strip() for x in sel.split(","))
+            if got == want:
+                return m.group(0)
+        return ""
+
+    def test_base_font_is_bigger(self):
+        """正文 12.5px → 14px。"""
+        self.assertIn("font:14px/1.55", self.html)
+
+    def test_rail_is_wider_and_bigger(self):
+        """左侧功能列整列放大（用户：「空间冗余很多，可以多放大点」）。"""
+        self.assertIn("width:200px", self._rule(self.html, ".rail"))
+        self.assertIn("font-size:15px", self._rule(self.html, ".rail .nav"))
+
+    def test_wheel_controls_are_much_bigger(self):
+        """★ 滚轮区（可改的地方）：控件和数字都要大。"""
+        self.assertIn("font-size:22px", self._rule(self.html, ".spin"))
+        self.assertIn("min-width:60px", self._rule(self.html, ".spin"))
+        self.assertIn("font-size:22px", self._rule(self.html, ".numin"))
+        self.assertIn("font-size:22px", self._rule(self.html, ".tun .num"))
+        self.assertIn("width:19px", self._rule(self.html, ".blood .bar .pip"))
+        self.assertIn("height:34px", self._rule(self.html, ".stat .v .spin,.stat .v .numin"))
+
+    def test_auxiliary_small_text_kept(self):
+        """注释用的小字**保持原大小**（单位行副信息 11.5px、技能名 9.5px）。"""
+        self.assertIn("font-size:11.5px", self._rule(self.html, ".umeta"))
+        self.assertIn("font-size:9.5px", self._rule(self.html, ".sk .nm"))
+
+    def test_wheel_control_has_hint(self):
+        """滚轮控件悬停给提示（「第一反应就是这里可以改」）。"""
+        self.assertIn("Alt+滚轮 ±1（也可按住上下拖）", self.html)
+
+
+# =====================================================================
 # U50：工具条横向溢出 + 兵力卡恢复「数字调血量 / 条上调压制」
 # =====================================================================
 
@@ -1554,8 +1614,8 @@ class TestU49LayoutAndLegality(unittest.TestCase):
         """
         self.assertEqual(self.html.count('class="hintline"'), 1)
         self.assertIn('class="blood${bloodDirty?', self.html)
-        self.assertIn(".stat .v .spin,.stat .v .numin{height:26px", self.html)
-        self.assertIn("min-height:26px", self.html)
+        self.assertIn(".stat .v .spin,.stat .v .numin{height:34px", self.html)
+        self.assertIn("min-height:34px", self.html)
 
     def test_specialist_pool_window_has_fixed_height(self):
         """备选池窗口**固定高度** —— 勾「显示全部」不许变大小。"""
