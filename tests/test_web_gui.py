@@ -1466,6 +1466,58 @@ class TestUiDialogsAndNames(unittest.TestCase):
 
 
 # =====================================================================
+# U50：工具条横向溢出 + 兵力卡恢复「数字调血量 / 条上调压制」
+# =====================================================================
+
+
+class TestU50ToolbarAndStrength(unittest.TestCase):
+    """U50 —— 两处：① 单位页工具条不许横向溢出；② 兵力卡恢复 §6.1b 两层滚轮。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    @staticmethod
+    def _rule(css, selector):
+        i = css.find(selector + "{")
+        if i < 0:
+            return ""
+        j = css.find("}", i)
+        return css[i:j + 1]
+
+    def test_toolbar_wraps_instead_of_overflowing(self):
+        """总部下拉框的宽度由**最长总部名**决定 ⇒ 窄窗口必须换行，不能横向溢出。"""
+        self.assertIn(".toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;",
+                      self.html)
+        self.assertIn("max-width:100%", self._rule(self.html, ".sel"))
+
+    def test_strength_card_has_tot_and_blood_bar(self):
+        """兵力卡 = 数值区（当前血量）+ 血量条（滚轮调压制）。"""
+        self.assertIn('id="sp_tot_${u.id}"', self.html)
+        self.assertIn('id="sp_blood_${u.id}"', self.html)
+        self.assertNotIn('id="sp_act_${u.id}"', self.html)
+        self.assertNotIn('id="sp_sup_${u.id}"', self.html)
+
+    def test_blood_bar_wheel_adjusts_suppressed_only(self):
+        """血量条上 Alt+滚轮 = 调 `sup_st`（`act_st` 不变，tot 跟着变）。"""
+        self.assertIn("altWheel(barEl", self.html)
+        self.assertIn('field:"sup_st"', self.html)
+        self.assertIn("const cap = (max>0) ? (max - actCur) : Infinity;", self.html)
+
+    def test_tot_spin_clamps_to_game_max(self):
+        """数字区夹取：tot ∈ [sup, max_st]（上限是游戏定死的）。"""
+        self.assertIn("min:sup, max:(max>0?max:null)", self.html)
+
+    def test_pending_list_shows_player_facing_numbers(self):
+        """待应用清单显示玩家看到的量，写盘仍是 `act_st` / `sup_st`。"""
+        self.assertIn("dispBase, dispValue", self.html)
+        self.assertIn("`单位 ${u.id} 当前血量`", self.html)
+        self.assertIn("`单位 ${u.id} 被压制兵力`", self.html)
+
+
+# =====================================================================
 # U49：兵力卡精简 / 备选池固定尺寸 + 默认折叠 / 挂载合法性方向
 # =====================================================================
 
@@ -1488,16 +1540,26 @@ class TestU49LayoutAndLegality(unittest.TestCase):
         j = css.find("}", i)
         return css[i:j + 1]
 
-    def test_detail_card_has_no_pip_bar_or_legend(self):
-        """单位详情兵力卡**不再**有段格条 + 图例（数字已经说清，冗余）。"""
-        self.assertNotIn('class="blood"', self.html)
+    def test_detail_card_has_no_legend_row(self):
+        """单位详情兵力卡**不再有那条常驻图例行**（未压 / 压制 / 差 的文字说明）。
+
+        ⚠️ **U50 改判了一部分**：段格条（血量条）是**控件不是装饰** ——
+        它是「在条上滚轮调被压制量」的入口（规范 §6.1b），
+        U49 把它当冗余展示删掉时**连这个交互一起删没了** ⇒ U50 把血量条恢复了。
+        真正被删掉并**保留删除**的只有那条**图例行**（`.legend`）；
+        血量条的颜色含义改由**悬停浮层**说明。
+        """
         self.assertNotIn('class="legend"', self.html)
-        self.assertNotIn(".blood{", self.html)
         self.assertNotIn(".legend{", self.html)
 
     def test_strength_and_xp_cards_line_up(self):
-        """兵力卡与经验卡都是「标签 / 数值 / 提示」三行，数值控件一样高。"""
-        self.assertEqual(self.html.count('class="hintline"'), 2)
+        """兵力卡与经验卡都是「标签 / 数值 / 第三行」三行，数值控件一样高。
+
+        U50：兵力卡的第三行是**血量条**（U49 之前是提示行），
+        经验卡的第三行仍是提示行 ⇒ 两张卡的行数与基线仍然对齐。
+        """
+        self.assertEqual(self.html.count('class="hintline"'), 1)
+        self.assertIn('class="blood${bloodDirty?', self.html)
         self.assertIn(".stat .v .spin,.stat .v .numin{height:26px", self.html)
         self.assertIn("min-height:26px", self.html)
 

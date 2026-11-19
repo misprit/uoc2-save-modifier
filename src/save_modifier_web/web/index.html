@@ -174,13 +174,20 @@ table.list td.k{color:var(--muted)}
 .cols>*{min-width:0}
 .cols-wide{grid-template-columns:minmax(520px,1.45fr) minmax(340px,1fr)}
 .cols-half{grid-template-columns:minmax(300px,1fr) minmax(300px,1fr)}
-.toolbar{display:flex;align-items:center;gap:10px;background:var(--surface-alt);
+/* U50：**工具条不许横向溢出** —— 单位页的「总部」下拉框宽度由
+   **最长那个总部名**决定（存档不同 ⇒ 名字长短不同 ⇒ 宽度不同），
+   窄窗口下两件控件的最小宽度加起来超过工具条 ⇒ select 撑出工具条、
+   压掉右侧内边距，搜索框的 placeholder 也被挤没。
+   ⇒ 工具条**允许换行**（窄了就让 select 落到第二行），select 再加
+   `max-width:100%` 兜底（就算总部名更长也不会溢出）。 */
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface-alt);
   border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:12px}
 .inp{background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 9px;
   font:inherit;font-size:13px;color:var(--text)}
 .inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(36,91,143,.13)}
 .toolbar .sp{flex:1}
-.sel{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 9px;font-size:13px}
+.sel{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 9px;font-size:13px;
+  max-width:100%}
 .chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text)}
 .tabs{display:flex;gap:2px;background:var(--surface-alt);border:1px solid var(--border);
   border-radius:6px;padding:2px;width:fit-content;margin:0 0 12px}
@@ -233,6 +240,16 @@ table.list td.k{color:var(--muted)}
 /* U49：兵力卡与经验卡的内容行**对齐** —— 两张卡的数值控件必须一样高
    （`.spin` 与 `.numin` 统一 26px / 行高 22px），否则两卡的数字不在同一条基线上。 */
 .stat .v .spin,.stat .v .numin{height:26px;box-sizing:border-box;line-height:22px;flex:none}
+.stat .lb .capw{font-size:11px;color:var(--muted)}
+/* U50：血量条（段格条）**是控件不是装饰** ——
+   在它上面 Alt+滚轮 = 调「被压制的量」（规范 §6.1b：act_st 不变，
+   tot_st = act_st + sup_st 跟着变）。 */
+.blood{margin-top:6px;cursor:ns-resize;border-radius:6px;transition:box-shadow .12s}
+.blood:hover{box-shadow:0 0 0 2px rgba(36,91,143,.18)}
+.blood.dirty .bar{border-color:var(--accent);background:var(--accent-light)}
+.blood .bar{display:flex;gap:3px;padding:3px 5px;border-radius:5px;
+  border:1px solid var(--border);background:var(--surface)}
+.blood .bar .pip{width:13px;height:13px}
 /* U32：大数字用输入框、小数字用 Alt+滚轮 —— 两套控件 */
 .numin{width:78px;text-align:center;padding:1px 6px;border:1px dashed var(--border);
   border-radius:6px;background:var(--surface);font-family:var(--mono);font-weight:700;
@@ -249,7 +266,9 @@ table.list td.k{color:var(--muted)}
 .spin.dirty{border-color:var(--accent);background:var(--accent-light)}
 .spin.bad{border-color:var(--danger);background:var(--danger-light);color:var(--danger)}
 .spin .u{font-size:10px;color:var(--muted);font-weight:400}
-.hintline{font-size:11px;color:var(--muted);margin-top:6px}
+/* U50：提示行与血量条**同高**（21px）⇒ 两张卡的第三行底边对齐 */
+.hintline{font-size:11px;color:var(--muted);margin-top:6px;min-height:21px;
+  display:flex;align-items:flex-end}
 /* 特种兵区 */
 .specbox{margin-top:14px;border:1px solid var(--border);border-radius:8px;
   background:var(--surface);overflow:hidden}
@@ -1092,10 +1111,15 @@ function bindNumIn(el, opts){
   apply();
 }
 
-/* 把一次编辑挂到「待应用」；值等于原值就撤掉 */
-function queueEdit(kind, key, params, base, value, label){
+/* 把一次编辑挂到「待应用」；值等于原值就撤掉。
+   ⚠️ `dispBase` / `dispValue`：**待应用清单里显示的那一对数**。
+   U50：兵力卡上玩家调的是「当前血量」/「被压制量」，
+   写盘的却是 `act_st` / `sup_st` ⇒ 显示用的数与写盘用的数**可能不是同一个**。 */
+function queueEdit(kind, key, params, base, value, label, dispBase, dispValue){
   if(value === base){ dropPendingKind(kind, key); return; }
-  setPending(kind, key, params, `${label} ${base} → ${value}`, value);
+  const b = (dispBase===undefined)?base:dispBase;
+  const v = (dispValue===undefined)?value:dispValue;
+  setPending(kind, key, params, `${label} ${b} → ${v}`, value);
 }
 
 /* ===================================================================
@@ -1161,6 +1185,17 @@ function unitDetailHTML(u){
   const specs = projectedSpecs(u);
   const xp  = pendingVal("unit_field", uKey(u.id,"xp"), u.xp||0);
   const max = u.max_st || ut.max_st || 0;
+  /* U50：兵力改成**两层**（规范 §6.1b）——
+     当前血量 tot = 未被压制 act + 被压制 sup；上限 = max_st（游戏定死）。 */
+  const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
+  const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
+  const tot = act + sup;
+  const bloodDirty = (act!==(u.act_st||0)) || (sup!==(u.sup_st||0));
+  const pips = [];
+  for(let i=0;i<Math.max(max, tot);i++){
+    const cls = i<act ? "on" : (i<tot ? "sup" : "");
+    pips.push(`<span class="pip ${cls}"></span>`);
+  }
   const slots = specs.length ? specs.map(s=>{
     const st = (CATALOG&&CATALOG.spec_types[s.type])||{};
     const flag = (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("");
@@ -1223,11 +1258,13 @@ function unitDetailHTML(u){
     <div class="vsep"></div>
     <div class="stats">
       <div class="stat">
-        <div class="lb"><span>兵力</span><span class="hintw">Alt+滚轮 ±1</span></div>
-        <div class="v"><span class="spin" id="sp_act_${u.id}"></span>
-          <small>现有</small> + <span class="spin" id="sp_sup_${u.id}"></span>
-          <small>增援</small></div>
-        <div class="hintline">上限 ${max||"—"} · 现有 + 增援 = 总兵力</div>
+        <div class="lb"><span>兵力</span><span class="hintw">数字调血量 · 条上调压制</span></div>
+        <div class="v"><span class="spin" id="sp_tot_${u.id}"></span>
+          <small>当前血量 / 上限 ${max||"—"}</small></div>
+        <div class="blood${bloodDirty?' dirty':''}" id="sp_blood_${u.id}"
+          data-tip="<b>血量条</b> · 在上面 Alt+滚轮 = 调<b>被压制</b>的量<br>实 = 未被压制 · 淡 = 被压制 · 空 = 还差<br>当前：未压 ${act} · 被压 ${sup}（合计 ${tot}）">
+          <div class="bar">${pips.join("")}</div>
+        </div>
       </div>
       <div class="stat">
         <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
@@ -1275,7 +1312,7 @@ function pageUnits(w){
       <div class="pbody">
         <div class="toolbar">
           <input class="inp" id="uq" placeholder="搜索单位 / 类型 / 编号…" value="${esc(UQUERY||"")}"
-                 style="flex:1;min-width:120px">
+                 style="flex:1;min-width:96px">
           <select class="sel" id="uhq"><option value="">全部总部</option>
             ${hqs.map(h=>`<option value="${h.id}" ${String(h.id)===hqf?'selected':''}>${
               esc(h.name_cn||h.name_brief||h.name_full||("总部 "+h.id))}</option>`).join("")}
@@ -1311,22 +1348,52 @@ function pageUnits(w){
 }
 
 function bindUnitControls(u){
-  const actEl = document.getElementById("sp_act_"+u.id);
-  const supEl = document.getElementById("sp_sup_"+u.id);
+  const totEl = document.getElementById("sp_tot_"+u.id);
+  const barEl = document.getElementById("sp_blood_"+u.id);
   const xpEl  = document.getElementById("in_xp_"+u.id);
-  const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
-  const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
+  const baseAct = u.act_st||0, baseSup = u.sup_st||0;
+  const act = pendingVal("unit_field", uKey(u.id,"act_st"), baseAct);
+  const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), baseSup);
   const xp  = pendingVal("unit_field", uKey(u.id,"xp"), u.xp||0);
-  if(actEl) bindSpin(actEl, {base:u.act_st||0, cur:act, min:0, max:null, onChange(v){
+  const ut  = (CATALOG&&CATALOG.unit_types[u.type])||{};
+  const max = u.max_st || ut.max_st || 0;      /* 0 = 拿不到上限 ⇒ 不夹上界 */
+
+  /* ① 数字区 = **当前血量**（tot = 未被压制 + 被压制）—— Alt+滚轮 ±1 调它。
+        规范 §6.1b：sup_st 保持不变 ⇒ act_st = tot − sup_st；
+        夹取 tot ∈ [sup_st, max_st]（上限拿不到就不夹上界）。 */
+  if(totEl) bindSpin(totEl, {base:baseAct+baseSup, cur:act+sup,
+    min:sup, max:(max>0?max:null), onChange(v){
+    const s = pendingVal("unit_field", uKey(u.id,"sup_st"), baseSup);
+    let t = v;
+    if(t < s) t = s;
+    if(max>0 && t > max) t = max;
+    const a = t - s;
     queueEdit("unit_field", uKey(u.id,"act_st"),
-      {unit_id:u.id, field:"act_st", value:v}, u.act_st||0, v, `单位 ${u.id} 现有兵力`);
+      {unit_id:u.id, field:"act_st", value:a}, baseAct, a,
+      `单位 ${u.id} 当前血量`, baseAct+baseSup, t);
     SEL.units = u.id; show("units");
   }});
-  if(supEl) bindSpin(supEl, {base:u.sup_st||0, cur:sup, min:0, max:null, onChange(v){
-    queueEdit("unit_field", uKey(u.id,"sup_st"),
-      {unit_id:u.id, field:"sup_st", value:v}, u.sup_st||0, v, `单位 ${u.id} 增援兵力`);
-    SEL.units = u.id; show("units");
-  }});
+
+  /* ② 血量条 = **被压制的量**（sup_st）—— 在条上 Alt+滚轮 ±1 调它。
+        规范 §6.1b：act_st 保持不变 ⇒ tot = act_st + sup_st 跟着变；
+        夹取 sup ∈ [0, max_st − act_st] ——
+        「上限是游戏定死的」⇒ 压制量只能吃「还差」那几格，不能把总血量顶过上限
+        （上限拿不到就不夹上界，只夹 ≥ 0）。 */
+  if(barEl){
+    const cur = pendingVal("unit_field", uKey(u.id,"sup_st"), baseSup);
+    const actCur = pendingVal("unit_field", uKey(u.id,"act_st"), baseAct);
+    const cap = (max>0) ? (max - actCur) : Infinity;
+    altWheel(barEl, function(d){
+      let v = cur + d;
+      if(v < 0) v = 0;
+      if(v > cap) v = cap;
+      if(v === cur) return;
+      queueEdit("unit_field", uKey(u.id,"sup_st"),
+        {unit_id:u.id, field:"sup_st", value:v}, baseSup, v,
+        `单位 ${u.id} 被压制兵力`, baseSup, v);
+      SEL.units = u.id; show("units");
+    });
+  }
   if(xpEl) bindNumIn(xpEl, {base:u.xp||0, cur:xp, min:0, max:400,
     kind:"unit_field", key:uKey(u.id,"xp"),
     params:{unit_id:u.id, field:"xp", value:xp},
