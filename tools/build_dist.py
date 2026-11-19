@@ -188,6 +188,12 @@ def main() -> int:
         f"{PKG_NAME}/python/Lib/site-packages/yaml/_yaml.cp314-win_amd64.pyd",
         f"{PKG_NAME}/python/Lib/site-packages/tkinter/__init__.py",
         f"{PKG_NAME}/tests/test_api_contract.py",
+        # U74/U75 新增的（之前漏了 ⇒ 打出来的包可能缺东西却照样「自检 OK」）
+        f"{PKG_NAME}/run_web.bat",
+        f"{PKG_NAME}/run_tests.bat",
+        f"{PKG_NAME}/使用说明.txt",
+        f"{PKG_NAME}/src/save_modifier_web/web/i18n.json",
+        f"{PKG_NAME}/src/save_modifier_web/version.py",
     ]
     missing = [m for m in must if m not in names]
     if missing:
@@ -195,7 +201,8 @@ def main() -> int:
         for m in missing:
             print("   ", m)
         return 1
-    print("自检 OK：run.bat / run_gui.bat / 核心库 / GUI / locale / 战役索引 / Tcl-Tk / PyYAML / tkinter 都在包里")
+    print("自检 OK：run.bat / run_web.bat / run_gui.bat / 核心库 / GUI / locale / 战役索引 / "
+          "i18n 词表 / Tcl-Tk / PyYAML / tkinter / 使用说明 都在包里")
     return 0
 
 
