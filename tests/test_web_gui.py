@@ -2352,5 +2352,69 @@ class TestU67SwitchAndSaveAs(_SaveCopyBase):
             "edits": [{"kind": "no_such_kind", "params": {}}]})
         self.assertFalse(r["ok"])
         self.assertFalse(os.path.exists(dest), "出错的另存为不能留下半成品")
+class TestU68ImportWhenNoSave(_SaveCopyBase):
+    """U68 —— 没识别到存档时：打开其他位置的存档 / 拖拽导入。
 
+    用户原话：「另外在存档读取界面，如果没有识别到存档，是否应该允许玩家
+    自己拖拽存档进来或者打开一个选区存档位置的窗口。」
+    """
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()          # ⚠️ 基类要起 HTTP 服务（别覆盖掉）
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_empty_state_offers_both_entrances(self):
+        self.assertIn("没有识别到存档", self.html)
+        self.assertIn("打开其他位置的存档", self.html)
+        self.assertIn("id=\"nosave\"", self.html)
+
+    def test_drop_zone_is_wired(self):
+        self.assertIn("function bindDropZone()", self.html)
+        self.assertIn("function importSaveFile(f)", self.html)
+        self.assertIn("bindDropZone();", self.html)
+
+    def test_import_writes_a_byte_identical_copy(self):
+        import base64
+        self.use_temp_appdata()
+        raw = io.open(self.copy, "rb").read()
+        r = self.post("/api/import-save", {
+            "name": "拖进来的.usg",
+            "data": base64.b64encode(raw).decode("ascii")})
+        self.assertTrue(r["ok"], r.get("errors"))
+        p = r["path"]
+        self.assertTrue(os.path.isfile(p))
+        self.assertEqual(io.open(p, "rb").read(), raw)
+        self.assertIn("modifier_imports", p)
+
+    def test_import_never_overwrites(self):
+        import base64
+        self.use_temp_appdata()
+        raw = io.open(self.copy, "rb").read()
+        b64 = base64.b64encode(raw).decode("ascii")
+        r1 = self.post("/api/import-save", {"name": "同名.usg", "data": b64})
+        r2 = self.post("/api/import-save", {"name": "同名.usg", "data": b64})
+        self.assertTrue(r1["ok"] and r2["ok"])
+        self.assertNotEqual(r1["path"], r2["path"], "同名导入不许覆盖")
+
+    def test_import_rejects_a_non_zip_payload(self):
+        import base64
+        self.use_temp_appdata()
+        r = self.post("/api/import-save", {
+            "name": "假的.usg",
+            "data": base64.b64encode(b"not a zip").decode("ascii")})
+        self.assertFalse(r["ok"])
+        self.assertTrue(r["errors"])
+
+    def test_imported_copy_can_be_opened_by_path(self):
+        import base64
+        self.use_temp_appdata()
+        raw = io.open(self.copy, "rb").read()
+        r = self.post("/api/import-save", {
+            "name": "打开用.usg",
+            "data": base64.b64encode(raw).decode("ascii")})
+        v = self.get_json("/api/view/" + urllib.request.quote(r["save_id"]))
+        self.assertIn("units", v)
+        self.assertIn("hqs", v)

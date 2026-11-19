@@ -78,6 +78,11 @@ button,input,select{font:inherit}
 .fb .fbcol .fbrow .s{color:var(--muted);font-size:11px}
 .fb .fbcol .fbrow.picked .s{color:#dbe8f4}
 .fb .hint{color:var(--muted);font-size:12px}
+
+/* ---------------- U68：拖拽导入 ---------------- */
+.drop{border:2px dashed var(--border);border-radius:8px;padding:16px;margin-top:14px;
+  text-align:center;color:var(--muted);font-size:13px}
+.drop.on{border-color:var(--accent);background:var(--accent-light);color:var(--accent-dark)}
 .hdr .hint{font-size:12px;color:var(--muted)}
 .hdr .sp{flex:1}
 .badge{font-size:11.5px;padding:1px 7px;border-radius:20px;background:var(--accent-light);
@@ -876,6 +881,19 @@ tr.oldrow{opacity:.6}
       <tbody id="oldRows"></tbody>
     </table>
     <div class="empty" id="empty" style="display:none">没有匹配的存档</div>
+    <div class="empty" id="nosave" style="display:none">
+      <div style="font-size:15px;color:var(--text);font-weight:600">没有识别到存档</div>
+      <div style="margin:8px auto 14px;max-width:560px;color:var(--muted);font-size:12.5px">
+        存档可能不在默认位置（游戏装在别的盘、手动备份过、mod 存档）。你可以：</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn pri" onclick="openFilePicker({mode:'open',title:'选择存档文件（.usg）',onPick:openPickedPath})">打开其他位置的存档…</button>
+        <button class="btn" onclick="reload()">重新扫描</button>
+      </div>
+      <div class="drop" id="drop">把 <b>.usg</b> 存档拖到这里
+        <div style="margin-top:6px;font-size:11.5px">
+          （浏览器拿不到拖入文件的完整路径 ⇒ 导入的是<b>副本</b>，改动只作用在副本上；
+          想改原文件请用上面的「打开其他位置的存档」）</div></div>
+    </div>
   </div>
   <div class="warnbar" style="width:min(1180px,100%);margin-top:12px">
     ⚠ <b>改存档前请先退出游戏</b> —— 文件被占用时写回会失败。
@@ -3482,6 +3500,55 @@ async function doUndo(){
 }
 
 /* ===================================================================
+   U68：没识别到存档时 —— 打开其他位置 / 拖进来
+   ------------------------------------------------------------------
+   用户原话：「另外在存档读取界面，如果没有识别到存档，是否应该允许玩家
+   自己拖拽存档进来或者打开一个选区存档位置的窗口。」
+   =================================================================== */
+async function importSaveFile(f){
+  if(!/\.usg$/i.test(f.name||"")){
+    alert("只认 .usg 存档文件（你拖进来的是「" + f.name + "」）");
+    return;
+  }
+  try{
+    const buf = await f.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    const CH = 0x8000;
+    for(let i=0;i<bytes.length;i+=CH)
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i+CH));
+    const r = await post("/api/import-save", {name:f.name, data:btoa(bin)});
+    const d = r.data;
+    if(!d.ok){ alert("导入失败：" + (d.errors||[]).join("；")); return; }
+    await openSave(d.save_id);
+  }catch(e){
+    alert("导入失败：" + (e.message||e));
+  }
+}
+function bindDropZone(){
+  const sp = document.getElementById("splash");
+  const dz = document.getElementById("drop");
+  if(!sp) return;
+  let depth = 0;
+  sp.addEventListener("dragenter", function(e){
+    e.preventDefault(); depth++;
+    if(dz) dz.classList.add("on");
+  });
+  sp.addEventListener("dragover", function(e){ e.preventDefault(); });
+  sp.addEventListener("dragleave", function(e){
+    e.preventDefault(); depth = Math.max(0, depth-1);
+    if(!depth && dz) dz.classList.remove("on");
+  });
+  sp.addEventListener("drop", async function(e){
+    e.preventDefault(); depth = 0;
+    if(dz) dz.classList.remove("on");
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(!f) return;
+    await importSaveFile(f);
+  });
+}
+
+/* ===================================================================
    U67：切换存档 / 另存为 / 内置文件浏览器
    ------------------------------------------------------------------
    用户原话：「目前选了一个存档后，除非退出，不然没法重新选择存档。
@@ -3706,7 +3773,13 @@ function paint(){
   const olds = all.filter(isOld);
   document.getElementById("cnt").textContent = list.length + " 个存档" +
     (olds.length?(" · " + olds.length + " 个历史存档"):"");
-  document.getElementById("empty").style.display = list.length ? "none":"block";
+  /* U68：区分两种「空」——
+     ① 一个存档都没有（`SAVES` 空）⇒ 给「打开其他位置 / 拖进来」的出口；
+     ② 有存档但搜索没匹配上 ⇒ 仍是原来的「没有匹配的存档」。 */
+  const none = !SAVES.length;
+  document.getElementById("empty").style.display = (list.length || none) ? "none":"block";
+  const nsBox = document.getElementById("nosave");
+  if(nsBox) nsBox.style.display = none ? "block":"none";
   const rowHTML = s => `
     <tr onclick="openSave('${encodeURIComponent(s.save_id).replace(/'/g, "%27")}')">
       <td>${esc(s.name)}<div style="color:var(--muted);font-size:11.5px">${esc(s.display)}</div></td>
@@ -3727,6 +3800,7 @@ function paint(){
 }
 document.getElementById("q").addEventListener("input", paint);
 initTip();
+bindDropZone();          /* U68：拖 .usg 进这一页 ⇒ 导入成副本 */
 
 function esc(s){ return String(s??"").replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }

@@ -723,6 +723,50 @@ def api_fs_list(dir_path: str) -> dict:
             "dirs": dirs, "files": files, "roots": _fs_roots(paths)}
 
 
+def api_import_save(payload) -> dict:
+    """拖进来的存档 —— 存成**副本**放到修改器自己的导入目录。
+
+    ⚠️ **浏览器拿不到拖入文件的完整路径**（File API 只给 name / size / 内容）
+    ⇒ 只能收字节 ⇒ 落成副本；**改动只作用在副本上**，原文件一个字节都不动。
+    想直接改原文件 ⇒ 用「打开其他位置的存档…」（那条路走的是文件浏览器，能拿到路径）。
+    """
+    import base64
+
+    from save_modifier_core import CorePaths
+
+    paths = CorePaths.discover()
+    raw_name = ((payload or {}).get("name") or "").strip()
+    # 只取文件名 —— 不要路径
+    name = raw_name.replace("\\", "/").split("/")[-1] or "imported.usg"
+    if not name.lower().endswith(".usg"):
+        name += ".usg"
+    b64 = (payload or {}).get("data") or ""
+    try:
+        data = base64.b64decode(b64, validate=True)
+    except Exception as exc:
+        return {"ok": False, "errors": ["数据不是合法的 base64：%s" % exc]}
+    if not data:
+        return {"ok": False, "errors": ["文件是空的"]}
+    if not data.startswith(b"PK"):
+        return {"ok": False, "errors": ["这不像存档文件（.usg 应该是 zip 包）"]}
+    imp = paths.uoc2_appdata / "modifier_imports"
+    try:
+        imp.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return {"ok": False, "errors": ["建不了导入目录：%s" % exc]}
+    target = imp / name
+    n = 2
+    while target.exists():
+        target = imp / ("%s_%d%s" % (Path(name).stem, n, Path(name).suffix))
+        n += 1
+    try:
+        target.write_bytes(data)
+    except OSError as exc:
+        return {"ok": False, "errors": ["写文件失败：%s" % exc]}
+    return {"ok": True, "path": str(target), "save_id": str(target),
+            "bytes": len(data), "summary": "已导入副本 %s" % target.name}
+
+
 def api_save_as(payload) -> dict:
     """「另存为」—— 把存档（**可含待应用改动**）写成一个新的 .usg 文件。
 
@@ -1105,6 +1149,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(_jsonable(api_undo(payload)))
             elif path == "/api/save-as":
                 self._json(_jsonable(api_save_as(payload)))
+            elif path == "/api/import-save":
+                self._json(_jsonable(api_import_save(payload)))
             else:
                 self._json({"ok": False, "errors": ["未知接口"]}, 404)
         except ValueError as exc:
