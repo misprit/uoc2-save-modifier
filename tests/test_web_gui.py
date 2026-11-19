@@ -1460,6 +1460,67 @@ class TestUiDialogsAndNames(unittest.TestCase):
 
 
 # =====================================================================
+# U53：单位页工具条横跨整页 + 「仅当前场景激活」筛选 + 列表列加宽
+# =====================================================================
+
+
+class TestU53ToolbarAndBattleFilter(unittest.TestCase):
+    """U53 —— 筛选栏回到同一行 + 补上「当前场景激活单位」筛选 + 列表宽度回复。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+        cls.srv = io.open(os.path.join(root, "src", "save_modifier_web",
+                                      "server.py"), encoding="utf-8").read()
+        cls.core = io.open(os.path.join(root, "src", "save_modifier_core",
+                                       "container.py"), encoding="utf-8").read()
+
+    @staticmethod
+    def _rule(css, selector):
+        import re
+        want = ",".join(x.strip() for x in selector.split(","))
+        for m in re.finditer(r"([^{}]+)\{([^}]*)\}", css):
+            sel = re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S)
+            got = ",".join(x.strip() for x in sel.split(","))
+            if got == want:
+                return m.group(0)
+        return ""
+
+    def test_toolbar_spans_the_whole_page(self):
+        """工具条**横跨整页**（放在两栏之上）⇒ 搜索 + 总部 + 激活筛选**一行**。"""
+        self.assertIn('class="toolbar toolbar-top"', self.html)
+        self.assertIn('class="cols cols-units"', self.html)
+
+    def test_battle_only_filter_exists(self):
+        """「仅当前场景激活」筛选；**不在战斗里置灰**（按能力位 in_battle）。"""
+        self.assertIn('id="ubattle"', self.html)
+        self.assertIn("仅当前场景激活", self.html)
+        self.assertIn("UONLY", self.html)
+        self.assertIn("VIEW.battle_unit_ids", self.html)
+        self.assertIn("VIEW.in_battle", self.html)
+        self.assertIn('${inBattle?"":"disabled"}', self.html)
+
+    def test_units_columns_are_wider_without_the_gap(self):
+        """列表列加宽（0.6fr → 0.64fr）+ 栏间不留那道空档（gap 0）。"""
+        rule = self._rule(self.html, ".cols-units")
+        self.assertIn("0.64fr", rule)
+        self.assertIn("gap:0", rule)
+
+    def test_data_tip_quotes_are_escaped(self):
+        """`data-tip` 的值里**不能直接带双引号**（`class="tn"` 会把属性提前闭合
+        ⇒ 提示文字被当成正文渲染出来，U53 实测踩到）。"""
+        self.assertIn('.replace(/"/g, "&quot;")', self.html)
+
+    def test_server_exposes_battle_unit_ids(self):
+        """服务端把战斗名单与 in_battle 一起给前端。"""
+        self.assertIn('data["battle_unit_ids"]', self.srv)
+        self.assertIn('data["in_battle"]', self.srv)
+        self.assertIn("def battle_unit_ids(", self.core)
+
+
+# =====================================================================
 # U52：字号整体放大 + 滚轮区显著放大 + 注释小字保持原样
 # =====================================================================
 

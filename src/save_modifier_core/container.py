@@ -207,6 +207,8 @@ class View:
     shelf: list[CardView] = field(default_factory=list)
     store: list[StoreEntryView] = field(default_factory=list)
     battle_turn: int | None = None
+    #: 当前战斗里**已激活**的单位 id（`games/<场景>/units.yml`）—— 战斗中才有
+    battle_unit_ids: tuple[int, ...] = ()
     warnings: list[str] = field(default_factory=list)
 
     @property
@@ -230,6 +232,9 @@ class Save:
         self.paths = paths
         self._zf: zipfile.ZipFile | None = None
         self._names: list[str] | None = None
+        #: 当前战斗里已激活的单位 id（缓存一次就够 —— 战斗层只读）
+        self._battle_unit_ids: tuple[int, ...] = ()
+        self._battle_unit_ids_done = False
         self._yaml_cache: dict[str, Any] = {}
         self._overlay: dict[str, bytes] = {}
         self._battle_turn: int | None = None
@@ -396,6 +401,33 @@ class Save:
             return {}
         data = self.read_yaml(f"{d}/main.yml", {})
         return data if isinstance(data, dict) else {}
+
+    def battle_unit_ids(self) -> tuple[int, ...]:
+        """当前战斗里**已激活**的单位 id 名单。
+
+        数据源 = `games/<场景>/units.yml`（独立场景是 `game/units.yml`）——
+        那是个**扁平的 id 列表**（实测 `[2, 5, 7, 10, 11, 12]`），
+        是规范 §7.2 单位页过滤器 #2「当前战斗激活的单位」的**唯一**来源。
+
+        ⚠️ **只在战斗进行中才存在**（71 个存档里 15 个在战斗中）
+        ⇒ 不在战斗里返回空元组（界面上那个过滤器要置灰 + 说明原因）。
+        """
+        if self._battle_unit_ids_done:
+            return self._battle_unit_ids
+        self._battle_unit_ids_done = True
+        d = self.battle_dir()
+        if d is None:
+            self._battle_unit_ids = ()
+            return self._battle_unit_ids
+        data = self.read_yaml(f"{d}/units.yml", [])
+        if not isinstance(data, list):
+            self._battle_unit_ids = ()
+            return self._battle_unit_ids
+        self._battle_unit_ids = tuple(
+            sorted(int(x) for x in data
+                   if isinstance(x, int) and not isinstance(x, bool))
+        )
+        return self._battle_unit_ids
 
     def roster_ids(self) -> set[int]:
         """战役名册 `document/units.yml` 里的单位 id 集合。
@@ -604,6 +636,7 @@ class Save:
             shelf=shelf,
             store=store,
             battle_turn=self.battle_turn(),
+            battle_unit_ids=self.battle_unit_ids(),
             warnings=warnings,
         )
 

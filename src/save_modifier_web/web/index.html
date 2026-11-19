@@ -186,6 +186,16 @@ table.list td.k{color:var(--muted)}
   font:inherit;font-size:14px;color:var(--text)}
 .inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(36,91,143,.13)}
 .toolbar .sp{flex:1}
+/* U53：单位页的工具条**横跨整页**（放在两栏之上）——
+   搜索框 + 总部筛选 + 「仅当前场景激活」**一行**排得下，
+   不用再窄了就换行。左右 14px 与下方面板对齐。 */
+.toolbar-top{margin:0 14px 12px}
+.toolbar .tbcount{font-size:12.5px;color:var(--muted);white-space:nowrap}
+/* U53：单位页两栏 —— 列表列加宽，栏间**不留那道空档**
+   （gap 0 ⇒ 两个面板的 margin 相接 = 28px）。 */
+.cols-units{grid-template-columns:minmax(320px,0.64fr) minmax(430px,1.36fr);gap:0}
+.chk.dis{opacity:.45;cursor:not-allowed}
+.chk.dis input{cursor:not-allowed}
 .sel{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 9px;font-size:14px;
   max-width:100%}
 .chk{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--text)}
@@ -779,7 +789,7 @@ const TOKEN = QS.get("t") || "";
 const OPEN_ID = QS.get("open") || "";
 const OPEN_PAGE = QS.get("page") || "";
 let SAVES = [], VIEW = null, PAGE = "overview";
-let UQUERY = "", UHQFILTER = "";
+let UQUERY = "", UHQFILTER = "", UONLY = false;   /* UONLY = 只看当前场景激活的单位 */
 let HQSTATE = {};
 let MODAL = null;      /* 模态框的状态（U40） */
 
@@ -1301,25 +1311,41 @@ function pageUnits(w){
   if(!cur){ cur = units[0]; SEL.units = cur ? cur.id : null; }
   const q = (UQUERY||"").trim().toLowerCase();
   const hqf = UHQFILTER;
+  /* U53：过滤器 #2「当前场景（战斗）已激活的单位」——
+     名单 = `games/<场景>/units.yml`（扁平的 id 列表，规范 §7.2）。
+     ⚠️ **只在战斗进行中才存在** ⇒ 不在战斗里置灰 + 悬停说明原因。 */
+  const battleIds = new Set((VIEW.battle_unit_ids||[]).map(Number));
+  const inBattle = !!VIEW.in_battle && battleIds.size > 0;
   const list = units.filter(u=>{
     if(hqf!=="" && String(u.hq_id??"")!==hqf) return false;
+    if(UONLY && inBattle && !battleIds.has(u.id)) return false;
     if(!q) return true;
     const hay = (unitCn(u.type)+" "+(u.type||"")+" "+(u.name_brief||"")+" "+
                  (u.name_full||"")+" "+(u.id)).toLowerCase();
     return hay.includes(q);
   });
   const hqs = VIEW.hqs||[];
-  w.innerHTML = `<div class="cols">
+  /* ⚠️ `data-tip` 的值里**不能直接带双引号**（`class="tn"`）——
+     否则属性提前闭合，提示文字会被当成正文渲染出来（U53 实测踩到）。
+     ⇒ 照别处的做法把 `"` 转成 `&quot;`（getAttribute 取回来时浏览器会解码）。 */
+  const battleTip = (inBattle
+    ? `<span class="tn">仅当前场景激活的单位</span><span class="tr">只看当前战斗场景里已激活的单位（名单里 ${battleIds.size} 个）</span>`
+    : `<span class="tn">仅当前场景激活的单位</span><span class="tr">该存档不在战斗中，没有战斗名单可对照</span>`).replace(/"/g, "&quot;");
+  w.innerHTML = `<div class="toolbar toolbar-top">
+      <input class="inp" id="uq" placeholder="搜索单位 / 类型 / 编号…" value="${esc(UQUERY||"")}"
+             style="flex:1 1 150px;min-width:100px">
+      <select class="sel" id="uhq" style="flex:0 1 auto;max-width:280px"><option value="">全部总部</option>
+        ${hqs.map(h=>`<option value="${h.id}" ${String(h.id)===hqf?'selected':''}>${
+          esc(h.name_cn||h.name_brief||h.name_full||("总部 "+h.id))}</option>`).join("")}
+      </select>
+      <label class="chk${inBattle?"":" dis"}" data-tip="${battleTip}">
+        <input type="checkbox" id="ubattle" ${UONLY?"checked":""} ${inBattle?"":"disabled"}>仅当前场景激活</label>
+      <span class="sp"></span>
+      <span class="tbcount">显示 ${list.length} / 共 ${units.length} 个</span>
+    </div>
+    <div class="cols cols-units">
     <div class="panel"><h3>单位 · 共 ${units.length} 个</h3>
       <div class="pbody">
-        <div class="toolbar">
-          <input class="inp" id="uq" placeholder="搜索单位 / 类型 / 编号…" value="${esc(UQUERY||"")}"
-                 style="flex:1;min-width:96px">
-          <select class="sel" id="uhq"><option value="">全部总部</option>
-            ${hqs.map(h=>`<option value="${h.id}" ${String(h.id)===hqf?'selected':''}>${
-              esc(h.name_cn||h.name_brief||h.name_full||("总部 "+h.id))}</option>`).join("")}
-          </select>
-        </div>
         <div class="rows">${list.map(unitRowHTML).join("") ||
           `<div class="placeholder"><div class="big">没有匹配的单位</div>
             换个关键词，或把「总部」筛选清空。</div>`}</div>
@@ -1327,7 +1353,7 @@ function pageUnits(w){
     <div class="panel"><h3>单位 · 详情</h3>
       <div class="detail" id="udetail">${unitDetailHTML(cur)}</div>
     </div>
-  </div>`;
+    </div>`;
 
   const uq = document.getElementById("uq");
   if(uq) uq.addEventListener("input", function(){
@@ -1339,6 +1365,9 @@ function pageUnits(w){
   });
   const uh = document.getElementById("uhq");
   if(uh) uh.addEventListener("change", function(){ UHQFILTER = this.value; show("units"); });
+  /* U53：过滤器 #2 —— 只看当前场景已激活的单位 */
+  const ub = document.getElementById("ubattle");
+  if(ub) ub.addEventListener("change", function(){ UONLY = this.checked; show("units"); });
 
   if(cur) bindUnitControls(cur);
   /* 候选池要按单位类型取 —— 换单位就重拉（带缓存） */

@@ -153,6 +153,10 @@ def api_view(save_id: str) -> dict:
             })
         data["_features"] = features
         data["_save_id"] = save_id
+        # U53：单位页过滤器 #2「当前场景激活的单位」的数据源
+        # （`games/<场景>/units.yml` 的扁平 id 名单；**只在战斗中才有**）。
+        data["battle_unit_ids"] = list(view.battle_unit_ids)
+        data["in_battle"] = bool(caps.in_battle)
         # ⚠️ `SaveInfo.name` / `display_name` 是**属性**，不是 dataclass 字段
         # ⇒ `_jsonable` 不会输出它们 ⇒ 前端拿不到存档名（U42 实测 Header 显示「—」）。
         try:

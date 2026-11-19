@@ -193,6 +193,35 @@ class TestMountLegality(SpecPoolTestBase):
         self.assertEqual(after[0]["specs"], [])
 
 
+class TestBattleUnitIds(SpecPoolTestBase):
+    """U53：当前场景（战斗）里**已激活**的单位名单。
+
+    数据源 = `games/<场景>/units.yml` —— **扁平的 id 列表**
+    （fixture 里是 `[1, 2]`；实测真实存档 `Stalingrad.usg` 是 86 个）。
+    规范 §7.2 单位页过滤器 #2「当前战斗激活的单位」的**唯一**来源。
+    """
+
+    def test_battle_dir_points_at_current_scenario(self):
+        with self.open() as save:
+            self.assertEqual(save.battle_dir(), "games/avalanche")
+            self.assertTrue(save.capabilities().in_battle)
+
+    def test_battle_unit_ids_is_a_flat_id_list(self):
+        with self.open() as save:
+            self.assertEqual(save.battle_unit_ids(), (1, 2))
+
+    def test_view_exposes_battle_unit_ids(self):
+        with self.open() as save:
+            v = save.view()
+            self.assertEqual(v.battle_unit_ids, (1, 2))
+
+    def test_no_battle_dir_means_empty_list(self):
+        """不在战斗里 ⇒ 没有那份名单（界面上那个过滤器要置灰）。"""
+        with self.open() as save:
+            save.battle_dir = lambda: None      # 强制「不在战斗里」
+            self.assertEqual(save.battle_unit_ids(), ())
+
+
 class TestRemoveSpec(SpecPoolTestBase):
     def test_remove_spec(self):
         plan, res = self.commit([Edit.unit_spec_remove(1, "ger_arty_40")])
