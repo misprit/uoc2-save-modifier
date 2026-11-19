@@ -4471,12 +4471,26 @@ Required('max_st', default=7) : All(int, Range(min=1, max=7))
 **读什么**：`data/entity_types/…` —— **特种兵 / 单位类型 / 卡牌 / 总部类型 / 国籍**
 （这些是修改器要用的静态信息）。
 
-**两种形态都读**
+**三种形态都读**（U73 补齐「裸文件」这一种 —— 那才是普通 mod 的常态）
 
 | 形态 | 位置 | 怎么读 |
 |---|---|---|
-| `dir` | `<项目>/_packages/<包名>/…`（已解压） | 当普通包用 |
-| `zip` | `<项目>/xxx.zip` 里的 `_packages/<包名>/…`（还没装） | **只读，不落盘** —— 新增 `catalog._ZipMember`（接口和 `Path` 一样有 `read_bytes()`） |
+| **裸文件** | `<项目>/data/entity_types/…`（项目目录**本身就是**一个包） | 当普通包用 |
+| `dir` | `<项目>/_packages/<包名>/…` | 当普通包用 |
+| `zip` | `<项目>/xxx.zip` 里的上面两种 | **只读，不落盘** —— `catalog._PkgSource`（目录与 zip 同一套读法） |
+
+**机制补充（U73 · 用户补充 + 字节码坐实）**
+
+| 环节 | 结论 | 依据 |
+|---|---|---|
+| Steam 创意工坊 | 只是**分发渠道** —— 场景编辑器把「包」上传上去 | `scenario_editor/edit_ctrl.pyc::_update_workshop_item` ⇒ `set_item_content_dir(self._package_path)` |
+| 下载下来的东西 | **包的裸文件**（不需要解压） | 同上 |
+| 普通 mod 怎么生效 | 放进游戏的**用户包目录** `%LOCALAPPDATA%\.uoc2\_packages\<名字>\` ⇒ 游戏当包加载 ⇒ **直接生效** | `paths.pyc::all_non_game_package_dirs` + `_build_package_list` |
+| 改游戏引擎的 mod | **不是包** ⇒ 只能手动覆盖游戏目录（你的「所见即所得」就是这种） | 同上 |
+| 游戏会自己读创意工坊吗 | **不会** —— `init_packages(mod_packages=())` 默认空，且全 lib 里没人调它 | `paths.pyc` |
+
+⇒ 修改器两边都要能读：**已装进用户包的**（U70 的顺序：用户包优先）与
+**还在创意工坊里没装的**（U71/U73：作为参考数据并入）。
 
 **优先级（关键）**：**磁盘包（用户包 → 官方包）优先**，创意工坊 zip 里的包**只补空缺**
 ⇒ 游戏真正在用的数据永远不会被「还没装进游戏的 mod」盖掉；
