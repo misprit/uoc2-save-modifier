@@ -2046,3 +2046,34 @@ class TestU61TheaterInfiniteHint(unittest.TestCase):
     def test_the_hint_only_shows_for_infinite_assets(self):
         """提示只给「无限」的那些项显示（有限的不用显示）。"""
         self.assertIn("${inf ? `<div class=\"talt\">「无限」= 每回合恢复", self.html)
+
+
+# =====================================================================
+# U62：导航栏图标 —— 自绘的「两字母徽标」
+# =====================================================================
+
+
+class TestU62NavBadges(unittest.TestCase):
+    """U62 —— 占位字符（▤▥▦▧▨▩▪◈）换成自绘的两字母徽标。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_all_seven_pages_have_a_letter_badge(self):
+        """7 个功能页各一个徽标：OV / UN / HQ / CD / ST / TA / CP。"""
+        for tag in ("OV", "UN", "HQ", "CD", "ST", "TA", "CP"):
+            self.assertIn('class="ic">%s<' % tag, self.html)
+
+    def test_placeholder_glyphs_are_gone(self):
+        """视觉稿的占位字符不许再留着。"""
+        for ch in ("\u2592", "\u25a4", "\u25a6", "\u25a7", "\u25a8",
+                   "\u25a9", "\u25c8"):
+            self.assertNotIn('class="ic">%s<' % ch, self.html)
+
+    def test_badge_is_drawn_in_css(self):
+        """徽标是 CSS 画的（圆角方块 + 字母），不依赖素材。"""
+        self.assertIn(".rail .nav .ic{width:22px;height:22px", self.html)
+        self.assertIn("font:700 10.5px/20px var(--mono)", self.html)

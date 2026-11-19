@@ -50,8 +50,15 @@ button,input,select{font:inherit}
   color:var(--text);font-size:15px;cursor:pointer;transition:background .12s}
 .rail .nav:hover{background:var(--surface-alt)}
 .rail .nav.on{background:var(--accent);color:#fff;font-weight:600}
-.rail .nav.on .ic{color:#fff}
-.rail .nav .ic{width:20px;text-align:center;font-size:15px;color:var(--muted)}
+/* U62：导航图标改成**两字母徽标**（自绘，纯 CSS）——
+   原来那套 ▤▥▦▧▨▩▪◈ 是视觉稿的占位符，一直没换成正经图标。
+   游戏包里凑不齐一套一致的（只有 hq_icon / battle_icon 等零星几个），
+   ⇒ 按用户口味自绘：22×22 圆角方块 + 两个字母（OV/UN/HQ/CD/ST/TA/CP）。 */
+.rail .nav .ic{width:22px;height:22px;flex:none;border-radius:6px;
+  background:var(--surface-alt);border:1px solid var(--border);color:var(--muted);
+  font:700 10.5px/20px var(--mono);text-align:center;letter-spacing:.4px}
+.rail .nav.on .ic{background:rgba(255,255,255,.16);border-color:transparent;
+  color:var(--accent)}
 .rail .nav .ct{margin-left:auto;font-size:11.5px;background:var(--danger);color:#fff;
   border-radius:20px;padding:1px 7px;font-weight:700}
 .rail .nav.on .ct{background:rgba(255,255,255,.28)}
@@ -124,8 +131,12 @@ table.list td.k{color:var(--muted)}
 .rail .nav{display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;font-size:15px}
 .rail .nav:hover{background:var(--accent-light)}
 .rail .nav.on{background:var(--selection);color:var(--accent-dark);font-weight:600}
-.rail .nav .ic{width:20px;text-align:center;color:var(--muted)}
-.rail .nav.on .ic{color:var(--accent)}
+/* U62：同上（第二套 .rail 规则）——见上面那条注释。 */
+.rail .nav .ic{width:22px;height:22px;flex:none;border-radius:6px;
+  background:var(--surface-alt);border:1px solid var(--border);color:var(--muted);
+  font:700 10.5px/20px var(--mono);text-align:center;letter-spacing:.4px}
+.rail .nav.on .ic{background:rgba(255,255,255,.16);border-color:transparent;
+  color:#fff}
 .work{flex:1;min-width:0;display:flex;flex-direction:column;overflow:auto;padding-bottom:8px}
 /* U56：`.work` 是 column flex ⇒ 直接子项默认能压缩 ⇒ 内容超出视口时
    **面板被压扁**（`.panel{overflow:hidden}` 顺手裁掉）而不是容器滚动
@@ -836,13 +847,13 @@ tr.oldrow{opacity:.6}
   <div class="body">
     <div class="rail">
       <div class="grp">功能</div>
-      <div class="nav on" data-p="overview"><span class="ic">▤</span>概览</div>
-      <div class="nav" data-p="units"><span class="ic">▥</span>单位<span class="ct" id="ctUnits"></span></div>
-      <div class="nav" data-p="hqs"><span class="ic">▧</span>总部<span class="ct" id="ctHqs"></span></div>
-      <div class="nav" data-p="cards"><span class="ic">▨</span>卡牌<span class="ct" id="ctCards"></span></div>
-      <div class="nav" data-p="store"><span class="ic">▩</span>商店<span class="ct" id="ctStore"></span></div>
-      <div class="nav" data-p="theater"><span class="ic">▪</span>战区资产<span class="why" id="whyTheater"></span></div>
-      <div class="nav" data-p="campaign"><span class="ic">◈</span>战役</div>
+      <div class="nav on" data-p="overview"><span class="ic">OV</span>概览</div>
+      <div class="nav" data-p="units"><span class="ic">UN</span>单位<span class="ct" id="ctUnits"></span></div>
+      <div class="nav" data-p="hqs"><span class="ic">HQ</span>总部<span class="ct" id="ctHqs"></span></div>
+      <div class="nav" data-p="cards"><span class="ic">CD</span>卡牌<span class="ct" id="ctCards"></span></div>
+      <div class="nav" data-p="store"><span class="ic">ST</span>商店<span class="ct" id="ctStore"></span></div>
+      <div class="nav" data-p="theater"><span class="ic">TA</span>战区资产<span class="why" id="whyTheater"></span></div>
+      <div class="nav" data-p="campaign"><span class="ic">CP</span>战役</div>
       <div class="sep"></div>
       <div class="undo" id="railUndo">撤销栈 <b>0</b> 条</div>
     </div>
