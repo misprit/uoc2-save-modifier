@@ -1465,6 +1465,49 @@ class TestUiDialogsAndNames(unittest.TestCase):
 
 
 # =====================================================================
+# U55：待应用明细改到「应用更改」弹窗 + 主体锁定
+# =====================================================================
+
+
+class TestU55PendingModalAndLayoutLock(unittest.TestCase):
+    """U55 —— 底栏删掉（不再跳变 / 不再挤变形），明细改到弹窗里。"""
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_bottom_drawer_is_gone(self):
+        """底部那个会跳变的待应用抽屉**删掉了**。"""
+        self.assertNotIn('id="drawer"', self.html)
+        self.assertNotIn('id="pendList"', self.html)
+        self.assertNotIn('id="pendCount"', self.html)
+        self.assertNotIn(".drawer", self.html)
+
+    def test_pending_detail_lives_in_the_confirm_modal(self):
+        """待应用**明细**在「应用更改」的确认弹窗里逐条列出。"""
+        self.assertIn("待应用明细（", self.html)
+        self.assertIn("dropPendingFromModal(", self.html)
+        self.assertIn('class="plist"', self.html)
+
+    def test_body_is_layout_locked(self):
+        """主体锁定：`.body` 高度恒定（内部各自滚动）。"""
+        self.assertIn(".body{flex:1;display:flex;min-height:0;overflow:hidden}", self.html)
+        self.assertIn(".status{display:flex", self.html)
+        self.assertIn("flex:none;white-space:nowrap;overflow:hidden", self.html)
+
+    def test_apply_result_shown_in_modal(self):
+        """写入结果 / 失败原因改成弹窗（原来写在抽屉里的 errBox / warnBox）。"""
+        self.assertNotIn('getElementById("errBox")', self.html)
+        self.assertNotIn('getElementById("warnBox")', self.html)
+        self.assertNotIn('id="errBox"', self.html)
+        self.assertNotIn('id="warnBox"', self.html)
+        self.assertIn("✓ 已应用", self.html)
+        self.assertIn("✕ 应用失败", self.html)
+
+
+# =====================================================================
 # U54：血量条单一入口 / 全局移除 Alt+滚轮 / 活跃+压制 >= 1
 # =====================================================================
 

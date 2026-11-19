@@ -117,7 +117,7 @@ table.list td.k{color:var(--muted)}
 .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
 .btn.pri:hover{background:var(--accent-dark);color:#fff}
 
-.body{flex:1;display:flex;min-height:0}
+.body{flex:1;display:flex;min-height:0;overflow:hidden}
 .rail{width:200px;flex:none;background:var(--surface);border-right:1px solid var(--border);
   padding:8px 0}
 .rail .grp{font-size:11.5px;color:var(--muted);letter-spacing:.08em;padding:12px 16px 6px}
@@ -145,7 +145,8 @@ table.list td.k{color:var(--muted)}
 .kv .k{color:var(--muted)}
 .kv .v{font-family:var(--mono)}
 .status{display:flex;align-items:center;gap:14px;padding:6px 14px;
-  background:var(--surface);border-top:1px solid var(--border);font-size:12.5px;color:var(--muted)}
+  background:var(--surface);border-top:1px solid var(--border);font-size:12.5px;color:var(--muted);
+  flex:none;white-space:nowrap;overflow:hidden}
 .status .ok{color:var(--ok)} .status .no{color:var(--danger)}
 .note{border:1px solid var(--border);border-radius:7px;background:var(--surface-alt);
   padding:10px 12px;font-size:12.5px;color:var(--muted);line-height:1.6}
@@ -685,19 +686,13 @@ tr.oldrow{opacity:.6}
 .modal .ro{font-size:10.5px;padding:1px 6px;border:1px dashed var(--border);border-radius:4px;
   color:var(--muted);font-family:var(--mono);font-weight:400}
 
-/* 待应用清单（全局底部抽屉 —— 换页也看得见改了什么） */
-.drawer{position:relative;margin:0 14px 8px;background:var(--surface);
-  border:1px solid var(--border);border-radius:9px;box-shadow:0 -6px 20px rgba(20,40,60,.08);
-  overflow:hidden;flex:none}
-.drawer .dh{background:var(--surface-alt);border-bottom:1px solid var(--border);padding:6px 12px;
-  font-size:13.5px;font-weight:700;color:var(--accent-dark);display:flex;align-items:center;gap:10px}
-.drawer .dh .files{margin-left:auto;font-weight:400;font-size:11.5px;color:var(--muted);
-  font-family:var(--mono)}
-.drawer .dlist{padding:6px 12px;max-height:132px;overflow:auto}
-.drawer.empty .dlist{display:none}
-.drawer.empty .dh{border-bottom:none}
-.drawer .err,.drawer .warn{padding:0 12px 8px}
-
+/* U55：**主体锁定** —— `.body` 独占剩余高度（内部自己滚），
+   底部的状态栏高度恒定 ⇒ 改任何东西都不会再让上方卡片变形。
+   `.body{overflow:hidden}` 防止内容溢出到窗口外。 */
+/* U55：待应用**明细**（现在在「应用更改」的弹窗里） */
+.plist{margin:8px 0;border:1px solid var(--border);border-radius:7px;
+  padding:2px 10px;max-height:190px;overflow:auto;background:var(--surface-alt)}
+.plist .ph{font-size:11.5px;color:var(--muted);padding:5px 0 2px}
 .pending{margin:0;padding:0;list-style:none}
 .pending li{display:flex;gap:8px;align-items:center;padding:5px 0;
   border-bottom:1px solid var(--surface-alt);font-size:13px}
@@ -738,7 +733,7 @@ tr.oldrow{opacity:.6}
     Python 只起一个本地 <code>127.0.0.1</code> 服务（带随机 token），核心库
     <code>save_modifier_core</code> 负责读存档与校验。<br>
     <b>7 个页面都接的是真实数据</b>：概览 · 单位 · 总部 · 卡牌 · 商店 · 战区资产 · 战役。
-    改动先进「待应用」（右下角抽屉），点「应用更改」才写盘 —— 写前自动备份、可撤销。
+    改动先进「待应用」，点右上角「应用更改」会**弹出明细二次确认**，确认后才写盘 —— 写前自动备份、可撤销。
   </div>
 </div>
 
@@ -767,15 +762,10 @@ tr.oldrow{opacity:.6}
     </div>
     <div class="work" id="work"></div>
   </div>
-  <div class="drawer empty" id="drawer">
-    <div class="dh">待应用 <span id="pendCount" style="font-weight:400">0</span> 条
-      <span class="files" id="pendFiles"></span>
-      <button class="btn" onclick="doUndo()">↶ 撤销</button>
-      <button class="btn pri" id="btnApplyDrawer" onclick="doApply()">应用更改</button>
-    </div>
-    <div class="dlist"><ul class="pending" id="pendList"></ul>
-      <div class="err" id="errBox"></div><div class="warn" id="warnBox"></div></div>
-  </div>
+  <!-- U55：底部抽屉**删掉了** —— 待应用明细改到「应用更改」的弹窗里。
+       原来它在**文档流**里，明细一展开高度就从 35px 跳到 170px，
+       把上面的 `.body` 挤扁 ⇒ 底栏跳变 + 上方卡片跟着变形。
+       现在主体 `.body` 独占剩余高度，明细只在弹窗里出现。 -->
   <div class="status" id="status"></div>
 </div>
 
@@ -899,25 +889,21 @@ function setPending(kind, key, params, label, value){
   paintPending();
 }
 function paintPending(){
-  const el = document.getElementById("pendList");
-  if(el){
-    el.innerHTML = PENDING.map((p,i)=>`<li><span class="d">${esc(p.label)}</span>
-      <span class="x" onclick="dropPending(${i})">移除</span></li>`).join("")
-      || `<li style="color:var(--muted)">（没有待应用的改动）</li>`;
-    const cnt = document.getElementById("pendCount");
-    if(cnt) cnt.textContent = PENDING.length;
-  }
+  /* U55：底栏删了 ⇒ 明细只在「应用更改」的弹窗里画（见 openConfirm）。
+     状态只留在顶栏徽章 + 底部状态栏。 */
   const hp = document.getElementById("hPending");
   if(hp) hp.textContent = PENDING.length;
-  /* ⚠️ Header 与抽屉各有一个「应用更改」—— 禁用状态要**同步**
-     （之前两个都是 id="btnApply"，getElementById 只拿到第一个，
-      抽屉里那个永远不禁用，U44 实测抓到）。 */
-  ["btnApply", "btnApplyDrawer"].forEach(id=>{
-    const ba = document.getElementById(id);
-    if(ba) ba.disabled = !PENDING.length;
-  });
-  const dr = document.getElementById("drawer");
-  if(dr) dr.classList.toggle("empty", !PENDING.length);
+  const hd = document.getElementById("hDirty");
+  if(hd) hd.textContent = PENDING.length
+      ? `有 ${PENDING.length} 条未应用的改动` : "就绪 · 未改动磁盘";
+  const ba = document.getElementById("btnApply");
+  if(ba) ba.disabled = !PENDING.length;
+}
+/* U55：在确认弹窗里移除某一条 ⇒ 撤掉它并**刷新确认框** */
+function dropPendingFromModal(i){
+  dropPending(i);
+  if(!PENDING.length){ closeModal(); return; }
+  doApply();          /* 重新 plan，把确认框刷新一遍 */
 }
 function dropPending(i){
   PENDING.splice(i,1);
@@ -1463,10 +1449,13 @@ function addSpec(unitId, specType){
   if(u && u.type){
     const chk = specAttachCheck(specType, u.type);
     if(!chk.ok){
-      const eb = document.getElementById("errBox");
-      if(eb) eb.textContent = chk.why;
-      const sb = document.getElementById("status");
-      if(sb) sb.textContent = chk.why;
+      /* U55：底栏删了 ⇒ 提示改成**弹窗**（原来写在抽屉里的 errBox）。 */
+      openModal(`<div class="mh">✕ 不能挂这个特种兵</div>
+        <div class="mb"><div class="erow">${esc(chk.why)}</div>
+        <div class="fine">按游戏自己的规则：<b>阵营必须相同</b>，且
+        <b>国籍相同</b>或<b>单位国籍的 parent_nationality</b>匹配（规范 §7.3.2）。</div></div>
+        <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`,
+        {cls:"err"});
       return;
     }
   }
@@ -2489,7 +2478,22 @@ function openConfirm(mode, info){
       <button class="btn pri" onclick="reallyApply()">仍然应用</button>`;
   } else {
     title = `⚠ 应用 ${files.length} 处改动？`;
-    body = `<div>将改动存档 <b>${esc(info.save_name||VIEW.save&&VIEW.save.name||"")}</b> 里的：</div>
+    /* U55：待应用**明细**（逐条）在这里 —— 底栏不再常驻展开。
+       明细用普通字符串拼好再拼进来（别写成嵌套反引号）。 */
+    let detail = "";
+    if(PENDING.length){
+      const items = PENDING.map(function(p,i){
+        return '<li class="pending" style="display:flex;gap:8px;align-items:center;'
+             + 'padding:4px 0;border-bottom:1px solid var(--surface-alt);font-size:13px">'
+             + '<span style="font-family:var(--mono);color:var(--accent-dark);font-weight:600">'
+             + esc(p.label) + '</span>'
+             + '<span style="margin-left:auto;color:var(--danger);cursor:pointer;font-size:12px"'
+             + ' onclick="dropPendingFromModal(' + i + ')">移除</span></li>';
+      }).join("");
+      detail = '<div class="plist"><div class="ph">待应用明细（' + PENDING.length + ' 条）</div>'
+             + items + '</div>';
+    }
+    body = detail + `<div>将改动存档 <b>${esc(info.save_name||VIEW.save&&VIEW.save.name||"")}</b> 里的：</div>
       <div class="elist">${files.map(f=>`<div><span class="f">${esc(f.entry)}</span>${
         f.notes.length?`<span class="d">${esc(f.notes.join("；"))}</span>`:""}</div>`).join("")}</div>
       <div class="fine">写回前会自动备份：<b>${esc(info.backup||"（原文件保留为 _BACKUP）")}</b>
@@ -3116,11 +3120,9 @@ function pendingEdits(){
 }
 async function doApply(){
   if(!PENDING.length) return;
-  const box = document.getElementById("errBox");
-  const wbox = document.getElementById("warnBox");
-  box.textContent = ""; wbox.textContent = "";
   /* ⚠️ 先 plan（**不碰磁盘**）再弹确认框 —— 写盘前让玩家看清要改什么。
-     plan.errors 非空 ⇒ 硬拦；只有 warnings ⇒ 软警告；都没有 ⇒ 正常确认。 */
+     plan.errors 非空 ⇒ 硬拦；只有 warnings ⇒ 软警告；都没有 ⇒ 正常确认。
+     U55：确认框里同时列出**逐条待应用明细**。 */
   const r = await post("/api/plan", {save_id: VIEW._save_id, edits: pendingEdits()});
   const d = r.data;
   if(!d.ok){
@@ -3143,18 +3145,44 @@ async function reallyApply(){
     PENDING = [];
     paintPending();
     await openSave(VIEW._save_id);
-    const w = document.getElementById("warnBox");
-    if(w) w.textContent = (d.warnings||[]).join("\n");
+    /* U55：底栏没了 ⇒ 写入结果改成**弹窗**提示（含软警告）。 */
+    const warns = (d.warnings||[]);
+    const warnHTML = warns.map(function(w){
+      return '<div>⚠ ' + esc(w) + '</div>';
+    }).join("");
+    openModal('<div class="mh">✓ 已应用</div>'
+      + '<div class="mb">'
+      + '<div>改动已写入存档'
+      + (d.summary ? '：' + esc(String(d.summary)) : '') + '。</div>'
+      + (warns.length ? '<div class="wrow">' + warnHTML + '</div>' : '')
+      + '<div class="fine">写回前已自动备份原存档（<b>' + esc(d.backup||"—")
+      + '</b>）· 仍可一键撤销。</div>'
+      + '</div>'
+      + '<div class="mf"><button class="btn pri" onclick="closeModal()">好</button></div>', {});
   } else {
-    const box = document.getElementById("errBox");
-    if(box) box.textContent = (d.errors||[]).join("\n");
+    const errHTML = (d.errors||[]).map(function(e){
+      return '<div class="erow">✕ ' + esc(e) + '</div>';
+    }).join("");
+    openModal('<div class="mh">✕ 应用失败</div>'
+      + '<div class="mb">' + errHTML + '</div>'
+      + '<div class="mf"><button class="btn pri" onclick="closeModal()">返回</button></div>',
+      {cls:"err"});
   }
 }
 async function doUndo(){
   const r = await post("/api/undo", {save_id: VIEW._save_id});
   const d = r.data;
   if(d.ok){ await openSave(VIEW._save_id); }
-  else { const b=document.getElementById("errBox"); if(b) b.textContent=(d.errors||[]).join("\n"); }
+  else {
+    /* U55：底栏删了 ⇒ 撤销失败改成**弹窗**。 */
+    const uerr = (d.errors||[]).map(function(e){
+      return '<div class="erow">✕ ' + esc(e) + '</div>';
+    }).join("");
+    openModal('<div class="mh">✕ 撤销失败</div>'
+      + '<div class="mb">' + uerr + '</div>'
+      + '<div class="mf"><button class="btn pri" onclick="closeModal()">返回</button></div>',
+      {cls:"err"});
+  }
 }
 
 /* ---------------- 启动页 ---------------- */
@@ -3221,7 +3249,7 @@ async function openSave(sid){
     `能力位：${(VIEW._features||[]).filter(f=>f.ok).length}/${(VIEW._features||[]).length} 可用` +
     ` · 声望 <b class="ok">${VIEW.prestige??"—"}</b> · 分数 <b>${VIEW.score??"—"}</b>` +
     ` · 单位 <b>${(VIEW.units||[]).length}</b> · 总部 <b>${(VIEW.hqs||[]).length}</b>` +
-    `<span style="margin-left:auto">${PENDING.length?"有未应用的改动":"就绪 · 未改动磁盘"}</span>`;
+    `<span style="margin-left:auto" id="hDirty">${PENDING.length?"有未应用的改动":"就绪 · 未改动磁盘"}</span>`;
   show(PAGE);
 }
 
