@@ -36,6 +36,48 @@ button,input,select{font:inherit}
   padding:4px 10px;font-size:13.5px;display:flex;align-items:center;gap:8px;max-width:44vw;
   overflow:hidden}
 .hdr .save .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------------- U67：当前存档按钮 + 菜单 + 内置文件浏览器 ---------------- */
+.hdr .save{cursor:pointer;font:inherit;color:inherit;text-align:left}
+.hdr .save:hover{background:#e4ecf6}
+.hdr .save .caret{font-size:10px;color:var(--muted);margin-left:1px}
+.modal.wide{width:min(880px,94vw)}
+/* 窄视口（内置浏览器侧栏只有 ~720 px）：两栏并排会被挤爆 ⇒ 改成上下堆叠 */
+@media (max-width:820px){
+  .fb .fbcols{grid-template-columns:1fr}
+  .fb .fbcol{border-right:none;border-bottom:1px solid var(--border)}
+  .fb .fbcol:last-child{border-bottom:none}
+}
+.curbox{font-size:13.5px;padding:8px 10px;border:1px solid var(--border);
+  border-radius:7px;background:var(--surface-alt);margin-bottom:10px}
+.curbox .fine{margin-top:2px;font-family:var(--mono);font-size:11.5px}
+.menu .mi{padding:9px 11px;border:1px solid var(--border);border-radius:7px;margin-bottom:8px;
+  cursor:pointer;background:var(--surface-alt)}
+.menu .mi:hover{border-color:var(--accent);background:var(--accent-light)}
+.menu .mi b{display:block;font-size:13.5px}
+.menu .mi span{font-size:12px;color:var(--muted)}
+.fb{border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.fb .fbrow{display:flex;gap:8px;align-items:center;padding:6px 9px;
+  border-bottom:1px solid var(--surface-alt)}
+.fb .fbrow input{flex:1;min-width:0;padding:6px 9px;border:1px solid var(--border);
+  border-radius:6px;background:var(--surface);outline:none}
+.fb .fbrow input:focus{border-color:var(--accent)}
+.fb .fbroots{display:flex;gap:6px;flex-wrap:wrap;padding:7px 9px;
+  border-bottom:1px solid var(--surface-alt);background:var(--surface-alt)}
+.fb .chip{font-size:11.5px;border:1px solid var(--border);border-radius:12px;
+  padding:2px 9px;cursor:pointer;background:var(--surface)}
+.fb .chip:hover{border-color:var(--accent);color:var(--accent-dark)}
+.fb .fbcols{display:grid;grid-template-columns:1fr 1fr;min-height:236px}
+.fb .fbcol{min-width:0;border-right:1px solid var(--border)}
+.fb .fbcol:last-child{border-right:none}
+.fb .fbt{font-size:11px;color:var(--muted);padding:6px 9px;
+  border-bottom:1px solid var(--surface-alt)}
+.fb .fbcol .fbrow{font-size:12.5px;cursor:pointer;justify-content:space-between}
+.fb .fbcol .fbrow:hover{background:var(--accent-light)}
+.fb .fbcol .fbrow.picked{background:var(--accent);color:#fff}
+.fb .fbcol .fbrow .s{color:var(--muted);font-size:11px}
+.fb .fbcol .fbrow.picked .s{color:#dbe8f4}
+.fb .hint{color:var(--muted);font-size:12px}
 .hdr .hint{font-size:12px;color:var(--muted)}
 .hdr .sp{flex:1}
 .badge{font-size:11.5px;padding:1px 7px;border-radius:20px;background:var(--accent-light);
@@ -769,7 +811,7 @@ tr.oldrow{opacity:.6}
 /* ---------------- 模态框 + 写盘确认框（U40 · 视觉稿 §9） ---------------- */
 .mask{position:fixed;inset:0;background:rgba(16,26,38,.45);display:none;place-items:center;z-index:200}
 .mask.on{display:grid}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:9px;width:560px;
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:9px;width:min(560px,94vw);
   box-shadow:0 20px 50px rgba(20,40,60,.32);overflow:hidden;max-height:88vh;
   display:flex;flex-direction:column}
 .modal.err{border-color:#eec3c5}
@@ -851,7 +893,7 @@ tr.oldrow{opacity:.6}
 <div id="app">
   <div class="hdr">
     <span class="brand"><span class="logo">U2</span>存档修改器</span>
-    <span class="save" id="hSave"><span class="nm">—</span></span>
+    <button class="save" id="hSave" onclick="openSaveMenu()"><span class="nm">—</span></button>
     <span class="hint">改动会先备份原存档</span>
     <span class="sp"></span>
     <button class="btn" onclick="doUndo()">↶ 撤销</button>
@@ -950,8 +992,12 @@ function paintHeader(){
   if(!el || !VIEW) return;
   const save = VIEW.save||{};
   const inBattle = theaterEditable();
+  /* U67：当前存档是个**按钮** —— 点开是菜单（切换存档 / 另存为 / 放弃改动）。 */
+  const imported = String(VIEW._save_id||"").indexOf("modifier_imports") >= 0;
   el.innerHTML = `<span class="nm">${esc(save.display_name||save.file_name||save.save_id||"—")}</span>
-    ${inBattle?'<span class="badge battle">战斗中</span>':""}`;
+    ${imported?'<span class="badge">导入副本</span>':""}
+    ${inBattle?'<span class="badge battle">战斗中</span>':""}
+    <span class="caret">▾</span>`;
 }
 function paintRail(){
   if(!VIEW) return;
@@ -3433,6 +3479,215 @@ async function doUndo(){
       + '<div class="mf"><button class="btn pri" onclick="closeModal()">返回</button></div>',
       {cls:"err"});
   }
+}
+
+/* ===================================================================
+   U67：切换存档 / 另存为 / 内置文件浏览器
+   ------------------------------------------------------------------
+   用户原话：「目前选了一个存档后，除非退出，不然没法重新选择存档。
+   我看现在存档编辑界面顶端有显示当前存档的名称，要不给那个变成一个按钮，
+   按了出个菜单，允许更换编辑对象或存档另存为。」
+   =================================================================== */
+
+/* 文件浏览器的状态（路径、列表、选中项） */
+const FS = {mode:"open", dir:"", parent:"", name:"", roots:[], dirs:[],
+            files:[], picked:-1, onPick:null};
+
+function openSaveMenu(){
+  const cur = (VIEW&&VIEW.save)||{};
+  const n = PENDING.length;
+  openModal(`<div class="mh">当前存档</div>
+    <div class="mb">
+      <div class="curbox"><b>${esc(cur.display_name||cur.file_name||"—")}</b>
+        <span class="fine">${esc(cur.path||(VIEW&&VIEW._save_id)||"")}</span></div>
+      <div class="menu">
+        <div class="mi" onclick="doSwitchSave()"><b>切换到其他存档…</b>
+          <span>回到存档列表重新挑一个 —— <b>不用退出修改器</b></span></div>
+        <div class="mi" onclick="doSaveAs(true)"><b>另存为…（含待应用改动）</b>
+          <span>把当前改动写成一个<b>新存档文件</b>；原存档一个字节都不动</span></div>
+        <div class="mi" onclick="doSaveAs(false)"><b>导出当前副本…</b>
+          <span>复制当前磁盘上的存档（已应用的状态）到别的位置</span></div>
+        <div class="mi" onclick="doReloadCurrent()"><b>放弃改动并重新读取</b>
+          <span>丢弃 ${n} 条未应用的改动，回到磁盘上的状态</span></div>
+      </div>
+      ${n?`<div class="fine">⚠ 当前有 <b>${n}</b> 条<b>未应用</b>的改动 ——
+        切换存档 / 重新读取会丢弃它们；「另存为」则会把它们一起写进新文件。</div>`:""}
+    </div>
+    <div class="mf"><button class="btn" onclick="closeModal()">关闭</button></div>`,
+    {cls:"menu"});
+}
+
+/* ---------- 切换存档（不用退出） ---------- */
+function doSwitchSave(){
+  if(PENDING.length){
+    const items = PENDING.slice(0,8).map(p=>
+      '<li class="pending"><span class="d">'+esc(p.label)+'</span></li>').join("");
+    openModal(`<div class="mh">有 ${PENDING.length} 条未应用的改动</div>
+      <div class="mb"><div>切换存档会<b>丢弃</b>这些改动：</div>
+        <div class="plist">${items}${PENDING.length>8?
+          '<li class="pending"><span class="d">…还有 '+(PENDING.length-8)+' 条</span></li>':""}</div>
+        <div class="fine">想留着它们？先「应用更改」，或者用「另存为」写一个新文件。</div></div>
+      <div class="mf"><button class="btn" onclick="openSaveMenu()">返回</button>
+        <button class="btn pri" onclick="doSwitchSaveForce()">放弃改动并切换</button></div>`);
+    return;
+  }
+  doSwitchSaveForce();
+}
+function doSwitchSaveForce(){
+  PENDING = []; paintPending();
+  closeModal();
+  VIEW = null; USTACK = null; PICKCACHE = {};
+  document.getElementById("app").style.display = "none";
+  document.getElementById("splash").style.display = "block";
+  reload().catch(()=>{});
+}
+
+/* ---------- 重新读取当前存档 ---------- */
+function doReloadCurrent(){
+  if(!VIEW || !VIEW._save_id) return;
+  if(PENDING.length){
+    openModal(`<div class="mh">有 ${PENDING.length} 条未应用的改动</div>
+      <div class="mb"><div>重新读取会<b>丢弃</b>这些改动（回到磁盘上的状态）。</div></div>
+      <div class="mf"><button class="btn" onclick="openSaveMenu()">返回</button>
+        <button class="btn pri" onclick="doReloadCurrentForce()">放弃并重新读取</button></div>`);
+    return;
+  }
+  doReloadCurrentForce();
+}
+async function doReloadCurrentForce(){
+  const sid = VIEW && VIEW._save_id;
+  closeModal();
+  if(sid) await openSave(sid);
+}
+
+/* ---------- 另存为 ---------- */
+async function doSaveAs(withEdits){
+  const edits = withEdits ? pendingEdits() : [];
+  if(withEdits && !edits.length){
+    openModal(`<div class="mh">没有待应用的改动</div>
+      <div class="mb"><div>当前没有未应用的改动 —— 用「导出当前副本…」即可。</div></div>
+      <div class="mf"><button class="btn" onclick="closeModal()">好</button></div>`);
+    return;
+  }
+  const cur = (VIEW&&VIEW.save)||{};
+  const base = String(cur.file_name||cur.name||"save").replace(/\.usg$/i,"");
+  openFilePicker({
+    mode:"save",
+    title: withEdits ? "另存为…（含待应用改动）" : "导出当前副本…",
+    defName: base + (withEdits ? "_改" : "_副本"),
+    onPick: async (dir, name)=>{
+      const dest = dir + "\\" + name;
+      const r = await post("/api/save-as",
+        {save_id: VIEW._save_id, dest: dest, edits: edits});
+      const d = r.data;
+      if(!d.ok){
+        openModal(`<div class="mh">✕ 另存失败</div>
+          <div class="mb">${(d.errors||[]).map(e=>'<div class="erow">✕ '+esc(e)+'</div>').join("")}</div>
+          <div class="mf"><button class="btn" onclick="closeModal()">返回</button></div>`,
+          {cls:"err"});
+        return;
+      }
+      openModal(`<div class="mh">✓ 已另存</div>
+        <div class="mb"><div>新存档：<b>${esc(d.path||dest)}</b></div>
+          <div class="fine">原存档 <b>没有</b>被改动 —— 另存为只是复制一份出来。
+          ${withEdits?"这次另存<b>包含</b>了待应用改动。":""}</div></div>
+        <div class="mf"><button class="btn pri" onclick="closeModal()">好</button></div>`);
+    }
+  });
+}
+
+/* ---------- 内置文件浏览器 ---------- */
+function openFilePicker(opts){
+  opts = opts || {};
+  FS.mode = opts.mode || "open";
+  FS.onPick = opts.onPick || null;
+  FS.name = opts.defName || "";
+  FS.dir = opts.dir || "";
+  FS.picked = -1;
+  openModal(`<div class="mh">${esc(opts.title||"选择文件")}</div>
+    <div class="mb"><div class="fb">
+      <div class="fbrow"><input id="fbPath" placeholder="目录路径" value="${esc(FS.dir)}">
+        <button class="btn" onclick="fbGo()">转到</button>
+        <button class="btn" onclick="fbUp()">上一级</button></div>
+      <div class="fbroots" id="fbRoots"></div>
+      <div class="fbcols">
+        <div class="fbcol"><div class="fbt">目录</div><div id="fbDirs"></div></div>
+        <div class="fbcol"><div class="fbt">存档文件（.usg）</div><div id="fbFiles"></div></div>
+      </div>
+      ${FS.mode==="save"?`<div class="fbrow">
+        <span style="width:60px;flex:none;color:var(--muted);font-size:12.5px">文件名</span>
+        <input id="fbName" value="${esc(FS.name)}"></div>`:""}
+      <div class="fbrow hint" id="fbHint"></div>
+    </div></div>
+    <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="fbPick()">${
+        FS.mode==="save" ? "另存到这里" : "打开这个存档"}</button></div>`,
+    {cls:"wide"});
+  fbGo(FS.dir);
+}
+async function fbGo(dir){
+  const el = document.getElementById("fbPath");
+  if(!el) return;
+  const p = (dir!==undefined && dir!==null) ? dir : (el.value||"");
+  let d;
+  try{ d = await api("/api/fs/list?dir=" + encodeURIComponent(p||"")); }
+  catch(e){ d = {ok:false, error:String(e.message||e)}; }
+  const roots = document.getElementById("fbRoots");
+  const dbox = document.getElementById("fbDirs");
+  const fbox = document.getElementById("fbFiles");
+  const hint = document.getElementById("fbHint");
+  if(!d.ok){
+    if(dbox) dbox.innerHTML = `<div class="fbrow" style="color:var(--danger)">${
+      esc(d.error||"读不到这个目录")}</div>`;
+    if(fbox) fbox.innerHTML = "";
+    if(hint) hint.textContent = "";
+    return;
+  }
+  el.value = d.dir||"";
+  FS.dir = d.dir||""; FS.parent = d.parent||"";
+  FS.roots = d.roots||[]; FS.dirs = d.dirs||[]; FS.files = d.files||[];
+  FS.picked = -1;
+  if(roots) roots.innerHTML = FS.roots.map((r,i)=>
+    `<span class="chip" onclick="fbRoot(${i})">${esc(r.label)}</span>`).join("");
+  if(dbox) dbox.innerHTML = (FS.parent ?
+      `<div class="fbrow" onclick="fbUp()">…（上一级）</div>` : "") +
+    FS.dirs.map((x,i)=>`<div class="fbrow" onclick="fbDir(${i})">${esc(x.name)}</div>`).join("");
+  if(fbox) fbox.innerHTML = FS.files.map((x,i)=>
+    `<div class="fbrow" id="fbFile${i}" onclick="fbFile(${i})">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</span>
+      <span class="s">${esc(x.size||"")}</span></div>`).join("");
+  if(hint) hint.textContent = FS.mode==="save"
+    ? "选好目录，在上面填文件名 —— 同名文件不会被覆盖。"
+    : "选一个存档文件打开。";
+}
+function fbRoot(i){ const r = FS.roots[i]; if(r) fbGo(r.path); }
+function fbDir(i){ const d = FS.dirs[i]; if(d) fbGo(d.path); }
+function fbUp(){ if(FS.parent) fbGo(FS.parent); }
+function fbFile(i){
+  FS.picked = i;
+  const box = document.getElementById("fbFiles");
+  if(!box) return;
+  box.querySelectorAll(".fbrow").forEach((el,k)=>el.classList.toggle("picked", k===i));
+}
+function fbPick(){
+  const cb = FS.onPick;
+  if(FS.mode==="save"){
+    const nameEl = document.getElementById("fbName");
+    const name = ((nameEl && nameEl.value) || "").trim();
+    if(!name){ alert("请先填文件名"); return; }
+    closeModal();
+    if(cb) cb(FS.dir, name);
+    return;
+  }
+  if(FS.picked < 0 || !FS.files[FS.picked]){ alert("请先选一个存档文件"); return; }
+  const f = FS.files[FS.picked];
+  closeModal();
+  if(cb) cb(f.path);
+}
+
+/* 选中的路径 → 打开它（绝对路径也能当 save_id 用，核心库认） */
+async function openPickedPath(p){
+  await openSave(p);
 }
 
 /* ---------------- 启动页 ---------------- */

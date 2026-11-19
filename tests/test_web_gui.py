@@ -2207,3 +2207,150 @@ class TestU65UnitBloodPartialRefresh(unittest.TestCase):
     def test_bbox_cache_carries_image_size(self):
         """内容框缓存里补上原图宽高（内联定位需要）。"""
         self.assertIn("return {x0:x0, y0:y0, x1:x1, y1:y1, w:W, h:H};", self.html)
+# U67 / U68：切换存档 · 另存为 · 内置文件浏览器 · 拖拽导入
+# =====================================================================
+
+
+class _SaveCopyBase(WebGuiTestBase):
+    """给服务端写操作测试用：准备一个存档**副本**（绝不碰用户的真存档）。"""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from save_modifier_core import list_saves
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="webcopy_"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        src = None
+        for info in list_saves():
+            p = str(info.path)
+            if "BACKUP" not in p and p.endswith(".usg"):
+                src = p
+                break
+        if src is None:
+            self.skipTest("本机没有存档")
+        self.copy = str(self.tmp / "copy.usg")
+        shutil.copyfile(src, self.copy)
+
+    def post(self, path, body):
+        import json
+        import urllib.request
+        req = urllib.request.Request(
+            self.url(path),
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "X-Token": server._Handler.token},
+            method="POST")
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+
+    def use_temp_appdata(self):
+        """把「游戏数据目录」指到临时目录 ⇒ 导入的副本不会落进用户真目录。"""
+        old = os.environ.get("UOC2_APPDATA")
+        d = self.tmp / "appdata"
+        d.mkdir(parents=True, exist_ok=True)
+        os.environ["UOC2_APPDATA"] = str(d)
+
+        def restore():
+            if old is None:
+                os.environ.pop("UOC2_APPDATA", None)
+            else:
+                os.environ["UOC2_APPDATA"] = old
+        self.addCleanup(restore)
+
+
+class TestU67SwitchAndSaveAs(_SaveCopyBase):
+    """U67 —— 切换存档（不用退出）· 另存为 · 内置文件浏览器。
+
+    用户原话：「目前选了一个存档后，除非退出，不然没法重新选择存档。
+    我看现在存档编辑界面顶端有显示当前存档的名称，要不给那个变成一个按钮，
+    按了出个菜单，允许更换编辑对象或存档另存为。」
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()          # ⚠️ 基类要起 HTTP 服务（别覆盖掉）
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    # ---- 前端 ----
+
+    def test_current_save_is_a_button_that_opens_a_menu(self):
+        self.assertIn("function openSaveMenu()", self.html)
+        self.assertIn("onclick=\"openSaveMenu()\"", self.html)
+
+    def test_menu_offers_switch_and_save_as(self):
+        for t in ("切换到其他存档", "另存为", "导出当前副本", "放弃改动并重新读取"):
+            self.assertIn(t, self.html)
+
+    def test_switch_asks_before_dropping_pending_edits(self):
+        self.assertIn("function doSwitchSave()", self.html)
+        self.assertIn("function doSwitchSaveForce()", self.html)
+        self.assertIn("放弃改动并切换", self.html)
+
+    def test_file_picker_exists_and_is_responsive(self):
+        self.assertIn("function openFilePicker(opts)", self.html)
+        self.assertIn("function fbGo(", self.html)
+        self.assertIn("function fbPick()", self.html)
+        # 窄视口（内置浏览器侧栏 ~720 px）下按钮不能被挤出屏幕
+        self.assertIn("width:min(880px,94vw)", self.html)
+
+    # ---- 服务端 ----
+
+    def test_fs_list_lists_dirs_and_usg_files(self):
+        import urllib.parse
+        d = self.get_json("/api/fs/list?dir=" + urllib.parse.quote(str(self.tmp)))
+        self.assertTrue(d["ok"], d)
+        self.assertIn("dirs", d)
+        self.assertIn("files", d)
+        self.assertIn("roots", d)
+        self.assertTrue(any(f["name"] == "copy.usg" for f in d["files"]), d["files"])
+
+    def test_fs_list_rejects_a_non_directory(self):
+        import urllib.parse
+        d = self.get_json("/api/fs/list?dir=" +
+                          urllib.parse.quote(str(self.tmp / "copy.usg")))
+        self.assertFalse(d["ok"])
+        self.assertTrue(d.get("error"))
+
+    def test_save_as_writes_a_copy_and_leaves_the_original_alone(self):
+        before = io.open(self.copy, "rb").read()
+        dest = str(self.tmp / "copy_out.usg")
+        r = self.post("/api/save-as", {"save_id": self.copy, "dest": dest, "edits": []})
+        self.assertTrue(r["ok"], r.get("errors"))
+        self.assertTrue(os.path.isfile(dest))
+        self.assertEqual(io.open(self.copy, "rb").read(), before, "原存档不能被动")
+
+    def test_save_as_never_overwrites_an_existing_file(self):
+        dest = str(self.tmp / "copy_out.usg")
+        with io.open(dest, "wb") as fh:
+            fh.write(b"KEEP")
+        r = self.post("/api/save-as", {"save_id": self.copy, "dest": dest, "edits": []})
+        self.assertFalse(r["ok"])
+        self.assertTrue(r["errors"])
+        self.assertEqual(io.open(dest, "rb").read(), b"KEEP", "已存在的文件不能被覆盖")
+
+    def test_save_as_with_edits_only_touches_the_copy(self):
+        dest = str(self.tmp / "copy_edit.usg")
+        v = self.get_json("/api/view/" + urllib.request.quote(self.copy))
+        old = v.get("prestige") or 0
+        r = self.post("/api/save-as", {
+            "save_id": self.copy, "dest": dest,
+            "edits": [{"kind": "progress",
+                       "params": {"field": "prestige", "value": old + 3}}]})
+        self.assertTrue(r["ok"], r.get("errors"))
+        v2 = self.get_json("/api/view/" + urllib.request.quote(dest))
+        self.assertEqual(v2.get("prestige"), old + 3, "新文件要带上改动")
+        v3 = self.get_json("/api/view/" + urllib.request.quote(self.copy))
+        self.assertEqual(v3.get("prestige"), old, "原存档不能被动")
+
+    def test_save_as_with_a_bad_edit_writes_nothing(self):
+        dest = str(self.tmp / "copy_bad.usg")
+        r = self.post("/api/save-as", {
+            "save_id": self.copy, "dest": dest,
+            "edits": [{"kind": "no_such_kind", "params": {}}]})
+        self.assertFalse(r["ok"])
+        self.assertFalse(os.path.exists(dest), "出错的另存为不能留下半成品")
+
+

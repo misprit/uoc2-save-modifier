@@ -661,6 +661,141 @@ def find_surface(rel: str):
     return None
 
 
+# ---------------------------------------------------------------- 文件浏览 / 另存为
+
+
+def _fs_roots(paths) -> list:
+    """文件浏览器的快捷入口（游戏存档目录 / 桌面 / 文档 / 各盘根）。"""
+    out = []
+    home = Path.home()
+    for label, p in (("游戏存档目录", paths.save_root),
+                     ("桌面", home / "Desktop"),
+                     ("文档", home / "Documents"),
+                     ("下载", home / "Downloads")):
+        try:
+            if p.is_dir():
+                out.append({"label": label, "path": str(p)})
+        except OSError:
+            continue
+    if os.name == "nt":
+        for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            try:
+                root = Path(ch + ":\\")
+                if root.is_dir():
+                    out.append({"label": ch + ":\\", "path": str(root)})
+            except OSError:
+                continue
+    return out
+
+
+def api_fs_list(dir_path: str) -> dict:
+    """列一个目录 —— **内置文件浏览器**用（U67）。
+
+    ⚠️ 这是**用户主动**打开的本地文件浏览器（界面里点「打开其他位置的存档」），
+    和「静态文件服务」不是一回事 —— 后者有目录穿越防护，前者本来就是给人翻盘的。
+    """
+    from save_modifier_core import CorePaths
+
+    paths = CorePaths.discover()
+    raw = (dir_path or "").strip()
+    try:
+        d = Path(raw).expanduser().resolve() if raw else paths.save_root.resolve()
+    except OSError as exc:
+        return {"ok": False, "error": "路径无效：%s" % exc}
+    if not d.is_dir():
+        return {"ok": False, "error": "不是目录：%s" % d, "dir": str(d)}
+    dirs, files = [], []
+    try:
+        for p in sorted(d.iterdir(), key=lambda x: x.name.lower()):
+            try:
+                if p.is_dir():
+                    dirs.append({"name": p.name, "path": str(p)})
+                elif p.is_file() and p.suffix.lower() == ".usg":
+                    st = p.stat()
+                    files.append({"name": p.name, "path": str(p),
+                                  "size": _size(st.st_size), "bytes": st.st_size})
+            except OSError:
+                continue
+    except OSError as exc:
+        return {"ok": False, "error": "读目录失败：%s" % exc, "dir": str(d)}
+    parent = str(d.parent) if d.parent != d else ""
+    return {"ok": True, "dir": str(d), "parent": parent,
+            "dirs": dirs, "files": files, "roots": _fs_roots(paths)}
+
+
+def api_save_as(payload) -> dict:
+    """「另存为」—— 把存档（**可含待应用改动**）写成一个新的 .usg 文件。
+
+    ⚠️ 三条硬规矩：
+    1. **绝不覆盖已存在的文件** —— 宁可让用户换个名字；
+    2. **原存档一个字节都不动**（另存为只是复制一份出来）；
+    3. 带改动时，先复制到临时目录 → 在副本上走完整的
+       「plan → 备份 → 写回 → 校验」管线 → 再复制到目标位置
+       ⇒ 目标文件一定是**合法的存档**，不是一个半成品。
+    """
+    import shutil
+    import tempfile
+
+    from save_modifier_core import Catalog, CorePaths, open_save
+
+    save_id = (payload or {}).get("save_id") or ""
+    dest_raw = ((payload or {}).get("dest") or "").strip()
+    edits = (payload or {}).get("edits") or []
+    if not save_id:
+        return {"ok": False, "errors": ["没有指定存档"]}
+    if not dest_raw:
+        return {"ok": False, "errors": ["没有指定保存位置"]}
+    dest = Path(dest_raw).expanduser()
+    if dest.suffix.lower() != ".usg":
+        dest = dest.with_name(dest.name + ".usg")
+    if dest.exists():
+        return {"ok": False,
+                "errors": ["目标文件已存在：%s（不会覆盖，换个名字）" % dest.name]}
+    if not dest.parent.is_dir():
+        return {"ok": False, "errors": ["目录不存在：%s" % dest.parent]}
+    try:
+        with open_save(save_id) as save:
+            src = Path(save.info.path)
+    except Exception as exc:
+        return {"ok": False, "errors": ["读不到原存档：%s" % exc]}
+    if not src.is_file():
+        return {"ok": False, "errors": ["原存档不在了：%s" % src]}
+
+    tmpdir = None
+    try:
+        if edits:
+            tmpdir = Path(tempfile.mkdtemp(prefix="uoc2_saveas_"))
+            work = tmpdir / dest.name
+            shutil.copy2(src, work)
+            catalog = Catalog(CorePaths.discover())
+            with open_save(str(work)) as wsave:
+                # ⚠️ 前端传的是 `[{kind, params}]` ⇒ 要先转成核心库的 Edit 对象
+                #    （与 api_commit 走同一条 `_edits_from`）
+                plan = wsave.plan_edit(_edits_from({"edits": edits}),
+                                           catalog=catalog)
+                if not plan.ok:
+                    return {"ok": False, "errors": list(plan.errors),
+                            "warnings": list(plan.warnings)}
+                res = wsave.commit(plan)
+                if not res.ok:
+                    return {"ok": False, "errors": list(res.errors)}
+            shutil.copy2(work, dest)
+        else:
+            shutil.copy2(src, dest)
+    except Exception as exc:
+        return {"ok": False, "errors": ["写入失败：%s" % exc]}
+    finally:
+        if tmpdir is not None:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+    try:
+        size = dest.stat().st_size
+    except OSError:
+        size = 0
+    return {"ok": True, "path": str(dest), "bytes": size,
+            "with_edits": bool(edits),
+            "summary": "已另存为 %s" % dest.name}
+
+
 # ---------------------------------------------------------------- 战役页 / 撤销栈
 
 
@@ -904,6 +1039,9 @@ class _Handler(BaseHTTPRequestHandler):
                     q = parse_qs(urlparse(self.path).query)
                     sid = (q.get("save_id") or [""])[0]
                     self._json(api_undo_stack(sid))
+                elif path == "/api/fs/list":
+                    q = parse_qs(urlparse(self.path).query)
+                    self._json(api_fs_list((q.get("dir") or [""])[0]))
                 else:
                     self._json({"error": "未知接口"}, 404)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务
@@ -965,6 +1103,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(_jsonable(api_commit(payload)))
             elif path == "/api/undo":
                 self._json(_jsonable(api_undo(payload)))
+            elif path == "/api/save-as":
+                self._json(_jsonable(api_save_as(payload)))
             else:
                 self._json({"ok": False, "errors": ["未知接口"]}, 404)
         except ValueError as exc:
