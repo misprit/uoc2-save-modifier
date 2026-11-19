@@ -4397,6 +4397,60 @@ Required('max_st', default=7) : All(int, Range(min=1, max=7))
 **测试**：610 → **625**（新增 `tests/test_game_dir.py` 15 项：设置往返 / 坏文件当空 /
 拒绝非游戏目录 / 失效设置自动忽略 / 库扫描 / 接口读写 / 前端源码断言）。
 
+#### 10.10.39 ★ 包列表与游戏对齐：顺序 + `not_moddable` 整包禁用（U70）
+
+> **【2026-11-19 · U70 用户提问】**
+> 「你目前是否理解统一指挥2这款游戏steam的mod加载方式？……你在抓取基础信息，
+> 比如特种兵信息的时候，目前能否正确读取mod内容，且当mod内容和游戏本体同时存在时，
+> 是否能正确处理？」
+
+**先说游戏自己的规矩（字节码 + `packages.yml` 实证）**
+
+| 规矩 | 内容 | 依据 |
+|---|---|---|
+| 包从哪来 | ① **非官方包**（用户 `_packages/` 里的每个子目录）→ ② **官方包**（base / dlc1..dlc10） | `paths.pyc::_build_package_list` |
+| 容器内顺序 | **`listdir` 原序**（不是 sorted） | 同上 |
+| 同名文件 | **第一个包里有的整文件胜出**（后面的包不再参与）⇒ **mod 替换原版** | `paths.pyc::join_abs` |
+| mod 能不能加东西 | `packages.yml` 的 `addable`：`data/maps/*`、`data/scenarios/*`、`data/campaigns/*` | 游戏根 `packages.yml` |
+| mod 能不能改东西 | `not_moddable` 列出的文件（`data/entity_types/nationalities.yml`、`factions.yml`、`shaders/*.yml`、`assets/atlases/*` …）—— **mod 里出现就整个包被禁用**（不是只跳过那个文件） | `paths.pyc::check_not_moddable` |
+| 创意工坊 | `init_packages(mod_packages=())` **默认空** ⇒ 标准启动**不加载**创意工坊包；全游戏代码里只有场景编辑器提过 "workshop"（不是 Steam 创意工坊） | `paths.pyc` / 全 lib 扫描 |
+
+**U70 之前修改器的偏差**
+
+| 项 | 旧行为 | 后果 |
+|---|---|---|
+| 容器内顺序 | `sorted(...)` | 同名文件冲突时**选中的包可能和游戏不是同一个** |
+| 官方包顺序 | 字母序 ⇒ `dlc1, dlc10, dlc2…` | 与游戏的 `dlc1..dlc10` 数字序不一致 |
+| `not_moddable` | **不知道** | 会读到游戏里**根本不加载**的 mod 内容 |
+| 创意工坊 | 不加载 | ✅ 与游戏一致（不改） |
+| DLC 所有权 | 全部加载 | ✅ **按用户拍板：不管买没买，全部加载**（修改器尽量给全数据） |
+
+**U70 改了什么**
+
+1. **包顺序 = 游戏的顺序**：非官方包 → 官方包；容器内 `listdir` 原序；官方包按
+   **数字序**（dlc2 在 dlc10 前面）；用户目录里叫 `base`/`dlcN` 的目录**不算 mod**；
+2. **`not_moddable` 整包禁用**：读游戏根 `packages.yml` 的规则，命中就把该包
+   从包列表里剔掉（**官方包永远不禁用** —— 游戏只在 mod 目录里查）；
+3. **界面提示**：启动页「游戏本体」那行显示「⚠ N 个 mod 被游戏禁用（not_moddable）· 修改器也不读」，
+   悬停能看到具体是哪个包、命中了哪条规则；
+4. **DLC 全部加载**（按用户口径，不做所有权判断）。
+
+**⚠️ 已知缺口：`.patch.yml` 增量**
+
+游戏有「同名文件的 `.patch.yml` 补丁」机制（`paths.pyc::get_yml`：**先找整文件，
+找不到就找 `<同名>.patch.yml`，补丁可以叠加**）。但：
+
+* 官方包（base + dlc1..dlc10）里 **0 个 `.patch.yml`**（全量扫过）；
+* 实体类型那条路径的**合并语义**没能从字节码钉死（`yaml_load` 是原生模块，
+  `entity_types.pyc::_set_from_directory` 的「类型名集合 ↔ 文件解析」对应关系没完全还原）
+  ⇒ 按「字节码 > 实测 > 推断」的规矩**不猜**。
+
+⇒ 修改器**暂不支持** `.patch.yml` 增量：若 mod 用 `foo.patch.yml` 替代 `foo.yml`，
+修改器读到的仍是原版 `foo.yml`。这是**已知偏差**，遇到这种 mod 时类型数值可能与游戏不一致。
+
+**测试**：625 → **635**（新增 `tests/test_mod_packages.py` 10 项：包顺序 / 官方包名跳过 /
+规则读取 / 整包禁用 / 官方包不禁用 / 通配规则 / 干净 mod 保留 / 核心库与模块函数同序）。
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
