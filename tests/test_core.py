@@ -72,12 +72,47 @@ class TestDiscovery(unittest.TestCase):
         for s in self.saves:
             self.assertIsNotNone(s.campaign_id, f"{s.save_id} 缺 campaign_id")
 
-    def test_old_saves_marked_archived(self):
+    def test_archived_flag_follows_the_location_not_the_name(self):
+        """U72：`archived` 按**位置**判定（不在 campaigns / games 下），
+        **不按目录名** —— 玩家把归档区叫什么都行。
+
+        （旧实现是「路径里有 "Old Saves" 就算归档」，
+        玩家换个目录名就认不出来了。）
+        """
         for s in self.saves:
-            if "Old Saves" in s.path.parts:
-                self.assertTrue(s.archived)
-            else:
-                self.assertFalse(s.archived)
+            try:
+                rel = s.path.relative_to(self.paths.save_root)
+            except ValueError:
+                continue
+            expect = rel.parts[0] not in ("campaigns", "games")
+            self.assertEqual(s.archived, expect, s.save_id)
+
+    def test_archive_dir_with_any_name_is_scanned(self):
+        """存档根下**任意名字**的目录里的存档都要被扫到（不挑 "Old Saves"）。"""
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from ._fixtures import make_save
+
+        tmp = Path(tempfile.mkdtemp(prefix="archdir_"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        root = tmp / "save"
+        # ① 游戏认的两个目录
+        make_save(root / "campaigns" / "a.usg")
+        make_save(root / "games" / "b.usg")
+        # ② 玩家自建的归档区（**故意不叫** Old Saves）
+        make_save(root / "我的旧存档" / "c.usg")
+
+        paths = CorePaths(uoc2_appdata=tmp)
+        found = {s.save_id: s for s in list_saves(paths)}
+        self.assertIn("campaigns/a.usg", found)
+        self.assertIn("games/b.usg", found)
+        self.assertIn("我的旧存档/c.usg", found,
+                      "归档区改了名字就认不出来了")
+        self.assertFalse(found["campaigns/a.usg"].archived)
+        self.assertFalse(found["games/b.usg"].archived)
+        self.assertTrue(found["我的旧存档/c.usg"].archived)
 
 
 class TestCapabilities(unittest.TestCase):

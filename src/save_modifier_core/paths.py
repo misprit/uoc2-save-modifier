@@ -487,8 +487,30 @@ class CorePaths:
 
     @property
     def old_saves_dir(self) -> Path:
-        """游戏自己归档的历史存档目录。"""
+        """（旧名，保留兼容）玩家自建的归档目录。
+
+        ⚠️ **游戏不认这个目录** —— 游戏只读 `campaigns` 与 `games` 两个目录。
+        新代码请用 `archive_dirs()`（认存档根下**所有**非 campaigns/games 的目录）。
+        """
         return self.save_root / "Old Saves"
+
+    def archive_dirs(self) -> list[Path]:
+        """存档根下**除 campaigns / games 以外**的目录（玩家自己整理的归档区）。
+
+        ⚠️ **游戏只认 `campaigns` 与 `games` 两个目录**（实测）⇒ 根下其它目录
+        都是玩家自己放的旧存档，**目录名叫什么都行** ⇒ 修改器一律认。
+        """
+        root = self.save_root
+        if not root.is_dir():
+            return []
+        out: list[Path] = []
+        try:
+            for d in sorted(root.iterdir()):
+                if d.is_dir() and d.name not in ("campaigns", "games"):
+                    out.append(d)
+        except OSError:
+            pass
+        return out
 
     # ---- 游戏包 ----
 

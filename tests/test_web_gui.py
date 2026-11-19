@@ -2418,3 +2418,45 @@ class TestU68ImportWhenNoSave(_SaveCopyBase):
         v = self.get_json("/api/view/" + urllib.request.quote(r["save_id"]))
         self.assertIn("units", v)
         self.assertIn("hqs", v)
+
+
+# =====================================================================
+# U72：表述修正（归档区不叫「Old Saves」· 血量条注释简化）
+# =====================================================================
+
+
+class TestU72Wording(unittest.TestCase):
+    """U72 —— 表述修正。
+
+    用户原话：「游戏本来只能识别 save 路径下 campaigns 和 games 两个文件夹的存档，
+    old saves 这个文件夹是我自己加的。我觉得你能识别整个根目录存档的功能是实用的，
+    但是其表述就别加 old saves 这种我自己创造的内容了……
+    顺便你也修另一个表述小毛病，单位详情页修改兵力那里，有注释
+    『实 = 活跃 · 淡 = 被压制 · 空 = 还差』，其实保留『实 = 活跃 · 淡 = 被压制』大家都能看懂了」
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cls.html = io.open(os.path.join(root, "src", "save_modifier_web", "web",
+                                       "index.html"), encoding="utf-8").read()
+
+    def test_no_claim_that_old_saves_is_a_game_feature(self):
+        """界面里**不得**再把「Old Saves」说成游戏的功能。"""
+        self.assertNotIn("Old Saves", self.html)
+        self.assertNotIn("游戏自己的「Old Saves」", self.html)
+        self.assertNotIn("历史存档（游戏自己的", self.html)
+
+    def test_archive_band_uses_the_new_wording(self):
+        self.assertIn("其他位置的存档（你自己归档的旧存档）", self.html)
+
+    def test_archive_split_uses_the_archived_flag(self):
+        """分组改用 `archived` 标记 ⇒ **不按目录名挑**。"""
+        self.assertIn("const isOld = s => !!s.archived;", self.html)
+
+    def test_blood_hint_drops_the_redundant_part(self):
+        """血量条注释：「实 = 活跃 · 淡 = 被压制」（去掉「空 = 还差」）。"""
+        self.assertIn("实 = 活跃 · 淡 = 被压制", self.html)
+        self.assertNotIn("实 = 活跃 · 淡 = 被压制 · 空 = 还差", self.html)
+        # 悬停浮层与行内提示两处
+        self.assertEqual(self.html.count("实 = 活跃 · 淡 = 被压制"), 2)

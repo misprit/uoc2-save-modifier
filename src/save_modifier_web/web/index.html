@@ -882,7 +882,7 @@ tr.oldrow{opacity:.6}
       <thead><tr><th>存档</th><th>类型</th><th>状态</th><th>最后修改</th><th style="text-align:right">大小</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
-    <div class="histband" id="histBand" style="display:none"><span>历史存档（游戏自己的「Old Saves」）</span>
+    <div class="histband" id="histBand" style="display:none"><span>其他位置的存档（你自己归档的旧存档）</span>
       <span class="fline"></span></div>
     <table class="list" id="oldTable" style="display:none">
       <tbody id="oldRows"></tbody>
@@ -1510,10 +1510,10 @@ function unitDetailHTML(u){
       <div class="stat">
         <div class="lb"><span>兵力</span><span class="capw">上限 ${max||"—"}</span></div>
         <div class="blood${bloodDirty?' dirty':''}" id="sp_blood_${u.id}"
-          data-tip="<b>血量条</b> · 滚轮 = 调<b>活跃</b>兵力<br>Alt+滚轮 = 调<b>压制</b>兵力（两者之和不变）<br>实 = 活跃 · 淡 = 被压制 · 空 = 还差">
+          data-tip="<b>血量条</b> · 滚轮 = 调<b>活跃</b>兵力<br>Alt+滚轮 = 调<b>压制</b>兵力（两者之和不变）<br>实 = 活跃 · 淡 = 被压制">
           <div class="bar">${pips}</div>
         </div>
-        <div class="hintline">实 = 活跃 · 淡 = 被压制 · 空 = 还差</div>
+        <div class="hintline">实 = 活跃 · 淡 = 被压制</div>
       </div>
       <div class="stat">
         <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
@@ -3839,12 +3839,13 @@ function paint(){
   const q = (document.getElementById("q").value||"").trim().toLowerCase();
   const all = SAVES.filter(s => !q ||
     (s.name+" "+s.display+" "+s.campaign).toLowerCase().includes(q));
-  /* 历史存档（游戏自己的「Old Saves」）单独一段 */
-  const isOld = s => /Old Saves/i.test(s.save_id||"") || /old saves/i.test(s.display||"");
+  /* U72：不在 campaigns / games 下的（= 玩家自建的归档区）单独一段。
+     ⚠️ **不按目录名挑** —— 玩家把归档区叫什么都行（游戏只认 campaigns / games 两个目录）。 */
+  const isOld = s => !!s.archived;
   const list = all.filter(s=>!isOld(s));
   const olds = all.filter(isOld);
   document.getElementById("cnt").textContent = list.length + " 个存档" +
-    (olds.length?(" · " + olds.length + " 个历史存档"):"");
+    (olds.length?(" · " + olds.length + " 个归档存档"):"");
   /* U68：区分两种「空」——
      ① 一个存档都没有（`SAVES` 空）⇒ 给「打开其他位置 / 拖进来」的出口；
      ② 有存档但搜索没匹配上 ⇒ 仍是原来的「没有匹配的存档」。 */

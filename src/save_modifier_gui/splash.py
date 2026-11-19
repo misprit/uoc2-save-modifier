@@ -137,7 +137,7 @@ class SavePicker(tk.Frame):
             if needle and needle not in pretty_name(s).lower():
                 continue
             self.tree.insert("", "end", iid=s.save_id,
-                             values=("历史存档（游戏自己的「Old Saves」）",
+                             values=("其他位置的存档（玩家归档）",
                                      pretty_name(s), self._stage_of(s),
                                      _fmt_time(s.mtime), _fmt_size(s.size)))
         self._sync_button()

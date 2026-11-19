@@ -482,7 +482,8 @@ class Repl:
         print(f"存档根目录: {self.paths.save_root}")
         print(f"  战役: {self.paths.campaigns_dir}")
         print(f"  场景: {self.paths.games_dir}")
-        print(f"  历史: {self.paths.old_saves_dir}")
+        print("  归档区（玩家自建，游戏不认）: "
+              f"{[d.name for d in self.paths.archive_dirs()]}")
         print(f"用户包目录: {self.paths.user_packages_dir}")
         for p in self.paths.packages():
             print(f"  包: {p}")

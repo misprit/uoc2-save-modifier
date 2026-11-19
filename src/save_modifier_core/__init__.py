@@ -39,7 +39,8 @@ from .catalog import CardWhitelist, Catalog, UnitType
 from .commit import CommitResult, commit, make_backup
 from .container import (CardView, HqView, Save, StoreEntryView, UnitView,
                         View)
-from .discovery import SaveInfo, list_saves, resolve_save_id
+from .discovery import (SaveInfo, is_archived_path, list_saves,
+                        resolve_save_id)
 from .edits import UNSET, Edit
 from .locale import TranslationStore
 from .paths import CorePaths
@@ -122,7 +123,8 @@ def open_save(save_id: str, paths: CorePaths | None = None) -> Save:
         else path.relative_to(paths.save_root).as_posix(),
         path=path,
         kind="standalone" if standalone else "campaign",
-        archived="Old Saves" in path.parts,
+        # ⚠️ 游戏只认 campaigns / games ⇒ 其它位置 = 玩家自建的归档区
+        archived=is_archived_path(path, paths),
         is_primary=True,
         campaign_id=main.get("campaign_id") or None,
         campaign_name=main.get("campaign_name") or None,

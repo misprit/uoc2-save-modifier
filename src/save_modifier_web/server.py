@@ -120,6 +120,8 @@ def api_saves() -> dict:
             "campaign": info.campaign_name or info.campaign_id or "",
             "scenario": info.scenario or "",
             "kind": "战役" if info.kind == "campaign" else "独立场景",
+            # U72：在**玩家自建的归档目录**里？（游戏只认 campaigns / games）
+            "archived": bool(info.archived),
             "mtime": _mtime(info.mtime),
             "size": _size(info.size),
         })

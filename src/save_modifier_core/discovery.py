@@ -1,13 +1,16 @@
 """存档发现：扫描存档目录，产出存档清单。
 
-目录布局（游戏自己定的）
-------------------------
+目录布局
+--------
 ```
 %LOCALAPPDATA%\\.uoc2\\save\\
-├─ campaigns\\<战役>.usg          战役存档（游戏正在写的那份）
-├─ games\\<战役>_<场景>.usg        独立场景存档
-└─ Old Saves\\<战役>\\<难度>\\*.usg 游戏自己归档的历史存档
+├─ campaigns\\<战役>.usg       战役存档（**游戏认**）
+├─ games\\<战役>_<场景>.usg     独立场景存档（**游戏认**）
+└─ <玩家自建的目录>\\*.usg      玩家自己整理的旧存档（**游戏不认**，改名叫什么都行）
 ```
+
+⚠️ **游戏只读 `campaigns` 与 `games` 两个目录**（实测）⇒ 根下其它目录都是
+玩家自己放的归档区 ⇒ 修改器**照样识别**（`archived=True`），不挑目录名。
 
 `save_id` 用**相对存档根目录的 posix 路径**（如 `campaigns/west.usg`）——
 它稳定、唯一、可反解回路径，跨机器也能用。
@@ -22,7 +25,8 @@ from pathlib import Path
 from . import yamlio
 from .paths import CorePaths
 
-__all__ = ["SaveInfo", "list_saves", "resolve_save_id", "read_root_main"]
+__all__ = ["SaveInfo", "list_saves", "resolve_save_id", "read_root_main",
+           "is_archived_path"]
 
 
 @dataclass(frozen=True)
@@ -35,7 +39,7 @@ class SaveInfo:
     path: Path
     #: `campaign`（战役存档）| `standalone`（独立场景存档）
     kind: str = "campaign"
-    #: 是否在游戏的「Old Saves」归档目录里
+    #: 是否在**玩家自建的归档目录**里（游戏不认的位置 —— 存档根下非 campaigns/games）
     archived: bool = False
     #: 是否是游戏当前会写的那一份（排除备份/副本）
     is_primary: bool = True
@@ -139,6 +143,21 @@ def _scan_dir(directory: Path, kind: str, archived: bool,
         ))
 
 
+def is_archived_path(path: Path, paths: CorePaths | None = None) -> bool:
+    """这个存档是不是放在**玩家自建的归档目录**里（游戏不认的位置）。
+
+    ⚠️ 判定只看**相对存档根的第一段目录名**是不是 `campaigns` / `games`
+    ⇒ 玩家把归档区叫什么都行（不挑 "Old Saves" 这个名字）。
+    """
+    paths = paths or CorePaths.discover()
+    try:
+        rel = Path(path).resolve().relative_to(paths.save_root.resolve())
+    except (ValueError, OSError):
+        return False
+    parts = rel.parts
+    return bool(parts) and parts[0] not in ("campaigns", "games")
+
+
 def list_saves(paths: CorePaths | None = None, *,
                include_archived: bool = True) -> list[SaveInfo]:
     """扫描全部存档，按最后修改时间倒序。
@@ -146,7 +165,10 @@ def list_saves(paths: CorePaths | None = None, *,
     参数
     ----
     paths : 路径集合；不给就自动探测。
-    include_archived : 是否包含「Old Saves」里的历史存档（默认包含）。
+    include_archived : 是否包含**玩家自建归档目录**里的存档（默认包含）。
+
+        ⚠️ 游戏只认 `campaigns` 与 `games` 两个目录；根下其它目录都是玩家
+        自己整理的旧存档 —— **目录名叫什么都行**（不挑 "Old Saves"）。
     """
     paths = paths or CorePaths.discover()
     root = paths.save_root
@@ -154,7 +176,8 @@ def list_saves(paths: CorePaths | None = None, *,
     _scan_dir(paths.campaigns_dir, "campaign", False, root, out)
     _scan_dir(paths.games_dir, "standalone", False, root, out)
     if include_archived:
-        _scan_dir(paths.old_saves_dir, "campaign", True, root, out)
+        for d in paths.archive_dirs():
+            _scan_dir(d, "campaign", True, root, out)
     out.sort(key=lambda s: s.mtime, reverse=True)
     return out
 
