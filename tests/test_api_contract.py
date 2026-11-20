@@ -162,11 +162,15 @@ class TestEditKinds(unittest.TestCase):
 
     ⚠️ 2026-11-19 再 +1 种（U64）：`level`（改难度，根 `main.yml`）——
     难度决定**手牌上限**，手牌超限时必须拦住（让玩家先删手牌）。
+
+    ⚠️ 2026-11-20 再 +1 种（U84）：`unit_spec_active`（特种兵的**被压制**状态，
+    根 `units.yml`）—— 游戏里特种兵条目只有 type / active / captured / idx
+    四个字段，`active=false` 就是被压制（字节码实证，见 §5.1ppp）。
     """
 
     EXPECTED = {
         "progress", "level",
-        "unit_field", "unit_spec_add", "unit_spec_remove",
+        "unit_field", "unit_spec_add", "unit_spec_remove", "unit_spec_active",
         "hq_force_pool", "hq_field", "hq_trucks", "hq_branch_level",
         "hq_branch_suppressed", "hq_branch_sp",
         "hq_force_pool_add",
@@ -186,7 +190,7 @@ class TestEditKinds(unittest.TestCase):
 
     def test_factories_exist(self):
         for name in ("progress", "level", "unit_field", "unit_spec_add",
-                     "unit_spec_remove", "hq_force_pool", "hq_field",
+                     "unit_spec_remove", "unit_spec_active", "hq_force_pool", "hq_field",
                      "hq_trucks", "hq_branch_level", "hq_branch_suppressed",
                      "hq_branch_sp", "hq_force_pool_add",
                      "hq_force_pool_remove", "card_add", "card_remove",
