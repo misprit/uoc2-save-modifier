@@ -721,7 +721,8 @@
   "0 无 · 1 转移动 · 2 只能打 · 3 不受限": "0 none · 1 convert to move · 2 attack only · 3 unlimited",
   "单位 {0} 工事等级": "Unit {0} entrenchment",
   "单位 {0} 移动力": "Unit {0} movement",
-  "单位 {0} 行动力": "Unit {0} action points"
+  "单位 {0} 行动力": "Unit {0} action points",
+  "移动力是剩余的移动点；敌方控制区是另一回事——进控制区会被定住，那是地图按敌方单位算出来的，不是这个数。": "Movement points are what is left of this turn's movement; the enemy zone of control is a different thing — a unit that enters it is held in place, and that zone is computed from the enemy's positions on the map, not from this number."
  },
  "errors": {
   "**取消专精**（{old_used} → {sp_used}）—— 该技能发动时的 CP 消耗会涨回去": "**Specialisation removed** ({old_used} → {sp_used}) — the CP cost of activating that skill goes back up",

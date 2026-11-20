@@ -1596,7 +1596,7 @@ function unitCombatFieldsHTML(u){
     <div class="stat" id="st_mp_${u.id}">
       <div class="lb"><span>${L("移动力")}</span><span class="hintw">${L("可直接输入")}</span></div>
       <div class="v"><input class="numin" id="in_mp_${u.id}" type="text" inputmode="numeric"
-        autocomplete="off" value="${mp}"></div>
+        autocomplete="off" value="${mp}" title="${L("移动力是剩余的移动点；敌方控制区是另一回事——进控制区会被定住，那是地图按敌方单位算出来的，不是这个数。")}"></div>
       <div class="hintline">${L("战斗里会按类型的移动力重算")}</div>
     </div>
     <div class="stat" id="st_ap_${u.id}">
