@@ -1799,11 +1799,15 @@ class TestU49LayoutAndLegality(unittest.TestCase):
 
         U85：单位详情多了三张卡（**工事等级 / 移动力 / 行动力**）⇒
         详情里一共 5 张卡、5 行 hintline（每张卡都还是「标签 / 内容 / 提示」三行）。
+
+        U102：作战标记卡多了一行「三个标记互斥」的提示 + 一行「存档里本来就有
+        冲突」的提示 ⇒ hintline 6 → 8（**仍然只加在作战标记卡上**）。
         """
         # U54：兵力卡**删掉数值区**，改成一条血量条 + 一行颜色含义说明
         # ⇒ 两张卡都是「标签 / 内容 / 提示」三行
         # U85：+3 张卡（工事等级 / 移动力 / 行动力）⇒ 2 → 5；U89：+1 张（作战标记）⇒ 6
-        self.assertEqual(self.html.count('class="hintline"'), 6)
+        # U102：作战标记卡 +2 行提示（互斥 / 冲突）⇒ 6 → 8
+        self.assertEqual(self.html.count('class="hintline"'), 8)
         # U74：class 变成占位符 `class="blood{7}"`
         self.assertIn('class="blood{', self.html)
         self.assertNotIn('id="sp_tot_${u.id}"', self.html)

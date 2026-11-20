@@ -175,15 +175,23 @@ class ElasticDefenseConstraintTest(unittest.TestCase):
 
     # ---- 别的标记不受这条限制 ----
     def test_other_orders_are_not_restricted(self):
-        """「死守」「后卫部队」任何单位都能挂（游戏里没有 armor_mobile 条件）。"""
-        plan = self.plan([Edit.unit_orders(1, ["no_retreat", "rearguard"])])
+        """「死守」「后卫部队」任何单位都能挂（游戏里没有 armor_mobile 条件）。
+
+        ⚠️ **U102**：三个标记**互斥**（一个单位只能有一个）⇒ 这里用
+        **两个单位各挂一个**，而不是给同一个单位挂两个。
+        """
+        plan = self.plan([Edit.unit_orders(1, ["no_retreat"]),
+                          Edit.unit_orders(2, ["rearguard"])])
         self.assertTrue(plan.ok, plan.errors)
         with open_save(str(self.save_path)) as save:
             res = save.commit(plan)
         self.assertTrue(res.ok, res.errors)
         b = self.battle()
         self.assertIn(1, b["no_retreat_units"])
-        self.assertIn(1, b["rearguard_units"])
+        self.assertIn(2, b["rearguard_units"])
+        # 互斥：同一个单位不会同时出现在两个列表里
+        self.assertNotIn(1, b["rearguard_units"])
+        self.assertNotIn(2, b["no_retreat_units"])
 
     def test_removing_is_always_allowed(self):
         """撤除已有标记**不受**限制（存档里原本就有的也不主动清理）。"""
