@@ -797,6 +797,24 @@ def _hq_force_pool(w, e: Edit) -> Outcome:
     return oc
 
 
+def _batch_final_hq_field(w, hq_id, field):
+    """这一批编辑**全部执行完**后，这个总部的该字段会是什么值。
+
+    U97：同一批编辑是**依次执行**的 ⇒ handler 执行到某条时，
+    别的字段可能还没改（中间态）⇒ 用它判定会**误报**。
+    例：玩家同时把 CP 调到 9、把 CP 上限也调到 9 ——
+    先执行 CP 那条时上限还是 6 ⇒ 误报「CP 9 超过上限 6」。
+
+    没有同批的编辑 ⇒ 返回 None（调用方回退到存档里的当前值）。
+    """
+    final = None
+    for ed in (getattr(w, "batch_edits", None) or []):
+        p = getattr(ed, "params", None) or {}
+        if p.get("hq_id") == hq_id and p.get("field") == field:
+            final = p.get("value")
+    return final
+
+
 def _hq_field(w, e: Edit) -> Outcome:
     """总部的某个字段（经验 / CP / 补给 / 卡车 / 俘虏 …）。"""
     oc = Outcome()
@@ -863,19 +881,22 @@ def _hq_field(w, e: Edit) -> Outcome:
     w.touch("hqs.yml")
     oc.summary = f"总部 {hq_id} 的 {field}：{old} → {value}"
 
-    if field == "cp" and isinstance(hq.get("max_cp"), int) and value > hq["max_cp"]:
+    # ⚠️ U97：判定要看**这一批改完之后**的值，不能看中间态
+    #（同一批编辑依次执行 ⇒ 先改 CP 时上限可能还没改 ⇒ 误报）。
+    _cp_final = _batch_final_hq_field(w, hq_id, "cp")
+    _maxcp_final = _batch_final_hq_field(w, hq_id, "max_cp")
+    _cp_now = _cp_final if _cp_final is not None else hq.get("cp")
+    _maxcp_now = _maxcp_final if _maxcp_final is not None else hq.get("max_cp")
+    if field == "cp" and isinstance(_maxcp_now, int) and value > _maxcp_now:
         oc.warnings.append(
-            f"CP {value} 超过该总部的上限 {hq['max_cp']} —— 游戏读档时按上限截断，"
-            f"多出来的 CP 会白给")
-    if field == "max_cp" and isinstance(hq.get("cp"), int) and hq["cp"] > value:
+            f"CP {value} 超过该总部的上限 {_maxcp_now} —— 游戏读档时按上限截断"
+            f"（`HQState._repair_data`），多出来的 CP 会白给")
+    if field == "max_cp" and isinstance(_cp_now, int) and _cp_now > value:
         oc.warnings.append(
-            f"CP 上限降到 {value}，但当前 CP 是 {hq['cp']} —— 游戏读档时按上限截断")
-    if field == "xp" and isinstance(old, int) and value < old:
-        oc.warnings.append(
-            "降低总部经验会让下属单位掉经验（游戏按『总部经验 - 单位经验』算欠账）")
-    if field == "xp_target" and isinstance(old, int) and value < old:
-        oc.warnings.append(
-            "降低经验目标会让下属单位立刻算成欠账")
+            f"CP 上限降到 {value}，但当前 CP 是 {_cp_now} —— 游戏读档时按上限截断"
+            f"（`HQState._repair_data`）")
+    # ⚠️ U94 之后 **xp / xp_target 已经不能改**（上面直接拦掉了）
+    # ⇒ 原来那两条「降低经验 / 降低目标」的警告**永远不会触发** ⇒ U97 删掉（死代码）。
     if field in ("prisoners", "loss_count", "intels_revealed"):
         oc.warnings.append(
             f"{field} 是游戏自己累计的统计值，改了不会被重算，但界面可能对不上")

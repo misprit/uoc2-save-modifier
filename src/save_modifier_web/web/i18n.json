@@ -737,8 +737,6 @@
  "errors": {
   "**取消专精**（{old_used} → {sp_used}）—— 该技能发动时的 CP 消耗会涨回去": "**Specialisation removed** ({old_used} → {sp_used}) — the CP cost of activating that skill goes back up",
   "**降级**（{old} → {level}）—— 总部已经投过的点不会退回来，而且这个分支提供的加成/容量会立刻变小": "**Downgraded** ({old} → {level}) — points already spent on the HQ are not refunded, and this branch's bonuses/capacity shrink immediately",
-  "CP {value} 超过该总部的上限 {hq_max_cp} —— 游戏读档时按上限截断，多出来的 CP 会白给": "CP {value} exceeds this HQ's cap of {hq_max_cp} — the game truncates to the cap when loading, so the extra CP is wasted",
-  "CP 上限降到 {value}，但当前 CP 是 {hq_cp} —— 游戏读档时按上限截断": "CP cap lowered to {value}, but the current CP is {hq_cp} — the game truncates to the cap when loading",
   "card_store_set 至少要改一个字段（card_type / is_free）": "card_store_set needs at least one field changed (card_type / is_free)",
   "cp 必须在 {HQ_CP_MIN}–{HQ_CP_MAX} 之间（游戏的硬范围），收到 {value}": "cp must be between {HQ_CP_MIN}–{HQ_CP_MAX} (the game's hard range), got {value}",
   "is_free 必须是 True / False，收到 {is_free}": "is_free must be True / False, got {is_free}",
@@ -993,8 +991,6 @@
   "这个资产本场景还剩 {total} 次可用 —— 删掉就没有了（想保留次数就改数值，不要删）": "this asset still has {total} uses left in this scenario — deleting it removes them (change the number instead if you want to keep the uses)",
   "阵营 {fac} ≠ 玩家 {player_faction}": "faction {fac} ≠ the player's {player_faction}",
   "阵营不同（单位 {ut_faction} / 特种兵 {sp_faction}）": "different factions (unit {ut_faction} / special force {sp_faction})",
-  "降低总部经验会让下属单位掉经验（游戏按『总部经验 - 单位经验』算欠账）": "lowering the HQ experience makes subordinate units lose experience (the game computes the deficit as \"HQ experience - unit experience\")",
-  "降低经验目标会让下属单位立刻算成欠账": "lowering the experience target immediately puts subordinate units in deficit",
   "难度只能是 {join_PLAY_LEVELS}，收到 {value}": "difficulty must be one of {join_PLAY_LEVELS}, got {value}",
   "难度没有变化": "the difficulty did not change",
   "难度还决定**以后**开的新会议：免费卡数 / 折扣卡数 / AI 强度 / 「重置会议」时重建的 HQ 卡车与步兵阶梯 —— 现有手牌与货架**不会**被改动": "difficulty also decides **future** meetings: the number of free cards / discount cards / AI strength / the HQ truck and infantry ladders rebuilt on \"reset meeting\" — the current hand and shelf are **not** changed",
@@ -1028,7 +1024,9 @@
   "delay 必须是非负整数（游戏的硬范围），收到 {arg0}": "delay must be a non-negative integer (the game's hard range), got {arg0}",
   "该单位普通部队合计 {total}（活跃 + 被压制）超过该类型的上限 {limit}（{unit_get_type} 的 max_st）—— 特种兵不占这个名额；游戏读档时会把超出的部分截回 {limit}，这部分会白改": "this unit's regular troops total {total} (active + suppressed), above that type's limit {limit} ({unit_get_type} max_st) — special forces do **not** count toward that limit; the game truncates the excess back to {limit} when it loads the save, so that part of the change is lost",
   "该单位普通部队合计（活跃 + 被压制）不能超过类型上限 {limit}（{unit_get_type} 的 max_st）—— 已把被压制兵力从 {s_old} 调到 {s}": "this unit's regular troops (active + suppressed) cannot exceed the type's limit {limit} ({unit_get_type} max_st) — the suppressed strength was reduced from {s_old} to {s}",
-  "该单位普通部队合计（活跃 + 被压制）不能超过类型上限 {limit}（{unit_get_type} 的 max_st）—— 活跃兵力已按上限截断（{a_old} → {a}）": "this unit's regular troops (active + suppressed) cannot exceed the type's limit {limit} ({unit_get_type} max_st) — the active strength was capped at the limit ({a_old} → {a})"
+  "该单位普通部队合计（活跃 + 被压制）不能超过类型上限 {limit}（{unit_get_type} 的 max_st）—— 活跃兵力已按上限截断（{a_old} → {a}）": "this unit's regular troops (active + suppressed) cannot exceed the type's limit {limit} ({unit_get_type} max_st) — the active strength was capped at the limit ({a_old} → {a})",
+  "CP {value} 超过该总部的上限 {maxcp_now} —— 游戏读档时按上限截断（`HQState._repair_data`），多出来的 CP 会白给": "CP {value} is above this HQ's limit {maxcp_now} — the game truncates it to the limit when it loads the save (`HQState._repair_data`), so the extra CP is wasted",
+  "CP 上限降到 {value}，但当前 CP 是 {cp_now} —— 游戏读档时按上限截断（`HQState._repair_data`）": "the CP limit drops to {value}, but the current CP is {cp_now} — the game truncates it to the limit when it loads the save (`HQState._repair_data`)"
  },
  "values": {
   "arg1": {

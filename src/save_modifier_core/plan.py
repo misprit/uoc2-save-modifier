@@ -105,6 +105,11 @@ class Work:
         self._raws: dict[str, bytes] = {}
         self.touched: set[str] = set()
         self.outcomes: list[Outcome] = []
+        #: U97：**本批要执行的所有编辑** —— handler 可以据此判断
+        #: 「这一批改完之后」的值（而不是执行到一半的中间态）。
+        #: 同一批编辑是**依次执行**的 ⇒ 中间态会误报
+        #: （U96 的兵力上限、U97 的总部 CP 都是这么来的）。
+        self.batch_edits: list = []
 
     # ---- 条目读写 ----
 
@@ -188,6 +193,7 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
     edit_list = order_edits(list(edits))
     if not edit_list:
         return plan
+    w.batch_edits = list(edit_list)
 
     for edit in edit_list:
         outcome = apply_edit(w, edit)
