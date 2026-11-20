@@ -2557,6 +2557,10 @@ function projectedCards(list, kind){
 function cardTileHTML(c, kind){
   /* U90：卡名与「免费 / 收费」**分开两行** —— 卡名被截断时状态照样看得见。 */
   const free = !!c.is_free;
+  /* U93：英文按钮词太长会被**截断**（"Make paid" → "Make pa…"）
+     ⇒ 英文用短词（Free / Paid），完整说明放进 title。 */
+  const freeBtn = free ? L("改收费") : L("改免费");
+  const freeTip = free ? L("改成收费") : L("改成免费");
   return L2(`<div class="hcard">
     <div class="ci">{0}</div>
     <div class="cp"><b>{1}</b></div>
@@ -2565,7 +2569,7 @@ function cardTileHTML(c, kind){
     <div class="acts">
       <button class="btn rm" onclick="{5}">
         {6}</button>
-      <button class="btn rm" onclick="{7}">
+      <button class="btn rm" onclick="{7}" title="{9}">
         {8}</button>
     </div>
   </div>`, imgTag(cardImg(c.card_type), cardCn(c.card_type)), esc(cardCn(c.card_type)),
@@ -2574,7 +2578,7 @@ function cardTileHTML(c, kind){
      kind==="hand"
         ? ("cardRemove("+c.position+")") : ("cardStoreRemove("+c.position+")"), kind==="hand"?L("移除"):L("下架"), kind==="hand"
         ? ("cardSetFree("+c.position+","+(free?"false":"true")+")")
-        : ("cardStoreSetFree("+c.position+","+(free?"false":"true")+")"), free?L("改收费"):L("改免费"));
+        : ("cardStoreSetFree("+c.position+","+(free?"false":"true")+")"), freeBtn, freeTip);
 }
 
 /* 卡牌选择器现在走**模态框**（U40b） */
@@ -2731,9 +2735,15 @@ function pageStore(w){
     const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("") : "";
     const tex = isSpec ? specTex(e.spec) : "steps/step.png";
     const texCls = isSpec ? "spico" : "";
+    /* U93：英文界面下**游戏自己的英文名恰好等于 id**（infantry / armor）
+       ⇒ 原来那两行会一模一样 ⇒ 相同就不画第二行。 */
+    const nm = storeEntryCn(e);
+    const idTxt = e.spec||e.equipment||"";
+    const subLine = (idTxt && idTxt!==nm)
+        ? `<div style="color:var(--muted);font-size:10.5px">${esc(idTxt)}</div>` : "";
     return L2(`<tr>
       <td><div class="thumb">{0}</div></td>
-      <td>{1}<div style="color:var(--muted);font-size:10.5px">{2}</div></td>
+      <td>{1}{2}</td>
       <td class="dim">{3}</td>
       <td class="dim">{4} / {5} /
         {6} / {7}</td>
@@ -2742,7 +2752,7 @@ function pageStore(w){
         inputmode="numeric" autocomplete="off" value="{12}"></td>
       <td class="num"><span class="spin" id="st_q_{13}_{14}_{15}"></span></td>
       <td><span class="rm" onclick="storeRemove('{16}','{17}',{18})">下架</span></td>
-    </tr>`, imgTag(tex, storeEntryCn(e), texCls), esc(storeEntryCn(e)), esc(e.spec||e.equipment||""), esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", isSpec?esc(st.artillery??"—"):"—", tags, e.front, e.sub, index, price, e.front, e.sub, index, e.front, e.sub, index);
+    </tr>`, imgTag(tex, storeEntryCn(e), texCls), esc(nm), subLine, esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", isSpec?esc(st.artillery??"—"):"—", tags, e.front, e.sub, index, price, e.front, e.sub, index, e.front, e.sub, index);
   }).join("");
 
   w.innerHTML = L2(`<div class="panel"><h3>商店</h3><div class="pbody">
@@ -2987,7 +2997,7 @@ function pageTheater(w){
     <div class="pbody"><div class="tgrid">{2}</div>
       <div class="note">候选全集 = <b>游戏那 7 种</b>（<code>constants.theater_asset_types</code>）——
         存档里没有的也列出来，可以<b>添加</b>；有的可以<b>删除</b>。<br>
-        战区资产是<b>唯一的 L3 写入例外</b>（写的是
+        战区资产是<b>两个 L3 写入例外之一</b>（写的是
         <code>games/&lt;场景&gt;/main.yml</code>，不是 5 张 L1 表）——
         所以这一页<b>只有进行中的战斗才能改</b>。<br>
         不变式：<b>当前可用 ≤ 本场景剩余</b>（游戏每用一次就让剩余减 1，减成负数存档会打不开）。
@@ -4391,7 +4401,7 @@ function show(p){
             <b>这一版能做什么</b>：读存档、列能力位、<b>改战役进度</b>（改完进「待应用」，
             点右上角「应用更改」才写盘，写前自动备份、可撤销）。<br>
             <b>各页进度</b>：单位 ✅ · 总部 ✅ · 卡牌 ✅ · 商店 ✅ · 战区资产 ✅ · 战役 ✅（只读）。
-            <b>战区资产</b>要存档正在战斗里才有内容（它是唯一的 L3 写入例外）。
+            <b>战区资产</b>要存档正在战斗里才有内容（它是两个 L3 写入例外之一）。
           </div></div></div>
       </div>
     </div>`, caps, levelPickerHTML(), backupStackHTML());

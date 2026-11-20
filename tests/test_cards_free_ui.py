@@ -97,8 +97,14 @@ class TestFreeStateOnItsOwnLine(CardsFreeUiTestBase):
         self.assertIn('L("收费")', self.tile)
 
     def test_buttons_follow_the_current_state(self):
-        """按钮文案随状态变：免费⇒「改收费」，收费⇒「改免费」。"""
-        self.assertIn('free?L("改收费"):L("改免费")', self.tile)
+        """按钮文案随状态变：免费⇒「改收费」，收费⇒「改免费」。
+
+        U93：英文按钮词太长会被**截断** ⇒ 英文改用短词（Free / Paid），
+        完整说明放进 title（`改成免费` / `改成收费`）。
+        """
+        self.assertIn('const freeBtn = free ? L("改收费") : L("改免费");', self.tile)
+        self.assertIn('const freeTip = free ? L("改成收费") : L("改成免费");', self.tile)
+        self.assertIn('title="{9}"', self.tile)
 
     def test_freeline_has_its_own_css(self):
         """.hcard .freeline —— 免费 / 收费两套颜色。"""
