@@ -303,5 +303,58 @@ class TrPayloadTest(unittest.TestCase):
         self.assertEqual(payload, server._tr_payload(payload))
 
 
+class PerfGuardTest(unittest.TestCase):
+    """U81：英文界面的**响应时间**护栏。"""
+
+    def test_view_in_english_is_not_slow(self):
+        """英文界面下打开一个存档要够快（曾经 23 秒 ⇒ 像「打不开」）。"""
+        import time
+
+        from ._helpers import find_saves
+        saves = find_saves(limit_per_dir=1)
+        if not saves:
+            self.skipTest("本机没有存档 ⇒ 没法测打开存档的耗时")
+        sid = str(saves[0])
+        orig = server.ui_language
+        server.ui_language = lambda: "en"
+        try:
+            t0 = time.time()
+            server.api_view(sid)
+            dt = time.time() - t0
+        finally:
+            server.ui_language = orig
+        # 曾经的 bug 是 23 秒；留足余量也只要 8 秒
+        self.assertLess(dt, 8.0,
+                        "英文界面打开存档用了 %.1f 秒（U81 的性能回归？）" % dt)
+
+    def test_ui_language_is_cheap(self):
+        """`ui_language()` 在热路径上 ⇒ 不能每次都去扫游戏目录。"""
+        import time
+
+        t0 = time.time()
+        for _ in range(200):
+            server.ui_language()
+        dt = time.time() - t0
+        self.assertLess(dt, 3.0,
+                        "ui_language() 调 200 次用了 %.1f 秒（热路径太贵）" % dt)
+
+
+class LangButtonPlaceTest(unittest.TestCase):
+    """U81：语言按钮只能在**启动页**（改语言会整页刷新 ⇒ 会弄丢已打开的存档）。"""
+
+    def test_lang_button_only_in_splash(self):
+        html = io.open(os.path.join(WEB, "index.html"), encoding="utf-8").read()
+        self.assertEqual(html.count('id="btnLang"'), 1,
+                         "语言按钮应该只有一个")
+        pos = html.index('id="btnLang"')
+        app = html.index('<div id="app">')
+        self.assertLess(pos, app, "语言按钮必须在启动页（主界面里不该有）")
+
+    def test_header_has_no_lang_button(self):
+        html = io.open(os.path.join(WEB, "index.html"), encoding="utf-8").read()
+        head = html[html.index('<div class="hdr">'):html.index('<div class="hdr">') + 2000]
+        self.assertNotIn('id="btnLang"', head, "页头里不该再有语言按钮")
+
+
 if __name__ == "__main__":
     unittest.main()

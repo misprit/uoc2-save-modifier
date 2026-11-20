@@ -877,6 +877,9 @@ tr.oldrow{opacity:.6}
       <input id="q" placeholder="搜索存档…">
       <span style="font-size:11.5px;color:var(--muted)" id="cnt"></span>
       <button onclick="reload()">刷新</button>
+      <!-- U81：语言按钮放在**启动页** —— 改语言会整页刷新（词表要重载），
+           在修改界面里改会把已打开的存档弄丢 ⇒ 只允许在选存档之前改。 -->
+      <button class="btn" id="btnLang" onclick="openLangMenu()">中文</button>
     </div>
     <table class="list">
       <thead><tr><th>存档</th><th>类型</th><th>状态</th><th>最后修改</th><th style="text-align:right">大小</th></tr></thead>
@@ -922,7 +925,6 @@ tr.oldrow{opacity:.6}
     <button class="save" id="hSave" onclick="openSaveMenu()"><span class="nm">—</span></button>
     <span class="hint">改动会先备份原存档</span>
     <span class="sp"></span>
-    <button class="btn" id="btnLang" onclick="openLangMenu()">中文</button>
     <button class="btn" onclick="doUndo()">↶ 撤销</button>
     <button class="btn pri" id="btnApply" onclick="doApply()">应用更改<span class="badge-n" id="hPending">0</span></button>
   </div>
@@ -1107,9 +1109,6 @@ function paintHeader(){
   if(!el || !VIEW) return;
   const save = VIEW.save||{};
   const inBattle = theaterEditable();
-  /* U74：语言按钮上的字也跟着切 */
-  const lb = document.getElementById("btnLang");
-  if(lb) lb.textContent = (LANG === "en") ? "EN" : L("中文");
   /* U67：当前存档是个**按钮** —— 点开是菜单（切换存档 / 另存为 / 放弃改动）。 */
   const imported = String(VIEW._save_id||"").indexOf("modifier_imports") >= 0;
   el.innerHTML = L2(`<span class="nm">{0}</span>
@@ -3928,6 +3927,9 @@ async function reload(){
   paint();
 }
 function paint(){
+  /* U81：语言按钮上的字跟着切（按钮在**启动页**） */
+  const _lb = document.getElementById("btnLang");
+  if(_lb) _lb.textContent = (LANG === "en") ? "EN" : L("中文");
   const q = (document.getElementById("q").value||"").trim().toLowerCase();
   const all = SAVES.filter(s => !q ||
     (s.name+" "+s.display+" "+s.campaign).toLowerCase().includes(q));

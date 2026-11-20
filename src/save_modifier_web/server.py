@@ -209,8 +209,7 @@ def _campaign_index(paths=None):
     lang = data_language()
     hit = _CAMP_INDEX.get(lang)
     if hit is None:
-        hit = load_campaign_index(
-            locale=TranslationStore(paths, locale=lang))
+        hit = load_campaign_index(locale=_tr_store(lang))
         _CAMP_INDEX[lang] = hit
     return hit
 
@@ -223,12 +222,11 @@ def _campaign_data(paths=None):
     ⇒ 这里在**显示层**把它换成跟着界面语言的那一份（核心库一个字不改）。
     """
     from save_modifier_core.campaigns import CampaignData
-    from save_modifier_core.locale import TranslationStore
     from save_modifier_core.paths import CorePaths
 
     paths = paths or CorePaths.discover()
     cd = CampaignData(paths, _campaign_index(paths))
-    cd.locale = TranslationStore(paths, locale=data_language())
+    cd.locale = _tr_store(data_language())
     return cd
 
 
@@ -251,8 +249,7 @@ def _localize_position(cp, cid, paths):
     """战役位置里的**名字**跟着界面语言（战役 / 会议 / 战线 / 场景）。"""
     if not isinstance(cp, dict):
         return cp
-    from save_modifier_core.locale import TranslationStore
-    tr = TranslationStore(paths, locale=data_language())
+    tr = _tr_store(data_language())
     # 战役名（包名从内置索引拿：dlc4 / base …）
     try:
         for pkg in (_campaign_index(paths).campaign_packages(cid) or []):
@@ -396,9 +393,7 @@ def api_view(save_id: str) -> dict:
         # ⚠️ 中文一律来自游戏包 `localization/chi/strings.yml` —— 不自己翻译（§5.7）。
         _tr = None
         try:
-            from save_modifier_core.locale import TranslationStore
-            from save_modifier_core.paths import CorePaths as _CP
-            _tr = TranslationStore(_CP.discover(), locale=data_language())
+            _tr = _tr_store(data_language())
             for _u in (data.get("units") or []):
                 _u["name_cn"] = _tr.get(_u.get("name_brief") or "", "") or (_u.get("name_brief") or "")
                 _u["full_cn"] = _tr.get(_u.get("name_full") or "", "") or (_u.get("name_full") or "")
@@ -509,11 +504,10 @@ def _catalog_payload() -> dict:
         return _CATALOG_CACHE
 
     from save_modifier_core import Catalog, CorePaths
-    from save_modifier_core.locale import TranslationStore
 
     paths = CorePaths.discover()
     catalog = Catalog(paths)
-    tr = TranslationStore(paths, locale=data_language())
+    tr = _tr_store(data_language())
 
     def cn(key, fallback: str = "") -> str:
         """查一条中文；查不到退回 `fallback`（一般是内部 id）。"""
@@ -1162,6 +1156,23 @@ def _game_language() -> str:
 _UI_LANG_CACHE: tuple | None = None
 
 
+#: 游戏 `settings.yml` 的路径（**缓存** —— `ui_language()` 每次被问都要用，
+#: 而 `CorePaths.discover()` 会去扫游戏目录 ⇒ 放在热路径上就是灾难，U81 踩过）
+_GAME_SETTINGS: list = []
+
+
+def _game_settings_path():
+    """游戏自己的 `settings.yml` 路径（只查一次）。"""
+    if not _GAME_SETTINGS:
+        try:
+            from save_modifier_core.paths import CorePaths
+            _GAME_SETTINGS.append(
+                CorePaths.discover().uoc2_appdata / "settings.yml")
+        except Exception:
+            _GAME_SETTINGS.append(None)
+    return _GAME_SETTINGS[0]
+
+
 def ui_language() -> str:
     """**界面语言**：用户自己选的 > 游戏设置 > 中文。
 
@@ -1170,6 +1181,8 @@ def ui_language() -> str:
 
     ⚠️ **按 mtime 缓存** —— 翻译每条报错都要问一次语言，
     不能每条都去读两个设置文件。
+    ⚠️ **U81**：游戏 settings.yml 的路径也缓存住（别每次 `discover()`）——
+    这个函数在热路径上（每个响应节点都会问一次语言）。
     """
     global _UI_LANG_CACHE
     from save_modifier_core.paths import config_path, read_config
@@ -1177,10 +1190,9 @@ def ui_language() -> str:
         cfg_mtime = config_path().stat().st_mtime
     except OSError:
         cfg_mtime = 0.0
+    gs_path = _game_settings_path()
     try:
-        from save_modifier_core.paths import CorePaths
-        gs_path = CorePaths.discover().uoc2_appdata / "settings.yml"
-        gs_mtime = gs_path.stat().st_mtime
+        gs_mtime = gs_path.stat().st_mtime if gs_path else 0.0
     except OSError:
         gs_mtime = 0.0
     if _UI_LANG_CACHE is not None and _UI_LANG_CACHE[:2] == (cfg_mtime, gs_mtime):
@@ -1194,6 +1206,24 @@ def ui_language() -> str:
         lang = "chi"
     _UI_LANG_CACHE = (cfg_mtime, gs_mtime, lang)
     return lang
+
+
+#: 按语言的本地化 store（**进程内缓存**）
+#:
+#: ⚠️ 每次新建 `TranslationStore` 都要重读 11 个包 × 40 个 yml（实测 0.07 s/次）
+#:    ⇒ 一个请求里建好几次就是几秒 ⇒ U81 起一律走缓存。
+_TR_STORES: dict = {}
+
+
+def _tr_store(locale: str):
+    """按语言的本地化 store（进程内缓存）。"""
+    st = _TR_STORES.get(locale)
+    if st is None:
+        from save_modifier_core.locale import TranslationStore
+        from save_modifier_core.paths import CorePaths
+        st = TranslationStore(CorePaths.discover(), locale=locale)
+        _TR_STORES[locale] = st
+    return st
 
 
 def data_language() -> str:
@@ -1264,7 +1294,10 @@ def _err_values() -> dict:
 
 
 def _compile_err_templates(table: dict):
-    """把「带占位符的模板」编译成正则（长的在前）。"""
+    """把「带占位符的模板」编译成正则（长的在前）。
+
+    ⇒ 连同**字面量替换表**一起缓存（U81：原来每条报错都要重排一次 266 条）。
+    """
     global _ERR_RX_CACHE
     if _ERR_RX_CACHE is not None and _ERR_RX_CACHE[0] is table:
         return _ERR_RX_CACHE[1]
@@ -1295,8 +1328,17 @@ def _compile_err_templates(table: dict):
     # 字面量多的（更具体的）先替
     pats.sort(key=lambda x: (-x[0], -x[1]))
     out = [(rx, en, pairs) for _, _, rx, en, pairs in pats]
-    _ERR_RX_CACHE = (table, out)
+    lits = sorted(((k, v) for k, v in table.items()
+                   if "{" not in k and isinstance(v, str)),
+                  key=lambda kv: -len(kv[0]))
+    _ERR_RX_CACHE = (table, out, lits)
     return out
+
+
+def _err_literals(table: dict) -> list:
+    """字面量替换表（长的在前）—— 随编译缓存一起缓存（U81）。"""
+    _compile_err_templates(table)
+    return _ERR_RX_CACHE[2]
 
 
 def _fill_template(en_tpl: str, groups: dict, pairs: list, values: dict,
@@ -1319,17 +1361,22 @@ def _fill_template(en_tpl: str, groups: dict, pairs: list, values: dict,
     return out
 
 
-def tr_error(text, depth: int = 0) -> str:
+def tr_error(text, depth: int = 0, lang: str | None = None) -> str:
     """把**一条**中文报错/警告/摘要翻成英文（**只在显示层**，核心库一个字不改）。
 
     ① 整条精确匹配；
     ② **模板**匹配 —— 报错里带着真值（`单位 U1 的 xp=900 越界（必须 0..400）`），
        整条匹配不上 ⇒ 把词表里的 `{name}` 占位符编译成正则再匹配；
     ③ 兜底：整串里能认出来的中文片段换掉（核心库把几条错误拼成一串时用）。
+
+    ⚠️ **U81**：`lang` 由调用方传进来（**别在热路径上问语言**）——
+    一次响应几十万节点，每个节点问一次语言 ⇒ 每次请求 23 秒。
     """
     if not isinstance(text, str) or not text or not _CJK.search(text):
         return text
-    if ui_language() != "en":
+    if lang is None:
+        lang = ui_language()
+    if lang != "en":
         return text
     table = _err_table()
     if not table:
@@ -1357,8 +1404,7 @@ def tr_error(text, depth: int = 0) -> str:
             def _sub(m, en=en, pairs=pairs):
                 return _fill_template(en, m.groupdict(), pairs, values, depth)
             out = rx.sub(_sub, out)
-    lits = [(k, v) for k, v in table.items() if "{" not in k and isinstance(v, str)]
-    lits.sort(key=lambda kv: -len(kv[0]))
+    lits = _err_literals(table)
     for zh, en in lits:
         if zh in out:
             out = out.replace(zh, en)
@@ -1368,31 +1414,38 @@ def tr_error(text, depth: int = 0) -> str:
     return out
 
 
-def tr_errors(items) -> list:
+def tr_errors(items, lang: str | None = None) -> list:
     """一批报错/警告逐条翻译。"""
-    return [tr_error(x) for x in (items or [])]
+    return [tr_error(x, lang=lang) for x in (items or [])]
 
 
-def _tr_payload(obj):
-    """把响应里**给玩家看的文案**翻成英文（数据本身一个字不动）。"""
-    if ui_language() != "en":
+def _tr_payload(obj, lang: str | None = None):
+    """把响应里**给玩家看的文案**翻成英文（数据本身一个字不动）。
+
+    ⚠️ **U81：语言只算一次**（`lang`）—— 原来每个节点都问一次 `ui_language()`，
+    而它要扫游戏目录 ⇒ 一次请求 23 秒（英文模式；中文模式第一行就 return 所以看不出来）。
+    """
+    if lang is None:
+        lang = ui_language()
+    if lang != "en":
         return obj
     if isinstance(obj, dict):
-        return {k: (_tr_value(v) if k in _TR_KEYS else _tr_payload(v))
+        return {k: (_tr_value(v, lang) if k in _TR_KEYS else _tr_payload(v, lang))
                 for k, v in obj.items()}
     if isinstance(obj, list):
-        return [_tr_payload(x) for x in obj]
+        return [_tr_payload(x, lang) for x in obj]
     return obj
 
 
-def _tr_value(v):
+def _tr_value(v, lang: str | None = None):
     """一个「文案值」：字符串 ⇒ 翻译；列表/字典 ⇒ 递归。"""
     if isinstance(v, str):
-        return tr_error(v)
+        return tr_error(v, lang=lang)
     if isinstance(v, list):
-        return [tr_error(x) if isinstance(x, str) else _tr_payload(x) for x in v]
+        return [tr_error(x, lang=lang) if isinstance(x, str)
+                else _tr_payload(x, lang) for x in v]
     if isinstance(v, dict):
-        return _tr_payload(v)
+        return _tr_payload(v, lang)
     return v
 
 
@@ -1431,8 +1484,7 @@ def api_campaign_detail(save_id: str) -> dict:
         # U74：场景名跟着界面语言（内置索引里是**写死的中文**）
         _tr2 = None
         try:
-            from save_modifier_core.locale import TranslationStore
-            _tr2 = TranslationStore(paths, locale=data_language())
+            _tr2 = _tr_store(data_language())
         except Exception:
             _tr2 = None
         route = []
@@ -1459,9 +1511,7 @@ def api_campaign_detail(save_id: str) -> dict:
                 roster = _jsonable(r)
                 # 名册单位的 name_brief 是**本地化键** ⇒ 翻成中文（§5.7）
                 try:
-                    from save_modifier_core.locale import TranslationStore as _TS
-                    from save_modifier_core.paths import CorePaths as _CP2
-                    _tr2 = _TS(_CP2.discover(), locale=data_language())
+                    _tr2 = _tr_store(data_language())
                     for _u in (roster.get("units") or []):
                         _u["name_cn"] = (_tr2.get(str(_u.get("name_brief") or ""), "")
                                           or str(_u.get("name_brief") or ""))
@@ -1615,7 +1665,8 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _json(self, obj, code=200):
         # ⚠️ **显示层翻译**（U74）：界面是英文时，把报错/警告/摘要翻成英文
-        obj = _tr_payload(obj)
+        # ⚠️ **U81**：语言**只问一次**（整包一个）—— 别每个节点问一遍。
+        obj = _tr_payload(obj, lang=ui_language())
         self._send(code, json.dumps(obj, ensure_ascii=False).encode("utf-8"),
                    "application/json; charset=utf-8")
 
