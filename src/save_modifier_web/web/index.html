@@ -1522,7 +1522,22 @@ function unitRowHTML(u){
   </div>`, u.id===SEL.units?'sel':'', u.id, u.id, avaImg(u.type, unitCn(u.type), AVA_BOX_LIST), esc(unitCn(u.type)), esc(u.type||""), esc(u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id)), hq?(L(" · 总部 ")+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):"", u.xp!==null&&u.xp!==undefined?(L(" · 经验 ")+u.xp):"", u.entr?(L(" · 被压制 ")+u.entr):"", pips, badges);
 }
 
-function pickUnit(id){ SEL.units = id; show("units"); }
+function pickUnit(id){
+  SEL.units = id;
+  /* U82：只重画**详情**，列表原位不动 ——
+     原来走 `show("units")`（整页重绘）⇒ 列表滚动位置被重置
+     ⇒ 每选一个单位都要重新滚回去（用户反馈：反人类）。
+     列表里除了 `.sel` 高亮，选中时本来就不会变
+     （经验显示原值；血量条是 U65 的 refreshUnitBlood 实时刷的）。 */
+  document.querySelectorAll("#work .urow").forEach(function(r){
+    r.classList.toggle("sel", String(r.dataset.uid)===String(id));
+  });
+  const cur = (VIEW.units||[]).find(u=>u.id===id);
+  const det = document.getElementById("udetail");
+  if(det) det.innerHTML = unitDetailHTML(cur);
+  if(cur) bindUnitControls(cur);
+  paintPending();
+}
 
 function unitDetailHTML(u){
   if(!u) return L(`<div class="placeholder"><div class="big">没有单位</div></div>`);
@@ -1601,7 +1616,7 @@ function unitDetailHTML(u){
       <div class="stat">
         <div class="lb"><span>兵力</span><span class="capw">上限 {6}</span></div>
         <div class="blood{7}" id="sp_blood_{8}"
-          data-tip="<b>血量条</b> · 滚轮 = 调<b>活跃</b>兵力<br>Alt+滚轮 = 调<b>压制</b>兵力（两者之和不变）<br>实 = 活跃 · 淡 = 被压制">
+          data-tip="<b>血量条</b> · 滚轮 = 调<b>活跃</b>兵力<br>Alt+滚轮 = 调<b>压制</b>兵力（与活跃同方向，两者之和不变）<br>实 = 活跃 · 淡 = 被压制">
           <div class="bar">{9}</div>
         </div>
         <div class="hintline">实 = 活跃 · 淡 = 被压制</div>
@@ -1622,8 +1637,8 @@ function unitDetailHTML(u){
       <span class="sbsep"></span>
       <span class="sbm">候选口径：{14}</span>
       <span class="sp"></span>
-      <label class="chk"><input type="checkbox" id="allcb" {15}
-        onchange="toggleFullPool()">显示全部</label>
+      <label class="chk" title="把该单位所有可挂的特种兵都列出来（不只当前已挂的）"><input type="checkbox" id="allcb" {15}
+        onchange="toggleFullPool()">显示所有特种兵</label>
       <span class="sbhint">点图标挂上 · 点已挂的卸下 · <b>同一种可以挂多个</b> · 悬停看数值</span>
     </div>
     <div class="specsplit">
@@ -1749,8 +1764,12 @@ function bindUnitControls(u){
       const s0 = pendingVal("unit_field", uKey(u.id,"sup_st"), baseSup);
       let a = a0, s = s0;
       if(ev.altKey){
-        /* Alt+滚轮 = 调压制（两者之和不变） */
-        if(d>0){ if(a<1) return; s+=1; a-=1; }
+        /* U82：Alt+滚轮 = 调压制（两者之和不变）。
+           ⚠️ **方向跟活跃一致**：`d = deltaY>0 ? -1 : 1`（向上滚 d=+1）
+           ⇒ 向上滚 = 活跃 +1 / 压制 −1，向下滚 = 活跃 −1 / 压制 +1。
+           原来两个分支是反的（向上滚反而让活跃减少），跟人的直觉相反，
+           实际用起来反应不过来（用户反馈）。 */
+        if(d<0){ if(a<1) return; s+=1; a-=1; }
         else    { if(s<1) return; s-=1; a+=1; }
       } else {
         /* 普通滚轮 = 调活跃（超过上限就消减压制补上） */
