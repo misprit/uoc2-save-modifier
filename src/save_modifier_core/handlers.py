@@ -38,18 +38,30 @@ class Outcome:
 #: **允许改**的单位字段。`type` 不在其中 —— 它是只读信息（§5.4、§7.5）。
 UNIT_FIELD_ALLOWED = {
     "xp", "act_st", "sup_st", "name_brief", "name_full",
-    "uv", "entr", "supply", "ap",
+    "uv", "entr", "supply", "ap", "mp",
+}
+
+#: 字段的**中文名**（变更说明里用，别让玩家对着 `entr` 猜）。
+#:
+#: U85（2026-11-20）：`entr` / `ap` / `mp` / `supply` 原本只写字段名，
+#: 玩家根本不知道 `entr` 是工事等级 ⇒ 变更清单里全是天书。
+UNIT_FIELD_CN = {
+    "entr": "工事等级",
+    "ap": "行动力",
+    "mp": "移动力",
+    "supply": "补给",
 }
 
 #: 战斗外改会被场景预设覆盖的字段（§3.5.8 存活性矩阵）
-UNIT_FIELD_RISKY = {"uv", "entr", "supply", "ap"}
+UNIT_FIELD_RISKY = {"uv", "entr", "supply", "ap", "mp"}
 
 #: 单位数值字段的取值范围（§5.2）
 UNIT_FIELD_RANGE = {
     "xp": (0, 400),
-    "entr": (0, 2),
+    "entr": (0, 2),          # 游戏的 `unit_max_entr_level = 2`（U85 字节码实证）
     "supply": (0, 3),
-    "ap": (0, 3),
+    "ap": (0, 3),            # 游戏的 `ap_max_value = 3`（ap_none/conv/lock/full）
+    "mp": (0, None),         # 上限 = 类型的基础移动力（`_type.move`），没法静态校验
     "act_st": (0, None),
     "sup_st": (0, None),
 }
@@ -351,10 +363,39 @@ def _unit_field(w, e: Edit) -> Outcome:
     old = unit.get(field)
     unit[field] = value
     w.touch("units.yml")
-    oc.summary = f"单位 {unit_id} 的 {field}：{old!r} → {value!r}"
+    #: U85：变更说明里给几个字段**中文名**（`entr` → 工事等级），
+    #: 字段名也带上，方便对照存档。
+    #: ⚠️ **分字段写死**（不走变量）—— 这样每条都能单独翻译，
+    #: 英文界面不会夹着中文。
+    if field == "entr":
+        oc.summary = f"单位 {unit_id} 的工事等级（entr）：{old!r} → {value!r}"
+    elif field == "ap":
+        oc.summary = f"单位 {unit_id} 的行动力（ap）：{old!r} → {value!r}"
+    elif field == "mp":
+        oc.summary = f"单位 {unit_id} 的移动力（mp）：{old!r} → {value!r}"
+    elif field == "supply":
+        oc.summary = f"单位 {unit_id} 的补给（supply）：{old!r} → {value!r}"
+    else:
+        oc.summary = f"单位 {unit_id} 的 {field}：{old!r} → {value!r}"
     if field in UNIT_FIELD_RISKY:
-        oc.warnings.append(
-            f"单位 {unit_id} 的 {field} 在战斗外改，下一次开打时可能被场景预设覆盖（§3.5.8）")
+        # ⚠️ U85：分字段写死中文名（`entr` → 工事等级）——
+        #    玩家不该在警告里看到英文字段名；分字段写才能各自翻译。
+        if field == "entr":
+            oc.warnings.append(
+                f"单位 {unit_id} 的工事等级在战斗外改，"
+                "下一次开打时可能被场景预设覆盖（§3.5.8）")
+        elif field == "ap":
+            oc.warnings.append(
+                f"单位 {unit_id} 的行动力在战斗外改，"
+                "下一次开打时可能被场景预设覆盖（§3.5.8）")
+        elif field == "mp":
+            oc.warnings.append(
+                f"单位 {unit_id} 的移动力在战斗外改，"
+                "下一次开打时可能被场景预设覆盖（§3.5.8）")
+        else:
+            oc.warnings.append(
+                f"单位 {unit_id} 的 {field} 在战斗外改，"
+                "下一次开打时可能被场景预设覆盖（§3.5.8）")
     if field == "xp":
         oc.warnings.append(
             "登陆单位被补兵后 XP 会被重算掉一部分（§3.5.6）")

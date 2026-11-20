@@ -60,6 +60,10 @@ class UnitView:
     entr: int | None = None
     supply: int | None = None
     ap: int | None = None
+    #: **移动力**（剩余的移动点）—— U85 补：视图里原来没有这个字段，
+    #: 界面读不到、测试也读不到。游戏里它是**状态量**（`apply_mp_ap` 会按
+    #: 类型的 `move` 重算），存档里存的是当前值。
+    mp: int | None = None
     losses: int | None = None
     retreated: bool | None = None
     #: 该单位是否出现在战役名册 `document/units.yml` 里
@@ -549,6 +553,7 @@ class Save:
                 entr=u.get("entr"),
                 supply=u.get("supply"),
                 ap=u.get("ap"),
+                mp=u.get("mp"),
                 losses=u.get("losses"),
                 retreated=u.get("retreated"),
                 in_roster=u["id"] in roster if roster else True,
