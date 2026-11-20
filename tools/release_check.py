@@ -82,6 +82,45 @@ def step_zip():
     check("成品 zip 完整（%s，%.1f MB）" % (zp.name, zp.stat().st_size / 1048576.0),
           bad is None and not missing,
           ("损坏：%s" % bad) if bad else (("缺：%s" % missing) if missing else ""))
+    step_zip_fresh(zp)
+
+
+def step_zip_fresh(zp):
+    """**包里的东西是不是当前的？** —— 逐字节比（U100）。
+
+    ⚠️ 原来的第②项只验「文件齐全 + 没损坏」⇒ **旧包照样报 OK**
+    （2026-11-20 实测：09:58 打的旧包四项全绿，包里却没有 U89 之后的改动）。
+    ⇒ 这里把 zip 里每个条目与工作区同名文件逐字节比一遍。
+
+    * 只比**仓库里存在**的那些（zip 里多出来的构建残留不算不一致）；
+    * zip 里没有、工作区有的 ⇒ 也算不一致（漏打）。
+    """
+    prefix = "uoc2-save-modifier/"
+    diff: list[str] = []
+    checked = 0
+    with zipfile.ZipFile(zp) as z:
+        for name in z.namelist():
+            if name.endswith("/") or not name.startswith(prefix):
+                continue
+            rel = name[len(prefix):]
+            f = REPO / rel
+            if not f.is_file():
+                continue                      # 仓库里没有的（构建残留）⇒ 不管
+            try:
+                a = z.read(name)
+            except KeyError:
+                continue
+            try:
+                b = f.read_bytes()
+            except OSError:
+                diff.append(rel + "（读不到）")
+                continue
+            checked += 1
+            if hashlib.sha256(a).digest() != hashlib.sha256(b).digest():
+                diff.append(rel)
+    check("成品 zip 与当前代码**逐字节一致**", not diff,
+          ("%d/%d 个文件不同：%s" % (len(diff), checked, "、".join(diff[:5])))
+          if diff else "比对 %d 个文件，全一致" % checked)
 
 
 # ---------------------------------------------------------------- ③ 真实存档演练
