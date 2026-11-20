@@ -1719,8 +1719,9 @@ class TestU50ToolbarAndStrength(unittest.TestCase):
         self.assertIn('if(ev.altKey){', self.html)
         self.assertIn('field:"act_st"', self.html)
         self.assertIn('field:"sup_st"', self.html)
-        # Alt 分支：两者之和不变（压制 +1 ⇒ 活跃 −1）
-        self.assertIn("if(d>0){ if(a<1) return; s+=1; a-=1; }", self.html)
+        # Alt 分支：两者之和不变。U82：**方向跟活跃一致**
+        # （向上滚 = 活跃 +1 / 压制 −1；向下滚 = 活跃 −1 / 压制 +1）
+        self.assertIn("if(d<0){ if(a<1) return; s+=1; a-=1; }", self.html)
         self.assertIn("else    { if(s<1) return; s-=1; a+=1; }", self.html)
 
     def test_blood_bar_clamps_to_game_max(self):
