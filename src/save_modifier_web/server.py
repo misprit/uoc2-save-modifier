@@ -394,12 +394,14 @@ def api_view(save_id: str) -> dict:
         _tr = None
         try:
             _tr = _tr_store(data_language())
+            #: U83：名字回退链 = **当前语言 → 英文 → 内部 id**
+            _pick = _name_lookup(data_language())
             for _u in (data.get("units") or []):
-                _u["name_cn"] = _tr.get(_u.get("name_brief") or "", "") or (_u.get("name_brief") or "")
-                _u["full_cn"] = _tr.get(_u.get("name_full") or "", "") or (_u.get("name_full") or "")
+                _u["name_cn"] = _pick(_u.get("name_brief") or "", _u.get("name_brief") or "")
+                _u["full_cn"] = _pick(_u.get("name_full") or "", _u.get("name_full") or "")
             for _h in (data.get("hqs") or []):
-                _h["name_cn"] = _tr.get(_h.get("name_brief") or "", "") or (_h.get("name_brief") or "")
-                _h["full_cn"] = _tr.get(_h.get("name_full") or "", "") or (_h.get("name_full") or "")
+                _h["name_cn"] = _pick(_h.get("name_brief") or "", _h.get("name_brief") or "")
+                _h["full_cn"] = _pick(_h.get("name_full") or "", _h.get("name_full") or "")
         except Exception as exc:
             data["_name_error"] = str(exc)
 
@@ -507,13 +509,8 @@ def _catalog_payload() -> dict:
 
     paths = CorePaths.discover()
     catalog = Catalog(paths)
-    tr = _tr_store(data_language())
-
-    def cn(key, fallback: str = "") -> str:
-        """查一条中文；查不到退回 `fallback`（一般是内部 id）。"""
-        if not key:
-            return fallback
-        return tr.get(key, "") or fallback
+    #: 显示名回退链 = **当前语言 → 英文 → 内部 id**（U83）
+    cn = _name_lookup(data_language())
 
     #: 难度列表（游戏常量 `play_levels`）—— 中文名查 locale，
     #: `deck_limit` = 该难度的**手牌上限**（`card_deck_limit`，改难度时用来判冲突）。
@@ -1226,6 +1223,38 @@ def _tr_store(locale: str):
     return st
 
 
+def _name_lookup(data_lang: str):
+    """返回一个「查显示名」的闭包：**当前语言 → 英文 → 内部 id**。
+
+    U83（2026-11-20 · 朋友反馈）：mod 常常**只做英文翻译**
+    （游戏底层本来就是英文）⇒ 中文界面下查不到中文名时，
+    直接退到**英文**，别退到文件名 / 内部 id
+    （游戏里显示的是他改的文件名，修改器不该显示得更难看）。
+
+    ⚠️ **只加一级、且只在"查不到"时生效** ——
+    游戏自带资源 chi / eng **100% 覆盖**（实测各 16776 键，差集为 0）
+    ⇒ 现有显示**一个字符都不会变**。
+    ⚠️ **绝不自己翻译**（规范 §5.7）—— 英文也是游戏自己的资源。
+    """
+    tr = _tr_store(data_lang)
+    #: 英文表只在「当前语言不是英文」时才用得上（英文界面下 `tr` 已经是它）
+    tr_en = _tr_store("eng") if data_lang != "eng" else None
+
+    def pick(key, fallback: str = "") -> str:
+        if not key:
+            return fallback
+        v = tr.get(key, "")
+        if v:
+            return v
+        if tr_en is not None:
+            v = tr_en.get(key, "")
+            if v:
+                return v
+        return fallback
+
+    return pick
+
+
 def data_language() -> str:
     """**数据名字的语言**（单位/特种兵/卡牌/战役的名字）—— 跟**界面语言**一致。
 
@@ -1511,13 +1540,14 @@ def api_campaign_detail(save_id: str) -> dict:
                 roster = _jsonable(r)
                 # 名册单位的 name_brief 是**本地化键** ⇒ 翻成中文（§5.7）
                 try:
-                    _tr2 = _tr_store(data_language())
+                    #: U83：名字回退链 = **当前语言 → 英文 → 内部 id**
+                    _pick2 = _name_lookup(data_language())
                     for _u in (roster.get("units") or []):
-                        _u["name_cn"] = (_tr2.get(str(_u.get("name_brief") or ""), "")
-                                          or str(_u.get("name_brief") or ""))
+                        _u["name_cn"] = _pick2(str(_u.get("name_brief") or ""),
+                                               str(_u.get("name_brief") or ""))
                     for _h in (roster.get("hqs") or []):
-                        _h["name_cn"] = (_tr2.get(str(_h.get("name_brief") or ""), "")
-                                         or str(_h.get("name_brief") or ""))
+                        _h["name_cn"] = _pick2(str(_h.get("name_brief") or ""),
+                                               str(_h.get("name_brief") or ""))
                 except Exception:
                     pass
 
