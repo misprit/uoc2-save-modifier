@@ -62,6 +62,19 @@ ORDER_LOCALE_KEYS = {
 }
 
 
+def _effective_orders(keys) -> tuple[str, ...]:
+    # 存档里一个单位可能同时在多个标记列表里 —— **只返回游戏会认的那个**。
+    #
+    # 依据（U102，字节码）：`Gamelike.get_defense_flag_string`
+    # （`state/gamelike/gamelike.pyc:1470-1476`）按
+    # **no_retreat → rearguard → elastic_defense** 的顺序**只返回一个**
+    # ⇒ 存档里有冲突时，游戏只认第一个，其余静默忽略。
+    for k in ORDER_LISTS:            # dict 的插入顺序 = 游戏的优先级顺序
+        if k in keys:
+            return (k,)
+    return ()
+
+
 @dataclass(frozen=True)
 class UnitView:
     """单位（根 `units.yml` 的一条）。"""
@@ -93,7 +106,17 @@ class UnitView:
     max_spec: int | None = None
     #: U89：**作战标记**（HQ 技能的命令）—— `no_retreat` / `rearguard` /
     #: `elastic_defense`；只对当前战斗有效。
+    #:
+    #: ⚠️ **U102：这三个标记互斥 —— 一个单位同时只能有一个。**
+    #: 游戏里下达命令是「先把该单位从三个列表全清掉、再加进其中一个」
+    #: （`state/scenario/commands_unit.pyc::UnitSetFlags._set_flags:359-368`），
+    #: 且三个 `can_make_*` 都要求「该单位没有其它标记」
+    #: （`Gamelike.has_any_defense_flag`）⇒ 这里**只给生效的那一个**
+    #:（按游戏优先级 no_retreat → rearguard → elastic_defense）。
     orders: tuple[str, ...] = ()
+    #: U102：存档里这个单位**本来就**同时在多个列表里（游戏自己造不出这种状态，
+    #: 可能是别的工具写的）⇒ 界面提示一句。只读，不改存档。
+    orders_conflict: bool = False
     #: U92：是不是**装甲机动单位**（类型判定）——
     #: 游戏里「反击」只允许这种单位挂（`can_make_elastic_defense`）。
     armor_mobile: bool = False
@@ -614,7 +637,10 @@ class Save:
                 mp=u.get("mp"),
                 losses=u.get("losses"),
                 retreated=u.get("retreated"),
-                orders=tuple(orders_map.get(u["id"], ())),
+                # U102：三个标记互斥 ⇒ 只暴露**生效的那一个**（游戏优先级）
+                orders=_effective_orders(orders_map.get(u["id"], ())),
+                # U102：存档里本来就有冲突（同一单位在多个列表里）⇒ 标记出来
+                orders_conflict=len(orders_map.get(u["id"], ())) > 1,
                 # U92：类型级判定（有没有游戏包都安全 —— 没有就是 False）
                 armor_mobile=bool(catalog.armor_mobile(t)) if (catalog and t) else False,
                 in_roster=u["id"] in roster if roster else True,

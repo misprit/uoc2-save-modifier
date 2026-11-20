@@ -706,6 +706,24 @@ def _unit_orders(w, e: Edit) -> Outcome:
         return oc
     orders = [o for o in ORDER_LISTS if o in orders]     # 去重 + 按固定顺序
 
+    # U102：游戏里这三个标记**互斥** —— 一个单位同时只能有一个。
+    # 字节码依据（三条独立路径共同维持）：
+    #   ① `Gamelike.has_any_defense_flag`（gamelike.pyc:1452-1455）
+    #      = 该单位在三个列表**任意一个**里；
+    #   ② 三个 `can_make_*`（entities_view/unit.pyc:84/91/98）的最后一个条件
+    #      都是 `not has_any_defense_flag(self.id)`；
+    #   ③ `UnitSetFlags._set_flags`（scenario/commands_unit.pyc:359-368）
+    #      = 先从三个列表全 discard，再 add 进**其中一个**。
+    if len(orders) > 1:
+        oc.errors.append(
+            "一个单位**只能有一个**作战标记（死守 / 后卫部队 / 反击三者互斥）—— "
+            "游戏里下达命令是「先把该单位从三个列表全清掉、再加进其中一个」"
+            "（`UnitSetFlags._set_flags`），而且三个 `can_make_*` 都要求"
+            "「该单位没有别的标记」（`has_any_defense_flag`）；"
+            "存档里有冲突时游戏只认第一个（%s）"
+            % "、".join(orders))
+        return oc
+
     # U92：游戏硬约束 —— **「反击」只允许装甲机动单位**
     # （`can_make_elastic_defense` 的第一个条件就是 `armor_mobile`）。
     # ⚠️ 只拦**新增**；撤除已有标记不受影响（存档里原本就有的也不主动清理）。
