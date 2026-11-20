@@ -54,11 +54,18 @@ class HqTestBase(unittest.TestCase):
 
 
 class TestHqField(HqTestBase):
-    def test_set_xp(self):
-        plan, res = self.commit([Edit.hq_field(5, "xp", 42)])
-        self.assertTrue(plan.ok, plan.errors)
-        self.assertTrue(res.ok, res.errors)
-        self.assertEqual(self.hq()["xp"], 42)
+    def test_set_xp_is_blocked(self):
+        """U94：**总部经验不能手改** —— 经验目标由游戏按战役规模动态重算
+        （`campaign._set_hqs_xp_target`），写进去也会被下一次战役推进覆盖；
+        升级请直接改分支等级 / 技能专精（用户 2026-11-20 决定删掉这个功能）。"""
+        plan, _ = self.commit([Edit.hq_field(5, "xp", 42)])
+        self.assertFalse(plan.ok, "改总部经验竟然通过了")
+        self.assertIn("不能手改", plan.errors[0])
+
+    def test_set_xp_target_is_blocked(self):
+        plan, _ = self.commit([Edit.hq_field(5, "xp_target", 100)])
+        self.assertFalse(plan.ok)
+        self.assertIn("不能手改", plan.errors[0])
 
     def test_set_cp(self):
         plan, res = self.commit([Edit.hq_field(5, "cp", 9)])
@@ -125,7 +132,7 @@ class TestHqField(HqTestBase):
         self.assertFalse(plan.ok)
 
     def test_only_hqs_yml_changes(self):
-        plan, res = self.commit([Edit.hq_field(5, "xp", 42)])
+        plan, res = self.commit([Edit.hq_field(5, "cp", 4)])
         self.assertEqual(res.changed, ["hqs.yml"])
 
 
