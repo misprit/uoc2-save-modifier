@@ -121,6 +121,28 @@ def step_zip_fresh(zp):
     check("成品 zip 与当前代码**逐字节一致**", not diff,
           ("%d/%d 个文件不同：%s" % (len(diff), checked, "、".join(diff[:5])))
           if diff else "比对 %d 个文件，全一致" % checked)
+    _check_not_missing(zp)
+
+
+def _check_not_missing(zp):
+    """**漏打检测**：工作区里有、包里没有的文件。
+
+    ⚠️ 不自己实现打包规则 —— 直接用 `build_dist.collect()`（打包脚本自己的清单），
+    否则两份规则迟早对不上（U100 就是只做了内容比对，漏打查不出来）。
+    """
+    try:
+        sys.path.insert(0, str(REPO / "tools"))
+        import build_dist
+        expected = {entry for _, entry in build_dist.collect()}
+    except Exception as e:      # 打包脚本自己坏了 ⇒ 报出来，别静默放过
+        check("成品 zip **没漏打**文件", False, "打包规则算不出来：%s" % e)
+        return
+    with zipfile.ZipFile(zp) as z:
+        names = set(z.namelist())
+    missing = sorted(expected - names)
+    check("成品 zip **没漏打**文件", not missing,
+          ("应进包但没进：%s" % "、".join(missing[:5])) if missing
+          else "应进包 %d 个文件，全在包里" % len(expected))
 
 
 # ---------------------------------------------------------------- ③ 真实存档演练
