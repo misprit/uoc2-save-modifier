@@ -258,6 +258,7 @@
   "总部 {0} 兵库加 {1}": "HQ {0}: add {1} to force pool",
   "总部 {0} 兵库加 {1} × {2}": "HQ {0}: add {1} × {2} to force pool",
   "总部 {0} 兵库移除 {1}": "HQ {0}: remove {1} from force pool",
+  "总部 {0} 兵库 {1} 数量": "HQ {0}: force pool {1} count",
   "总部 {0} 兵库第 {1} 条数量": "HQ {0}: force pool entry {1} count",
   "总部 {0} 改名": "HQ {0}: rename",
   "总部 {0} 经验": "HQ {0}: XP",

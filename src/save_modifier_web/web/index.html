@@ -1211,6 +1211,14 @@ function dropPendingFromModal(i){
   if(!PENDING.length){ closeModal(); return; }
   doApply();          /* 重新 plan，把确认框刷新一遍 */
 }
+/* 按 kind + key 撤掉一条挂起（U91：撤掉刚加的兵库条目） */
+function dropPendingByKey(kind, key){
+  const i = PENDING.findIndex(x=>x.kind===kind && x.key===key);
+  if(i<0) return false;
+  PENDING.splice(i,1);
+  paintPending();
+  return true;
+}
 function dropPending(i){
   PENDING.splice(i,1);
   paintPending();
@@ -2116,15 +2124,27 @@ function hqGeneralCn(g){
 }
 function hqEquipCn(e){ return (VIEW.equipment_cn||{})[e] || e; }
 
-/* 兵库的「投影」：把待应用里的加/删先算上，界面上才看得到 */
+/* 兵库的「投影」：把待应用里的加/删先算上，界面上才看得到。
+   ⚠️ U91：每条都要带 `_o` = **它在存档里的原始下标** ——
+   界面的行号会因为挂起的删除而**前移**，拿行号当下标会：
+   ① 两次移除撞上同一个 key ⇒ 后一次把前一次**覆盖**掉 ⇒ 看着「没反应」；
+   ② 应用时按下标删 ⇒ **删错条目**（删了 idx0 之后原 idx1 前移）。
+   ⇒ 兵库的所有编辑（移除 / 改数量）一律用 `_o`。 */
 function projectedPool(h){
-  const pool = (h.force_pool||[]).map(e=>Object.assign({}, e));
+  const raw = (h.force_pool||[]);
+  const pool = raw.map((e,i)=>Object.assign({}, e, {_o:i}));
+  let added = 0;
   PENDING.forEach(p=>{
-    if(p.kind==="hq_force_pool_add" && p.params.hq_id===h.id)
-      pool.push(Object.assign({}, p.params.entry));
+    if(p.kind==="hq_force_pool_add" && p.params.hq_id===h.id){
+      /* 还没写进存档的新条目 ⇒ 虚拟下标（存盘时是追加到末尾） */
+      pool.push(Object.assign({}, p.params.entry,
+        {_o:raw.length+added, _new:true, _key:p.key}));
+      added++;
+    }
     if(p.kind==="hq_force_pool_remove" && p.params.hq_id===h.id){
-      const i = p.params.index;
-      if(i>=0 && i<pool.length) pool.splice(i,1);
+      /* 按**原始下标**找那条 —— 投影数组的行号已经前移过了 */
+      const j = pool.findIndex(e=>e._o===p.params.index);
+      if(j>=0) pool.splice(j,1);
     }
   });
   return pool;
@@ -2202,19 +2222,19 @@ function hqPoolHTML(h){
     <div style="padding:10px 11px;color:var(--muted);font-size:12px">兵库是空的</div></div>`);
   /* 按延迟分组（游戏是分批上线的） */
   const groups = {};
-  pool.forEach((e,i)=>{
+  pool.forEach((e)=>{
     const d = e.delay||0;
-    (groups[d]=groups[d]||[]).push([i,e]);
+    (groups[d]=groups[d]||[]).push([e._o,e]);   /* ⚠️ 存的是**原始下标**（U91） */
   });
   const delays = Object.keys(groups).map(Number).sort((a,b)=>a-b);
   let body = "";
   delays.forEach(d=>{
     body += L2("<tr class=\"fdelay\"><td colspan=\"6\">延迟 <b>{0}</b> 回合 —— 这一批要等 {1} 个回合才能部署</td></tr>", d, d);
-    groups[d].forEach(([i,e])=>{
+    groups[d].forEach(([o,e])=>{
       const isSpec = !!e.spec;
       const nm = isSpec ? specCn(e.spec) : hqEquipCn(e.equipment);
       const st = isSpec ? ((CATALOG&&CATALOG.spec_types[e.spec])||{}) : {};
-      const q = pendingVal("hq_force_pool", hqPoolKey(h.id,i), e.quantity||0);
+      const q = pendingVal("hq_force_pool", hqPoolKey(h.id,o), e.quantity||0);
       const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("") : "";
       const tip = isSpec ? specTipHTML(e.spec, L("延迟 ")+d+L(" 回合 · 数量 ")+(e.quantity||0)).replace(/"/g,"&quot;")
         : esc(hqEquipCn(e.equipment)+L(" · 延迟 ")+d+L(" 回合"));
@@ -2229,7 +2249,7 @@ function hqPoolHTML(h){
         <td><span class="spin" id="fp_q_{9}_{10}"></span></td>
         <td><span class="rm" onclick="hqPoolRemove({11},{12})">移除</span></td>
       </tr>`, tip, isSpec?imgTag(specTex(e.spec), nm, "spico")
-          :imgTag("steps/step.png", nm), esc(nm), isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:"", esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", tags, h.id, i, h.id, i);
+          :imgTag("steps/step.png", nm), esc(nm), isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:"", esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", tags, h.id, o, h.id, o);
     });
   });
   return L2(`<div class="fpool">
@@ -2357,14 +2377,15 @@ function bindHqControls(h){
 
   /* 兵库数量（每条一个滚轮 ±1 控件） */
   const pool = projectedPool(h);
-  pool.forEach((e,i)=>{
-    const el = document.getElementById("fp_q_"+h.id+"_"+i);
+  pool.forEach((e)=>{
+    const o = e._o;                 /* ⚠️ 存档原始下标，不是界面行号（U91） */
+    const el = document.getElementById("fp_q_"+h.id+"_"+o);
     if(!el) return;
-    bindSpin(el, {base:e.quantity||0, cur:pendingVal("hq_force_pool", hqPoolKey(h.id,i), e.quantity||0), min:0, max:null,
+    bindSpin(el, {base:e.quantity||0, cur:pendingVal("hq_force_pool", hqPoolKey(h.id,o), e.quantity||0), min:0, max:null,
       onChange(v){
-        queueEdit("hq_force_pool", hqPoolKey(h.id,i),
-          {hq_id:h.id, index:i, quantity:v}, e.quantity||0, v,
-          L2("总部 {0} 兵库第 {1} 条数量", h.id, i+1));
+        queueEdit("hq_force_pool", hqPoolKey(h.id,o),
+          {hq_id:h.id, index:o, quantity:v}, e.quantity||0, v,
+          L2("总部 {0} 兵库 {1} 数量", h.id, e.spec?specCn(e.spec):hqEquipCn(e.equipment)));
         SEL.hqs = h.id; show("hqs");
       }});
   });
@@ -2438,13 +2459,23 @@ function hqPoolAdd(id, specType){
     {hq_id:id, entry}, L2("总部 {0} 兵库加 {1}", id, specCn(specType)));
   show("hqs");
 }
-function hqPoolRemove(id, index){
+/* ⚠️ U91：`origin` = 该条目在**存档里的原始下标**（不是界面上的行号）。
+   界面行号会因挂起的删除而前移，拿它当下标会：
+   ① 两次移除撞同一个 key ⇒ 后一次把前一次覆盖掉 ⇒ 看着「没反应」；
+   ② 应用时按下标删 ⇒ 删错条目。 */
+function hqPoolRemove(id, origin){
   const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
-  const pool = (h.force_pool||[]);
-  const e = pool[index]||{};
+  const e = projectedPool(h).find(x=>x._o===origin);
+  if(!e) return;
   const nm = e.spec ? specCn(e.spec) : hqEquipCn(e.equipment);
-  setPending("hq_force_pool_remove", `hq_force_pool_remove:${id}:${index}`,
-    {hq_id:id, index}, L2("总部 {0} 兵库移除 {1}", id, nm));
+  if(e._new){
+    /* 这条还没写进存档 ⇒ 撤掉那条「加条目」就行，不必发删除 */
+    dropPendingByKey("hq_force_pool_add", e._key);
+    show("hqs");
+    return;
+  }
+  setPending("hq_force_pool_remove", `hq_force_pool_remove:${id}:${origin}`,
+    {hq_id:id, index:origin}, L2("总部 {0} 兵库移除 {1}", id, nm));
   show("hqs");
 }
 
@@ -3795,9 +3826,16 @@ function toggleFullPool(){ SEL.fullPool = !SEL.fullPool; show("units"); }
    删了会让后面条目的下标整体前移，先删再改数量就会改错行，U35） */
 function pendingEdits(){
   const edits = PENDING.map(p=>({kind:p.kind, params:p.params}));
-  edits.sort((a,b)=>(a.kind==="hq_force_pool_remove"?1:0)
-                    -(b.kind==="hq_force_pool_remove"?1:0));
-  return edits;
+  /* 兵库**删条目**要排在最后，且**按下标降序** ——
+     删了会让后面条目的下标整体前移，先删再改数量就会改错行（U35）；
+     ⚠️ 多条删除若**升序**执行会**删错条目**（删了 idx0 之后原 idx1 前移，
+     再删 idx1 就删到了别的条目）—— U91 实测（顺序 A 会删掉步兵那条）。
+     ⇒ 删除类编辑统一按 index 降序 ⇒ 跟玩家点按钮的先后无关。 */
+  const isRm = e=>e.kind==="hq_force_pool_remove";
+  const others = edits.filter(e=>!isRm(e));
+  const removes = edits.filter(isRm)
+      .sort((a,b)=>(b.params.index||0)-(a.params.index||0));
+  return others.concat(removes);
 }
 async function doApply(){
   if(!PENDING.length) return;

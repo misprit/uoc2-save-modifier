@@ -153,6 +153,24 @@ def _layer_of(entry: str) -> str:
     return "L1"
 
 
+def order_edits(edits):
+    """把编辑**按安全顺序**排好再执行。
+
+    * **按下标删除**的编辑（兵库删条目）要排在**最后** ——
+      删了会让后面条目的下标整体前移，先删再改数量就会改错行（U35）；
+    * 同类删除之间要按 index **降序** ——
+      删了 idx0 之后原 idx1 前移到 idx1，再删 idx1 就**删到了别的条目**
+      （U91 实测：升序删两条 ⇒ 步兵那条被误删）。
+      ⇒ 降序 ⇒ 顺序与玩家点按钮的先后**无关**。
+
+    其余编辑保持原顺序（Python 的 sort 是稳定的）。
+    """
+    removes = [e for e in edits if e.kind == "hq_force_pool_remove"]
+    others = [e for e in edits if e.kind != "hq_force_pool_remove"]
+    removes.sort(key=lambda e: (e.params or {}).get("index") or 0, reverse=True)
+    return others + removes
+
+
 def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
     """规划一批编辑。**不碰磁盘。**
 
@@ -167,7 +185,7 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
     plan = Plan(save_id=save.info.save_id, path=save.path)
     w = Work(save, catalog)
 
-    edit_list = list(edits)
+    edit_list = order_edits(list(edits))
     if not edit_list:
         return plan
 
