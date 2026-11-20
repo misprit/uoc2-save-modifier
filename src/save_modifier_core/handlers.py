@@ -37,9 +37,15 @@ class Outcome:
 # ---------------------------------------------------------------- 单位字段
 
 #: **允许改**的单位字段。`type` 不在其中 —— 它是只读信息（§5.4、§7.5）。
+#:
+#: U94（2026-11-20 · 全面审查）：**`uv`（单位在地图上的坐标）也删掉了** ——
+#: ① 改坐标极易造出非法局面（单位落到地图外 / 与别的单位同格）；
+#: ② 游戏的 `uv_schema` 要求它是 `[int, int]`，写错**存档直接打不开**；
+#: ③ 界面本来就没有改坐标的入口（玩家用不到）⇒
+#: 与「改总部经验」同理 —— 没把握就不给，宁可不写也不写坏。
 UNIT_FIELD_ALLOWED = {
     "xp", "act_st", "sup_st", "name_brief", "name_full",
-    "uv", "entr", "supply", "ap", "mp",
+    "entr", "supply", "ap", "mp",
 }
 
 #: 字段的**中文名**（变更说明里用，别让玩家对着 `entr` 猜）。
@@ -89,10 +95,20 @@ CARD_FIELD_ALLOWED = {"is_free"}
 #: （游戏自己的改名走根 main.yml 的 `renamed_hqs` —— 那是 **id 重映射**，
 #:  键和值都是正整数，不是名字表；它为空时游戏就显示 hqs.yml 里的 name_brief。）
 HQ_FIELD_ALLOWED = {
-    "xp", "xp_target", "cp", "max_cp", "supply",
+    "cp", "max_cp", "supply",
     "trucks", "prisoners", "loss_count", "intels_revealed",
     "name_brief", "name_full",
 }
+
+#: U94：**总部经验与经验目标不能手改**（用户 2026-11-20 决定删掉这个功能）。
+#:
+#: 取证（游戏字节码）：`state/campaign/campaign.pyc::Campaign._set_hqs_xp_target`
+#: —— 每次**战役推进**都会按「该总部在战役里的单位数 × 场景回合数 ×
+#: `hq_xp_taget_fudge_factor`」**重算**每个总部的 `xp_target`。
+#: ⇒ 静态写进去的值会被游戏下一次推进直接覆盖（功能基本无效），
+#: 而把 `xp`（当前经验）改大会触发游戏自己的「可升级」连锁 ——
+#: 升级我们本来就能直接改（分支等级 / 技能专精），没必要走这条有副作用的路。
+HQ_XP_FIELDS = ("xp", "xp_target")
 
 #: 总部里**是字符串**的字段（其余都是整数）
 HQ_FIELD_TEXT = {"name_brief", "name_full"}
@@ -744,6 +760,15 @@ def _hq_field(w, e: Edit) -> Outcome:
     value = e.params.get("value")
     if not w.require(w.caps.can_edit_hqs, "hqs", "hqs.yml"):
         return oc
+    if field in HQ_XP_FIELDS:
+        # U94：经验 / 经验目标**不能手改**（游戏会重算，写了也白写）。
+        oc.errors.append(
+            "总部经验（xp）与经验目标（xp_target）**不能手改** —— "
+            "经验目标是游戏按战役规模动态重算的"
+            "（`campaign._set_hqs_xp_target`：该总部的单位数 × 场景回合数 × "
+            "hq_xp_taget_fudge_factor），下次战役推进就会覆盖；"
+            "想升级请直接改**分支等级 / 技能专精**。")
+        return oc
     if field not in HQ_FIELD_ALLOWED:
         oc.errors.append(
             f"不允许改总部字段 {field!r}；可改：{', '.join(sorted(HQ_FIELD_ALLOWED))}")
@@ -1155,6 +1180,13 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
     # 条目字段补齐：游戏自己写的是 {delay, nationality, quantity, spec?|equipment?}
     new = dict(entry)
     new.setdefault("delay", 0)
+    # ⚠️ U94：游戏的 `force_pool_schema` 里 `delay` 是**非负整数**
+    #   （`state/entities/data_validation/force_pool.pyc`）⇒ 写负数**存档打不开**。
+    _delay = new.get("delay")
+    if not isinstance(_delay, int) or isinstance(_delay, bool) or _delay < 0:
+        oc.errors.append(
+            "delay 必须是非负整数（游戏的硬范围），收到 %r" % (_delay,))
+        return oc
     if not new.get("nationality"):
         # ⚠️ 原来这里 setdefault 成空串 —— 游戏读不出来（U22 修）。
         # 实测（U22）：真实存档里 商店 1043 条 + 兵库 1747 条 spec 条目，
