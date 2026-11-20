@@ -431,6 +431,20 @@ def api_view(save_id: str) -> dict:
                     }
         data["skills"] = skills
         data["generals"] = generals
+        # U89：作战标记（HQ 技能的三种命令）—— 显示名跟着界面语言
+        try:
+            from save_modifier_core.container import ORDER_LISTS, ORDER_LOCALE_KEYS
+            data["orders_meta"] = {
+                k: {"key": k,
+                    "name": ((_tr.get(ORDER_LOCALE_KEYS[k], "") if _tr else "")
+                             or k),
+                    "icon": "sheet/special_defense_%s.png" % k}
+                for k in ORDER_LISTS
+            }
+            data["orders_available"] = bool(save.battle_dir())
+        except Exception:
+            data["orders_meta"] = {}
+            data["orders_available"] = False
         # 战区资产的中文名 = locale `id_<asset>_view`（如 id_air_supply_view → 空中补给）
         # ⚠️ **全集 7 种都要有名字**（U45）—— 界面要列没在存档里的那些候选。
         _t_assets = [str(a.get("asset")) for a in (data.get("theater_assets") or [])

@@ -723,7 +723,11 @@
   "单位 {0} 移动力": "Unit {0} movement",
   "单位 {0} 行动力": "Unit {0} action points",
   "基础 ": "base ",
-  "移动力是剩余的移动点；单位进入敌方控制区会被游戏清零（这就是被定住的原因），所以被定住的单位这里通常是 0。战斗中改立即生效（战斗里的单位数据就在这个存档里）；战斗外改，进战斗后的回合开始会按补给重算。": "Movement points are what is left of this turn's movement; entering an enemy zone of control zeroes them (that is what pins the unit), so a pinned unit usually shows 0 here. Changes take effect at once while the battle is in progress (the live unit data lives in this save); outside battle they are recomputed at the start of the turn."
+  "移动力是剩余的移动点；单位进入敌方控制区会被游戏清零（这就是被定住的原因），所以被定住的单位这里通常是 0。战斗中改立即生效（战斗里的单位数据就在这个存档里）；战斗外改，进战斗后的回合开始会按补给重算。": "Movement points are what is left of this turn's movement; entering an enemy zone of control zeroes them (that is what pins the unit), so a pinned unit usually shows 0 here. Changes take effect at once while the battle is in progress (the live unit data lives in this save); outside battle they are recomputed at the start of the turn.",
+  "作战标记": "Combat orders",
+  "点击切换": "click to toggle",
+  "HQ 技能下的命令 · 敌方下一回合结束前有效": "an order from an HQ skill · valid until the end of the enemy's next turn",
+  "单位 {0} 作战标记": "Unit {0} combat orders"
  },
  "errors": {
   "**取消专精**（{old_used} → {sp_used}）—— 该技能发动时的 CP 消耗会涨回去": "**Specialisation removed** ({old_used} → {sp_used}) — the CP cost of activating that skill goes back up",
@@ -1002,7 +1006,17 @@
   "单位 {unit_id} 的补给（supply）：{old} → {value}": "unit {unit_id}: supply (supply): {old} → {value}",
   "单位 {unit_id} 的工事等级在战斗外改，下一次开打时可能被场景预设覆盖（§3.5.8）": "unit {unit_id}'s entrenchment level is changed outside combat — the next battle may overwrite it with the scenario preset (§3.5.8)",
   "单位 {unit_id} 的行动力在战斗外改，下一次开打时可能被场景预设覆盖（§3.5.8）": "unit {unit_id}'s action points are changed outside combat — the next battle may overwrite it with the scenario preset (§3.5.8)",
-  "单位 {unit_id} 的移动力在战斗外改，下一次开打时可能被场景预设覆盖（§3.5.8）": "unit {unit_id}'s movement points are changed outside combat — the next battle may overwrite it with the scenario preset (§3.5.8)"
+  "单位 {unit_id} 的移动力在战斗外改，下一次开打时可能被场景预设覆盖（§3.5.8）": "unit {unit_id}'s movement points are changed outside combat — the next battle may overwrite it with the scenario preset (§3.5.8)",
+  "orders 必须是列表，收到 {orders}": "orders must be a list, got {orders}",
+  "{entry} 结构异常": "{entry} has an unexpected structure",
+  "⚠️ 游戏**开着**时改盘 ⇒ 退出时的自动保存会覆盖你的改动 ⇒ 改之前先退出游戏": "⚠️ changing the file while the game is running means its auto-save on exit will overwrite your change — quit the game first",
+  "作战标记是**命令**：敌方下一回合结束前有效 —— 游戏回合开始会把它清掉（`Game.start_turn_clear`）": "combat orders are **commands**: valid until the end of the enemy's next turn — the game clears them when a turn starts (`Game.start_turn_clear`)",
+  "单位 id 必须是整数，收到 {unit_id}": "the unit id must be an integer, got {unit_id}",
+  "单位 {arg0} 的作战标记：{arg1}": "combat orders of unit {arg0}: {arg1}",
+  "单位 {unit_id} 不在这场战斗里（当前战斗的单位 id 名单）": "unit {unit_id} is not in this battle (see the battle's unit id list)",
+  "只对**当前这场战斗**生效；下一场战斗按场景自己的定义重置": "applies to **this battle only**; the next one is reset from the scenario's own definition",
+  "当前存档没有进行中的战斗 —— 作战标记是战斗里的命令": "this save has no battle in progress — combat orders are battle commands",
+  "未知的作战标记 {arg0}；游戏只认这三种：{arg1}": "unknown combat order {arg0}; the game only knows these three: {arg1}"
  },
  "values": {
   "arg1": {

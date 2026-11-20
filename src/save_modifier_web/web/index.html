@@ -396,6 +396,14 @@ table.list td.k{color:var(--muted)}
   border-radius:6px;font-size:15px;font-weight:600;padding:6px 0;cursor:pointer;line-height:1.3}
 .lvlbtn:hover{border-color:var(--accent);color:var(--accent-dark)}
 .lvlbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+/* U89：作战标记（HQ 技能的三种命令）—— 用游戏原图 */
+.orderrow{display:flex;gap:6px;margin-top:4px}
+.orderbtn{flex:1;height:34px;border:1px solid var(--border);background:var(--surface);
+  border-radius:6px;padding:3px;cursor:pointer;display:grid;place-items:center}
+.orderbtn img{max-width:26px;max-height:26px;object-fit:contain;opacity:.35;filter:grayscale(1)}
+.orderbtn:hover{border-color:var(--accent)}
+.orderbtn.on{border-color:var(--warn);background:#fff}
+.orderbtn.on img{opacity:1;filter:none}
 /* U49：兵力卡与经验卡的内容行**对齐** —— 两张卡的数值控件必须一样高
    （`.spin` 与 `.numin` 统一 26px / 行高 22px），否则两卡的数字不在同一条基线上。 */
 .stat .v .spin,.stat .v .numin{height:34px;box-sizing:border-box;line-height:30px;flex:none}
@@ -1588,7 +1596,22 @@ function unitCombatFieldsHTML(u){
      控制区锁定把存档里的 mp 清零了，"解除锁定"就是按它恢复。 */
   const ut = (CATALOG&&CATALOG.unit_types&&CATALOG.unit_types[u.type])||{};
   const baseMove = (ut.move===undefined||ut.move===null)?null:ut.move;
-  return `<div class="stat" id="st_entr_${u.id}">
+  /* U89：作战标记（HQ 技能的三种命令）—— 只在**当前战斗**里有 */
+  const orderMeta = (VIEW&&VIEW.orders_meta)||{};
+  const orderKeys = Object.keys(orderMeta);
+  const myOrders = specOrders(u);
+  const orderCard = (!orderKeys.length || !VIEW.orders_available) ? "" :
+    `<div class="stat" id="st_orders_${u.id}">
+      <div class="lb"><span>${L("作战标记")}</span><span class="hintw">${L("点击切换")}</span></div>
+      <div class="orderrow">${orderKeys.map(k=>{
+        const m = orderMeta[k]||{};
+        const on = myOrders.indexOf(k)>=0;
+        return `<button class="orderbtn${on?" on":""}" onclick="event.stopPropagation();toggleUnitOrder(${u.id},'${k}')" title="${esc(m.name||k)}"><img src="/surfaces/${m.icon||("sheet/special_defense_"+k+".png")}?t=${TOKEN}" alt="${esc(m.name||k)}"></button>`;
+      }).join("")}</div>
+      <div class="hintline">${L("HQ 技能下的命令 · 敌方下一回合结束前有效")}</div>
+    </div>`;
+
+  return orderCard + `<div class="stat" id="st_entr_${u.id}">
       <div class="lb"><span>${L("工事等级")}</span></div>
       <div class="lvlrow">
         <button class="lvlbtn${on(entr===0)}" onclick="setUnitEntr(${u.id},0)">0</button>
@@ -1627,7 +1650,35 @@ function bindUnitCombatFields(u){
         {unit_id:u.id, field:"mp", value:v}, base, v, L2("单位 {0} 移动力", u.id));
     }});
 }
-/* 切换工事等级（0 / 1 / 2） */
+/* U89：单位的**作战标记**（HQ 技能的三种命令）。
+   ⚠️ 数据在**战斗层**（`games/<场景>/main.yml` 的三个单位 id 列表）——
+   标记是**命令**，敌方下一回合结束前有效。 */
+function specOrders(u){
+  const base = (u.orders||[]).slice();
+  const pk = "unit_orders:"+u.id;
+  const p = PENDING.find(x=>x.kind==="unit_orders" && x.key===pk);
+  if(p){
+    const v = (p.value!==undefined) ? p.value : (p.params&&p.params.orders);
+    if(Array.isArray(v)) return v.slice();
+  }
+  return base;
+}
+function toggleUnitOrder(unitId, key){
+  const u = (VIEW.units||[]).find(x=>x.id===unitId); if(!u) return;
+  const cur = specOrders(u);
+  const next = cur.indexOf(key)>=0 ? cur.filter(k=>k!==key) : cur.concat([key]);
+  const pk = "unit_orders:"+unitId;
+  const base = (u.orders||[]).slice();
+  if(JSON.stringify(next)===JSON.stringify(base)){
+    dropPendingKind("unit_orders", pk);
+  }else{
+    setPending("unit_orders", pk, {unit_id:unitId, orders:next},
+      L2("单位 {0} 作战标记", unitId), next);
+  }
+  refreshUnitCombatFields(u);
+}
+
+/* U87：解除敌方控制区的锁定。
 function setUnitEntr(unitId, lv){
   const u = (VIEW.units||[]).find(x=>x.id===unitId); if(!u) return;
   const key = uKey(unitId,"entr");
