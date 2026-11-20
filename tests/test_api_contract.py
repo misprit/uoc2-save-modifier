@@ -171,6 +171,7 @@ class TestEditKinds(unittest.TestCase):
     EXPECTED = {
         "progress", "level",
         "unit_field", "unit_spec_add", "unit_spec_remove", "unit_spec_active",
+        "unit_orders",
         "hq_force_pool", "hq_field", "hq_trucks", "hq_branch_level",
         "hq_branch_suppressed", "hq_branch_sp",
         "hq_force_pool_add",
@@ -190,7 +191,8 @@ class TestEditKinds(unittest.TestCase):
 
     def test_factories_exist(self):
         for name in ("progress", "level", "unit_field", "unit_spec_add",
-                     "unit_spec_remove", "unit_spec_active", "hq_force_pool", "hq_field",
+                     "unit_spec_remove", "unit_spec_active", "unit_orders",
+                     "hq_force_pool", "hq_field",
                      "hq_trucks", "hq_branch_level", "hq_branch_suppressed",
                      "hq_branch_sp", "hq_force_pool_add",
                      "hq_force_pool_remove", "card_add", "card_remove",

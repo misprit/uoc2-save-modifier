@@ -1802,8 +1802,8 @@ class TestU49LayoutAndLegality(unittest.TestCase):
         """
         # U54：兵力卡**删掉数值区**，改成一条血量条 + 一行颜色含义说明
         # ⇒ 两张卡都是「标签 / 内容 / 提示」三行
-        # U85：+3 张卡（工事等级 / 移动力 / 行动力）⇒ 2 → 5
-        self.assertEqual(self.html.count('class="hintline"'), 5)
+        # U85：+3 张卡（工事等级 / 移动力 / 行动力）⇒ 2 → 5；U89：+1 张（作战标记）⇒ 6
+        self.assertEqual(self.html.count('class="hintline"'), 6)
         # U74：class 变成占位符 `class="blood{7}"`
         self.assertIn('class="blood{', self.html)
         self.assertNotIn('id="sp_tot_${u.id}"', self.html)
