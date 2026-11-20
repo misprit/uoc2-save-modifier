@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .catalog import THEATER_ASSET_TYPES
+from .container import ORDER_LISTS
 from .edits import UNSET, Edit
 
 __all__ = ["Outcome", "apply_edit"]
@@ -565,6 +566,79 @@ def _unit_spec_active(w, e: Edit) -> Outcome:
         oc.warnings.append(
             "被压制的特种兵不提供效果；游戏会按该单位的恢复步数逐步把它恢复"
             "（战斗里由 `apply_recovery_specs` 处理，U84）")
+    return oc
+
+
+def _unit_orders(w, e: Edit) -> Outcome:
+    """给单位**下 / 撤**作战标记（HQ 技能的三种「命令」，U89）。
+
+    ⚠️ 写的是**战斗层** `games/<场景>/main.yml`（独立场景是 `game/main.yml`）——
+    这是本仓库的**第二个 L3 例外**（第一个是战区资产），用户 2026-11-20 批准。
+
+    三个列表：`no_retreat_units`（不能撤退）/ `rearguard_units`（后卫部队）
+    / `elastic_defense_units`（反击）。
+
+    ⚠️ 这些是**命令**，**敌方下一回合结束前有效** ⇒ 游戏回合开始会清
+    （`Game.start_turn_clear`）⇒ 改完只对**当前回合**有效。
+    """
+    oc = Outcome()
+    unit_id = e.params.get("unit_id")
+    orders = e.params.get("orders")
+    if not isinstance(unit_id, int) or isinstance(unit_id, bool):
+        oc.errors.append(f"单位 id 必须是整数，收到 {unit_id!r}")
+        return oc
+    if not isinstance(orders, list):
+        oc.errors.append(f"orders 必须是列表，收到 {orders!r}")
+        return oc
+    bad = [o for o in orders if o not in ORDER_LISTS]
+    if bad:
+        oc.errors.append(
+            "未知的作战标记 %s；游戏只认这三种：%s"
+            % (bad, "、".join(ORDER_LISTS)))
+        return oc
+    orders = [o for o in ORDER_LISTS if o in orders]     # 去重 + 按固定顺序
+
+    battle_dir = w.save.battle_dir()
+    if battle_dir is None:
+        oc.errors.append("当前存档没有进行中的战斗 —— 作战标记是战斗里的命令")
+        return oc
+    in_battle = w.save.battle_unit_ids()
+    if in_battle and unit_id not in in_battle:
+        oc.errors.append(f"单位 {unit_id} 不在这场战斗里（当前战斗的单位 id 名单）")
+        return oc
+
+    entry = f"{battle_dir}/main.yml"
+    data = w.table(entry, {})
+    if not isinstance(data, dict):
+        oc.errors.append(f"{entry} 结构异常")
+        return oc
+
+    # 先把这个单位从三个列表里**全部**摘掉，再按新的 orders 放回去
+    for list_key in ORDER_LISTS.values():
+        ids = data.get(list_key)
+        if not isinstance(ids, list):
+            continue
+        data[list_key] = [x for x in ids if x != unit_id]
+    for key in orders:
+        list_key = ORDER_LISTS[key]
+        ids = data.get(list_key)
+        if not isinstance(ids, list):
+            ids = []
+            data[list_key] = ids
+        if unit_id not in ids:
+            ids.append(unit_id)
+    w.touch(entry)
+
+    oc.summary = ("单位 %d 的作战标记：%s"
+                  % (unit_id, "、".join(orders) if orders else "（全撤）"))
+    oc.warnings.append(
+        "作战标记是**命令**：敌方下一回合结束前有效 —— "
+        "游戏回合开始会把它清掉（`Game.start_turn_clear`）")
+    oc.warnings.append(
+        "只对**当前这场战斗**生效；下一场战斗按场景自己的定义重置")
+    oc.warnings.append(
+        "⚠️ 游戏**开着**时改盘 ⇒ 退出时的自动保存会覆盖你的改动 ⇒ "
+        "改之前先退出游戏")
     return oc
 
 
@@ -1994,6 +2068,7 @@ _HANDLERS = {
     "unit_field": _unit_field,
     "unit_spec_add": _unit_spec_add,
     "unit_spec_remove": _unit_spec_remove,
+    "unit_orders": _unit_orders,
     "unit_spec_active": _unit_spec_active,
     "hq_force_pool": _hq_force_pool,
     "hq_field": _hq_field,

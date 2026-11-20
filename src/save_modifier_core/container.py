@@ -43,6 +43,25 @@ _TURN_RE = re.compile(r"^turn_(\d+)")
 # ---------------------------------------------------------------- 只读视图
 
 
+#: 作战标记（HQ 技能的三种「命令」）⇒ 战斗层 `main.yml` 里的列表名。
+#:
+#: U89（2026-11-20）：用户批准把**战斗层**列为可写（第二个 L3 例外，
+#: 第一个是战区资产）。标记的官方名称来自游戏 locale：
+#: `id_no_retreat`（不能撤退）/ `id_rearguard`（后卫部队）/ `id_elastic_defense`（反击）。
+ORDER_LISTS = {
+    "no_retreat": "no_retreat_units",
+    "rearguard": "rearguard_units",
+    "elastic_defense": "elastic_defense_units",
+}
+
+#: 标记的 locale 键（显示名）
+ORDER_LOCALE_KEYS = {
+    "no_retreat": "id_no_retreat",
+    "rearguard": "id_rearguard",
+    "elastic_defense": "id_elastic_defense",
+}
+
+
 @dataclass(frozen=True)
 class UnitView:
     """单位（根 `units.yml` 的一条）。"""
@@ -72,6 +91,9 @@ class UnitView:
     max_st: int | None = None
     #: 类型的特种兵上限（`min(3, max_spec)`）
     max_spec: int | None = None
+    #: U89：**作战标记**（HQ 技能的命令）—— `no_retreat` / `rearguard` /
+    #: `elastic_defense`；只对当前战斗有效。
+    orders: tuple[str, ...] = ()
 
     @property
     def total_st(self) -> int | None:
@@ -355,6 +377,36 @@ class Save:
             return None
         return f"games/{scenario}" if self.has(f"games/{scenario}/main.yml") else None
 
+    def combat_orders(self) -> dict:
+        """当前战斗里，**哪些单位被下了哪些作战标记**。
+
+        数据源 = 当前战斗的 `main.yml` 里的三个**单位 id 列表**：
+
+        * `no_retreat_units` —— 不能撤退（死守）
+        * `rearguard_units` —— 后卫部队
+        * `elastic_defense_units` —— 反击
+
+        ⚠️ 这三个是 **HQ 技能下的「命令」**（`id_super_tooltip_hq_bar_*`），
+        **敌方下一回合结束前有效** ⇒ 游戏回合开始会清掉（`Game.start_turn_clear`）。
+
+        返回 `{单位id: [标记key, …]}`；不在战斗里（或没有这些列表）返回 {}。
+        """
+        try:
+            data = self.battle_main()
+        except Exception:
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        out: dict = {}
+        for key, list_key in ORDER_LISTS.items():
+            ids = data.get(list_key)
+            if not isinstance(ids, list):
+                continue
+            for uid in ids:
+                if isinstance(uid, int) and not isinstance(uid, bool):
+                    out.setdefault(uid, []).append(key)
+        return out
+
     def document_theater_assets(self) -> dict:
         """存档自带的**场景定义**里，这场战斗本来有哪些战区资产。
 
@@ -534,6 +586,9 @@ class Save:
         main = self.root_main()
         roster = self.roster_ids() if caps.has_root_units else set()
 
+        # U89：作战标记（当前战斗层的一次读取）
+        orders_map = self.combat_orders() if caps.in_battle else {}
+
         units = []
         for u in self.root_units():
             if not isinstance(u.get("id"), int):
@@ -556,6 +611,7 @@ class Save:
                 mp=u.get("mp"),
                 losses=u.get("losses"),
                 retreated=u.get("retreated"),
+                orders=tuple(orders_map.get(u["id"], ())),
                 in_roster=u["id"] in roster if roster else True,
                 max_st=catalog.max_st(t) if (catalog and t) else None,
                 max_spec=(catalog.spec_cap(t) if (catalog and t) else None),

@@ -25,6 +25,7 @@ EDIT_KINDS = (
     "unit_field",          # 单位的某个字段（根 units.yml）
     "unit_spec_add",       # 加特种（根 units.yml）
     "unit_spec_remove",    # 卸特种（根 units.yml）
+    "unit_orders",         # 作战标记（战斗层 games/<场景>/main.yml）
     "unit_spec_active",    # 特种兵的「被压制」状态（根 units.yml）
     "hq_force_pool",       # 总部兵库数量（根 hqs.yml）
     "hq_field",            # 总部的某个字段（根 hqs.yml）
@@ -142,6 +143,21 @@ class Edit:
         return Edit("unit_spec_active",
                     {"unit_id": unit_id, "spec_type": spec_type, "idx": idx,
                      "value": active})
+
+    @staticmethod
+    def unit_orders(unit_id: int, orders: list[str]) -> "Edit":
+        """单位身上的**作战标记**（U89）。
+
+        `orders` 是标记 key 的列表，取值：
+        `no_retreat`（不能撤退）/ `rearguard`（后卫部队）/ `elastic_defense`（反击）。
+
+        ⚠️ 写的是**战斗层** `games/<场景>/main.yml` 的三个单位 id 列表
+        （本仓库第二个 L3 例外，用户 2026-11-20 批准）。
+        ⚠️ 这些是 **HQ 技能下的命令**，敌方下一回合结束前有效
+        ⇒ 游戏回合开始会清掉。
+        """
+        return Edit("unit_orders",
+                    {"unit_id": unit_id, "orders": list(orders)})
 
     @staticmethod
     def hq_force_pool(hq_id: int, index: int, quantity: int) -> "Edit":
@@ -374,6 +390,8 @@ class Edit:
             return (f"单位 {p.get('unit_id')} 的特种 {p.get('spec_type')}"
                     + (f"（槽位 {p.get('idx')}）" if p.get("idx") is not None else "")
                     + ("：设为被压制" if not p.get("value") else "：恢复活跃"))
+        if k == "unit_orders":
+            return f"单位 {p.get('unit_id')} 的作战标记：{', '.join(p.get('orders') or []) or '无'}"
         if k == "unit_spec_remove":
             return f"单位 {p.get('unit_id')} 卸特种 {p.get('spec_type')}"
         if k == "hq_force_pool":
