@@ -380,6 +380,48 @@ def _unit_field(w, e: Edit) -> Outcome:
     old = unit.get(field)
     unit[field] = value
     w.touch("units.yml")
+
+    # ⚠️ U96：写入时**自动配平**「普通部队」（活跃 + 被压制）。
+    #
+    # 背景：上限 `max_st` 约束的是**普通部队**（游戏读档时也只查这两项：
+    # `UnitState.check_data_consistency`），**特种兵不占名额**
+    # （特种兵另占「总战力」，而总战力超上限游戏是允许的 —— 真实存档里
+    #   就有 166 个这样的单位 ⇒ 7 兵 + 2 特种兵是合法的）。
+    #
+    # 为什么必须在这里配平：前端滚轮调兵力时会**同时**改 act_st 与 sup_st
+    # （夹到上限时要从压制里扣），但两条编辑是**依次执行**的 ⇒
+    # 先执行 act_st 那条时 sup_st 还是旧值 ⇒ 「活跃 + 压制」算出来超上限
+    # ⇒ **误报**「普通部队合计超过上限」（用户 2026-11-20 报告）。
+    #
+    # 配平口径与前端夹取、与游戏读档修复（`UnitState._repair_data`）一致：
+    # 先从**压制**里扣，不够再截**活跃**。
+    if field in ("act_st", "sup_st") and w.catalog is not None:
+        limit = w.catalog.max_st(unit.get("type"))
+        if limit is not None:
+            a = int(unit.get("act_st") or 0)
+            s = int(unit.get("sup_st") or 0)
+            if a + s > limit:
+                s_old, a_old = s, a
+                need = a + s - limit
+                if s >= need:
+                    s -= need
+                else:
+                    s = 0
+                    a = limit
+                unit["sup_st"] = s
+                unit["act_st"] = a
+                if field == "act_st":
+                    value = a                # 变更说明要显示**实际写入**的值
+                if s != s_old:
+                    oc.warnings.append(
+                        f"该单位普通部队合计（活跃 + 被压制）不能超过类型上限 "
+                        f"{limit}（{unit.get('type')} 的 max_st）—— "
+                        f"已把被压制兵力从 {s_old} 调到 {s}")
+                else:
+                    oc.warnings.append(
+                        f"该单位普通部队合计（活跃 + 被压制）不能超过类型上限 "
+                        f"{limit}（{unit.get('type')} 的 max_st）—— "
+                        f"活跃兵力已按上限截断（{a_old} → {a}）")
     #: U85：变更说明里给几个字段**中文名**（`entr` → 工事等级），
     #: 字段名也带上，方便对照存档。
     #: ⚠️ **分字段写死**（不走变量）—— 这样每条都能单独翻译，
@@ -421,15 +463,18 @@ def _unit_field(w, e: Edit) -> Outcome:
             oc.warnings.append(
                 f"{value!r} 看起来是本地化 id，游戏会去本地化表里查它；"
                 "想显示固定文字请直接写明文（§5.5）")
-    # 战力软上限提示 —— 上限来自类型的 max_st，不硬拦（§5.3、§10 第 8 条）
+    # U96：上面已经**自动配平**过了 ⇒ 这里不该再报「超过上限」。
+    # 兜底：万一配平没兜住（类型上限拿不到之类），说清楚后果 ——
+    # 游戏的读档修复（`UnitState._repair_data`）会把超出的部分**截回上限**。
     if field in ("act_st", "sup_st") and w.catalog is not None:
         limit = w.catalog.max_st(unit.get("type"))
         if limit is not None:
             total = int(unit.get("act_st") or 0) + int(unit.get("sup_st") or 0)
             if total > limit:
                 oc.warnings.append(
-                    f"该单位战力合计 {total} 超过上限 {limit}"
-                    f"（类型 {unit.get('type')} 的 max_st）—— 游戏可能读不出这个值")
+                    f"该单位普通部队合计 {total}（活跃 + 被压制）超过该类型的上限 "
+                    f"{limit}（{unit.get('type')} 的 max_st）—— 特种兵不占这个名额；"
+                    f"游戏读档时会把超出的部分截回 {limit}，这部分会白改")
     return oc
 
 

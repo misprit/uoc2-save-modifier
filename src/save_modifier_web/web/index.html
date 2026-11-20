@@ -2048,10 +2048,14 @@ function bindUnitControls(u){
         }
       }
       if(a===a0 && s===s0) return;
-      if(a!==a0) queueEdit("unit_field", uKey(u.id,"act_st"),
-        {unit_id:u.id, field:"act_st", value:a}, baseAct, a, L2("单位 {0} 活跃兵力", u.id));
+      /* ⚠️ U96：**压制在前、活跃在后** ——
+         核心库是**依次执行**这两条编辑的；先改活跃的话，
+         那一刻「压制」还是旧值 ⇒ 「活跃 + 压制」算出来超过上限 ⇒ **误报警告**。
+         （核心库也会自动配平，但顺序对了变更说明才准确。） */
       if(s!==s0) queueEdit("unit_field", uKey(u.id,"sup_st"),
         {unit_id:u.id, field:"sup_st", value:s}, baseSup, s, L2("单位 {0} 被压制兵力", u.id));
+      if(a!==a0) queueEdit("unit_field", uKey(u.id,"act_st"),
+        {unit_id:u.id, field:"act_st", value:a}, baseAct, a, L2("单位 {0} 活跃兵力", u.id));
       SEL.units = u.id;
       refreshUnitBlood(u, a, s);     /* U65：局部更新，不重绘整页 */
     }, {passive:false});
