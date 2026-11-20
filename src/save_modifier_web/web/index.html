@@ -710,6 +710,11 @@ tr.oldrow{opacity:.6}
 .hcard .cp{font-size:12px;color:var(--muted);text-align:center;margin-top:4px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hcard .cp b{font-family:var(--mono);color:var(--accent-dark)}
+/* U90：**免费 / 收费** 单独一行（不再当卡名后缀 —— 卡名一长就看不见了） */
+.hcard .freeline{font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:visible;
+  text-overflow:clip;font-weight:600}
+.hcard .freeline.free{color:var(--ok)}
+.hcard .freeline.paid{color:var(--muted);font-weight:400}
 /* U47：手牌的两个操作**并成一行**（原来一卡两行，卡片区被撑得很高） */
 .hcard .acts{text-align:center;white-space:nowrap}
 .hcard .rm{display:inline-block;width:auto;margin:5px 2px 0;font-size:11px;padding:2px 6px}
@@ -2474,26 +2479,47 @@ function projectedCards(list, kind){
       const i = out.findIndex(c=>c.position===p.params.position);
       if(i>=0) out.splice(i,1);
     }
+    /* U90：**免费 / 收费** 的挂起改动也要立即反映到界面上 ——
+       以前只处理了新增 / 移除 ⇒ 点「改免费」后卡片看着没变
+       （要等应用后才变），和修改器「改动立即可视」的规矩不一致。 */
+    if(p.kind==="card_set" && kind==="hand" && p.params.field==="is_free"){
+      const i = out.findIndex(c=>c.position===p.params.position);
+      if(i>=0) out[i].is_free = !!p.params.value;
+    }
+    if(p.kind==="card_store_set" && kind==="shelf"){
+      const i = out.findIndex(c=>c.position===p.params.position);
+      if(i>=0){
+        if(p.params.is_free!==undefined && p.params.is_free!==null)
+          out[i].is_free = !!p.params.is_free;
+        /* 同一 kind 的另一半字段：**换牌** 也要马上看到 */
+        if(p.params.card_type) out[i].card_type = p.params.card_type;
+      }
+    }
   });
   return out;
 }
 
 function cardTileHTML(c, kind){
-  const free = c.is_free;
+  /* U90：卡名与「免费 / 收费」**分开两行** —— 卡名被截断时状态照样看得见。 */
+  const free = !!c.is_free;
   return L2(`<div class="hcard">
     <div class="ci">{0}</div>
-    <div class="cp"><b>{1}</b>{2}</div>
-    <div class="cp" style="margin-top:1px">{3}</div>
+    <div class="cp"><b>{1}</b></div>
+    <div class="cp" style="margin-top:1px">{2}</div>
+    <div class="cp freeline {3}">{4}</div>
     <div class="acts">
-      <button class="btn rm" onclick="{4}">
-        {5}</button>
-      <button class="btn rm" onclick="{6}">
-        {7}</button>
+      <button class="btn rm" onclick="{5}">
+        {6}</button>
+      <button class="btn rm" onclick="{7}">
+        {8}</button>
     </div>
-  </div>`, imgTag(cardImg(c.card_type), cardCn(c.card_type)), esc(cardCn(c.card_type)), free?L(" · 免费"):"", esc(cardInfo(c.card_type).subtitle||""), kind==="hand"
+  </div>`, imgTag(cardImg(c.card_type), cardCn(c.card_type)), esc(cardCn(c.card_type)),
+     esc(cardInfo(c.card_type).subtitle||""),
+     free?"free":"paid", free?L("免费"):L("收费"),
+     kind==="hand"
         ? ("cardRemove("+c.position+")") : ("cardStoreRemove("+c.position+")"), kind==="hand"?L("移除"):L("下架"), kind==="hand"
-        ? ("cardSetFree("+c.position+","+(c.is_free?"false":"true")+")")
-        : ("cardStoreSetFree("+c.position+","+(c.is_free?"false":"true")+")"), c.is_free?L("改收费"):L("改免费"));
+        ? ("cardSetFree("+c.position+","+(free?"false":"true")+")")
+        : ("cardStoreSetFree("+c.position+","+(free?"false":"true")+")"), free?L("改收费"):L("改免费"));
 }
 
 /* 卡牌选择器现在走**模态框**（U40b） */
