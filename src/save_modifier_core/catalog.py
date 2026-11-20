@@ -129,6 +129,10 @@ class UnitType:
     attack: int | None = None
     defense: int | None = None
     armor: int | None = None
+    #: **防御装甲**（类型表里的 `armor_def`）—— U92：
+    #: 步兵也有 `armor: 1`，但那是**被打时减伤**的防御装甲（`armor_def: true`），
+    #: **不是**能反冲锋的机动装甲 ⇒ 决定「反击」能不能挂。
+    armor_def: bool | None = None
     #: 战力上限 —— **上限在类型定义里，不在存档里**（规范 §5.3）
     #: ⚠️ U60：类型 yml **没写** `max_st` 时，游戏按 schema 默认 **7** 处理
     #: （`unit_types.pyc::_unit_type_schema`: `Required('max_st', default=7)`）
@@ -146,6 +150,28 @@ class UnitType:
     def spec_cap(self) -> int:
         """能挂几个特种兵 = `min(3, max_spec or 3)`（规范 §5.3）。"""
         return min(3, self.max_spec if self.max_spec is not None else 3)
+
+    @property
+    def armor_mobile(self) -> bool:
+        """这个类型是不是**装甲机动单位**（U92 · 字节码实证）。
+
+        游戏原文（`state/entities_view/unit.py:45`）：
+
+        ```python
+        armor_mobile = property(lambda self: self.armor
+                                         and not self.armor_def
+                                         and self.movement == 'mobile')
+        ```
+
+        ⇒ **反击**（`elastic_defense`）只允许这种单位挂
+        （`can_make_elastic_defense` 的**第一个条件**就是它，U92）；
+        「死守」「后卫部队」**没有**这条约束。
+
+        ⚠️ 步兵虽然有 `armor: 1`，但 `armor_def: true`（防御装甲）、
+        且 `movement` 是 `infantry` ⇒ **不算**装甲机动单位。
+        """
+        return bool(self.armor) and not self.armor_def \
+            and self.movement == "mobile"
 
     def step_icon(self) -> str:
         """这个单位类型的"战力阶梯"图标文件名（不含目录、不含扩展名）。
@@ -450,6 +476,7 @@ class Catalog:
             attack=_as_int(d.get("attack")),
             defense=_as_int(d.get("defense")),
             armor=_as_int(d.get("armor")),
+            armor_def=d.get("armor_def"),      # U92：防御装甲（决定能不能挂反击）
             # U60：缺 max_st 字段 ⇒ 用游戏 schema 的默认值 7（**不是 None**）
             max_st=(_as_int(d.get("max_st"))
                    if d.get("max_st") is not None else UNIT_TYPE_MAX_ST_DEFAULT),
@@ -468,6 +495,14 @@ class Catalog:
         """特种兵上限 = `min(3, max_spec or 3)`；类型未知按 3 处理。"""
         t = self.unit_type(type_name)
         return t.spec_cap if t else 3
+
+    def armor_mobile(self, type_name: str) -> bool:
+        """单位类型是不是**装甲机动单位**（「反击」的硬约束，U92）。
+
+        类型查不到 ⇒ False（宁可不许挂反击，也不给非装甲单位开口子）。
+        """
+        t = self.unit_type(type_name)
+        return bool(t and t.armor_mobile)
 
     def step_icon(self, type_name: str) -> str:
         """单位的"战力阶梯"图标文件名（不含目录、不含扩展名）。

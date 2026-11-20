@@ -549,6 +549,9 @@ def _catalog_payload() -> dict:
             "attack": t.attack,
             "defense": t.defense,
             "armor": t.armor,
+            # U92：防御装甲 + 「装甲机动单位」判定（「反击」的硬约束）
+            "armor_def": t.armor_def,
+            "armor_mobile": t.armor_mobile,
             "max_st": t.max_st,
             "max_spec": t.max_spec,
             "step_icon": t.step_icon(),

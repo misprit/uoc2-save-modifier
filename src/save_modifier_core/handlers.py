@@ -569,6 +569,53 @@ def _unit_spec_active(w, e: Edit) -> Outcome:
     return oc
 
 
+def _elastic_defense_allowed(w, unit_id):
+    """这个单位能不能挂「反击」？（U92 · 游戏硬约束）
+
+    **取证**（游戏字节码）：
+    * `state/entities_view/unit.py:45`
+
+      ```python
+      armor_mobile = property(lambda self: self.armor
+                                           and not self.armor_def
+                                           and self.movement == 'mobile')
+      ```
+
+    * `state/entities_view/unit.py:98` `can_make_elastic_defense` 的
+      **第一个条件**就是 `self.armor_mobile`
+      ⇒ **非装甲机动单位挂不了「反击」**；
+      而 `can_make_no_retreat` / `can_make_rearguard` **没有**这条约束。
+
+    **实证**（用户的 `west.usg`）：
+    `elastic_defense_units = [87, 104]`（87 = 突击炮、104 = 坦克）
+    两个都是 `movement=mobile` ⇒ 装甲机动；
+    同存档里的死守 / 后卫部队单位则是**步兵** ⇒ 印证只有反击有这条限制。
+
+    返回 `(ok, 原因)`；`原因` 为空表示没意见。
+    """
+    units = w.table("units.yml", [])
+    unit = next((u for u in units
+                 if isinstance(u, dict) and u.get("id") == unit_id), None)
+    if unit is None:
+        return True, ""            # 找不到单位 ⇒ 交给别的校验去报错
+    type_name = unit.get("type")
+    if w.catalog is None:
+        return True, ""            # 没有游戏包 ⇒ 判不了（下面会加一条警告）
+    if not type_name:
+        return True, ""
+    t = w.catalog.unit_type(type_name)
+    if t is None:
+        return True, ""            # 类型查不到（类型表可能缺）⇒ 不拦
+    if t.armor_mobile:
+        return True, ""
+    return False, (
+        "单位 %d（类型 %s）**不能挂「反击」** —— 游戏里的硬约束是"
+        "「反击只能挂**装甲机动单位**」"
+        "（要有装甲值 armor、不是防御装甲 armor_def、且 movement = mobile）；"
+        "这个单位是 movement=%s / armor=%s / armor_def=%s ⇒ 不是装甲机动单位。"
+        % (unit_id, type_name, t.movement, t.armor, t.armor_def))
+
+
 def _unit_orders(w, e: Edit) -> Outcome:
     """给单位**下 / 撤**作战标记（HQ 技能的三种「命令」，U89）。
 
@@ -597,6 +644,18 @@ def _unit_orders(w, e: Edit) -> Outcome:
             % (bad, "、".join(ORDER_LISTS)))
         return oc
     orders = [o for o in ORDER_LISTS if o in orders]     # 去重 + 按固定顺序
+
+    # U92：游戏硬约束 —— **「反击」只允许装甲机动单位**
+    # （`can_make_elastic_defense` 的第一个条件就是 `armor_mobile`）。
+    # ⚠️ 只拦**新增**；撤除已有标记不受影响（存档里原本就有的也不主动清理）。
+    if "elastic_defense" in orders:
+        ok, why = _elastic_defense_allowed(w, unit_id)
+        if not ok:
+            oc.errors.append(why)
+            return oc
+        if w.catalog is None:
+            oc.warnings.append(
+                "没有游戏包目录 ⇒ 没能校验「反击只能挂装甲机动单位」这条游戏硬约束")
 
     battle_dir = w.save.battle_dir()
     if battle_dir is None:

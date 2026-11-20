@@ -94,6 +94,9 @@ class UnitView:
     #: U89：**作战标记**（HQ 技能的命令）—— `no_retreat` / `rearguard` /
     #: `elastic_defense`；只对当前战斗有效。
     orders: tuple[str, ...] = ()
+    #: U92：是不是**装甲机动单位**（类型判定）——
+    #: 游戏里「反击」只允许这种单位挂（`can_make_elastic_defense`）。
+    armor_mobile: bool = False
 
     @property
     def total_st(self) -> int | None:
@@ -612,6 +615,8 @@ class Save:
                 losses=u.get("losses"),
                 retreated=u.get("retreated"),
                 orders=tuple(orders_map.get(u["id"], ())),
+                # U92：类型级判定（有没有游戏包都安全 —— 没有就是 False）
+                armor_mobile=bool(catalog.armor_mobile(t)) if (catalog and t) else False,
                 in_roster=u["id"] in roster if roster else True,
                 max_st=catalog.max_st(t) if (catalog and t) else None,
                 max_spec=(catalog.spec_cap(t) if (catalog and t) else None),

@@ -1,6 +1,7 @@
 {
  "ui": {
   " · 专精 ": " · Specialization ",
+  "「{0}」只能挂装甲机动单位（游戏硬约束）": "Only armored mobile units can take \"{0}\" (game rule)",
   " · 免费": " · Free",
   " · 延迟 ": " · Delay ",
   " · 总部 ": " · HQ ",
@@ -1017,7 +1018,9 @@
   "单位 {unit_id} 不在这场战斗里（当前战斗的单位 id 名单）": "unit {unit_id} is not in this battle (see the battle's unit id list)",
   "只对**当前这场战斗**生效；下一场战斗按场景自己的定义重置": "applies to **this battle only**; the next one is reset from the scenario's own definition",
   "当前存档没有进行中的战斗 —— 作战标记是战斗里的命令": "this save has no battle in progress — combat orders are battle commands",
-  "未知的作战标记 {arg0}；游戏只认这三种：{arg1}": "unknown combat order {arg0}; the game only knows these three: {arg1}"
+  "未知的作战标记 {arg0}；游戏只认这三种：{arg1}": "unknown combat order {arg0}; the game only knows these three: {arg1}",
+  "单位 {unit_id}（类型 {type_name}）**不能挂「反击」** —— 游戏里的硬约束是「反击只能挂**装甲机动单位**」（要有装甲值 armor、不是防御装甲 armor_def、且 movement = mobile）；这个单位是 movement={movement} / armor={armor} / armor_def={armor_def} ⇒ 不是装甲机动单位。": "Unit {unit_id} (type {type_name}) **cannot take Counterattack** — the game rule is that Counterattack can only be given to **armored mobile units** (needs an armor value, must not be defensive armor (armor_def), and movement must be `mobile`); this unit is movement={movement} / armor={armor} / armor_def={armor_def} ⇒ not an armored mobile unit.",
+  "没有游戏包目录 ⇒ 没能校验「反击只能挂装甲机动单位」这条游戏硬约束": "No game package ⇒ could not check the game rule \"Counterattack can only be given to armored mobile units\""
  },
  "values": {
   "arg1": {
