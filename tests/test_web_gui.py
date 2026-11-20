@@ -1796,10 +1796,14 @@ class TestU49LayoutAndLegality(unittest.TestCase):
 
         U50：兵力卡的第三行是**血量条**（U49 之前是提示行），
         经验卡的第三行仍是提示行 ⇒ 两张卡的行数与基线仍然对齐。
+
+        U85：单位详情多了三张卡（**工事等级 / 移动力 / 行动力**）⇒
+        详情里一共 5 张卡、5 行 hintline（每张卡都还是「标签 / 内容 / 提示」三行）。
         """
         # U54：兵力卡**删掉数值区**，改成一条血量条 + 一行颜色含义说明
         # ⇒ 两张卡都是「标签 / 内容 / 提示」三行
-        self.assertEqual(self.html.count('class="hintline"'), 2)
+        # U85：+3 张卡（工事等级 / 移动力 / 行动力）⇒ 2 → 5
+        self.assertEqual(self.html.count('class="hintline"'), 5)
         # U74：class 变成占位符 `class="blood{7}"`
         self.assertIn('class="blood{', self.html)
         self.assertNotIn('id="sp_tot_${u.id}"', self.html)
