@@ -4867,6 +4867,54 @@ Python 本来就在包里 ⇒ **9.5 KB 的壳**就够。
 | `test_alt_keeps_the_total_unchanged` | 活跃 + 压制之和不变 |
 | `test_alt_respects_the_lower_bound` | 不越活跃 + 压制 >= 1 的红线 |
 
+#### 10.10.48 ★ 特种兵也能「被压制」（U84）
+
+> **【2026-11-20 · U84 用户布置】**
+> 「特种兵和普通兵力一样，也是有是否被压制这个属性的。……后续我们在已挂载特种兵上要加个按钮，
+> 允许玩家调整已挂在的特种兵是否被压制。别忘了被压制的特种兵的图标联动变灰。」
+
+**机制（字节码实证，不是猜的）**
+
+存档里特种兵条目只有 **4 个字段**：`type` / `active` / `captured` / `idx`
+（`uoc2.state.entities.unit.SpecialistState.__init__`）——
+**没有独立的 suppressed 字段**，`active=false` **就是**被压制：
+
+| 环节 | 游戏自己的做法 |
+|---|---|
+| 渲染 | 按 `active` 选 `specialist/<类型>/status_act` 或 `status_sup`（`uoc2.common.scalables._render_status`） |
+| 产生 | 火力压制置 `spec.active=False`（`UnitState.apply_losses_att_pindown`） |
+| 恢复 | 按该单位的恢复步数逐步恢复（`UnitState.apply_recovery_specs`） |
+
+⇒ 实测真实存档里**本来就有** 15 个 `active=false` 的特种兵（游戏自己压出来的），
+说明它是**持久状态**，不是临时标记。
+
+**界面**
+
+| | 做法 |
+|---|---|
+| 按钮 | 槽位卡右侧一个「设为被压制 / 恢复活跃」小按钮（点一下切换） |
+| 图标 | 被压制 ⇒ **灰度 + 半透明**（`filter: grayscale(1)` + `opacity`） |
+| 卡片 | 被压制 ⇒ 边框变**虚线**、名字变灰、数值变淡 |
+| 标注 | 名字下方标一行「被压制」（橙色） |
+| 还没写盘的新增件 | **不给按钮** —— 临时槽位号还没定，写盘后才算数 |
+| 待应用 | 切换立刻在界面上生效（不进「待应用」也能看见灰化） |
+| 英文 | Suppress / Restore / Suppressed |
+
+**能改的是哪一层**：特种兵的压制状态写在**战役存档的根 `units.yml`**（L1）⇒ 可写；
+**战斗进行中**的单位在 `games/<场景>/units.yml`（L3/L4，只读）⇒ 改不了，
+改的是**下一次进战斗时**的初始状态。
+
+**回归护栏**（`tests/test_spec_suppression.py` 新增 17 项）
+
+| 测试 | 守住什么 |
+|---|---|
+| `test_suppress_writes_active_false` / `test_restore_writes_active_true` | 两个方向都真的写进盘里 |
+| `test_only_the_active_key_changes` | **只改 `active`**，`type` / `captured` / `idx` 原样、字段集合不变 |
+| `test_other_entries_are_untouched` | 别的单位 / 别的条目一个字节都不动 |
+| `test_added_spec_has_all_four_fields` | 新挂的特种兵 4 个字段齐全（`captured` 不能丢） |
+| `test_removing_one_keeps_the_others` | 卸一个不影响别的 |
+| `test_non_boolean_value_is_rejected` | 非法值要报错，不许悄悄改 |
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
