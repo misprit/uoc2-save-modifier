@@ -1661,6 +1661,8 @@ function unitCombatFieldsHTML(u){
         return `<button class="orderbtn${on?" on":""}${dis?" dis":""}" onclick="event.stopPropagation();toggleUnitOrder(${u.id},'${k}')" title="${esc(tip)}"><img src="/surfaces/${m.icon||("sheet/special_defense_"+k+".png")}?t=${TOKEN}" alt="${esc(m.name||k)}"></button>`;
       }).join("")}</div>
       <div class="hintline">${L("HQ 技能下的命令 · 敌方下一回合结束前有效")}</div>
+      <div class="hintline">${L("三个标记互斥：选新的会撤掉旧的")}</div>
+      ${u.orders_conflict?`<div class="hintline" style="color:var(--danger)">${L("存档里这个单位同时有多个标记，游戏只认第一个")}</div>`:""}
     </div>`;
 
   return orderCard + `<div class="stat" id="st_entr_${u.id}">
@@ -1730,7 +1732,11 @@ function toggleUnitOrder(unitId, key){
   /* U92：给非装甲机动单位挂「反击」⇒ 游戏不允许 ⇒ 不做
      （撤除已有标记不受限制）。 */
   if(key==="elastic_defense" && cur.indexOf(key)<0 && !unitArmorMobile(u)) return;
-  const next = cur.indexOf(key)>=0 ? cur.filter(k=>k!==key) : cur.concat([key]);
+  /* U102：三个标记**互斥** —— 游戏里下达命令是「先把这个单位从三个列表全清掉、
+     再加进其中一个」（`UnitSetFlags._set_flags`），且 `can_make_*` 都要求
+     「该单位没有别的标记」⇒ 这里点新的 = **替换**旧的，不是叠加。
+     点当前生效的那个 = 撤除（游戏允许「没下命令」这个状态）。 */
+  const next = (cur.length===1 && cur[0]===key) ? [] : [key];
   const pk = "unit_orders:"+unitId;
   const base = (u.orders||[]).slice();
   if(JSON.stringify(next)===JSON.stringify(base)){
