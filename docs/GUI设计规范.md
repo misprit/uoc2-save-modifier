@@ -5354,6 +5354,38 @@ by 烟柳边城 misprit           ← .by（灰、小字；"by " 由 CSS ::befor
 `tests/test_campaign_scroll.py` 里有一条测试专门盯着这件事：
 **词表里不许出现 `scrollbox`** —— 出现就说明有人改了模板。
 
+#### 10.10.58 ★ 作战标记：**三个互斥**，一个单位只能有一个（U102）
+
+> **【2026-11-20 · U102 用户报告】**
+> 「撤退、反击和死守着三个状态理论上在一个单位身上只能存在一个」
+
+**游戏自己的规矩**（字节码，三条独立路径共同维持）
+
+| 证据 | 说明 |
+|---|---|
+| `Gamelike.has_any_defense_flag`（`gamelike.pyc:1452-1455`） | 该单位 id 在 `no_retreat_units` / `rearguard_units` / `elastic_defense_units` **任意一个**列表里 |
+| `can_make_no_retreat`（`entities_view/unit.pyc:84`）/ `can_make_rearguard`（:91）/ `can_make_elastic_defense`（:98） | 三者的**最后一个条件**都是 `not has_any_defense_flag(self.id)` ⇒ **已有标记 ⇒ 不能再下另一个** |
+| `UnitSetFlags._set_flags`（`scenario/commands_unit.pyc:359-368`） | 下命令时**先从三个列表全 discard，再 add 进其中一个** ⇒ 写盘形态就是「三个列表里该单位只出现在一个里」 |
+| `Gamelike.get_defense_flag_string`（`gamelike.pyc:1470-1476`） | 按 no_retreat → rearguard → elastic_defense 的顺序**只返回一个** ⇒ 万一存档里有冲突，游戏只认第一个，其余**静默忽略** |
+
+**修改器原来的 bug**：`toggleUnitOrder` 用 `cur.concat([key])` ⇒ 点第二个按钮会让
+同一个单位**同时出现在两个列表里**（游戏自己永远不会产生这种状态），
+而且界面两个按钮都亮着、游戏里却只生效第一个 ⇒ **玩家被误导**。
+
+**改法**
+
+* **核心库硬拦**：`_unit_orders` 收到 >1 个标记 ⇒ 报错（挡住脚本 / REPL 绕过界面）；
+* **界面改成「替换」**：点新的标记 = 撤掉旧的（与 `_set_flags` 同语义）；
+  点已生效的那个 = 撤除（游戏允许「没下命令」这个状态）；
+* **读取端只显示生效的那一个**：视图里 `orders` 只给**游戏会认的那个**
+  （按游戏优先级），另给 `orders_conflict` 标记「存档里本来就有冲突」，
+  界面提示一句（存档不动）；
+* 提示行：「三个标记互斥：选新的会撤掉旧的」。
+
+**附带修掉的测试债**：U89 的老测试 `test_edit_adds_an_order` 断言的正是
+「一次能挂上两个标记」—— 那条断言本身就是 bug 的化石，已改成「互斥 ⇒ 拒绝」。
+
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
