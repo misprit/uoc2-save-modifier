@@ -1584,6 +1584,10 @@ function unitCombatFieldsHTML(u){
   const ap   = pendingVal("unit_field", uKey(u.id,"ap"),   (u.ap==null)?0:u.ap);
   const on = (b)=> b?" on":"";
   const sel = (b)=> b?" selected":"";
+  /* U87：类型的基础移动力（`unit_types/<类型>.yml` 的 `move`）——
+     控制区锁定把存档里的 mp 清零了，"解除锁定"就是按它恢复。 */
+  const ut = (CATALOG&&CATALOG.unit_types&&CATALOG.unit_types[u.type])||{};
+  const baseMove = (ut.move===undefined||ut.move===null)?null:ut.move;
   return `<div class="stat" id="st_entr_${u.id}">
       <div class="lb"><span>${L("工事等级")}</span></div>
       <div class="lvlrow">
@@ -1594,7 +1598,7 @@ function unitCombatFieldsHTML(u){
       <div class="hintline">${L("0 无 · 1 一级 · 2 二级（最高）")}</div>
     </div>
     <div class="stat" id="st_mp_${u.id}">
-      <div class="lb"><span>${L("移动力")}</span><span class="hintw">${L("可直接输入")}</span></div>
+      <div class="lb"><span>${L("移动力")}</span><span class="hintw">${baseMove!=null?L("基础 ")+baseMove:L("可直接输入")}</span></div>
       <div class="v"><input class="numin" id="in_mp_${u.id}" type="text" inputmode="numeric"
         autocomplete="off" value="${mp}" title="${L("移动力是剩余的移动点；单位进入敌方控制区会被游戏清零（这就是被定住的原因），所以被定住的单位这里通常是 0。")}"></div>
       <div class="hintline">${L("战斗里会按类型的移动力重算")}</div>

@@ -531,6 +531,7 @@ def _catalog_payload() -> dict:
             "faction": t.faction,
             "nationality": t.nationality,
             "movement": t.movement,
+            "move": t.move,
             "attack": t.attack,
             "defense": t.defense,
             "armor": t.armor,

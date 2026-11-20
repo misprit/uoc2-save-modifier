@@ -121,6 +121,11 @@ class UnitType:
     faction: str | None = None
     nationality: str | None = None
     movement: str | None = None
+    #: **基础移动力**（类型表里的 `move`）—— U87：控制区锁定会把存档里的
+    #: `mp` 清零，要恢复就得知道这个类型的满值是多少。
+    #: ⚠️ 游戏界面显示的移动力是**每回合重算**的（`apply_mp_ap`：有补给就给满），
+    #: 所以界面上"有 5 点移动力"而存档里 `mp` 可能是 0（被控制区清过）。
+    move: int | None = None
     attack: int | None = None
     defense: int | None = None
     armor: int | None = None
@@ -441,6 +446,7 @@ class Catalog:
             faction=d.get("faction"),
             nationality=d.get("nationality"),
             movement=d.get("movement"),
+            move=_as_int(d.get("move")),
             attack=_as_int(d.get("attack")),
             defense=_as_int(d.get("defense")),
             armor=_as_int(d.get("armor")),

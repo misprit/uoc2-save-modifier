@@ -202,5 +202,58 @@ class TestCombatFieldsUi(unittest.TestCase):
             self.assertIn(zh, errs, "词表里缺 %r" % zh)
 
 
+class TestBaseMovement(unittest.TestCase):
+    """U87：类型的基础移动力（`move`）—— 玩家要知道 mp 该填几。"""
+
+    def test_unit_type_exposes_base_movement(self):
+        from save_modifier_core import Catalog, CorePaths
+
+        cat = Catalog(CorePaths.discover())
+        t = cat.unit_type("us_arm_42")
+        if t is None:
+            self.skipTest("本机没有游戏包")
+        self.assertIsInstance(t.move, int)
+        self.assertGreater(t.move, 0)
+
+    def test_infantry_movement_is_not_more_than_armour(self):
+        """常识校验：步兵的基础移动力 ≤ 装甲（游戏里 3 vs 5/6/7）。"""
+        from save_modifier_core import Catalog, CorePaths
+
+        cat = Catalog(CorePaths.discover())
+        inf = cat.unit_type("us_inf_42")
+        arm = cat.unit_type("us_arm_42")
+        if inf is None or arm is None:
+            self.skipTest("本机没有游戏包")
+        self.assertLessEqual(inf.move, arm.move)
+
+    def test_api_catalog_carries_base_movement(self):
+        from save_modifier_web import server
+
+        payload = server.api_catalog()
+        units = payload.get("unit_types") or {}
+        if not units:
+            self.skipTest("本机没有游戏包")
+        for name, info in list(units.items())[:20]:
+            self.assertIn("move", info, name)
+
+
+class TestNoUnlockButton(unittest.TestCase):
+    """U87 收尾：玩家自己填 ap / mp ⇒ **不加**一键按钮。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = io.open(os.path.join(WEB, "index.html"),
+                           encoding="utf-8", newline="").read()
+
+    def test_no_one_click_unlock(self):
+        self.assertNotIn("解除控制区锁定", self.html)
+        self.assertNotIn("unlockZoc", self.html)
+
+    def test_base_movement_is_shown(self):
+        """但基础移动力要显示出来（省得玩家自己去查类型表）。"""
+        self.assertIn('L("基础 ")', self.html)
+        self.assertIn("baseMove", self.html)
+
+
 if __name__ == "__main__":
     unittest.main()
