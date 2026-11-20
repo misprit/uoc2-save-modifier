@@ -4915,6 +4915,67 @@ Python 本来就在包里 ⇒ **9.5 KB 的壳**就够。
 | `test_removing_one_keeps_the_others` | 卸一个不影响别的 |
 | `test_non_boolean_value_is_rejected` | 非法值要报错，不许悄悄改 |
 
+#### 10.10.49 ★ 单位详情的「工事等级 / 移动力 / 行动力」三张卡（U85）
+
+> **【2026-11-20 · U85 用户布置】**
+> 「一个单位本身在战斗中还有工事等级（可能是 fortify 这个词……代表驻垒等级，有 0、1、2 三级）、
+> 移动力（大部分步兵初始是 3、装甲 6，移动后减少）、行动力（代表是否可以攻击别人……
+> 一种是没有行动力，一种是受限行动力也就是只能攻击，还一种是不受限行动力，
+> 不受限行动力可以打人也可以转化为额外运动）。
+> 你需要找到存档中这些功能的位置，把编辑他们的功能做出来，
+> 就插入到单位明细血量那行和特种兵之间吧。也可以做成和血量经验一样的卡片，
+> 让他们根据窗口宽度自动换行。」
+
+**存档里的位置（三个字段都在单位的同一条记录里）**
+
+| 玩家说的 | 存档字段 | 取值 | 依据 |
+|---|---|---|---|
+| 工事等级（驻垒） | `entr` | 0 / 1 / 2 | 游戏的 `unit_max_entr_level = 2`；`can_make_entrenchment` 还要在补给范围内、有行动力 |
+| 移动力（剩余） | `mp` | 0 .. 类型的 `move` | `apply_mp_ap`：有补给就给满（`_type.move`），没有就扣 |
+| 行动力 | `ap` | 0 / 1 / 2 / 3 | 游戏的四个常量 `ap_none` / `ap_conv` / `ap_lock` / `ap_full`（`ap_max_value = 3`） |
+
+**行动力的四档（就是玩家说的「三种形式」+ 游戏里的第四档）**
+
+| 档 | 常量 | 含义 |
+|---|---|---|
+| 0 | `ap_none` | 没有行动力（不能攻击） |
+| 1 | `ap_conv` | 只能转成额外移动（摩托化：MP + `motor_pool_mp`） |
+| 2 | `ap_lock` | 受限：只能攻击（攻击后 `ap_full` → `ap_lock`） |
+| 3 | `ap_full` | 不受限：可攻击 + 可转额外移动 |
+
+**界面**
+
+| | 做法 |
+|---|---|
+| 位置 | 单位详情里，**血量那行之后、特种兵之前**（`dhead` 的 `.stats` 网格内） |
+| 工事等级 | 三个小按钮 **0 / 1 / 2**，当前档高亮（点一下切换） |
+| 移动力 | 数字输入框（可像经验一样直接输入） |
+| 行动力 | 一个下拉，四档各带一句人话说明 |
+| 换行 | `.stats` 改成 `repeat(auto-fit,minmax(190px,1fr))` ⇒ **按栏宽自动换行**（窄栏 2 列、宽栏 3 列） |
+| 英文 | Entrenchment / Movement / Action points（含四档说明） |
+
+**⚠️ 边界（得跟玩家说清）**
+
+* 改的是**战役存档的根 `units.yml`**（L1）⇒ 可写；
+* **战斗进行中**的单位在 `games/<场景>/units.yml`（L3/L4，只读）⇒ 战斗中的这三个值改不了；
+* 战役↔场景对账（`adjust_units_between_situations`）只对账 `act_st` / `sup_st` / `specs`
+  ⇒ **已经在场景存档里的单位**用场景里的值，改战役存档对它无效；
+* 这三个都是「战斗外改 ⇒ 可能被场景预设覆盖」⇒ 既有机制会弹软警告（U85 把警告里的
+  `entr` / `ap` / `mp` 也换成了中文名）。
+
+**回归护栏**（`tests/test_unit_combat_fields.py` 新增 18 项）
+
+| 测试 | 守住什么 |
+|---|---|
+| `test_set_entr` / `test_entr_over_max_is_blocked` | 工事等级可改、上限 2 |
+| `test_set_ap` / `test_ap_over_max_is_blocked` | 行动力可改、上限 3 |
+| `test_mp_is_editable_now` / `test_negative_mp_is_blocked` | 移动力可改、不能为负 |
+| `test_other_fields_are_untouched` | 改一个字段不许顺手动别的 |
+| `test_summary_uses_the_chinese_name` | 变更说明写「工事等级」而不是 `entr` |
+| `test_unit_view_has_mp` | 视图层要带 `mp`（以前没有 ⇒ 界面读不到） |
+| `test_cards_are_in_the_detail_template` | 三张卡的位置（血量之后、特种兵之前） |
+| `test_cards_wrap_by_width` | 按栏宽自动换行 |
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
