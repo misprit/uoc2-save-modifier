@@ -5113,6 +5113,62 @@ Python 本来就在包里 ⇒ **9.5 KB 的壳**就够。
 | `test_remove_and_quantity_change_together` | 删一条 + 改另一条的数量 ⇒ 改的是对的那条 |
 | `test_projection_carries_the_original_index` | 界面代码不许再拿行号当存档下标 |
 
+#### 10.10.53 ★ 作战标记：「反击」只允许**装甲机动单位**（U92）
+
+> **【2026-11-20 · U92 用户要求】**
+> 「在原版游戏中，反击这个技能是只能挂在装甲单位上的。我们的修改器是不是现在允许
+> 突破这个限制？我建议是按照游戏的硬约束，让非装甲单位不能挂反击，
+> 不然有可能出现 bug。」
+
+**取证**（游戏字节码）
+
+| 位置 | 内容 |
+|---|---|
+| `state/entities_view/unit.py:45` | `armor_mobile = property(lambda self: self.armor and not self.armor_def and self.movement == 'mobile')` |
+| `state/entities_view/unit.py:98` | `can_make_elastic_defense` 的**第一个条件**就是 `self.armor_mobile` |
+| `state/entities_view/unit.py:84 / 91` | `can_make_no_retreat` / `can_make_rearguard` **没有**这条条件 |
+| `state/entities/hq.pyc` | `HQState.can_unit_elastic_defense` = CP 够 + 在 HQ 范围内 + `unit.can_make_elastic_defense()` |
+
+⇒ **只有「反击」有装甲限制**；「死守」「后卫部队」任何单位都能挂。
+
+**判定式**：`armor and not armor_def and movement == 'mobile'`
+
+⚠️ `armor_def` 是**防御装甲**（被打时减伤的那点装甲）——
+步兵有 `armor: 1` 但 `armor_def: true` ⇒ 不算；
+摩托化步兵（`ger_mot_41` 等 **42 个**类型：`movement=mobile` 但 `armor_def=true`）也**不算**。
+
+**实证**（用户的 `west.usg`）：`elastic_defense_units = [87, 104]`（87 = 突击炮、104 = 坦克）
+两个都是 `movement=mobile` ⇒ 装甲机动；
+同一存档里的死守 / 后卫部队单位是**步兵** ⇒ 印证只有反击有这条限制。
+
+**做法**
+
+| 层 | 做法 |
+|---|---|
+| 核心库 | `Catalog.armor_mobile(type_name)` / `UnitType.armor_mobile`；`Edit.unit_orders` 挂「反击」时**硬拦**（非装甲机动 ⇒ `plan.errors`） |
+| 核心库 | 只拦**新增**；撤除已有标记不受限（存量不主动清理） |
+| 核心库 | 没有游戏包目录 ⇒ 判不了 ⇒ 放行，但给一条**警告** |
+| 界面 | 「反击」按钮对不适用的单位**置灰**，悬停说明「只能挂装甲机动单位（游戏硬约束）」；**已经挂着**的仍可点掉 |
+| 视图 | `UnitView.armor_mobile` + `api/catalog` 里的 `unit_types[*].armor_mobile` / `armor_def` |
+
+**实测**（浏览器 · 隔离的 `west.usg` 副本）：步兵的反击按钮灰、点了没反应（待应用 0）；
+装甲的正常可点（待应用 1）；绕过前端直接调 `/api/plan` ⇒ 后端同样硬拦（`ok: false`）；
+英文界面下报错完整翻译。
+
+**测试**：`tests/test_orders_constraints.py`（20 项）
+
+| 用例 | 守什么 |
+|---|---|
+| `test_infantry_cannot_take_elastic_defense` | 硬拦（进 `plan.errors`） |
+| `test_armored_unit_can_take_elastic_defense` | 装甲单位照常能挂 |
+| `test_other_orders_are_not_restricted` | 死守 / 后卫**不受**这条限制 |
+| `test_removing_is_always_allowed` | 撤除不受限（存量不清理） |
+| `test_without_catalog_it_is_only_a_warning` | 没游戏包 ⇒ 放行 + 警告 |
+| `test_armor_def_blocks_a_mobile_type` | 摩托化步兵（`armor_def=true`）**不算**装甲机动 |
+| `test_user_save_matches_the_rule` | 实证：用户存档里挂反击的单位确实都是装甲机动 |
+
+
+## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
 |---|---|---|---|
