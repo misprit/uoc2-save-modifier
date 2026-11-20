@@ -5318,6 +5318,8 @@ by 烟柳边城 misprit           ← .by（灰、小字；"by " 由 CSS ::befor
 **护栏**：`tests/test_splash_byline.py`（10 项）。
 
 
+## 11. 实施路线
+
 | 阶段 | 内容 | 验收 | 状态 |
 |---|---|---|---|
 | **G0** | 给随包 runtime 补 tcl/tk；`run_gui.bat` 弹出一个空窗口 | 双击 bat 出窗口；`python -c "import tkinter"` 通过 | ✅ 2026-11-18 |
