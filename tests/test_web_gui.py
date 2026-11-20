@@ -774,6 +774,21 @@ def _quote(path):
     return urllib.parse.quote(path, safe="")
 
 
+def _save_has_hand_cards(path):
+    """存档里有没有**手牌数据**（顶层 `cards.yml`）。
+
+    ⚠️ **新开的战役存档没有手牌**（还没打过一局）⇒ 挑"第一个存档"会挑到
+    这种 ⇒ 写测试就会误报「没有手牌数据」。（用户 2026-11-20 新建的
+    `west.usg` 就是这种 —— 它排在存档列表最前面。）
+    """
+    import zipfile
+    try:
+        with zipfile.ZipFile(path) as z:
+            return "cards.yml" in z.namelist()
+    except Exception:
+        return False
+
+
 class TestCardStoreWriteApi(WebGuiTestBase):
     """U36：卡牌页的写操作（手牌 / 货架）。**只用副本**。"""
 
@@ -788,11 +803,15 @@ class TestCardStoreWriteApi(WebGuiTestBase):
         src = None
         for info in list_saves():
             p = str(info.path)
-            if "BACKUP" not in p and p.endswith(".usg"):
-                src = p
-                break
+            if "BACKUP" in p or not p.endswith(".usg"):
+                continue
+            # ⚠️ **必须挑有手牌数据的存档**（新开的战役还没有 cards.yml）
+            if not _save_has_hand_cards(p):
+                continue
+            src = p
+            break
         if src is None:
-            self.skipTest("本机没有存档")
+            self.skipTest("本机没有带手牌数据的存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
 
