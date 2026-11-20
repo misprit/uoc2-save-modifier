@@ -1600,7 +1600,7 @@ function unitCombatFieldsHTML(u){
     <div class="stat" id="st_mp_${u.id}">
       <div class="lb"><span>${L("移动力")}</span><span class="hintw">${baseMove!=null?L("基础 ")+baseMove:L("可直接输入")}</span></div>
       <div class="v"><input class="numin" id="in_mp_${u.id}" type="text" inputmode="numeric"
-        autocomplete="off" value="${mp}" title="${L("移动力是剩余的移动点；单位进入敌方控制区会被游戏清零（这就是被定住的原因），所以被定住的单位这里通常是 0。")}"></div>
+        autocomplete="off" value="${mp}" title="${L("移动力是剩余的移动点；单位进入敌方控制区会被游戏清零（这就是被定住的原因），所以被定住的单位这里通常是 0。战斗中改立即生效（战斗里的单位数据就在这个存档里）；战斗外改，进战斗后的回合开始会按补给重算。")}"></div>
       <div class="hintline">${L("战斗里会按类型的移动力重算")}</div>
     </div>
     <div class="stat" id="st_ap_${u.id}">
