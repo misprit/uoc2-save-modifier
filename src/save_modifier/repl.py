@@ -297,6 +297,18 @@ class Repl:
         idx = _as_int(args[2], "idx") if len(args) > 2 else None
         return self._plan([Edit.unit_spec_remove(uid, args[1], idx)])
 
+    def cmd_supspec(self, args) -> bool:
+        """特种兵的「被压制」状态（0 = 被压制，1 = 活跃）。"""
+        if len(args) < 3:
+            raise ReplError(
+                "用法: supspec <单位id> <类型> <0|1> [idx]（0=被压制 1=活跃）")
+        uid = _as_int(args[0], "单位 id")
+        flag = args[2]
+        if flag not in ("0", "1"):
+            raise ReplError("第三个参数只能是 0（被压制）或 1（活跃）")
+        idx = _as_int(args[3], "idx") if len(args) > 3 else None
+        return self._plan([Edit.unit_spec_active(uid, args[1], idx, flag == "1")])
+
     def cmd_pool(self, args) -> bool:
         if len(args) < 3:
             raise ReplError("用法: pool <总部id> <条目序号> <数量>")

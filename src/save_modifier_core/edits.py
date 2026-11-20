@@ -25,6 +25,7 @@ EDIT_KINDS = (
     "unit_field",          # 单位的某个字段（根 units.yml）
     "unit_spec_add",       # 加特种（根 units.yml）
     "unit_spec_remove",    # 卸特种（根 units.yml）
+    "unit_spec_active",    # 特种兵的「被压制」状态（根 units.yml）
     "hq_force_pool",       # 总部兵库数量（根 hqs.yml）
     "hq_field",            # 总部的某个字段（根 hqs.yml）
     "hq_trucks",           # 总部补给卡车数（根 hqs.yml）
@@ -126,6 +127,21 @@ class Edit:
         """卸一个特种；同名有多个时卸一条（给 `idx` 指定卸哪一条）。"""
         return Edit("unit_spec_remove",
                     {"unit_id": unit_id, "spec_type": spec_type, "idx": idx})
+
+    @staticmethod
+    def unit_spec_active(unit_id: int, spec_type: str, idx: int | None,
+                         active: bool) -> "Edit":
+        """特种兵的「被压制」状态（`active=False` = 被压制）。
+
+        游戏里特种兵条目只有 4 个字段：`type` / `active` / `captured` / `idx`
+        （`uoc2.state.entities.unit.SpecialistState.__init__` 实证）——
+        **没有独立的 suppressed 字段**，`active=False` 就是被压制
+        （渲染走 `specialist/<类型>/status_sup`，见 `uoc2.common.scalables._render_status`）。
+        """
+        # ⚠️ **不转换** —— 非法值要原样送到 handler 去报错（那里校验是不是 bool）
+        return Edit("unit_spec_active",
+                    {"unit_id": unit_id, "spec_type": spec_type, "idx": idx,
+                     "value": active})
 
     @staticmethod
     def hq_force_pool(hq_id: int, index: int, quantity: int) -> "Edit":
@@ -354,6 +370,10 @@ class Edit:
             return f"单位 {p.get('unit_id')} 的 {p.get('field')}：{p.get('value')}"
         if k == "unit_spec_add":
             return f"单位 {p.get('unit_id')} 加特种 {p.get('spec_type')}"
+        if k == "unit_spec_active":
+            return (f"单位 {p.get('unit_id')} 的特种 {p.get('spec_type')}"
+                    + (f"（槽位 {p.get('idx')}）" if p.get("idx") is not None else "")
+                    + ("：设为被压制" if not p.get("value") else "：恢复活跃"))
         if k == "unit_spec_remove":
             return f"单位 {p.get('unit_id')} 卸特种 {p.get('spec_type')}"
         if k == "hq_force_pool":

@@ -478,6 +478,55 @@ def _unit_spec_remove(w, e: Edit) -> Outcome:
     return oc
 
 
+def _unit_spec_active(w, e: Edit) -> Outcome:
+    """特种兵的「被压制」状态（根 `units.yml`）。
+
+    ⚠️ 存档里特种兵条目只有 `type` / `active` / `captured` / `idx` 四个字段
+    —— **没有独立的 suppressed 字段**；`active=False` 就是被压制
+    （U84 的字节码实证）。
+    这里**只改 `active` 这一个键**，`type` / `captured` / `idx` 原样保留。
+    """
+    oc = Outcome()
+    unit_id = e.params.get("unit_id")
+    spec_type = e.params.get("spec_type")
+    idx = e.params.get("idx")
+    active = e.params.get("value")
+    if not w.require(w.caps.can_edit_units, "units", "units.yml"):
+        return oc
+    if not isinstance(active, bool):
+        oc.errors.append(
+            f"active 必须是布尔值（True = 活跃 / False = 被压制），收到 {active!r}")
+        return oc
+    units = w.table("units.yml", [])
+    unit = _find_by_id(units, unit_id)
+    if unit is None:
+        oc.errors.append(f"存档里没有 id 为 {unit_id} 的单位")
+        return oc
+    specs = unit.get("specs") or []
+    target = next((s for s in specs
+                   if isinstance(s, dict)
+                   and s.get("type") == spec_type
+                   and (idx is None or s.get("idx") == idx)), None)
+    if target is None:
+        oc.errors.append(f"单位 {unit_id} 没有特种 {spec_type}"
+                         + (f"（idx={idx}）" if idx is not None else ""))
+        return oc
+    old = bool(target.get("active", True))
+    if old == active:
+        return oc                       # 没变 ⇒ 什么都不写
+    target["active"] = active
+    unit["specs"] = specs
+    w.touch("units.yml")
+    oc.summary = (f"单位 {unit_id} 的特种 {spec_type}"
+                  + (f"（槽位 {target.get('idx')}）" if target.get("idx") is not None else "")
+                  + ("：设为被压制" if not active else "：恢复活跃"))
+    if not active:
+        oc.warnings.append(
+            "被压制的特种兵不提供效果；游戏会按该单位的恢复步数逐步把它恢复"
+            "（战斗里由 `apply_recovery_specs` 处理，U84）")
+    return oc
+
+
 def _hq_force_pool(w, e: Edit) -> Outcome:
     """总部兵库数量（根 `hqs.yml`）。"""
     oc = Outcome()
@@ -1904,6 +1953,7 @@ _HANDLERS = {
     "unit_field": _unit_field,
     "unit_spec_add": _unit_spec_add,
     "unit_spec_remove": _unit_spec_remove,
+    "unit_spec_active": _unit_spec_active,
     "hq_force_pool": _hq_force_pool,
     "hq_field": _hq_field,
     "hq_trucks": _hq_trucks,
