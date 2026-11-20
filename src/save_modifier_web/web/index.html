@@ -641,6 +641,26 @@ table.spec-tbl .spin{font-size:16px;padding:4px 9px;min-width:40px}
   border:1px solid var(--stage-edge);border-radius:4px;object-fit:contain}
 .cstore .csrow .csn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cstore .csrow .csp{font-family:var(--mono);color:var(--accent-dark);font-weight:700}
+/* ---------------- U99：战役页的长块 —— 限高 + 框内上下滚动 ----------------
+   战役页是 7 页里数据最多的（路线图 / 场景名册 / 会议商店都可能有几十行）
+   ⇒ 整页被拉得老长（实测 west 存档 ≈ 2500px，3.5 屏）。
+   现在改成：每一块**自己限高 + 自己滚**，页面整体回到「两屏左右」的量级。
+   （`.scrollbox` 只包住**内容**，标题栏留在框外 ⇒ 标题永远看得见） */
+.scrollbox{overflow:auto}
+.scrollbox.routebox{max-height:230px}
+.scrollbox.rosterbox{max-height:380px}
+.scrollbox.storebox{max-height:250px}
+/* 滚动条：Windows/Edge 定制一下，别是那条细得看不见的默认条 */
+.scrollbox::-webkit-scrollbar{width:11px;height:11px}
+.scrollbox::-webkit-scrollbar-track{background:var(--surface-alt)}
+.scrollbox::-webkit-scrollbar-thumb{background:#c3cfda;border-radius:6px;
+  border:2px solid var(--surface-alt)}
+.scrollbox::-webkit-scrollbar-thumb:hover{background:#a7b7c6}
+/* 表格在框里滚 ⇒ 表头吸顶（列名一直在） */
+.scrollbox table.rlist thead th{position:sticky;top:0;z-index:2}
+/* 真的装不下的块，标题栏上给个「↕」提示（只有溢出的块才有） */
+.storegrp.has-scroll .storetitle::after{content:"↕";font-size:12px;
+  color:var(--muted);opacity:.85}
 /* U56：备份/撤销行统一成三栏：标签 | 主内容（过长省略号截断）| 右侧小字
    （原来大小被 `margin-left:auto` 甩到面板最右边，和名字隔了一整屏） */
 .bkrow{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;
@@ -3167,7 +3187,29 @@ function pageCampaign(w){
         修改器只告诉你「现在在哪儿、能打哪几场」（§7.8）。<br>
         ⚠️ <b>名册与会议商店来自游戏包</b>（战役包默认配置）——
         <b>不是玩家存档</b>：单位不一定存活 / 一定继承 / 一定登场。</div>
-  </div></div>`, pos, esc(cp.campaign_name||cp.campaign_id||""), routeHTML(), scenes.length, sceneRows || L(`<tr><td colspan="3" class="dim">（没有索引到可选场景）</td></tr>`), (VIEW.hqs||[]).length, hqs, esc(cp.scenario_name||cp.scenario_id||"—"), rosterHTML(), esc(cp.front_name||cp.front||"—"), esc(cp.conference_text||cp.conference_id||"—"), conferenceStoreHTML());
+  </div></div>`, pos, esc(cp.campaign_name||cp.campaign_id||""), routeBox(), scenes.length, sceneRows || L(`<tr><td colspan="3" class="dim">（没有索引到可选场景）</td></tr>`), (VIEW.hqs||[]).length, hqs, esc(cp.scenario_name||cp.scenario_id||"—"), rosterHTML(), esc(cp.front_name||cp.front||"—"), esc(cp.conference_text||cp.conference_id||"—"), storeBox());
+  markScrollable(w);   /* U99：给真的溢出的块加「↕」提示 */
+}
+
+/* ---------- U99：战役页的三个长块 —— 限高 + 框内滚动 ---------- */
+function storeBox(){
+  /* 会议商店：卡片多的时候能排好几屏 ⇒ 限高 + 自己滚 */
+  return '<div class="scrollbox storebox">' + conferenceStoreHTML() + '</div>';
+}
+function routeBox(){
+  /* 路线图：会议多、每场场景多的时候会被撑得很高 ⇒ 限高 + 自己滚 */
+  return '<div class="scrollbox routebox">' + routeHTML() + '</div>';
+}
+/* 给「真的装不下」的块加个 ↕ 提示（只加在溢出的块上，不多不少） */
+function markScrollable(root){
+  const boxes = (root||document).querySelectorAll(".scrollbox");
+  for(let i=0;i<boxes.length;i++){
+    const b = boxes[i];
+    if(b.scrollHeight > b.clientHeight + 4){
+      const g = b.closest(".storegrp");
+      if(g) g.classList.add("has-scroll");
+    }
+  }
 }
 
 
@@ -3660,7 +3702,10 @@ function rosterHTML(){
       <td>{5}</td>
     </tr>`, esc(u.name_cn||u.name_brief||(L("单位 ")+u.id)), esc(hqName[u.hq_id]||u.hq_id||"—"), st||"—", u.entr!==undefined?u.entr:"—", u.xp!==undefined?u.xp:"—", specs||"—");
   }).join("");
-  return L2(`<div class="note" style="margin:0 0 10px">
+  /* U99：名册表可能有几十行 ⇒ 限高 + 框内滚动（表头吸顶）。
+     ⚠ **不改 L2 的模板字面量** —— 那个字面量就是词表 key，改了英文界面会掉回中文。
+     这里只对**翻译完的结果字符串**做替换（中英文的 `<table class="rlist">` 一致）。 */
+  const html = L2(`<div class="note" style="margin:0 0 10px">
     地图 {0} │ 开局 {1} │ {2} 回合
     │ 参战顺序 {3}
     │ 单位 {4}（在途 {5}）│ HQ {6}
@@ -3668,6 +3713,9 @@ function rosterHTML(){
     <table class="rlist"><thead><tr><th>单位</th><th>总部</th><th>兵力</th>
       <th>压制</th><th>XP</th><th>特种兵</th></tr></thead>
       <tbody>{7}</tbody></table>`, esc(r.map_name||"—"), esc(r.start||"—"), esc(r.base_num_turns??"—"), (r.turn_seq||[]).join(" → ")||"—", (r.units||[]).length, (r.enroute_units||[]).length, (r.hqs||[]).length, units||L(`<tr><td colspan="6" class="dim">（没有名册）</td></tr>`));
+  return html.replace('<table class="rlist">',
+    '<div class="scrollbox rosterbox"><table class="rlist">')
+            .replace('</table>', '</table></div>');
 }
 
 /* ---------- 这场会议的商店（游戏包默认） ---------- */
