@@ -5018,6 +5018,50 @@ Python 本来就在包里 ⇒ **9.5 KB 的壳**就够。
 * 命令**只在当前回合有效**（敌方下一回合结束前）⇒ 回合推进后会被游戏清掉；
 * **游戏开着**时改盘 ⇒ 游戏退出时的自动保存会**覆盖**你的改动
   ⇒ 改之前先退出游戏（读档 → 退出 → 改 → 再进）。
+#### 10.10.51 ★ 卡牌页：免费 / 收费**立即可见** + 状态单独一行（U90）
+
+> **【2026-11-20 · U90 用户布置】**
+> 「卡牌界面，切换卡牌免费与否的功能，点击后不会立即让页面变化，应用后卡牌目前
+> 的免费收费状态才变。这和修改器整体的修改效果立即可视矛盾，会让人迷惑我到底
+> 有没有勾上。调整现在ui，让呈现方式更清晰，例如，可以把免费或收费单独做一个
+> 状态显示在卡牌名称下方，而不是现在这样作为卡牌名称的后缀（顺带一提，如果卡牌
+> 名字很长，根本看不到免费状态的后缀）」
+
+**根因**：`projectedCards()` 只把**新增 / 移除**四类挂起改动投影到界面上
+（`card_add` / `card_remove` / `card_store_add` / `card_store_remove`），
+**漏了 `card_set` / `card_store_set`** ⇒ 重画时读到的还是**存档原值**
+⇒ 点了没反应，非要等「应用更改」才变。
+
+**界面**
+
+| | 做法 |
+|---|---|
+| 卡名 | 自己一行（`.hcard .cp` + `<b>`），**不再带「· 免费」后缀** |
+| 副标题 | 还是卡牌自己的那一行（`cardInfo().subtitle`） |
+| 状态 | **单独一行**（`.hcard .freeline`）：免费 = 绿（`--ok`），收费 = 灰（`--muted`） |
+| 截断 | 状态行**不截断**（`text-overflow:clip`）—— 卡名被省略也照样看得见状态 |
+| 按钮 | 文案随状态变：免费⇒「改收费」，收费⇒「改免费」 |
+| 词表 | 「免费」/「收费」在 `i18n.json`（英文界面自动 Free / Paid） |
+
+⚠️ 卡牌**贴图**与 `is_free` 无关（`_resolve_card_image` 只按 `card_type` 取图）
+⇒ 不动贴图，只改文字呈现。
+
+**顺带修掉的另一半**：货架「**换牌**」（`card_store_set` 的 `card_type` 字段）
+以前同样不立即可见 —— 同一个 kind 的两个字段，现在**都**有投影。
+
+**测试**：`tests/test_cards_free_ui.py`（13 项）
+
+| 用例 | 守什么 |
+|---|---|
+| `test_card_set_is_projected` | 手牌改免费/收费要投影（以前漏了） |
+| `test_card_store_set_is_projected` | 货架改免费/收费要投影 |
+| `test_card_set_only_applies_to_the_is_free_field` | 只投影 `is_free`（核心库只允许这个字段） |
+| `test_store_card_type_change_is_projected_too` | 换牌也要投影 |
+| `test_projection_does_not_touch_the_other_list` | 手牌改动不许串到货架 |
+| `test_card_name_has_no_free_suffix_anymore` | 不许再退回「卡名 · 免费」 |
+| `test_freeline_is_not_truncated` | 状态行不许被省略号截掉 |
+| `test_buttons_follow_the_current_state` | 按钮文案随状态变 |
+
 
 ## 11. 实施路线
 
