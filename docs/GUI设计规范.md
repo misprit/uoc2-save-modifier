@@ -2281,11 +2281,17 @@ campaign.add_card(card_type=c.card_type, unit_id=c.unit_id, is_free=c.is_free, .
 
 * 只在**当前进行中的战斗**里可改（`can_edit_theater_assets`）—— 战斗外改会被场景重算覆盖，
   这正是"改了却像没改"；
-* `theater_assets` 在存档里**按 phase 分组**（`[[phase0], [phase1], …]`）⇒
-  只改**当前 phase 那一组**（读战斗 `main.yml` 的 `phase` 字段），不是永远改第 0 组。
+* ⚠️ **U143（重要更正）**：`theater_assets` 的两组**不是"两个阶段"，
+  而是「**两个阵营各一组**」：
+  * 战斗 `main.yml` 的 `factions` 是**有序字典**，第 i 项 = 第 i 组的拥有者，
+    每项里 `player: local` / `player: ai` **直接标出哪一方是玩家**；
+  * `phase` = **现在轮到哪一方**（游戏读 `theater_assets[self.phase]`）；
+  * 字节码旁证：AI 代码 `is_ai = (self.phase != game.phase)` ⇒ **phase ⇔ 阵营**。
+  ⇒ 修改器**按阵营定位**：`side="player"`（默认）/ `"opponent"` / `"current"`（兼容）。
+  ⚠️ 以前按 `phase`（当前行动方）定位 ⇒ **轮到 AI 行动时会把敌方那组当成自己的**
+  （实测可编辑的战斗里 12 个有 1 个命中）⇒ 已修；
   ⚠️ 实测：场景包 `dlc3/moscow.usc/rostov_offensive` 的默认就是 `[[], [air_attack]]`
-  （第 0 组为空），存档与场景包**完全一致** ⇒ 按 `phase` 定位与游戏的
-  `Game.theater_assets[self.phase]` 语义吻合；
+  （第 0 组为空），存档与场景包**完全一致**；
 * 不在战斗里时，这一页显示说明卡 + 存档体检信息。
 
 **★ U45：战区资产「全量候选」（用户拍板）**
