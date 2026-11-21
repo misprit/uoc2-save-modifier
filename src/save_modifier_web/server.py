@@ -913,15 +913,40 @@ def find_surface(rel: str):
     返回 `Path` 或 `None`。找不到**不报错**（界面退化成占位方块，§5.6）。
     ⚠️ `package_roots()` 是**容器**目录（`_packages`）；真正的包在它下面
     （`base` / `dlc1` … / 用户 mod）⇒ 要用 `packages()`。
+
+    ⚠️ **U120：路径穿越防护** —— `rel` 直接来自 HTTP 请求路径
+    （`do_GET` 里有 `unquote(u.path)` ⇒ `%2e%2e%2f` 会变成 `../`），
+    **绝不能**让它逃出 `assets/surfaces/`：
+
+    * `Path("C:/Windows/win.ini")` 在 Windows 上是**绝对路径** ⇒
+      `Path(pkg) / "assets" / "surfaces" / rel` 会把前半段**整个替换掉**
+      ⇒ 等于「任意文件读取」（外部审阅报告 P0-1）；
+    * `..` 段同理。
+
+    ⇒ **三道闸**：① 逐段白名单校验（空段 / `.` / `..` / 带冒号的一律拒）；
+    ② 解析（`resolve`）后必须**仍在 `assets/surfaces/` 里面**；
+    ③ 才看它是不是文件。
     """
     from save_modifier_core import CorePaths
 
-    rel = (rel or "").replace("\\", "/").lstrip("/")
-    if not rel or ".." in rel.split("/"):
+    rel = (rel or "").replace("\\", "/")
+    if not rel:
         return None
+    parts = rel.split("/")
+    # ① 逐段校验
+    for p in parts:
+        if p in ("", ".", "..") or ":" in p:
+            return None
     paths = CorePaths.discover()
     for pkg in paths.packages():
-        cand = Path(pkg) / "assets" / "surfaces" / rel
+        try:
+            base = (Path(pkg) / "assets" / "surfaces").resolve()
+            cand = (base / Path(*parts)).resolve()
+        except (OSError, ValueError, RuntimeError):
+            continue
+        # ② 必须仍在 surfaces 目录**里面**（防盘符 / 防符号链接）
+        if cand == base or base not in cand.parents:
+            continue
         try:
             if cand.is_file():
                 return cand
