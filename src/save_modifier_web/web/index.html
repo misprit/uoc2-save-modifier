@@ -877,6 +877,15 @@ tr.oldrow{opacity:.6}
 .modal .spick .spgrid .pcell.blocked{opacity:.42;filter:grayscale(.9);cursor:not-allowed}
 .modal .spick .spgrid .pcell.blocked .dup{background:var(--danger)}
 .modal .spick .spfoot{padding:9px 11px;background:var(--surface);border-top:1px solid var(--border)}
+/* U147：软警告**汇总区**（一页列全，相同的合并 + 「×N」） */
+.warnbox{border:1px solid #e3d3a4;background:var(--warn-light);border-radius:8px;padding:9px 11px;margin-top:10px}
+.warnbox .wh{font-weight:700;color:var(--warn);font-size:13px;margin-bottom:7px}
+.warnbox .wl{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.warnbox .witem{display:flex;gap:7px;align-items:flex-start;font-size:12.5px;line-height:1.55}
+.warnbox .wb{color:var(--warn);flex:none}
+.warnbox .wt{flex:1}
+.warnbox .wx{flex:none;color:var(--muted);font-family:var(--mono);font-size:11.5px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0 5px}
 .modal .spick .slot.spcard{cursor:default}
 .modal .spick .slot.spcard:hover{border-color:var(--border);background:var(--surface-alt)}
 .modal .spick .slot.spcard:hover .slotname{color:inherit}
@@ -1004,6 +1013,7 @@ tr.oldrow{opacity:.6}
     <span class="hint">改动会先备份原存档</span>
     <span class="sp"></span>
     <button class="btn" id="btnUndo" onclick="doUndo()">↶ 撤销</button>
+    <button class="btn" id="btnWarn" onclick="showWarningsOnly()">看提醒</button>
     <button class="btn pri" id="btnApply" onclick="doApply()">应用更改<span class="badge-n" id="hPending">0</span></button>
   </div>
   <div class="body">
@@ -1269,6 +1279,9 @@ function paintPending(){
       ? L2("有 {0} 条未应用的改动", PENDING.length) : L("就绪 · 未改动磁盘");
   const ba = document.getElementById("btnApply");
   if(ba) ba.disabled = !PENDING.length;
+  /* U147：「看提醒」也要跟着待应用数走（没有待应用 ⇒ 没什么可提醒的） */
+  const bw = document.getElementById("btnWarn");
+  if(bw) bw.disabled = !PENDING.length;
 }
 /* U55：在确认弹窗里移除某一条 ⇒ 撤掉它并**刷新确认框** */
 function dropPendingFromModal(i){
@@ -3152,8 +3165,9 @@ function pageCards(w){
             onclick="restoreHand()">恢复上次会议牌局</button>
         </div>
         {10}
-        <div class="note">手牌是<b>你手里已经拿到的牌</b>；货架是<b>这一场会议可以买的牌</b>。
-          两者的 is_free 只是 tooltip 文案与卡背贴图，**没有玩法影响**（§7.5.2）。</div>
+        <div class="note">手牌是<b>你手里已经拿到的牌</b>；货架是<b>这一场会议可以买的牌</b>。<br>
+          ⚠️ <b>货架</b>上的 is_free = <b>价格 0</b>（不扣声望）；
+          <b>手牌</b>上的 is_free 只是 tooltip 文案与卡背贴图，**没有玩法影响**（§7.5.2）。</div>
       </div></div>
     <div class="panel"><h3>卡牌商店货架 · {11} / {12}</h3>
       <div class="pbody">
@@ -3276,7 +3290,8 @@ function pageStore(w){
     </div>
     <div class="note">同一个 <b>(战线, 子商店)</b> 里<b>任何重复条目都不许</b>
       （价格库存不同也算重复）；要改已有条目就直接改那一行。<br>
-      <b>库存不能填 0</b> —— 游戏没有「售罄」标记，下架请用「下架」按钮删条目。</div>
+      <b>库存不能填 0</b> —— 游戏没有「售罄」标记，下架请用「下架」按钮删条目。<br>
+      <b>价格 0 = 免费商品</b>（不扣声望），<b>不是</b>「下架」—— 要下架请用「下架」按钮。</div>
   </div></div>`, tabs, subtabs, esc(fcn[SEL.storeFront]||SEL.storeFront), esc(SEL.storeSub==="elite_store"?L("精英商店"):L("普通商店")), items.length, SEL.storePicker?L("收起"):L("上架新商品"), body || L(`<tr><td colspan="8" class="dim">这个商店是空的</td></tr>`));
 
   items.forEach((row)=>{
@@ -3644,7 +3659,8 @@ function pageTheater(w){
         不变式：<b>当前可用 ≤ 本场景剩余</b>（游戏每用一次就让剩余减 1，减成负数存档会打不开）。
         <b>本场景剩余 = 无限</b> 时，每回合恢复多少就永远有多少。<br>
         标 <b>新增</b> 的 = 场景本来没有、被加进来的（无中生有）；删掉的项会整个消失，
-        游戏里那个按钮也就没了。</div>
+        游戏里那个按钮也就没了。<br>
+        ⚠️ 战区资产**无法通过游戏内的『重置会议』撤销** —— 需要用修改器自己的撤销（§6.4）。</div>
     </div></div>`, uni.length, onCount, cards, esc(theaterSideCn(curSide)), sideTabs);
 
   uni.forEach(u=>{
@@ -3864,6 +3880,26 @@ document.getElementById("mask").addEventListener("mousedown", function(ev){
 });
 
 /* ---------- 写盘确认框（设计稿 §9） ---------- */
+/* ⚠️ **U147**：软警告**一页列全**（U118 那套"一条一条弹、逐个同意"太吵）。
+   相同的**合并成一条** + 「×N」徽标 ⇒ 一屏就能看完。 */
+function mdBold(s){
+  /* 先转义再加粗 ⇒ 文案里的 `**粗体**` 不会变成注入点 */
+  return esc(String(s??"")).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+}
+function warnBoxHTML(warnings){
+  const list = warnings||[];
+  if(!list.length) return "";
+  const cnt = new Map();
+  list.forEach(w=>{ const k=String(w); cnt.set(k,(cnt.get(k)||0)+1); });
+  const rows = [...cnt.entries()].map(([w,n])=>L2(
+    `<div class="witem"><span class="wb">⚠</span><span class="wt">{0}</span>{1}</div>`,
+    mdBold(w), n>1?L2('<span class="wx">×{0}</span>', n):""));
+  return L2(`<div class="warnbox">
+      <div class="wh">⚠ {0}</div>
+      <div class="wl">{1}</div>
+      <div class="fine">这些只是**提醒** —— 照写，不拦。点「应用更改」直接写入。</div>
+    </div>`, L2("这些提醒（共 {0} 条，合并后 {1} 条）", list.length, cnt.size), rows.join(""));
+}
 function planFiles(changes){
   const out = [];
   (changes||[]).forEach(c=>{
@@ -3882,14 +3918,6 @@ function openConfirm(mode, info){
       <div class="fine">硬拦：<b>plan.errors</b> 非空时按钮禁用 —— <b>原存档不会被写入</b>。</div>`, (info.errors||[]).map(e=>`<div class="erow">✕ ${esc(e)}</div>`).join(""));
     foot = L(`<button class="btn" onclick="closeModal()">返回修改</button>
       <button class="btn pri" disabled>应用更改</button>`);
-  } else if(mode==="warn"){
-    /* U118：**一条一条**弹软警告，逐个同意（全部同意后才写盘）。 */
-    title = L2("⚠ 软警告（第 {0}/{1} 条）", info.no||1, (info.no||1)+(info.left||0));
-    body = L2(`<div><div class="wrow">⚠ {0}</div></div>
-      <div class="fine">软警告：照写，只是提醒。同意后继续下一条；全部同意才会写盘。</div>`,
-      esc(info.warning||""));
-    foot = L(`<button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="applyStep()">同意，继续</button>`);
   } else {
     title = L2("⚠ 应用 {0} 处改动？", files.length);
     /* U55：待应用**明细**（逐条）在这里 —— 底栏不再常驻展开。
@@ -3907,18 +3935,15 @@ function openConfirm(mode, info){
       detail = L('<div class="plist"><div class="ph">待应用明细（') + PENDING.length + L(' 条）</div>')
              + items + '</div>';
     }
-    /* U118：有软警告时**先看列表**，点「应用更改」再**逐条**确认警告。 */
-    const warnTip = (info.warnings||[]).length
-      ? L2("<div class=\"fine\">下面还有 <b>{0}</b> 条软警告 —— 点「应用更改」后会**逐条**弹出来问你；全部同意才写盘。</div>",
-           (info.warnings||[]).length)
-      : "";
+    /* ⚠️ **U147**：软警告**一页列全**（不再逐条弹）⇒ 一次确认就够。 */
+    const warnBox = warnBoxHTML(info.warnings||[]);
     body = detail + L2(`<div>将改动存档 <b>{0}</b> 里的：</div>
       <div class="elist">{1}</div>
       <div class="fine">写回前会自动备份：<b>{2}</b>
         （同名已存在则递增为 <b>_BACKUP_2</b>）· 改动后仍可一键撤销。</div>`, esc(info.save_name||VIEW.save&&VIEW.save.name||""), files.map(f=>`<div><span class="f">${esc(f.entry)}</span>${
-        f.notes.length?`<span class="d">${esc(f.notes.join("；"))}</span>`:""}</div>`).join(""), esc(info.backup||L("（原文件保留为 _BACKUP）"))) + warnTip;
+        f.notes.length?`<span class="d">${esc(f.notes.join("；"))}</span>`:""}</div>`).join(""), esc(info.backup||L("（原文件保留为 _BACKUP）"))) + warnBox;
     foot = L(`<button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="applyStep()">应用更改</button>`);
+      <button class="btn pri" onclick="reallyApply()">应用更改</button>`);
   }
   openModal(`<div class="mh">${title}</div><div class="mb">${body}</div><div class="mf">${foot}</div>`,
             {cls: mode==="error" ? "err" : (mode==="warn" ? "warn" : "")});
@@ -4659,25 +4684,25 @@ async function doApply(){
     openConfirm("error", {errors:d.errors||[], changes:d.changes||[]});
     return;
   }
-  /* U118：不论有没有软警告，**先给玩家看改了什么东西的列表**；
-     软警告留到点「应用更改」之后**逐条**问（全部同意才写盘）。 */
-  APPLY_WARNINGS = (d.warnings||[]).slice();
-  APPLY_WARN_TOTAL = APPLY_WARNINGS.length;
+  /* ⚠️ **U147**：软警告**在确认页里一页列全** ⇒ 一次确认就够，
+     不再"点一次弹一条、逐个同意"（U118 那套太吵）。 */
   openConfirm("ok", {changes:d.changes||[], warnings:d.warnings||[],
     backup:d.backup, save_name:d.save_name});
 }
-/* U118：待确认的软警告队列（一条一条弹） */
-let APPLY_WARNINGS = [];
-let APPLY_WARN_TOTAL = 0;
-/* 点「应用更改」⇒ 先逐条确认警告 ⇒ 再写盘 */
-function applyStep(){
-  if(APPLY_WARNINGS.length){
-    const w = APPLY_WARNINGS.shift();
-    openConfirm("warn", {warning:w, left:APPLY_WARNINGS.length,
-                         no:(APPLY_WARN_TOTAL||0)-APPLY_WARNINGS.length});
+/* 随时看这一批改动的全部提醒（**不写盘**，只列出来） */
+async function showWarningsOnly(){
+  if(!PENDING.length) return;
+  const r = await post("/api/plan", {save_id: VIEW._save_id, edits: pendingEdits()});
+  const d = r.data;
+  if(!d.ok){
+    openConfirm("error", {errors:d.errors||[], changes:d.changes||[]});
     return;
   }
-  reallyApply();
+  const list = d.warnings||[];
+  if(!list.length){ alertModal(L("这一批改动没有软警告")); return; }
+  openModal(`<div class="mh">⚠ ${L2("软警告（{0} 条）", list.length)}</div>
+    <div class="mb">${warnBoxHTML(list)}</div>
+    <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`);
 }
 /* 确认框里点「应用更改」才真的写盘 */
 async function reallyApply(){

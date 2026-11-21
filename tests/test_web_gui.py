@@ -1319,11 +1319,15 @@ class TestFrontendGateExists(unittest.TestCase):
         self.assertIn("/api/plan", self.html)
         self.assertIn("openConfirm(", self.html)
 
-    def test_three_confirm_variants_exist(self):
-        """确认 / 硬错误 / 软警告 三个变体。"""
+    def test_two_confirm_variants_exist(self):
+        """确认 / 硬错误 两个变体。
+
+        ⚠️ **U147**：第三个变体「软警告（逐条弹）」**取消**了 ——
+        软警告改成在确认页里**一页列全**（用户反馈：一个个确认太吵）。"""
         self.assertIn('openConfirm("error"', self.html)
-        self.assertIn('openConfirm("warn"', self.html)
         self.assertIn('openConfirm("ok"', self.html)
+        self.assertNotIn('openConfirm("warn"', self.html)
+        self.assertIn("function warnBoxHTML(", self.html)
 
     def test_error_variant_disables_the_button(self):
         """硬错误 ⇒ 应用按钮禁用（原存档不会被写入）。"""

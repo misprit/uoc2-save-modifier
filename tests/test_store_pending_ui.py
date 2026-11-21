@@ -16,6 +16,10 @@
 ① 先弹**改动明细列表**；
 ② 点「应用更改」⇒ **逐条**弹软警告，逐个同意；
 ③ 全部同意 ⇒ 才写盘。
+
+⚠️ **U147（2026-11-21 用户反馈：「软警告太多了，而且需要一个个确认」）**
+上面 ②③ 那套**逐条弹、逐个同意**已经**取消** ⇒ 软警告改成
+**在同一个页面里一页列全**（相同的合并成一条 + 「×N」），一次确认就够。
 """
 
 import io
@@ -63,29 +67,25 @@ class StorePendingUiTest(unittest.TestCase):
     # ------------------------------------------------------------------ ②
 
     def test_apply_always_shows_the_change_list_first(self):
-        """有软警告时**也要先给列表**（警告留到点「应用更改」之后逐条问）。"""
-        body = self._body(self.html, "async function doApply()", "let APPLY_WARNINGS")
-        self.assertNotIn('openConfirm("warn"', body,
-                         "doApply 不该直接弹警告框")
+        """有软警告时**也要先给列表**（警告在同一页里列全）。"""
+        body = self._body(self.html, "async function doApply()",
+                           "async function showWarningsOnly(")
         self.assertIn('openConfirm("ok"', body)
-        self.assertIn("APPLY_WARNINGS", body)
+        self.assertIn("warnings:", body)
 
-    def test_apply_step_walks_the_warnings_one_by_one(self):
-        """`applyStep()`：还有警告就弹**一条**；都点完了才真的写盘。"""
-        body = self._body(self.html, "function applyStep()", "/* 确认框里点「应用更改」")
-        self.assertIn("APPLY_WARNINGS.shift()", body)
-        self.assertIn('openConfirm("warn"', body)
-        self.assertIn("reallyApply()", body)
+    def test_warnings_are_listed_on_one_page(self):
+        """⚠️ **U147**：软警告**一页列全** —— 不再"一条一条弹、逐个同意"。"""
+        self.assertNotIn('openConfirm("warn"', self.html,
+                         "逐条弹软警告的框子已经取消（U147）")
+        self.assertNotIn("APPLY_WARNINGS", self.html,
+                         "警告队列已经取消（U147）")
 
-    def test_the_list_box_says_the_warnings_come_one_by_one(self):
+    def test_the_confirm_page_shows_all_warnings(self):
+        """确认页里**直接列出**全部软警告（合并同类项 + 「×N」）。"""
         body = self._body(self.html, "function openConfirm(", "/* ===")
-        self.assertIn("下面还有", body)
-        self.assertIn('onclick="applyStep()"', body)
-
-    def test_the_warn_box_agrees_and_continues(self):
-        body = self._body(self.html, "function openConfirm(", "/* ===")
-        self.assertIn("同意，继续", body)
-        self.assertIn('onclick="applyStep()"', body)
+        self.assertIn("warnBoxHTML(info.warnings||[])", body)
+        self.assertIn('onclick="reallyApply()"', body,
+                      "确认一次就写盘，不再逐条同意")
 
 
 if __name__ == "__main__":
