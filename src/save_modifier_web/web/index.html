@@ -908,6 +908,15 @@ tr.oldrow{opacity:.6}
 .modal .erow{color:var(--danger);font-size:13px;padding:3px 0}
 .modal .wrow{color:var(--warn);font-size:13px;padding:3px 0}
 .modal .fine{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
+/* U111：JS 异常的兜底提示条 —— 这类失败本来**完全静默**（U108/U110），
+   玩家只看到「没反应」⇒ 现在让他一眼看到「出错了」并能截图反馈。 */
+.jserr{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+  max-width:min(760px,92vw);z-index:999;display:none;background:#2a1b1b;
+  color:#ffd9d9;border:1px solid #7a3b3b;border-radius:8px;padding:9px 13px;
+  font-size:12.5px;line-height:1.55;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.jserr.on{display:block}
+.jserr b{color:#ff9c9c}
+.jserr .x{float:right;cursor:pointer;margin-left:12px;color:#c9a0a0}
 .modal .fine b{font-family:var(--mono);color:var(--text)}
 .modal .ro{font-size:10.5px;padding:1px 6px;border:1px dashed var(--border);border-radius:4px;
   color:var(--muted);font-family:var(--mono);font-weight:400}
@@ -980,6 +989,9 @@ tr.oldrow{opacity:.6}
     改动先进「待应用」，点右上角「应用更改」会**弹出明细二次确认**，确认后才写盘 —— 写前自动备份、可撤销。
   </div>
 </div>
+
+<!-- U111：JS 异常的兜底提示（静默失败 ⇒ 玩家只看得到「没反应」） -->
+<div id="jsErr" class="jserr"></div>
 
 <!-- ============ 主界面 ============ -->
 <div id="app">
@@ -2013,9 +2025,15 @@ function toggleSpecSuppressed(unitId, specType, slotId){
     return;
   }
   const key = specSupKey(unitId, specType, s.idx);
+  /* U111：`base` 必须是**存档原值**（`queueEdit` 的约定：值等于原值就撤掉这条
+     待应用）⇒ 以前传的是「当前显示值」⇒ 改回原值撤不掉（留一条改了等于
+     没改的待应用）。 */
+  const u0 = (VIEW.units||[]).find(x=>x.id===unitId);
+  const s0 = ((u0&&u0.specs)||[]).find(x=>x.type===specType && x.idx===s.idx);
+  const base = (s0 && s0.active===false) ? false : true;
   queueEdit("unit_spec_active", key,
     {unit_id:unitId, spec_type:specType, idx:s.idx, value:next},
-    cur, next,
+    base, next,
     L2("单位 {0} 特种兵 {1}", unitId, specCn(specType)),
     cur ? L("活跃") : L("被压制"), next ? L("活跃") : L("被压制"));
   refreshSpecSlots(u);
@@ -2692,7 +2710,8 @@ function commitRenameHq(id){
 
 function hqTrucks(id, n){
   const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
-  const base = pendingVal("hq_trucks", `hq_trucks:${id}`, h.trucks||0);
+  /* U111：`base` = **存档原值**（见 `toggleSpecSuppressed` 的说明） */
+  const base = h.trucks||0;
   queueEdit("hq_trucks", `hq_trucks:${id}`,
     {hq_id:id, trucks:n}, base, n, L2("总部 {0} 补给卡车", id));
   refreshHqLocal(id, true);
@@ -4650,6 +4669,31 @@ bindDropZone();          /* U68：拖 .usg 进这一页 ⇒ 导入成副本 */
 
 function esc(s){ return String(s??"").replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ---------- U111：JS 异常的**全局兜底** ----------
+   ⚠️ **JS 的异常是静默的**：事件处理函数抛了异常，界面不报错、只是不响应
+   （U108 的 `theaterFieldCn`、U110 的 `setUnitEntr` 都是这一类，
+   用户只说得出「没反应」，开发只能靠猜）。
+   ⇒ 这里把异常**显示给玩家**（能截图反馈）+ 记进控制台（开发能拿栈）。 */
+function showJsError(msg, where){
+  try{
+    console.error("[UOC2] 界面出错：", msg, where);
+    const box = document.getElementById("jsErr");
+    if(!box) return;
+    box.innerHTML = '<span class="x" onclick="this.parentElement.classList.remove(\'on\')">✕</span>'
+      + L("界面出错了（这个操作没有生效）") + "：<b>" + esc(String(msg||"")) + "</b>"
+      + (where ? ' <span style="opacity:.75">(' + esc(where) + ')</span>' : "")
+      + "<br>" + L("这是修改器自己的问题，不影响你的存档；把这条截图发给开发者即可。");
+    box.classList.add("on");
+  }catch(e){ /* 连提示都失败就算了 */ }
+}
+window.addEventListener("error", function(ev){
+  showJsError(ev.message, String(ev.filename||"").split("/").pop() + ":" + (ev.lineno||0));
+});
+window.addEventListener("unhandledrejection", function(ev){
+  const r = ev.reason || {};
+  showJsError(r.message || String(r), "Promise");
+});
 
 async function openSave(sid){
   try {
