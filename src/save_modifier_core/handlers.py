@@ -1403,6 +1403,31 @@ def _hq_force_pool_remove(w, e: Edit) -> Outcome:
     return oc
 
 
+def _as_bool(v):
+    """把外部传来的值读成**布尔**（只认明确的值，不做「看着像」的强转）。
+
+    ⚠️ **U131**：原来写的是 `bool(v)` ⇒ **字符串 `"false"` 会被当成 True**
+    （`bool("false")` 是 True！）⇒ 「改成收费」会变成「**改成免费**」。
+
+    ⇒ 这里只认：真正的 `bool` / `0`-`1` 整数 / 明确写着 true-false 的字符串；
+    认不出来返回 `None`（由调用方报错，**不许**默默当成 False）。
+    """
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return False
+    if isinstance(v, int):
+        return bool(v) if v in (0, 1) else None
+    if isinstance(v, str):
+        t = v.strip().lower()
+        if t in ("true", "1", "yes", "y", "on"):
+            return True
+        if t in ("false", "0", "no", "n", "off", ""):
+            return False
+        return None
+    return None
+
+
 def _card_add(w, e: Edit) -> Outcome:
     """加卡（根 `cards.yml`）。"""
     oc = Outcome()
@@ -1470,8 +1495,14 @@ def _card_add(w, e: Edit) -> Outcome:
         oc.errors.append(f"卡牌 {card_type} 不召唤单位，unit_id 必须是 None")
         return oc
 
+    # ⚠️ **U131**：别用 `bool(...)` 强转（`"false"` 会被当成 True）
+    is_free = e.params.get("is_free")
+    flag = _as_bool(is_free)
+    if flag is None:
+        oc.errors.append(f"is_free 必须是 True / False，收到 {is_free!r}")
+        return oc
     cards.append({"card_type": card_type,
-                  "is_free": bool(e.params.get("is_free")),
+                  "is_free": flag,
                   "position": position,
                   "unit_id": unit_id,
                   "used": False})
@@ -1786,7 +1817,13 @@ def _card_store_add(w, e: Edit) -> Outcome:
     oc = Outcome()
     position = e.params.get("position")
     card_type = e.params.get("card_type")
-    is_free = bool(e.params.get("is_free"))
+    # ⚠️ **U131**：别用 `bool(...)` 强转（`"false"` 会被当成 True）
+    is_free = e.params.get("is_free")
+    flag = _as_bool(is_free)
+    if flag is None:
+        oc.errors.append(f"is_free 必须是 True / False，收到 {is_free!r}")
+        return oc
+    is_free = flag
     if not w.require(w.caps.can_edit_shelf, "shelf", "main.yml"):
         return oc
     if not isinstance(position, int) or isinstance(position, bool) or position < 1:
