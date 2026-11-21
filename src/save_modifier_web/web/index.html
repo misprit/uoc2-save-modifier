@@ -2344,14 +2344,41 @@ function hqRowHTML(h){
   const xp = h.xp||0;
   const xt = h.xp_target||0;
   const pct = xt ? Math.max(0, Math.min(100, Math.round(xp*100/xt))) : 0;
-  return L2(`<div class="hqrow {0}" onclick="pickHq({1})">
+  return L2(`<div class="hqrow {0}" data-hqid="{1}" onclick="pickHq({1})">
     <div class="nm"><b>{2}</b>
       <span>CP {3}/{4} · 经验 {5}/{6}</span>
       <div class="expbar"><i style="width:{7}%"></i></div></div>
   </div>`, h.id===SEL.hqs?'on':'', h.id, esc(h.name_cn||h.name_brief||(L("总部 ")+h.id)), cp, mx, xp, xt||"—", pct);
 }
-function pickHq(id){ SEL.hqs = id; show("hqs"); }
-function pickHqTab(t){ SEL.hqTab = t; show("hqs"); }
+/* U106：**局部刷新** —— 选中总部只重画【详情】+【清单里的这一行】，
+   清单本身**不重建** ⇒ 滚动位置天然不动（原来走 `show("hqs")` 整页重绘
+   ⇒ `.hqlist` 被重建 ⇒ scrollTop 归零 ⇒ 清单跳回顶部）。 */
+function pickHq(id){
+  SEL.hqs = id;
+  /* 选中高亮：只换 class，不动 DOM 结构 */
+  document.querySelectorAll("#work .hqrow").forEach(function(r){
+    r.classList.toggle("on", String(r.dataset.hqid)===String(id));
+  });
+  refreshHqLocal(id);
+}
+function pickHqTab(t){ SEL.hqTab = t; refreshHqLocal(SEL.hqs); }
+
+/* U106：**局部刷新** —— 只重画【详情】+【清单里的这一行】。
+   ⚠️ 清单**不重建** ⇒ 滚动位置天然不动（不再靠滚动保位兜底）。
+   `keepScroll=true` ⇒ 详情区的滚动位置也保住（**改完详情不跳**）。
+   ⚠️ 清单里那一行也要跟着更新（CP 等显示的是**待应用**的值）——
+      局部刷新必须把「整页重绘上的副作用」一起搬过来（U103 的教训）。 */
+function refreshHqLocal(hqId, keepScroll){
+  const h = (VIEW.hqs||[]).find(x=>x.id===hqId);
+  const det = document.querySelector("#work .detail");
+  const keep = (keepScroll && det) ? det.scrollTop : 0;
+  if(det) det.innerHTML = hqDetailHTML(h);
+  if(det) det.scrollTop = keep;
+  if(h) bindHqControls(h);
+  const row = document.querySelector('#work .hqrow[data-hqid="'+hqId+'"]');
+  if(row && h) row.outerHTML = hqRowHTML(h);
+  paintPending();
+}
 
 function hqSkillHTML(h, br, it){
   const act = it.action;
@@ -2541,7 +2568,7 @@ function bindHqControls(h){
     bindSpin(el, {base:(base===undefined?cur:base), cur, min, max, onChange(v){
       queueEdit("hq_field", hqKey(h.id, field),
         {hq_id:h.id, field, value:v}, (base===undefined?cur:base), v, L2("总部 {0} {1}", h.id, label));
-      SEL.hqs = h.id; show("hqs");
+      SEL.hqs = h.id; refreshHqLocal(h.id, true);
     }});
   };
   const cpc = pendingVal("hq_field", hqKey(h.id,"cp"), h.cp||0);
@@ -2566,7 +2593,7 @@ function bindHqControls(h){
         queueEdit("hq_force_pool", hqPoolKey(h.id,o),
           {hq_id:h.id, index:o, quantity:v}, e.quantity||0, v,
           L2("总部 {0} 兵库 {1} 数量", h.id, e.spec?specCn(e.spec):hqEquipCn(e.equipment)));
-        SEL.hqs = h.id; show("hqs");
+        SEL.hqs = h.id; refreshHqLocal(h.id, true);
       }});
   });
 }
@@ -2588,7 +2615,7 @@ function commitRenameHq(id){
   if(v) queueEdit("hq_field", hqKey(id,"name_brief"),
     {hq_id:id, field:"name_brief", value:v},
     h.name_cn||h.name_brief||"", v, L2("总部 {0} 改名", id));
-  show("hqs");
+  refreshHqLocal(id, true);
 }
 
 function hqTrucks(id, n){
@@ -2596,7 +2623,7 @@ function hqTrucks(id, n){
   const base = pendingVal("hq_trucks", `hq_trucks:${id}`, h.trucks||0);
   queueEdit("hq_trucks", `hq_trucks:${id}`,
     {hq_id:id, trucks:n}, base, n, L2("总部 {0} 补给卡车", id));
-  show("hqs");
+  refreshHqLocal(id, true);
 }
 
 function hqBranchLevel(id, br, d){
@@ -2607,7 +2634,7 @@ function hqBranchLevel(id, br, d){
   if(v<0) v=0; if(v>3) v=3;
   queueEdit("hq_branch_level", hqBrKey(id,br),
     {hq_id:id, branch:br, level:v}, node.level||0, v, L2("总部 {0} {1} 等级", id, BRANCH_CN[br]||br));
-  show("hqs");
+  refreshHqLocal(id, true);
 }
 function hqSuppress(id, br, d){
   const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
@@ -2619,7 +2646,7 @@ function hqSuppress(id, br, d){
   queueEdit("hq_branch_level", hqBrKey(id,br)+":sup",
     {hq_id:id, branch:br, level:lvl, suppressed:v}, node.suppressed||0, v,
     L2("总部 {0} {1} 被压制等级", id, BRANCH_CN[br]||br));
-  show("hqs");
+  refreshHqLocal(id, true);
 }
 function hqSpecialize(id, br, act, used, avail){
   if(avail<0) return;
@@ -2630,14 +2657,14 @@ function hqSpecialize(id, br, act, used, avail){
   queueEdit("hq_branch_sp", hqSpKey(id,br,act),
     {hq_id:id, branch:br, action:act, sp_used:v}, it.sp_used||0, v,
     L2("总部 {0} {1} 专精", id, hqSkillCn(act)));
-  show("hqs");
+  refreshHqLocal(id, true);
 }
 function hqPoolAdd(id, specType){
   const st = (CATALOG&&CATALOG.spec_types[specType])||{};
   const entry = {spec: specType, nationality: st.nationality||"", quantity:1, delay:0};
   setPending("hq_force_pool_add", `hq_force_pool_add:${id}:${specType}`,
     {hq_id:id, entry}, L2("总部 {0} 兵库加 {1}", id, specCn(specType)));
-  show("hqs");
+  refreshHqLocal(id, true);
 }
 /* ⚠️ U91：`origin` = 该条目在**存档里的原始下标**（不是界面上的行号）。
    界面行号会因挂起的删除而前移，拿它当下标会：
@@ -2651,12 +2678,12 @@ function hqPoolRemove(id, origin){
   if(e._new){
     /* 这条还没写进存档 ⇒ 撤掉那条「加条目」就行，不必发删除 */
     dropPendingByKey("hq_force_pool_add", e._key);
-    show("hqs");
+    refreshHqLocal(id, true);
     return;
   }
   setPending("hq_force_pool_remove", `hq_force_pool_remove:${id}:${origin}`,
     {hq_id:id, index:origin}, L2("总部 {0} 兵库移除 {1}", id, nm));
-  show("hqs");
+  refreshHqLocal(id, true);
 }
 
 
@@ -4528,17 +4555,30 @@ document.querySelectorAll(".rail .nav").forEach(n =>
     document.querySelectorAll(".rail .nav").forEach(x=>x.classList.toggle("on", x===n));
     show(PAGE); }));
 
-/* ---------- U103：整页重绘时的**滚动保位** ----------
-   单位页有两个独立的滚动容器：`.rows`（单位列表）与 `.detail`（详情）。
+/* ---------- U103 / U106：整页重绘时的**滚动保位** ----------
+   单位页有两个独立的滚动容器：`.rows`（单位列表）与 `.detail`（详情）；
+   总部页的清单 `.hqlist` 也是独立的（U106 补上 —— 原来只记了前两个
+   ⇒ 总部清单整页重绘后跳回顶部）。
    整页重绘会把它们重建 ⇒ scrollTop 归零 ⇒ **列表跳回顶部**。
    ⇒ 重绘前记住、画完放回去；**只对同一页生效**（换页仍然从顶部开始）。 */
+/* U106：详情区的内容**是不是还是那一份**？
+   · 同一个总部的同一个标签页 ⇒ 内容没换 ⇒ 滚动位置保住（改完详情不跳）；
+   · 换了总部 / 换了标签页 ⇒ 内容变了 ⇒ 旧位置没意义 ⇒ 从顶部开始。 */
+function scrollCtx(){
+  if(LASTPAGE==="hqs") return "hqs:"+SEL.hqs+"|"+SEL.hqTab;
+  if(LASTPAGE==="units") return "units:"+SEL.units;
+  return "";
+}
 function captureScroll(w){
   const rows = w.querySelector(".rows");
   const det  = w.querySelector(".detail");
+  const hql  = w.querySelector(".hqlist");
   return {
     work: w.scrollTop,
     rows: rows ? rows.scrollTop : 0,
     detail: det ? det.scrollTop : 0,
+    hqlist: hql ? hql.scrollTop : 0,
+    ctx: scrollCtx(),
   };
 }
 function restoreScroll(w, st){
@@ -4546,8 +4586,11 @@ function restoreScroll(w, st){
   w.scrollTop = st.work;
   const rows = w.querySelector(".rows");
   if(rows) rows.scrollTop = st.rows;
+  /* U106：总部清单的滚动位置也要保住 */
+  const hql = w.querySelector(".hqlist");
+  if(hql) hql.scrollTop = st.hqlist;
   const det = w.querySelector(".detail");
-  if(det) det.scrollTop = st.detail;
+  if(det) det.scrollTop = (st.ctx===scrollCtx()) ? st.detail : 0;
 }
 let LASTPAGE = "";
 function show(p){
