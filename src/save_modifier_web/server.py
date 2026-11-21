@@ -653,13 +653,20 @@ def api_catalog() -> dict:
     return _catalog_payload()
 
 
-def api_pickers(save_id: str, unit_type: str = "") -> dict:
+def api_pickers(save_id: str, unit_type: str = "",
+                unit_types: str = "") -> dict:
     """`GET /api/pickers` —— 各页选择器的候选。
 
     * `specialists_for_unit` —— 某个单位类型能挂的特种兵（战役池 ∩ 游戏规则）
     * `campaign_pool`      —— 该战役的特种兵池（总部兵库 / 商店上架用）
     * `store_universe`     —— 游戏自己在该战役该会议会卖的东西（**上架的校验依据**）
     * `cards`              —— 本存档本会议的卡牌白名单（**每次开卡牌页重算，不缓存**）
+
+    **U104**：传 `unit_types=a,b,c`（逗号分隔）⇒ 额外返回
+    `specialists_by_unit = {类型: {candidates, scope}}` ——
+    一次开存档、一次算战役池，把**所有单位类型**的候选池一次算完
+    （前端进单位页时拉一次 ⇒ 之后切单位是即时的；单次请求 370 ms，
+    逐个拉 13 种类型要 13 次往返）。
     """
     from save_modifier_core import Catalog, CorePaths, open_save
 
@@ -674,6 +681,16 @@ def api_pickers(save_id: str, unit_type: str = "") -> dict:
             names, scope = catalog.specialist_candidates(
                 unit_type, campaign_id=campaign_id)
         pool = sorted(catalog.campaign_specialist_pool(campaign_id))
+        # U104：批量 —— 一次算齐所有单位类型的候选池
+        by_unit: dict[str, dict] = {}
+        for t in [x for x in (unit_types or "").split(",") if x]:
+            if t in by_unit:
+                continue
+            try:
+                n2, s2 = catalog.specialist_candidates(t, campaign_id=campaign_id)
+            except Exception:
+                continue
+            by_unit[t] = {"candidates": list(n2), "scope": s2}
 
         conference = None
         try:
@@ -687,6 +704,8 @@ def api_pickers(save_id: str, unit_type: str = "") -> dict:
         return {
             "unit_type": unit_type,
             "specialists_for_unit": {"candidates": list(names), "scope": scope},
+            # U104：批量拿到的「每种单位类型的候选池」
+            "specialists_by_unit": by_unit,
             "campaign_pool": pool,
             # ⚠️ `store_item_universe()` 的键是**单数**（equipment / nationality / spec）
             "store_universe": {
@@ -1748,7 +1767,9 @@ class _Handler(BaseHTTPRequestHandler):
                     q = parse_qs(urlparse(self.path).query)
                     sid = (q.get("save_id") or [""])[0]
                     ut = (q.get("unit_type") or [""])[0]
-                    self._json(api_pickers(sid, ut))
+                    # U104：批量（一次算齐所有单位类型的候选池）
+                    uts = (q.get("unit_types") or [""])[0]
+                    self._json(api_pickers(sid, ut, uts))
                 elif path == "/api/campaign-detail":
                     q = parse_qs(urlparse(self.path).query)
                     sid = (q.get("save_id") or [""])[0]

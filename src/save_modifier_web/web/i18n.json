@@ -734,7 +734,10 @@
   "HQ 技能下的命令 · 敌方下一回合结束前有效": "an order from an HQ skill · valid until the end of the enemy's next turn",
   "单位 {0} 作战标记": "Unit {0} combat orders",
   "三个标记互斥：选新的会撤掉旧的": "The three orders are mutually exclusive - picking a new one clears the old",
-  "存档里这个单位同时有多个标记，游戏只认第一个": "This unit has several orders in the save; the game only honors the first one"
+  "存档里这个单位同时有多个标记，游戏只认第一个": "This unit has several orders in the save; the game only honors the first one",
+  "正在读取这个单位类型的可用特种兵…": "reading the available specialists for this unit type...",
+  "<div style=\"padding:12px;color:var(--muted);font-size:12px\">正在读取这个单位类型的可用特种兵…</div>": "<div style=\"padding:12px;color:var(--muted);font-size:12px\">reading the specialists available for this unit type...</div>",
+  "读取中": "reading"
  },
  "errors": {
   "**取消专精**（{old_used} → {sp_used}）—— 该技能发动时的 CP 消耗会涨回去": "**Specialisation removed** ({old_used} → {sp_used}) — the CP cost of activating that skill goes back up",

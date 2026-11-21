@@ -1607,6 +1607,54 @@ function unitRowHTML(u){
 
 /* U103：列表行里的特种兵徽章（最多 3 个）——
    列表行与局部刷新共用一份，别写两遍。 */
+/* U104：这个单位类型的候选池（**按类型**取，不看全局 PICK）。
+   `/api/pickers?unit_type=X` 返回的 `specialists_for_unit` 是**按单位类型**算的
+   （战役池 ∩ 游戏规则）⇒ 换单位类型必须换池子。
+   全局 `PICK` 只是「最后一次拉的那份」⇒ 用它会显示**上一个单位**的候选。
+   返回 null = 这个类型还没拉到（界面显示「正在读取…」，不拿错的池子凑合）。 */
+function unitPoolFor(u){
+  const t = u && u.type;
+  if(!t) return null;
+  const c = PICKCACHE[t];
+  if(c && c.specialists_for_unit) return c.specialists_for_unit;
+  return null;
+}
+/* U104：确保这个单位类型的候选池已到位；到位后**只重画当前详情**。 */
+function ensureUnitPool(u){
+  if(!u || !u.type) return;
+  if(PICKCACHE[u.type]) return;            /* 缓存里有 ⇒ 直接用 */
+  const uid = u.id, type = u.type;
+  loadPickers(type).then(()=>{
+    /* 只在「选中的还是这个单位」时才重画。
+       ⚠️ 不看 PAGE —— 换页时这个函数也会被调，refreshUnitLocal 内部
+       自带「元素在不在」的判断 ⇒ 换页后是无害的空操作。 */
+    if(SEL.units===uid) refreshUnitLocal(uid);
+  }).catch(()=>{});
+}
+
+/* U104：把这个存档里**所有单位类型**的候选池**一次拉齐**
+   （服务端一个请求算完 ⇒ 之后切单位是**即时**的）。
+   单次 /api/pickers 要 ~370 ms；逐个类型拉就是 N 次往返 ⇒ 切单位要等。 */
+async function prefetchUnitPools(types){
+  const want = [];
+  (types||[]).forEach(t=>{
+    if(t && PICKCACHE[t]===undefined && want.indexOf(t)<0) want.push(t);
+  });
+  if(!want.length) return;
+  try{
+    const q = "?save_id=" + encOnce(VIEW._save_id) +
+              "&unit_types=" + encOnce(want.join(","));
+    const d = await api("/api/pickers" + q);
+    const map = d.specialists_by_unit || {};
+    want.forEach(t=>{
+      const sp = map[t];
+      if(sp) PICKCACHE[t] = {specialists_for_unit: sp};
+    });
+  }catch(e){
+    /* 预取失败不致命 —— 切换单位时 ensureUnitPool 还会按需拉。 */
+  }
+}
+
 function unitBadgesHTML(u){
   return projectedSpecs(u).slice(0,3).map(s=>
     `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>`).join("");
@@ -1640,6 +1688,9 @@ function pickUnit(id){
   if(det) det.innerHTML = unitDetailHTML(cur);
   if(cur) bindUnitControls(cur);
   paintPending();
+  /* U104：换单位 ⇒ **候选池跟着换**（这个类型的池没拉到就拉，拉到后重画详情）。
+     ⚠️ U82 把这里改成局部刷新之后，候选池就没人拉了 ⇒ 显示的是上一个单位的。 */
+  ensureUnitPool(cur);
 }
 
 /* U85：**工事等级 / 移动力 / 行动力** 三张卡（单位详情，血量那行之后、特种兵之前）。
@@ -1886,10 +1937,15 @@ function unitDetailHTML(u){
     ? specs.map(s=>specSlotHTML(u, s, specs)).join("")
     : L(`<div class="slot empty">还没有挂特种兵</div>`);
 
-  const pool = (PICK && PICK.specialists_for_unit) || {candidates:[], scope:"none"};
+  /* U104：候选池**按单位类型**取（全局 PICK 只是最后一次拉的那份）。 */
+  const pool = unitPoolFor(u);
   let poolHTML;
   if(SEL.fullPool){
+    /* 「显示所有特种兵」走**类型表**（catalog），不依赖候选池 ⇒ 照旧。 */
     poolHTML = fullPoolHTML(u, specs);
+  } else if(!pool){
+    /* 这个类型的池还没拉到 ⇒ 明说「在读」，别拿上一个单位的池子糊弄。 */
+    poolHTML = L(`<div style="padding:12px;color:var(--muted);font-size:12px">正在读取这个单位类型的可用特种兵…</div>`);
   } else {
     /* U48：同一种特种兵**可以挂多个** ⇒ 已挂的不再灰掉，
        改成角标「已挂 N 个」；只有**槽位满了**才不让再挂。 */
@@ -1908,10 +1964,12 @@ function unitDetailHTML(u){
     }).join("") : L(`<div style="padding:12px;color:var(--muted);font-size:12px">没有可用候选</div>`);
   }
 
-  const scopeTip = {campaign:L("战役默认池 ∩ 游戏规则"),
-                    no_campaign:L("找不到战役包 ⇒ 只按游戏规则"),
-                    empty_intersection:L("该单位与战役池无交集 ⇒ 只按游戏规则"),
-                    none:"—"}[pool.scope] || pool.scope;
+  const scopeTip = pool
+    ? ({campaign:L("战役默认池 ∩ 游戏规则"),
+        no_campaign:L("找不到战役包 ⇒ 只按游戏规则"),
+        empty_intersection:L("该单位与战役池无交集 ⇒ 只按游戏规则"),
+        none:"—"}[pool.scope] || pool.scope)
+    : L("读取中");
 
   return L2(`<div class="dhead">
     <div class="ava">{0}</div>
@@ -2023,12 +2081,18 @@ function pageUnits(w){
   if(ub) ub.addEventListener("change", function(){ UONLY = this.checked; show("units"); });
 
   if(cur) bindUnitControls(cur);
-  /* 候选池要按单位类型取 —— 换单位就重拉（带缓存） */
-  if(cur && cur.type && PICKCACHE[cur.type] === undefined){
-    loadPickers(cur.type).then(()=>{
-      /* U103：候选表到位只影响详情里的候选池 ⇒ 局部刷新（原来整页重绘会跳顶）。 */
-      if(PAGE==="units") refreshUnitLocal(SEL.units);
-    }).catch(()=>{});
+  /* 候选池要按单位类型取 —— 换单位就重拉（带缓存）。
+     U104：走 `ensureUnitPool`（与 pickUnit 同一个入口），
+     到位后只重画详情（U103：整页重绘会跳顶）。 */
+  ensureUnitPool(cur);
+  /* U104：把列表里**所有单位类型**的候选池一次拉齐 ⇒ 切单位即时。 */
+  const types = [];
+  list.forEach(u=>{ if(u && u.type && types.indexOf(u.type)<0) types.push(u.type); });
+  if(types.length){
+    prefetchUnitPools(types).then(()=>{
+      /* 拉齐后如果当前单位之前显示的是「正在读取…」⇒ 换成真候选 */
+      if(SEL.units!=null) refreshUnitLocal(SEL.units);
+    });
   }
 }
 
