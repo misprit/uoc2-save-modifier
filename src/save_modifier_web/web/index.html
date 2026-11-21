@@ -1640,14 +1640,15 @@ function unitRowHTML(u){
     <div class="umin">
       <div class="uname">{4}
         <span class="full">{5}</span></div>
-      <div class="umeta">{6}
+      <div class="umeta"><span class="unm">{6}</span>
         {7}
         {8}
         {9}</div>
       <div class="pips">{10}</div>
     </div>
     <div class="ubadges">{11}</div>
-  </div>`, u.id===SEL.units?'sel':'', u.id, u.id, avaImg(u.type, unitCn(u.type), AVA_BOX_LIST), esc(unitCn(u.type)), esc(u.type||""), esc(u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id)), hq?(L(" · 总部 ")+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):"", u.xp!==null&&u.xp!==undefined?(L(" · 经验 ")+u.xp):"", u.entr?(L(" · 被压制 ")+u.entr):"", pips, badges);
+  </div>`, u.id===SEL.units?'sel':'', u.id, u.id, avaImg(u.type, unitCn(u.type), AVA_BOX_LIST), esc(unitCn(u.type)), esc(u.type||""), esc(pendingVal("unit_field", uKey(u.id,"name_brief"),
+        u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id))), hq?(L(" · 总部 ")+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):"", u.xp!==null&&u.xp!==undefined?(L(" · 经验 ")+u.xp):"", u.entr?(L(" · 被压制 ")+u.entr):"", pips, badges);
 }
 
 /* U103：列表行里的特种兵徽章（最多 3 个）——
@@ -1792,6 +1793,13 @@ function refreshUnitLocal(unitId){
   const row = document.querySelector('#work .urow[data-uid="'+unitId+'"]');
   const box = row ? row.querySelector(".ubadges") : null;
   if(box) box.innerHTML = unitBadgesHTML(u);
+  /* ⚠️ **U129**：改名是**待应用**的改动 ⇒ 左侧列表那一行也要跟着显示新名字
+     （原来只刷徽章 ⇒ 名字看着还是旧的，像是没改）。 */
+  const nm = row ? row.querySelector(".unm") : null;
+  if(nm && u){
+    nm.textContent = pendingVal("unit_field", uKey(unitId,"name_brief"),
+      u.name_cn||u.name_brief||u.name_full||(L("单位 ")+unitId));
+  }
   paintPending();
 }
 
@@ -2174,7 +2182,8 @@ function unitDetailHTML(u){
       <div class="specslots" id="specslots_{1}">{16}</div>
       <div class="specpool"><div class="poolflat">{17}</div></div>
     </div>
-  </div>`, avaImg(u.type, unitCn(u.type), AVA_BOX_DETAIL), u.id, esc(u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id)), u.id, esc(u.type||"—"), esc(natCn(ut.nationality)), max||"—", bloodDirty?' dirty':'', u.id, pips, u.id, xp, specs.length, u.max_spec||ut.max_spec||3, esc(scopeTip), SEL.fullPool?'checked':'', slots, poolHTML, unitCombatFieldsHTML(u));
+  </div>`, avaImg(u.type, unitCn(u.type), AVA_BOX_DETAIL), u.id, esc(pendingVal("unit_field", uKey(u.id,"name_brief"),
+        u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id))), u.id, esc(u.type||"—"), esc(natCn(ut.nationality)), max||"—", bloodDirty?' dirty':'', u.id, pips, u.id, xp, specs.length, u.max_spec||ut.max_spec||3, esc(scopeTip), SEL.fullPool?'checked':'', slots, poolHTML, unitCombatFieldsHTML(u));
 }
 
 function pageUnits(w){
@@ -2483,7 +2492,8 @@ function hqRowHTML(h){
     <div class="nm"><b>{2}</b>
       <span>CP {3}/{4} · 经验 {5}/{6}</span>
       <div class="expbar"><i style="width:{7}%"></i></div></div>
-  </div>`, h.id===SEL.hqs?'on':'', h.id, esc(h.name_cn||h.name_brief||(L("总部 ")+h.id)), cp, mx, xp, xt||"—", pct);
+  </div>`, h.id===SEL.hqs?'on':'', h.id, esc(pendingVal("hq_field", hqKey(h.id,"name_brief"),
+        h.name_cn||h.name_brief||(L("总部 ")+h.id))), cp, mx, xp, xt||"—", pct);
 }
 /* U106：**局部刷新** —— 选中总部只重画【详情】+【清单里的这一行】，
    清单本身**不重建** ⇒ 滚动位置天然不动（原来走 `show("hqs")` 整页重绘
@@ -2679,7 +2689,8 @@ function hqDetailHTML(h){
     <div class="tb {15}" onclick="pickHqTab('fp')">兵库
       <span class="n">{16}</span></div>
   </div>
-  {17}`, h.id, esc(h.name_cn||h.name_brief||(L("总部 ")+h.id)), h.id, esc(hqGeneralCn(h.general)), h.id, xp, h.id, xt, h.id, h.id, h.id, trucks.join(""), tr?tr:L("—（存档没记）"), tr?TRUCK_RANGE[tr-1]:"—", SEL.hqTab!=="fp"?'on':'', SEL.hqTab==="fp"?'on':'', projectedPool(h).length, SEL.hqTab==="fp" ? hqPoolHTML(h) : hqMatrixHTML(h), L("经验与目标由游戏动态计算，不能手改 —— 想升级请直接改下面的分支等级 / 技能"));
+  {17}`, h.id, esc(pendingVal("hq_field", hqKey(h.id,"name_brief"),
+        h.name_cn||h.name_brief||(L("总部 ")+h.id))), h.id, esc(hqGeneralCn(h.general)), h.id, xp, h.id, xt, h.id, h.id, h.id, trucks.join(""), tr?tr:L("—（存档没记）"), tr?TRUCK_RANGE[tr-1]:"—", SEL.hqTab!=="fp"?'on':'', SEL.hqTab==="fp"?'on':'', projectedPool(h).length, SEL.hqTab==="fp" ? hqPoolHTML(h) : hqMatrixHTML(h), L("经验与目标由游戏动态计算，不能手改 —— 想升级请直接改下面的分支等级 / 技能"));
 }
 
 function pageHqs(w){
