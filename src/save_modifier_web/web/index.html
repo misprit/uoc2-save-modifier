@@ -1588,8 +1588,7 @@ function unitRowHTML(u){
   const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
   const max = u.max_st || ut.max_st || 0;
   const pips = bloodPipsHTML(act, sup, max);
-  const badges = specs.slice(0,3).map(s=>
-    `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>`).join("");
+  const badges = unitBadgesHTML(u);
   const hq = (VIEW.hqs||[]).find(h=>h.id===u.hq_id);
   return L2(`<div class="urow {0}" data-uid="{1}" onclick="pickUnit({2})">
     <div class="ava">{3}</div>
@@ -1604,6 +1603,26 @@ function unitRowHTML(u){
     </div>
     <div class="ubadges">{11}</div>
   </div>`, u.id===SEL.units?'sel':'', u.id, u.id, avaImg(u.type, unitCn(u.type), AVA_BOX_LIST), esc(unitCn(u.type)), esc(u.type||""), esc(u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id)), hq?(L(" · 总部 ")+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):"", u.xp!==null&&u.xp!==undefined?(L(" · 经验 ")+u.xp):"", u.entr?(L(" · 被压制 ")+u.entr):"", pips, badges);
+}
+
+/* U103：列表行里的特种兵徽章（最多 3 个）——
+   列表行与局部刷新共用一份，别写两遍。 */
+function unitBadgesHTML(u){
+  return projectedSpecs(u).slice(0,3).map(s=>
+    `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>`).join("");
+}
+
+/* U103：**局部刷新** —— 只重画【详情】+【这一行的特种兵徽章】。
+   列表与头像原位不动 ⇒ 不跳顶、不闪（整页重绘会重建滚动容器与几百个 <img>）。 */
+function refreshUnitLocal(unitId){
+  const u = (VIEW.units||[]).find(x=>x.id===unitId);
+  const det = document.getElementById("udetail");
+  if(det) det.innerHTML = unitDetailHTML(u);
+  if(u) bindUnitControls(u);
+  const row = document.querySelector('#work .urow[data-uid="'+unitId+'"]');
+  const box = row ? row.querySelector(".ubadges") : null;
+  if(box) box.innerHTML = unitBadgesHTML(u);
+  paintPending();
 }
 
 function pickUnit(id){
@@ -2007,7 +2026,8 @@ function pageUnits(w){
   /* 候选池要按单位类型取 —— 换单位就重拉（带缓存） */
   if(cur && cur.type && PICKCACHE[cur.type] === undefined){
     loadPickers(cur.type).then(()=>{
-      if(PAGE==="units") show("units");
+      /* U103：候选表到位只影响详情里的候选池 ⇒ 局部刷新（原来整页重绘会跳顶）。 */
+      if(PAGE==="units") refreshUnitLocal(SEL.units);
     }).catch(()=>{});
   }
 }
@@ -2117,7 +2137,8 @@ function commitRename(id){
   if(v) queueEdit("unit_field", uKey(id,"name_brief"),
     {unit_id:id, field:"name_brief", value:v},
     u.name_cn||u.name_brief||"", v, L2("单位 {0} 改名", id));
-  show("units");
+  /* U103：局部刷新（重画详情 = 退出改名输入框）—— 整页重绘会跳顶。 */
+  refreshUnitLocal(id);
 }
 
 /* U48：同一种特种兵可以挂**多个** ⇒ 待应用的 key 必须带序号，
@@ -2144,7 +2165,9 @@ function addSpec(unitId, specType){
   setPending("unit_spec_add", `unit_spec_add:${unitId}:${specType}:${seq}`,
     {unit_id:unitId, spec_type:specType, seq:seq},
     L2("单位 {0} 加特种 {1}", unitId, specCn(specType)));
-  show("units");
+  /* U103：局部刷新 —— 原来 `show("units")` 整页重绘 ⇒
+     **单位列表跳回顶部** + 几百个头像重新加载（闪一下）。 */
+  refreshUnitLocal(unitId);
 }
 /* U48：卸哪一个 ⇒ 必须按 **idx** 定位（同一类型可能挂着好几个） */
 function removeSpec(unitId, specType, idx){
@@ -2156,13 +2179,13 @@ function removeSpec(unitId, specType, idx){
   if(s._pending){
     /* 还没写盘的新增 ⇒ 撤掉那条待应用就行，不必发 remove 编辑 */
     dropPendingKind("unit_spec_add", s._key);
-    show("units");
+    refreshUnitLocal(unitId);
     return;
   }
   setPending("unit_spec_remove", `unit_spec_remove:${unitId}:${specType}:${s.idx}`,
     {unit_id:unitId, spec_type:specType, idx:s.idx},
     L2("单位 {0} 卸特种 {1}（槽位 {2}）", unitId, specCn(specType), s.idx));
-  show("units");
+  refreshUnitLocal(unitId);
 }
 
 
@@ -3909,9 +3932,10 @@ function poolGroupOpen(nat){ return !!(SEL.poolOpen && SEL.poolOpen[nat]); }
 function togglePoolGroup(nat){
   SEL.poolOpen = SEL.poolOpen||{};
   SEL.poolOpen[nat] = !poolGroupOpen(nat);
-  show("units");
+  /* U103：只影响详情里的候选池 ⇒ 局部刷新（不重绘列表）。 */
+  refreshUnitLocal(SEL.units);
 }
-function toggleFullPool(){ SEL.fullPool = !SEL.fullPool; show("units"); }
+function toggleFullPool(){ SEL.fullPool = !SEL.fullPool; refreshUnitLocal(SEL.units); }
 
 /* ---------- 应用 / 撤销 ---------- */
 /* 待应用的编辑列表 → 请求体（兵库**删条目**要排在最后：
@@ -4401,7 +4425,43 @@ document.querySelectorAll(".rail .nav").forEach(n =>
     document.querySelectorAll(".rail .nav").forEach(x=>x.classList.toggle("on", x===n));
     show(PAGE); }));
 
+/* ---------- U103：整页重绘时的**滚动保位** ----------
+   单位页有两个独立的滚动容器：`.rows`（单位列表）与 `.detail`（详情）。
+   整页重绘会把它们重建 ⇒ scrollTop 归零 ⇒ **列表跳回顶部**。
+   ⇒ 重绘前记住、画完放回去；**只对同一页生效**（换页仍然从顶部开始）。 */
+function captureScroll(w){
+  const rows = w.querySelector(".rows");
+  const det  = w.querySelector(".detail");
+  return {
+    work: w.scrollTop,
+    rows: rows ? rows.scrollTop : 0,
+    detail: det ? det.scrollTop : 0,
+  };
+}
+function restoreScroll(w, st){
+  if(!st) return;
+  w.scrollTop = st.work;
+  const rows = w.querySelector(".rows");
+  if(rows) rows.scrollTop = st.rows;
+  const det = w.querySelector(".detail");
+  if(det) det.scrollTop = st.detail;
+}
+let LASTPAGE = "";
 function show(p){
+  const w = document.getElementById("work");
+  /* 同页重绘 ⇒ 保住滚动位置；换页 ⇒ 从头开始。 */
+  const st = (p===LASTPAGE) ? captureScroll(w) : null;
+  renderPage(p);
+  LASTPAGE = p;
+  if(st){
+    restoreScroll(w, st);                          /* 容器高度没变的话当场生效 */
+    /* ⚠️ **必须等布局完成**：刚换完 innerHTML 时新容器还没排版
+       （scrollHeight 可能还是 0）⇒ 此刻赋值会**落空**（对照实验实测：
+       整页重绘后 scrollTop 仍是 0）⇒ 下一帧再放一次。 */
+    requestAnimationFrame(function(){ restoreScroll(w, st); });
+  }
+}
+function renderPage(p){
   const w = document.getElementById("work");
   /* 导航高亮跟随当前页（`?page=` 深链进来时原来还亮在「概览」） */
   document.querySelectorAll(".rail .nav").forEach(x=>
