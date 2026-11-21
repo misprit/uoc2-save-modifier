@@ -1057,7 +1057,9 @@
   "{arg0}：YAML 解析失败（{arg1}）—— 已阻止写入；请先把这个存档备份好，再检查该文件": "{arg0}: YAML parsing failed ({arg1}) — writing has been blocked; back this save up and check that file first",
   "这些条目不允许写入：{arg0}（只允许改根层的 {arg1} 与当前战斗层的那张 main.yml）": "these entries must not be written: {arg0} (only the root-layer {arg1} and the current battle layer's main.yml may be changed)",
   "存档不在存档目录里（拒绝越界访问）：{arg0}": "the save is not inside the save folder (out-of-bounds access refused): {arg0}",
-  "存档路径打不开：{arg0}": "cannot open the save path: {arg0}"
+  "存档路径打不开：{arg0}": "cannot open the save path: {arg0}",
+  "备份放不下（{arg0}；备用目录也不行：{arg1}）": "no place to put the backup ({arg0}; the fallback directory also failed: {arg1})",
+  "这个存档正在被写入（另一个写盘还没结束）—— 请稍后再试": "this save is being written right now (another write is still running) — please try again in a moment"
  },
  "values": {
   "arg1": {
