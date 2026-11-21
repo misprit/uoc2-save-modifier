@@ -103,9 +103,13 @@ def steam_libraries() -> list[Path]:
     """Steam 的**所有**库目录（含自定义库）。
 
     ⚠️ 只查默认库会漏掉装在别的盘的 Steam —— 注册表里只有一个 `SteamPath`，
-    而库是另一回事（`steamapps/libraryfolders.vcf` 里列着全部库，
+    而库是另一回事（`steamapps/libraryfolders.vdf` 里列着全部库，
     但**这个文件不一定存在**，非标准安装下常常没有 ⇒ 还要兜底扫常见库位置）。
 
+    ⚠️ **U122：文件名是 `libraryfolders.vdf`（`.vdf`）** —— 原来写成了
+    `.vcf` ⇒ **这个文件从来就没被读到过** ⇒ 装在别的盘的库**一个都发现不了**
+    （外部审阅报告 P1-6；本机实测也只有 `.vdf`）。
+    
     字节码依据：`paths.pyc::all_package_dirs` ⇒ 游戏自己的包目录是
     `_mod_packages_dirs + [_user_packages_dir] + [_game_package_dir]`；
     游戏本体目录由**安装位置**决定（`_Paths.__init__`）。
@@ -114,10 +118,10 @@ def steam_libraries() -> list[Path]:
     root = _steam_root()
     if root is not None:
         libs.append(root)
-        for vcf in (root / "steamapps" / "libraryfolders.vcf",
-                    root / "config" / "libraryfolders.vcf"):
+        for vdf in (root / "steamapps" / "libraryfolders.vdf",
+                    root / "config" / "libraryfolders.vdf"):
             try:
-                text = vcf.read_text(encoding="utf-8", errors="ignore")
+                text = vdf.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 continue
             for m in re.finditer(r'"path"\s*"([^"]+)"', text):
@@ -127,7 +131,7 @@ def steam_libraries() -> list[Path]:
                     continue
                 if p.is_dir() and p not in libs:
                     libs.append(p)
-    # 兜底：常见库位置（libraryfolders.vcf 缺失时）
+    # 兜底：常见库位置（libraryfolders.vdf 缺失时）
     for extra in (Path("D:/SteamLibrary"), Path("D:/Steam"),
                   Path("E:/SteamLibrary"), Path("C:/SteamLibrary")):
         if extra.is_dir() and extra not in libs:
@@ -262,7 +266,7 @@ def detect_game_dir() -> Path | None:
     **优先级（U69）**
     1. 设置文件里用户手动指定的（`<游戏数据目录>/modifier_config.json`）；
     2. 环境变量 `UOC2_GAME_DIR`；
-    3. Steam 注册表 → **所有库**（`libraryfolders.vcf`）+ 常见安装位置。
+    3. Steam 注册表 → **所有库**（`libraryfolders.vdf`）+ 常见安装位置。
 
     ⚠️ 设置文件里指的目录要是没了（游戏被移动 / 卸载），**自动忽略它**继续往下找 ——
     否则用户会被一个失效的设置卡住。
