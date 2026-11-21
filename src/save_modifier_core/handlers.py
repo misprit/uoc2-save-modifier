@@ -483,6 +483,15 @@ def _unit_spec_add(w, e: Edit) -> Outcome:
     oc = Outcome()
     unit_id = e.params.get("unit_id")
     spec_type = e.params.get("spec_type")
+    # U105：新挂的特种兵可以**一上来就是被压制的**（`active=False`）——
+    # 游戏里「被压制」就是 `active=False`（没有独立的 suppressed 字段，
+    # 见 `_unit_spec_active` 的字节码实证）⇒ 与「先挂再压制」写出来的
+    # 存档**完全一样**（存档里原有的和我们新增的走同一套逻辑）。
+    active = e.params.get("active", True)
+    if not isinstance(active, bool):
+        oc.errors.append(
+            f"active 必须是布尔值（True = 活跃 / False = 被压制），收到 {active!r}")
+        return oc
     if not w.require(w.caps.can_edit_units, "units", "units.yml"):
         return oc
     if w.catalog is None:
@@ -543,12 +552,20 @@ def _unit_spec_add(w, e: Edit) -> Outcome:
     if free is None:
         oc.errors.append("没有空闲的特种槽位（idx 0..2）")
         return oc
-    specs.append({"active": True, "captured": False,
+    specs.append({"active": active, "captured": False,
                   "idx": free, "type": spec_type})
     w.touch("units.yml")
-    oc.summary = f"单位 {unit_id} 加特种 {spec_type}（槽位 {free}）"
+    if active:
+        oc.summary = f"单位 {unit_id} 加特种 {spec_type}（槽位 {free}）"
+    else:
+        oc.summary = (f"单位 {unit_id} 加特种 {spec_type}"
+                      f"（槽位 {free}，新增即被压制）")
     oc.warnings.append(
         "登陆/空降单位进战斗时会按场景目标对账，多余的特种会被退回总部兵库（§3.5.5）")
+    if not active:
+        oc.warnings.append(
+            "被压制的特种兵不提供效果；游戏会按该单位的恢复步数逐步把它恢复"
+            "（战斗里由 `apply_recovery_specs` 处理，U84）")
     return oc
 
 

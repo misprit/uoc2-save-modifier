@@ -1241,6 +1241,17 @@ function dropPendingFromModal(i){
   if(!PENDING.length){ closeModal(); return; }
   doApply();          /* 重新 plan，把确认框刷新一遍 */
 }
+/* U105：改一条**已有**待应用的参数（不新增条目）——
+   用途：新增特种兵的「压制状态」挂在「加特种」这条待应用上。 */
+function patchPendingParams(kind, key, params, label){
+  const e = PENDING.find(x=>x.kind===kind && x.key===key);
+  if(!e) return false;
+  e.params = params;
+  if(label!==undefined) e.label = label;
+  paintPending();
+  return true;
+}
+
 /* 按 kind + key 撤掉一条挂起（U91：撤掉刚加的兵库条目） */
 function dropPendingByKey(kind, key){
   const i = PENDING.findIndex(x=>x.kind===kind && x.key===key);
@@ -1548,7 +1559,8 @@ function projectedSpecs(u){
          都要 push 一个，不能因为「已经有同类型」就跳过。
          临时 idx 用**负数**，避免与存档里的真实 idx（0..2）撞。 */
       specs.push({idx:-1-specs.length, type:p.params.spec_type,
-                  active:true, captured:false, _pending:true, _key:p.key});
+                  active:true, captured:false, _pending:true, _key:p.key,
+                  _params:p.params});
     }
     if(p.kind==="unit_spec_remove" && p.params.unit_id===u.id){
       const i = specs.findIndex(s => s.type===p.params.spec_type &&
@@ -1560,9 +1572,14 @@ function projectedSpecs(u){
      type / active / captured / idx 四个字段，没有独立的 suppressed 字段）。
      「待应用」里改过的优先显示。 */
   specs.forEach(s=>{
-    if(s._pending) return;              /* 还没写盘的新增：active 恒为 true */
-    s.active = !!pendingVal("unit_spec_active", specSupKey(u.id, s.type, s.idx),
-                            s.active!==false);
+    if(s._pending){
+      /* U105：新增件**也能压制** —— 状态挂在**那条「加特种」的待应用**上
+         （写盘时一起生效 ⇒ 与「先挂再压制」写出来的存档完全一样）。 */
+      s.active = !(s._params && s._params.active===false);
+    }else{
+      s.active = !!pendingVal("unit_spec_active", specSupKey(u.id, s.type, s.idx),
+                              s.active!==false);
+    }
   });
   return specs;
 }
@@ -1570,6 +1587,13 @@ function projectedSpecs(u){
 /* U84：压制状态的待应用 key（同一目标只挂一条） */
 function specSupKey(unitId, specType, idx){
   return `unit_spec_active:${unitId}:${specType}:${idx}`;
+}
+
+/* U105：槽位的**稳定标识** ——
+   存档里已有的 ⇒ 「s:<idx>」；还没写盘的新增件 ⇒ 「p:<待应用的 key>」。
+   ⚠️ 新增件的临时负数 idx 会随清单变化（增删别的件就重排）⇒ 不能当标识用。 */
+function specSlotId(s){
+  return s._pending ? ("p:"+s._key) : ("s:"+s.idx);
 }
 
 /* U65：血量条的段格条（列表行与详情卡共用一份逻辑） */
@@ -1868,10 +1892,10 @@ function specSlotHTML(u, s, sameSpecs){
     ? (L("点击卸下这个特种兵（第 ")+nth+"/"+same.length+L(" 个 · 槽位 ")+slotNo+L("）"))
     : (L("点击卸下这个特种兵（槽位 ")+slotNo+L("）"));
   const sup = (s.active===false);
-  /* 还没写盘的新增件（idx 是临时负数）不给按钮 —— 写盘后槽位才定 */
-  const btn = (s.idx>=0)
-    ? `<button class="supbtn" onclick="event.stopPropagation();toggleSpecSuppressed(${u.id},${esc(JSON.stringify(s.type))},${s.idx})" title="${esc(L("切换这个特种兵是否被压制（被压制时不提供效果；游戏会按该单位的恢复步数逐步恢复）"))}">${sup ? L("恢复活跃") : L("设为被压制")}</button>`
-    : "";
+  /* U105：**存档里原有的**和**我们新增的（还没写盘）**用**同一张卡片**、
+     同一个按钮 ⇒ 压制状态对两者都能调。
+     新增件的槽位还没定，但压制状态照样能先定下来（写盘时一起生效）。 */
+  const btn = `<button class="supbtn" onclick="event.stopPropagation();toggleSpecSuppressed(${u.id},${esc(JSON.stringify(s.type))},${esc(JSON.stringify(specSlotId(s)))})" title="${esc(L("切换这个特种兵是否被压制（被压制时不提供效果；游戏会按该单位的恢复步数逐步恢复）"))}">${sup ? L("恢复活跃") : L("设为被压制")}</button>`;
   return L2(`<div class="slot{11}" onclick="removeSpec({0},{1},{2})" title="{3}">
       <span class="sq">{4}</span>
       <span class="slotinfo">
@@ -1894,16 +1918,31 @@ function specSlotHTML(u, s, sameSpecs){
      btn);
 }
 
-/* U84：切换已挂特种兵的「被压制」状态（写盘字段 = `active`） */
-function toggleSpecSuppressed(unitId, specType, idx){
+/* U84 / U105：切换特种兵的「被压制」状态（写盘字段 = `active`）。
+   ⚠️ **存档里原有的**与**我们新增的（还没写盘）**走**同一套逻辑**：
+     · 存档里原有的 ⇒ 挂一条 `unit_spec_active` 编辑（按 idx 定位）；
+     · 新增的（还没写盘）⇒ 压制状态直接挂在**那条「加特种」的待应用**上
+       （写盘时一起生效 ⇒ 写出来的存档与「先挂再压制」完全一样）。 */
+function toggleSpecSuppressed(unitId, specType, slotId){
   const u = (VIEW.units||[]).find(x=>x.id===unitId); if(!u) return;
-  const s = (u.specs||[]).find(x=>x.type===specType && x.idx===idx); if(!s) return;
-  const key = specSupKey(unitId, specType, idx);
+  const s = projectedSpecs(u).find(x=>x.type===specType && specSlotId(x)===slotId);
+  if(!s) return;
   /* ⚠️ 以**当前显示值**取反（可能已经有挂起的编辑） */
-  const cur = !!pendingVal("unit_spec_active", key, s.active!==false);
+  const cur = (s.active!==false);
   const next = !cur;
+  if(s._pending){
+    /* 新增件：改「加特种」那条待应用的参数（**不**另起一条编辑 ⇒
+       不会出现「加了」和「压制了」两条互相打架的待应用）。 */
+    const params = Object.assign({}, s._params||{}, {active: next});
+    patchPendingParams("unit_spec_add", s._key, params,
+      L2("单位 {0} 加特种 {1}", unitId, specCn(specType))
+      + (next ? "" : L("（新增即被压制）")));
+    refreshSpecSlots(u);
+    return;
+  }
+  const key = specSupKey(unitId, specType, s.idx);
   queueEdit("unit_spec_active", key,
-    {unit_id:unitId, spec_type:specType, idx:idx, value:next},
+    {unit_id:unitId, spec_type:specType, idx:s.idx, value:next},
     cur, next,
     L2("单位 {0} 特种兵 {1}", unitId, specCn(specType)),
     cur ? L("活跃") : L("被压制"), next ? L("活跃") : L("被压制"));
@@ -2227,7 +2266,7 @@ function addSpec(unitId, specType){
   }
   const seq = ++SPECSEQ;
   setPending("unit_spec_add", `unit_spec_add:${unitId}:${specType}:${seq}`,
-    {unit_id:unitId, spec_type:specType, seq:seq},
+    {unit_id:unitId, spec_type:specType, seq:seq, active:true},
     L2("单位 {0} 加特种 {1}", unitId, specCn(specType)));
   /* U103：局部刷新 —— 原来 `show("units")` 整页重绘 ⇒
      **单位列表跳回顶部** + 几百个头像重新加载（闪一下）。 */

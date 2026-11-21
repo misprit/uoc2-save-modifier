@@ -737,7 +737,8 @@
   "存档里这个单位同时有多个标记，游戏只认第一个": "This unit has several orders in the save; the game only honors the first one",
   "正在读取这个单位类型的可用特种兵…": "reading the available specialists for this unit type...",
   "<div style=\"padding:12px;color:var(--muted);font-size:12px\">正在读取这个单位类型的可用特种兵…</div>": "<div style=\"padding:12px;color:var(--muted);font-size:12px\">reading the specialists available for this unit type...</div>",
-  "读取中": "reading"
+  "读取中": "reading",
+  "（新增即被压制）": "(added already suppressed)"
  },
  "errors": {
   "**取消专精**（{old_used} → {sp_used}）—— 该技能发动时的 CP 消耗会涨回去": "**Specialisation removed** ({old_used} → {sp_used}) — the CP cost of activating that skill goes back up",
@@ -1032,7 +1033,8 @@
   "该单位普通部队合计（活跃 + 被压制）不能超过类型上限 {limit}（{unit_get_type} 的 max_st）—— 活跃兵力已按上限截断（{a_old} → {a}）": "this unit's regular troops (active + suppressed) cannot exceed the type's limit {limit} ({unit_get_type} max_st) — the active strength was capped at the limit ({a_old} → {a})",
   "CP {value} 超过该总部的上限 {maxcp_now} —— 游戏读档时按上限截断（`HQState._repair_data`），多出来的 CP 会白给": "CP {value} is above this HQ's limit {maxcp_now} — the game truncates it to the limit when it loads the save (`HQState._repair_data`), so the extra CP is wasted",
   "CP 上限降到 {value}，但当前 CP 是 {cp_now} —— 游戏读档时按上限截断（`HQState._repair_data`）": "the CP limit drops to {value}, but the current CP is {cp_now} — the game truncates it to the limit when it loads the save (`HQState._repair_data`)",
-  "一个单位**只能有一个**作战标记（死守 / 后卫部队 / 反击三者互斥）—— 游戏里下达命令是「先把该单位从三个列表全清掉、再加进其中一个」（`UnitSetFlags._set_flags`），而且三个 `can_make_*` 都要求「该单位没有别的标记」（`has_any_defense_flag`）；存档里有冲突时游戏只认第一个（{arg0}）": "a unit can only have ONE combat order (no retreat / rearguard / counterattack are mutually exclusive) - in the game, issuing an order first removes the unit from all three lists and then adds it to one of them (`UnitSetFlags._set_flags`), and all three `can_make_*` require that the unit carries no other order (`has_any_defense_flag`); if the save has a conflict the game only honors the first one ({arg0})"
+  "一个单位**只能有一个**作战标记（死守 / 后卫部队 / 反击三者互斥）—— 游戏里下达命令是「先把该单位从三个列表全清掉、再加进其中一个」（`UnitSetFlags._set_flags`），而且三个 `can_make_*` 都要求「该单位没有别的标记」（`has_any_defense_flag`）；存档里有冲突时游戏只认第一个（{arg0}）": "a unit can only have ONE combat order (no retreat / rearguard / counterattack are mutually exclusive) - in the game, issuing an order first removes the unit from all three lists and then adds it to one of them (`UnitSetFlags._set_flags`), and all three `can_make_*` require that the unit carries no other order (`has_any_defense_flag`); if the save has a conflict the game only honors the first one ({arg0})",
+  "单位 {unit_id} 加特种 {spec_type}（槽位 {free}，新增即被压制）": "unit {unit_id}: added special force {spec_type} (slot {free}, added already suppressed)"
  },
  "values": {
   "arg1": {

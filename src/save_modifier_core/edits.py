@@ -117,10 +117,16 @@ class Edit:
                     {"unit_id": unit_id, "field": field, "value": value})
 
     @staticmethod
-    def unit_spec_add(unit_id: int, spec_type: str) -> "Edit":
-        """给单位挂一个特种。"""
+    def unit_spec_add(unit_id: int, spec_type: str, active: bool = True) -> "Edit":
+        """给单位挂一个特种。
+
+        `active=False` = 这个特种兵**一挂上就是被压制的** ——
+        游戏里没有独立的 suppressed 字段（被压制 = `active=False`，
+        见 `Edit.unit_spec_active` 的字节码实证）⇒ 与「先挂再压制」
+        写出来的存档**完全一样**（U105：存档里原有的和我们新增的用同一套逻辑）。
+        """
         return Edit("unit_spec_add",
-                    {"unit_id": unit_id, "spec_type": spec_type})
+                    {"unit_id": unit_id, "spec_type": spec_type, "active": active})
 
     @staticmethod
     def unit_spec_remove(unit_id: int, spec_type: str,
