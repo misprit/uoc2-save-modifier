@@ -10,6 +10,7 @@
 """
 
 import hashlib
+import os
 import json
 import shutil
 import tempfile
@@ -33,9 +34,20 @@ class UndoTestBase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="undo_test_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        # U109：备份改放 `<修改器目录>/bak/` ⇒ 这里用**本测试自己的**目录
+        # （断言的是确切文件名，如 `s_BACKUP_2.usg`）。
+        self._bak_old = os.environ.get("UOC2_BAK_DIR")
+        os.environ["UOC2_BAK_DIR"] = str(self.tmp)
+        self.addCleanup(self._restore_bak)
         self.save_path = make_save(self.tmp / "s.usg")
         self.paths = CorePaths.discover()
         self.catalog = Catalog(self.paths)
+
+    def _restore_bak(self):
+        if self._bak_old is None:
+            os.environ.pop("UOC2_BAK_DIR", None)
+        else:
+            os.environ["UOC2_BAK_DIR"] = self._bak_old
 
     def open(self):
         return open_save(str(self.save_path), self.paths)
