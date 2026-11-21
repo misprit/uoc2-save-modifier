@@ -132,14 +132,18 @@ class TestShelfEdits(ShelfTestBase):
         self.path = self.make(main_overrides={"card_store": SHELF})
 
     def test_set_is_free_on_shelf_is_a_price(self):
-        """货架上的 `is_free` = **真实价格**（True ⇒ 0 声望）。"""
+        """货架上的 `is_free` = **真实价格**（True ⇒ 0 声望）。
+
+        ⚠️ **U146**：这条知识**不再每次当软警告弹**（噪音）⇒
+        改到**卡牌页的静态说明**里（见 `tests/test_warning_noise.py`）。
+        """
         plan, res = self.commit(self.path,
                                 [Edit.card_store_set(1, is_free=True)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
         shelf = self.read(self.path, "main.yml")["card_store"]
         self.assertTrue(shelf[0]["is_free"])
-        self.assertTrue(any("声望" in w for w in plan.warnings), plan.warnings)
+        self.assertFalse(any("声望" in w for w in plan.warnings), plan.warnings)
 
     def test_set_is_free_false(self):
         plan, res = self.commit(self.path,

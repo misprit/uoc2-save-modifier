@@ -126,10 +126,14 @@ class TestSpecSuppression(SpecSuppressionTestBase):
         self.assertIn("布尔", plan.errors[0])
 
     def test_warnings_explain_the_game_behaviour(self):
-        """压制要提示：游戏会按恢复步数把它恢复（免得玩家以为永久）。"""
+        """压制要说明：游戏会按恢复步数把它恢复（免得玩家以为永久）。
+
+        ⚠️ **U146**：这条知识**不再每次当软警告弹** ⇒
+        改到**按钮的悬停说明**里（见 `tests/test_warning_noise.py`）。
+        """
         plan, _ = self.commit([Edit.unit_spec_active(1, "ger_arty_40", 0, False)])
         self.assertTrue(plan.ok, plan.errors)
-        self.assertTrue(any("恢复" in w for w in plan.warnings), plan.warnings)
+        self.assertFalse(any("恢复" in w for w in plan.warnings), plan.warnings)
 
     def test_same_value_is_a_no_op(self):
         """本来就活跃 ⇒ **没事可做**（不是错误，也不该产生多余的备份）。"""

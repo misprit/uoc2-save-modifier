@@ -62,12 +62,16 @@ class TestStorePriceAndQuantity(CardStoreTestBase):
         self.assertEqual(store["south"]["store"][0]["quantity"], 20)   # 其余不动
 
     def test_price_zero_means_free_not_sold_out(self):
+        """price=0 = 免费商品（不是下架）。
+
+        ⚠️ **U146**：这条知识**不再每次当软警告弹** ⇒ 改到**商店页的说明**里。
+        """
         plan, res = self.commit([Edit.store_set("south", "store", 0, "price", 0)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
         store = self.read("store.yml")
         self.assertEqual(store["south"]["store"][0]["price"], 0)
-        self.assertTrue(any("免费" in w for w in plan.warnings), plan.warnings)
+        self.assertFalse(any("免费" in w for w in plan.warnings), plan.warnings)
 
     def test_quantity_zero_is_blocked(self):
         """`quantity: 0` 是游戏从不产生的非法状态。"""

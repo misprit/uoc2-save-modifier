@@ -115,10 +115,14 @@ class TestAddSuppressed(PendingSuppressionTestBase):
                          "「新增即被压制」与「先挂再压制」写出来的存档必须一致")
 
     def test_warning_explains_recovery(self):
-        """压制要提示：游戏会按恢复步数把它恢复（免得玩家以为永久）。"""
+        """压制要说明：游戏会按恢复步数把它恢复（免得玩家以为永久）。
+
+        ⚠️ **U146**：这条知识**不再每次当软警告弹** ⇒
+        改到**按钮的悬停说明**里（见 `tests/test_warning_noise.py`）。
+        """
         plan, _ = self.commit([Edit.unit_spec_add(1, "us_arty_42", active=False)])
         self.assertTrue(plan.ok, plan.errors)
-        self.assertTrue(any("恢复" in w for w in plan.warnings), plan.warnings)
+        self.assertFalse(any("恢复" in w for w in plan.warnings), plan.warnings)
 
     def test_summary_says_suppressed(self):
         plan, _ = self.commit([Edit.unit_spec_add(1, "us_arty_42", active=False)])

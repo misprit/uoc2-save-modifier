@@ -122,9 +122,12 @@ class TestTheaterAssetInBattle(TheaterAssetTestBase):
         self.assertFalse(plan.ok)
 
     def test_warns_that_game_cannot_undo_it(self):
+        """⚠️ **U146**：这条知识改到**战区资产页的静态说明**里
+        （原先每次都当软警告弹 ⇒ 噪音）。"""
         plan = self.plan(self.save_path,
                             [Edit.theater_asset("air_attack", to_use=5)])
-        self.assertTrue(any("重置会议" in w for w in plan.warnings), plan.warnings)
+        self.assertFalse(any("重置会议" in w for w in plan.warnings),
+                         plan.warnings)
 
 
 class TestTheaterAssetOutOfBattle(TheaterAssetTestBase):

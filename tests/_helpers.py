@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-__all__ = ["save_root", "find_saves", "game_dir"]
+__all__ = ["save_root", "find_saves", "game_dir", "web_html"]
 
 
 def save_root() -> Path:
@@ -26,6 +26,18 @@ def game_dir() -> Path | None:
         return Path(env)
     from save_modifier_core.paths import detect_game_dir
     return detect_game_dir()
+
+
+def web_html() -> str:
+    """前端的 `index.html` 全文。
+
+    要断言"界面上的**静态说明**写了某条知识"时用
+    （U146 起：软警告里的知识搬到了界面说明里）。
+    """
+    import io
+    p = (Path(__file__).resolve().parent.parent / "src" / "save_modifier_web"
+         / "web" / "index.html")
+    return io.open(p, encoding="utf-8", newline="").read()
 
 
 def find_saves(limit_per_dir: int = 2) -> list[Path]:

@@ -340,13 +340,8 @@ def _level(w, e: Edit) -> Outcome:
     main["level"] = value
     w.touch("main.yml")
     oc.summary = f"难度：{_level_cn(old) if old else '（空）'} → {_level_cn(value)}"
-    if n_hand:
-        oc.warnings.append(
-            f"新难度「{_level_cn(value)}」的手牌上限是 {limit} 张，"
-            f"手里现有 {n_hand} 张 —— 都在上限内，但**买新卡**时游戏会按新上限判断")
-    oc.warnings.append(
-        "难度还决定**以后**开的新会议：免费卡数 / 折扣卡数 / AI 强度 / "
-        "「重置会议」时重建的 HQ 卡车与步兵阶梯 —— 现有手牌与货架**不会**被改动")
+    # ⚠️ **U146**：这两条是**说明性**的（"都在上限内" / "以后开的新会议"）
+    # ⇒ 每次改难度都弹 ⇒ 噪音 ⇒ 删掉（手牌超上限那种**硬伤**在上面的 errors 里）。
     return oc
 
 
@@ -573,10 +568,7 @@ def _unit_spec_add(w, e: Edit) -> Outcome:
                       f"（槽位 {free}，新增即被压制）")
     oc.warnings.append(
         "登陆/空降单位进战斗时会按场景目标对账，多余的特种会被退回总部兵库（§3.5.5）")
-    if not active:
-        oc.warnings.append(
-            "被压制的特种兵不提供效果；游戏会按该单位的恢复步数逐步把它恢复"
-            "（战斗里由 `apply_recovery_specs` 处理，U84）")
+    # ⚠️ **U146**：「被压制的特种兵不提供效果」是**通用说明** ⇒ 删掉。
     return oc
 
 
@@ -651,10 +643,7 @@ def _unit_spec_active(w, e: Edit) -> Outcome:
     oc.summary = (f"单位 {unit_id} 的特种 {spec_type}"
                   + (f"（槽位 {target.get('idx')}）" if target.get("idx") is not None else "")
                   + ("：设为被压制" if not active else "：恢复活跃"))
-    if not active:
-        oc.warnings.append(
-            "被压制的特种兵不提供效果；游戏会按该单位的恢复步数逐步把它恢复"
-            "（战斗里由 `apply_recovery_specs` 处理，U84）")
+    # ⚠️ **U146**：「被压制的特种兵不提供效果」是**通用说明** ⇒ 删掉。
     return oc
 
 
@@ -801,8 +790,6 @@ def _unit_orders(w, e: Edit) -> Outcome:
         "作战标记是**命令**：敌方下一回合结束前有效 —— "
         "游戏回合开始会把它清掉（`Game.start_turn_clear`）")
     oc.warnings.append(
-        "只对**当前这场战斗**生效；下一场战斗按场景自己的定义重置")
-    oc.warnings.append(
         "⚠️ 游戏**开着**时改盘 ⇒ 退出时的自动保存会覆盖你的改动 ⇒ "
         "改之前先退出游戏")
     return oc
@@ -946,10 +933,6 @@ def _hq_field(w, e: Edit) -> Outcome:
     if field in ("prisoners", "loss_count", "intels_revealed"):
         oc.warnings.append(
             f"{field} 是游戏自己累计的统计值，改了不会被重算，但界面可能对不上")
-    if field == "trucks":
-        oc.warnings.append(
-            f"卡车数决定总部的补给作用范围（{TRUCK_MIN}–{TRUCK_MAX} 辆 → "
-            f"{'/'.join(str(r) for r in TRUCK_RANGES)} 格）；改它**不扣声望**")
     return oc
 
 
@@ -1109,9 +1092,7 @@ def _hq_branch_suppressed(w, e: Edit) -> Outcome:
         oc.warnings.append(
             "压制期间，这个分支的**生效等级**会下降"
             f"（{old_level} → {new_level}）；游戏在一局结束时会把压制还原")
-    elif suppressed < old_supp:
-        oc.warnings.append(
-            f"解除压制 —— 生效等级回到 {new_level}（解锁到 {real} 级不变）")
+    # ⚠️ **U146**：「解除压制」是**好消息** ⇒ 不该当警告弹出来。
     return oc
 
 
@@ -1248,9 +1229,7 @@ def _hq_branch_sp(w, e: Edit) -> Outcome:
         oc.warnings.append(
             f"**取消专精**（{old_used} → {sp_used}）—— "
             "该技能发动时的 CP 消耗会涨回去")
-    if sp_used > old_used:
-        oc.warnings.append(
-            f"专精会让 **{action}** 发动时的 CP 消耗从 {old_cost} 降到 {new_cost}")
+    # ⚠️ **U146**：「专精让 CP 消耗降低」是**好消息** ⇒ 不该当警告弹出来。
     return oc
 
 
@@ -1335,15 +1314,9 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
             f"**同一个总部里不能有两条延迟同为 {delay} 的同样条目**；"
             "延迟不同的可以共存")
         return oc
-    if others:
-        # 游戏自己的合并键 = (delay, nationality, spec|equipment)
-        # （`ForcePool.add` 延迟模式：命中同键就把 quantity 加到已有那条上，不新建）
-        # ⇒ 延迟不同 ⇒ 键不同 ⇒ 两条独立条目，**分批上线**。
-        where = "、".join(f"第 {i} 条（延迟 {d} 回合，数量 {q}）" for i, d, q in others)
-        oc.warnings.append(
-            f"本总部已有同样的「{_entry_label(new)}」：{where} —— "
-            f"**延迟不同可以共存**（游戏按延迟分批上线："
-            f"延迟 {delay} 的这批要等 {delay} 个回合才能部署）")
+    # ⚠️ **U146**：游戏自己的合并键 = (delay, nationality, spec|equipment)
+    #   ⇒ **延迟不同可以共存**（分批上线）—— 这只是**解释为什么没拦**，
+    #   不是"你改的东西可能不生效" ⇒ 噪音 ⇒ 删掉。
 
     pool.insert(index, new)
     hq["force_pool"] = pool
@@ -1546,9 +1519,6 @@ def _card_set(w, e: Edit) -> Outcome:
     target[field] = value
     w.touch("cards.yml")
     oc.summary = f"手牌槽位 {position} 的 {field}：{old} → {value}"
-    oc.warnings.append(
-        "手牌上的 is_free **没有玩法影响** —— 只改 tooltip 文案与卡背贴图；"
-        "想改价格要改货架上的卡（§7.5.2）")
     return oc
 
 
@@ -1778,11 +1748,8 @@ def _card_store_set(w, e: Edit) -> Outcome:
                           f"（原来 {old_free}）")
 
     w.touch("main.yml")
-    if is_free:
-        oc.warnings.append(
-            "货架上的 is_free=True = **价格 0**（不扣声望）—— 这是白嫖（§7.5.2）")
-    oc.warnings.append(
-        "货架只管**这一场会议** —— 进入新会议时游戏会按权重重掷（§7.5）")
+    # ⚠️ **U146**：这两条都是**说明性**的（玩家刚做的选择的复述 / 通用规则）
+    # ⇒ 噪音 ⇒ 删掉。
     return oc
 
 
@@ -1870,10 +1837,7 @@ def _card_store_add(w, e: Edit) -> Outcome:
                   "position": position, "unit_id": unit_id, "used": False})
     w.touch("main.yml")
     oc.summary = f"上架卡 {card_type}（槽位 {position}）"
-    if is_free:
-        oc.warnings.append("is_free=True = **价格 0**（不扣声望）—— 这是白嫖")
-    oc.warnings.append(
-        "货架只管**这一场会议** —— 进入新会议时游戏会按权重重掷（§7.5）")
+    # ⚠️ **U146**：同上（说明性）⇒ 删掉。
     return oc
 
 
@@ -1923,8 +1887,6 @@ def _store_set(w, e: Edit) -> Outcome:
     oc.summary = (f"商店 {front}/{sub} 第 {index} 条"
                   f"（{entry.get('spec') or entry.get('equipment')}）"
                   f" 的 {field}：{old} → {value}")
-    if field == "price" and value == 0:
-        oc.warnings.append("price=0 表示**免费商品**，不是下架")
     nat = entry.get("nationality")
     if isinstance(nat, str) and nat.lower() in ("allies", "axis"):
         oc.warnings.append(
@@ -2189,8 +2151,6 @@ def _theater_asset(w, e: Edit) -> Outcome:
         oc.warnings.append(
             f"当前可用 {after['to_use']} 次 大于 回合开始后的有效值 {eff} 次："
             f"回合开始时游戏会把当前可用次数重置为 {eff} 次")
-    oc.warnings.append(
-        "战区资产**无法通过游戏内的『重置会议』撤销** —— 需要用修改器自己的撤销（§6.4）")
     return oc
 
 
@@ -2269,8 +2229,6 @@ def _theater_asset_add(w, e: Edit) -> Outcome:
     oc.warnings.append(
         "游戏载入战斗时会把「当前可用」重置成「每回合恢复」"
         "（本场景剩余有限时取两者较小值）")
-    oc.warnings.append(
-        "战区资产**无法通过游戏内的『重置会议』撤销** —— 需要用修改器自己的撤销（§6.4）")
     return oc
 
 
@@ -2314,8 +2272,6 @@ def _theater_asset_remove(w, e: Edit) -> Outcome:
         oc.warnings.append(
             f"这一方（第 {idx} 组）删完是空的 —— "
             "游戏里这一方就没有战区资产了")
-    oc.warnings.append(
-        "战区资产**无法通过游戏内的『重置会议』撤销** —— 需要用修改器自己的撤销（§6.4）")
     return oc
 
 
