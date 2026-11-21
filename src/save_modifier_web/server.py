@@ -326,12 +326,47 @@ def api_saves() -> dict:
     return {"saves": rows}
 
 
+def _save_id_checked(save_id: str) -> str:
+    """把 `save_id` 还原成**存档根目录之内**的相对路径（U126）。
+
+    ⚠️ `save_id` 来自 HTTP 请求（query / body）⇒ **不能直接信**。
+    核心库的 `resolve_save_id` 允许**绝对路径** ⇒ 传
+    `C:\\Windows\\win.ini` 就会把**任意文件**当成存档打开
+    （`api_save_as` 还会把它**复制**出去 ⇒ 任意文件读取 + 外传）。
+
+    ⇒ 这里强制：解析（`resolve`）之后必须**仍在存档根目录之内**，
+    否则抛错（HTTP 层会把它变成 500 + 说明文字）。
+
+    返回**相对存档根的 posix 路径**（`campaigns/west.usg` 这种）——
+    与 `list_saves()` 给的 `save_id` 口径一致。
+    """
+    from save_modifier_core.paths import appdata_dir
+
+    raw = (save_id or "").strip()
+    if not raw:
+        raise ValueError("没有指定存档")
+    root = (appdata_dir() / "save").resolve()
+    try:
+        # 相对路径按存档根拼；绝对路径直接用（下面统一再核对边界）
+        cand = Path(raw) if Path(raw).is_absolute() else (root / Path(*raw.split("/")))
+        real = cand.resolve()
+    except OSError as exc:
+        raise ValueError("存档路径打不开：%s" % exc)
+    try:
+        rel = real.relative_to(root)
+    except ValueError:
+        raise ValueError("存档不在存档目录里（拒绝越界访问）：%s" % raw)
+    if not str(rel) or rel == Path("."):
+        raise ValueError("存档不在存档目录里（拒绝越界访问）：%s" % raw)
+    return rel.as_posix()
+
+
 def api_view(save_id: str) -> dict:
     """某个存档的完整只读投影（概览页 / 各功能页用）。"""
     from save_modifier_core import Catalog, CorePaths, open_save
 
     catalog = Catalog(CorePaths.discover())
-    with open_save(save_id) as save:
+    with open_save(_save_id_checked(save_id)) as save:
         view = save.view(catalog=catalog)
         caps = view.capabilities
         data = _jsonable(view)
@@ -671,7 +706,7 @@ def api_pickers(save_id: str, unit_type: str = "",
     from save_modifier_core import Catalog, CorePaths, open_save
 
     catalog = Catalog(CorePaths.discover())
-    with open_save(save_id) as save:
+    with open_save(_save_id_checked(save_id)) as save:
         info = save.info
         campaign_id = info.campaign_id
 
@@ -1147,7 +1182,7 @@ def api_save_as(payload) -> dict:
     if not dest.parent.is_dir():
         return {"ok": False, "errors": ["目录不存在：%s" % dest.parent]}
     try:
-        with open_save(save_id) as save:
+        with open_save(_save_id_checked(save_id)) as save:
             src = Path(save.info.path)
     except Exception as exc:
         return {"ok": False, "errors": ["读不到原存档：%s" % exc]}
@@ -1580,7 +1615,7 @@ def api_campaign_detail(save_id: str) -> dict:
     from save_modifier_core import CorePaths, open_save
 
     paths = CorePaths.discover()
-    with open_save(save_id) as save:
+    with open_save(_save_id_checked(save_id)) as save:
         try:
             pos = save.campaign_position()
         except Exception as exc:
@@ -1674,7 +1709,7 @@ def api_undo_stack(save_id: str) -> dict:
     from save_modifier_core import open_save
     from save_modifier_core.undo import load_stack
 
-    with open_save(save_id) as save:
+    with open_save(_save_id_checked(save_id)) as save:
         path = Path(save.path)
         records, _ = load_stack(path)
         stack = [{"id": r.id, "time": r.time, "summary": r.summary,
@@ -1713,7 +1748,7 @@ def api_plan(payload) -> dict:
 
     save_id = (payload or {}).get("save_id") or ""
     catalog = Catalog(CorePaths.discover())
-    with open_save(save_id) as save:
+    with open_save(_save_id_checked(save_id)) as save:
         plan = save.plan_edit(_edits_from(payload), catalog=catalog)
         # 备份文件**在哪里**提前算出来给确认框显示（写盘前就能告诉玩家）
         try:
@@ -1746,7 +1781,7 @@ def api_commit(payload) -> dict:
 
     save_id = (payload or {}).get("save_id") or ""
     catalog = Catalog(CorePaths.discover())
-    with open_save(save_id) as save:
+    with open_save(_save_id_checked(save_id)) as save:
         plan = save.plan_edit(_edits_from(payload), catalog=catalog)
         if not plan.ok:
             return {"ok": False, "errors": list(plan.errors),
@@ -1766,7 +1801,7 @@ def api_undo(payload) -> dict:
     from save_modifier_core import open_save
 
     save_id = (payload or {}).get("save_id") or ""
-    with open_save(save_id) as save:
+    with open_save(_save_id_checked(save_id)) as save:
         if not save.undo_available():
             return {"ok": False, "errors": ["没有可撤销的改动"], "summary": ""}
         r = save.undo()

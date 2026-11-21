@@ -17,7 +17,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-__all__ = ["CorePaths", "APP_DIR_NAME", "config_path", "read_config",
+__all__ = [
+    "appdata_dir","CorePaths", "APP_DIR_NAME", "config_path", "read_config",
            "write_config", "detect_game_dir", "game_dir_candidates",
            "looks_like_game_dir", "set_game_dir", "steam_libraries",
            "modifier_home", "backup_dir"]
@@ -26,6 +27,17 @@ APP_DIR_NAME = ".uoc2"
 
 #: **备份存档**目录名（放在**修改器所在目录**下 —— U109）
 BACKUP_DIR_NAME = "bak"
+
+
+def appdata_dir() -> Path:
+    """游戏数据目录（默认 `%LOCALAPPDATA%\\.uoc2`；`UOC2_APPDATA` 可覆盖）。
+
+    ⚠️ **U126**：服务端要核对「存档路径有没有越界」时**只需要这个目录**
+    —— 存档根 = `<游戏数据目录>/save`。
+    ⇒ 单独暴露一个轻量入口，**不用**为了拿存档根去探测游戏安装目录
+    （`CorePaths.discover()` 会去查注册表 + 扫 Steam 库，慢）。
+    """
+    return _default_appdata()
 
 
 def modifier_home() -> Path:
