@@ -200,14 +200,32 @@ class TestSpecPickerUi(unittest.TestCase):
         self.assertIn("MODAL.all", body)
 
     def test_default_list_is_the_player_ones(self):
+        """默认列表 = **玩家挂得上的那批**（直接取 `playerSpecs()`）。"""
         body = self._body(self.html, "function specPickItems(", "/* U107：切换「显示全部」 */")
-        self.assertIn("if(!all && !usable) return;", body,
+        self.assertIn("ok ? ok.slice()", body,
                       "默认必须只列玩家挂得上的")
 
-    def test_store_greys_out_the_unusable_ones(self):
-        """商店：挂不上的**灰掉**（买了也白花钱）。"""
-        body = self._body(self.html, "function specPickItems(", "/* U107：切换「显示全部」 */")
-        self.assertIn("blocked: !!(forStore && !usable)", body)
+    def test_show_all_covers_every_specialist_type(self):
+        """⭐ **U113**：「显示全部」= **游戏定义过的全部**特种兵
+        （与单位页的「显示所有特种兵」同一套范围）。
+
+        以前只给**战役池**（west 才 45 种）⇒ 比单位页能挂的（97 种）少一大截
+        ⇒ 用户以为「很多种挂不上 / 买不了」。
+        """
+        body = self._body(self.html, "function specPickItems(",
+                          "/* U107：切换「显示全部」 */")
+        self.assertIn("all ? allSpecTypes()", body)
+        self.assertIn("function allSpecTypes()", self.html)
+        self.assertIn("Object.keys(cat)", self.html)
+
+    def test_nothing_is_blocked_anymore(self):
+        """**U113**：不再灰掉 —— 核心库的门已经是「游戏定义过的全集」
+        （U107 改的）⇒ 游戏本来就接受 ⇒ 灰掉反而是多余的拦截。
+        挂不上的只在**悬停**里写明原因。"""
+        body = self._body(self.html, "function specPickItems(",
+                          "/* U107：切换「显示全部」 */")
+        self.assertIn("blocked: false", body)
+        self.assertNotIn("forStore && !usable", body)
 
     def test_both_pickers_use_the_shared_builder(self):
         self.assertIn("return specPickItems(projectedPool(h), false);", self.html)
