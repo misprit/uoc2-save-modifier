@@ -328,7 +328,8 @@ def undo_save(save_path: Path) -> UndoResult:
             "（可能是在游戏里手动改的）")
         res.errors.extend(bad)
         res.warnings.append(
-            "提示：可以直接把存档旁边的 `_BACKUP.usg` 复制回去作为回退")
+            # ⚠️ U116：U109 起备份改放 `<修改器目录>/bak/` ⇒ 提示也要跟着改
+            "提示：可以把 bak 文件夹里的 `_BACKUP.usg` 复制回去作为回退")
         return res
 
     # 走完整写回管线

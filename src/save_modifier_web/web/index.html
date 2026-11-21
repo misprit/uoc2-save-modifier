@@ -3778,7 +3778,7 @@ function renderHqPoolModal(){
             onchange="spickToggleAll()">显示全部（{6} 种）</label></div>
         <div class="fine" style="margin:0;padding:7px 11px 0">默认只列**玩家挂得上的**特种兵
           （{1} 种 · 玩家阵营 {7}）—— 敌方阵营的挂不到自己的单位上；
-          勾「显示全部」能看整个战役池。</div>
+          勾「显示全部」能看**游戏定义过的全部**特种兵。</div>
         <div class="spgrid" id="spick_grid">{2}</div>
         <div class="spfoot" id="spick_foot">{3}{4}</div>
       </div>`, esc(M.q||""), usableCount, cells, spickCardHTML(sel), natRowHTML(sel),
@@ -3954,8 +3954,8 @@ function renderStoreAddModal(){
           <label class="chk" title="把挂不到自己单位上的（敌方阵营）也列出来"><input type="checkbox" id="spick_all" {9}
             onchange="spickToggleAll()">显示全部（{10} 种）</label></div>
         <div class="fine" style="margin:0;padding:7px 11px 0">默认只列**玩家挂得上的**特种兵
-          （{5} 种 · 玩家阵营 {11}）—— 敌方阵营的买了也挂不上（灰掉的就是上架不了的）；
-          勾「显示全部」能看整个战役池。</div>
+          （{5} 种 · 玩家阵营 {11}）—— 敌方阵营的买了也挂不上；
+          勾「显示全部」能看**游戏定义过的全部**特种兵。</div>
         <div class="spgrid" id="spick_grid">{6}</div>
         <div class="spfoot" id="spick_foot">{7}</div>
       </div>

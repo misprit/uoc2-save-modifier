@@ -53,6 +53,7 @@ st <单位id> <活跃> [压制]    战力 act_st / sup_st
 name <单位id> <明文>         改显示名（**直接写明文**）
 spec <单位id> <特种类型>      加特种
 unspec <单位id> <类型> [idx]  卸特种
+supspec <单位id> <类型> <0|1> [idx]  特种兵的压制（0=被压制 1=活跃）
 pool <总部id> <条目序号> <数量>  总部兵库存量
 ptg <值>                     声望
 score <值>                   分数
@@ -341,22 +342,33 @@ class Repl:
         raise ReplError(f"未知 card 子命令 {args[0]}（add / del）")
 
     def cmd_store_set(self, args) -> bool:
+        # ⚠️ U116：商店是**两层**结构（`store.yml` = 战线 → {store, elite_store}）
+        # ⇒ 核心库签名是 (front, sub, index, field, value) —— 以前这里**少传 sub**
+        # ⇒ 一敲就 TypeError。sub 可省（默认普通商店 `store`）。
         if len(args) < 4:
-            raise ReplError("用法: store set <战线> <序号> <price|quantity> <值>")
+            raise ReplError(
+                "用法: store set <战线> <序号> <price|quantity> <值> [store|elite_store]")
         front = args[0]
         idx = _as_int(args[1], "条目序号")
         field = args[2]
         if field not in ("price", "quantity"):
             raise ReplError("字段只能是 price 或 quantity")
         value = _as_int(args[3], "值")
-        return self._plan([Edit.store_set(front, idx, field, value)])
+        sub = args[4] if len(args) > 4 else "store"
+        if sub not in ("store", "elite_store"):
+            raise ReplError("子商店只能是 store 或 elite_store")
+        return self._plan([Edit.store_set(front, sub, idx, field, value)])
 
     def cmd_store_del(self, args) -> bool:
         if len(args) < 2:
-            raise ReplError("用法: store del <战线> <条目序号>")
+            raise ReplError(
+                "用法: store del <战线> <条目序号> [store|elite_store]")
         front = args[0]
         idx = _as_int(args[1], "条目序号")
-        return self._plan([Edit.store_remove(front, idx)])
+        sub = args[2] if len(args) > 2 else "store"
+        if sub not in ("store", "elite_store"):
+            raise ReplError("子商店只能是 store 或 elite_store")
+        return self._plan([Edit.store_remove(front, sub, idx)])
 
     def cmd_hand(self, args) -> bool:
         return self._plan([Edit.hand_restore()])
@@ -368,7 +380,9 @@ class Repl:
         name = ASSET_ALIASES.get(args[0], args[0])
         to_use = _as_int(args[1], "可用次数")
         total = _as_int(args[2], "总次数") if len(args) > 2 else None
-        turn = _as_int(args[3], "每回合次数") if len(args) > 3 else 0
+        # ⚠️ U116：每回合恢复必须 ≥ 1（游戏硬范围）⇒ 省略时取 1，
+        # 以前传 0 ⇒ 必然被核心库拒（「uses_turn=0 必须是不小于 1 的整数」）。
+        turn = _as_int(args[3], "每回合次数") if len(args) > 3 else 1
         return self._plan([Edit.theater_asset(
             name, to_use=to_use, uses_total=total, uses_turn=turn)])
 
