@@ -1670,31 +1670,40 @@ function specNotUsableText(t){
   return L("挂不到玩家的任何单位上");
 }
 /* U107：特种兵候选（兵库 / 商店共用）——
-   **默认只列玩家挂得上的**（与单位页挂载特种兵同一套逻辑）：
-   敌方的买了也挂不到自己的单位上 ⇒ 不该混在一起让玩家挑。
-   ⚠️ 「显示全部」能展开到整个战役池（其余的灰掉 + 写明原因）。 */
+   **默认只列玩家挂得上的**（与单位页挂载特种兵同一套逻辑）。
+   ⚠️ U113：「显示全部」= **游戏定义过的全部特种兵**（与单位页的
+   「显示所有特种兵」同一套范围）—— 以前只给**战役池**（west 才 45 种）
+   ⇒ 比单位页能挂的（97 种）少一大截 ⇒ 玩家以为「很多种挂不上 / 买不了」。
+   ⚠️ U113：**不再灰掉** —— 核心库的门已经是「游戏定义过的全集」
+   （U107 改的）⇒ 游戏本来就接受 ⇒ 灰掉反而是多余的拦截；
+   挂不上的只在**悬停**里写明原因（是信息，不是拦截）。 */
 function specPickItems(have, forStore){
-  const pool = (PICK && PICK.campaign_pool) || [];
   const ok = playerSpecs();
   const okSet = ok ? new Set(ok) : null;
   const all = !!(MODAL && MODAL.all);
   const out = [];
-  pool.forEach(t=>{
+  /* 默认 = 玩家挂得上的；「显示全部」= 游戏定义过的全部（375 种） */
+  const list = all ? allSpecTypes()
+                   : (ok ? ok.slice() : ((PICK && PICK.campaign_pool) || []).slice());
+  list.forEach(t=>{
     const usable = !okSet || okSet.has(t);
-    if(!all && !usable) return;              /* 默认只列「挂得上」的 */
     const st = (CATALOG&&CATALOG.spec_types[t])||{};
     const dup = have.filter(e=>e.spec===t).length;
     const why = usable ? "" : specNotUsableText(t);
     out.push({id:t, name:specCn(t), tex:specTex(t), nat:natCn(st.nationality),
       attack:st.attack, defense:st.defense, armor:st.armor, artillery:st.artillery,
       flags:st.flags||[],
-      /* 商店：挂不上的**灰掉**（买了也白花钱）；兵库：只是标注
-         （真实存档里玩家的兵库确实有缴获的敌方特种兵）。 */
-      blocked: !!(forStore && !usable),
+      /* U113：不拦（游戏都接受）—— 只在悬停里说明 */
+      blocked: false,
       dup: dup?(L("已有 ")+dup):"",
       title: specCn(t)+" · "+natCn(st.nationality)+(why?("："+why):"")});
   });
   return out;
+}
+/* U113：游戏定义过的**全部**特种兵类型（与单位页的「显示所有特种兵」同一套）。 */
+function allSpecTypes(){
+  const cat = (CATALOG && CATALOG.spec_types) || {};
+  return Object.keys(cat).sort((a,b)=>specCn(a).localeCompare(specCn(b),"zh"));
 }
 /* U107：切换「显示全部」 */
 function spickToggleAll(){
@@ -3707,13 +3716,10 @@ function renderHqPoolModal(){
   const h = (VIEW.hqs||[]).find(x=>x.id===M.hqId);
   const items = hqPoolItems(h);
   const cells = spickCellsHTML(items, "hqPoolPick(@ID)");
-  /* U107：默认列表 = 玩家挂得上的；「显示全部」= 整个战役池 */
+  /* U107/U113：默认列表 = 玩家挂得上的；「显示全部」= **游戏定义过的全部** */
   const ok = playerSpecs();
-  const okSet = ok ? new Set(ok) : null;
-  const poolTotal = ((PICK && PICK.campaign_pool) || []).length;
-  const usableCount = okSet
-    ? ((PICK && PICK.campaign_pool) || []).filter(t=>okSet.has(t)).length
-    : poolTotal;
+  const allTotal = allSpecTypes().length;
+  const usableCount = ok ? ok.length : allTotal;
   const facText = playerFaction() || L("未知");
   const sel = items.find(i=>i.id===M.sel);
   /* 兵种模式：兵种只有 2 种，国籍从「游戏在该会议会卖的」里取 */
@@ -3755,7 +3761,7 @@ function renderHqPoolModal(){
         <div class="spgrid" id="spick_grid">{2}</div>
         <div class="spfoot" id="spick_foot">{3}{4}</div>
       </div>`, esc(M.q||""), usableCount, cells, spickCardHTML(sel), natRowHTML(sel),
-      (M.all?"checked":""), poolTotal, facText) : L2(`<div class="mrow"><span class="lb">兵种</span>
+      (M.all?"checked":""), allTotal, facText) : L2(`<div class="mrow"><span class="lb">兵种</span>
         <select class="sel" onchange="hqPoolEquip('{0}','this.value')">
           {1}
         </select></div>
@@ -3889,13 +3895,10 @@ function renderStoreAddModal(){
   const it = storeAddItems();
   const list = M.mode==="spec" ? it.specs : it.equips;
   const sel = list.find(i=>i.id===M.sel);
-  /* U107：默认列表 = 玩家挂得上的；「显示全部」= 整个战役池 */
+  /* U107/U113：默认列表 = 玩家挂得上的；「显示全部」= **游戏定义过的全部** */
   const ok = playerSpecs();
-  const okSet = ok ? new Set(ok) : null;
-  const poolTotal = ((PICK && PICK.campaign_pool) || []).length;
-  const usableCount = okSet
-    ? ((PICK && PICK.campaign_pool) || []).filter(t=>okSet.has(t)).length
-    : poolTotal;
+  const allTotal = allSpecTypes().length;
+  const usableCount = ok ? ok.length : allTotal;
   const facText = playerFaction() || L("未知");
   openModal(L2(`<div class="mh">上架新商品
       <span class="ro">存进 store.yml</span></div>
@@ -3939,7 +3942,7 @@ function renderStoreAddModal(){
              <span class="slotflags"><span class="none">兵种</span></span></span>
              </div><div class="spnat" style="margin-top:8px">国籍 <b>{2}</b></div>`, imgTag(sel.tex, sel.name), esc(sel.name), esc(sel.natName||"—"))
              : L(`<div class="slot empty" style="justify-content:center">还没选</div>`)), M.price,
-      (MODAL&&MODAL.all)?"checked":"", poolTotal, facText),
+      (MODAL&&MODAL.all)?"checked":"", allTotal, facText),
     {onOpen:function(){
       const pe = document.getElementById("mp_price");
       if(pe) pe.addEventListener("input", function(){ MODAL.price = parseInt(this.value,10)||0; });
