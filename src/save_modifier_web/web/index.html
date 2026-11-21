@@ -4977,7 +4977,9 @@ async function fbGo(dir){
   FS.roots = d.roots||[]; FS.dirs = d.dirs||[]; FS.files = d.files||[];
   FS.picked = -1;
   if(roots) roots.innerHTML = FS.roots.map((r,i)=>
-    `<span class="chip" onclick="fbRoot(${i})">${esc(r.label)}</span>`).join("");
+    /* ⚠️ **U150**：这些名字是**服务端**给的（`_fs_roots`）⇒
+       英文界面下要翻（词条在 `i18n.json` 的 `ui` 段）。 */
+    `<span class="chip" onclick="fbRoot(${i})">${esc(L(r.label))}</span>`).join("");
   if(dbox) dbox.innerHTML = (FS.parent ?
       L(`<div class="fbrow" onclick="fbUp()">…（上一级）</div>`) : "") +
     FS.dirs.map((x,i)=>`<div class="fbrow" onclick="fbDir(${i})">${esc(x.name)}</div>`).join("");

@@ -175,6 +175,12 @@ def ui_literals():
         s = raw.replace("\\'", "'")
         if CJK.search(s):
             out.add(s)
+    # ⚠️ **U150**：以前**只**收反引号与单引号 ⇒ **双引号**的 `L("…")`（前端里最常见的那种）
+    # 一直没被检查过 ⇒ 双引号里的漏译测试抓不到。现在三种引号全收。
+    for raw in re.findall(r'\bL2?\(\s*"((?:[^"\\]|\\.)*)"', nc):
+        s = raw.replace('\\"', '"')
+        if CJK.search(s):
+            out.add(s)
     return out
 
 
