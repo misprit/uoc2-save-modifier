@@ -28,8 +28,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("UOC2 Save Modifier")]
 [assembly: AssemblyCompany("烟柳边城 misprit")]
 [assembly: AssemblyCopyright("Copyright © 烟柳边城 misprit")]
-[assembly: AssemblyVersion("1.1.1.0")]
-[assembly: AssemblyFileVersion("1.1.1.0")]
+[assembly: AssemblyVersion("1.1.2.0")]
+[assembly: AssemblyFileVersion("1.1.2.0")]
 
 internal static class Launcher
 {
