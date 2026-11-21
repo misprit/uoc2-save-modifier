@@ -351,7 +351,8 @@ class TestTheaterAssetThreeFields(TheaterAssetTestBase):
     # ---------------------------------------------------------- phase 分组
 
     def test_phase_selects_the_right_group(self):
-        """`theater_assets` 按 **phase 分组** ⇒ 必须改当前 phase 那一组。"""
+        """⚠️ **U143**：真实存档里那两组是**两个阵营各一组**；
+        这个夹具**没有** `factions` ⇒ **退回 `phase`**（旧语义，保留兼容）。"""
         p = self.make("phase.usg", battle_overrides={
             "phase": 1,
             "theater_assets": [[], [

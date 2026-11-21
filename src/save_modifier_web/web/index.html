@@ -3319,9 +3319,28 @@ function storeRemove(front, sub, index){
      * 待应用里删掉的 ⇒ 标 **待删除**。
    =================================================================== */
 function theaterCn(a){ return (VIEW.theater_cn||{})[a] || a; }
-function theaterKey(asset){ return `theater_asset:${asset}`; }
-function theaterAddKey(asset){ return `theater_asset_add:${asset}`; }
-function theaterDelKey(asset){ return `theater_asset_remove:${asset}`; }
+/* ⚠️ **U143**：战区资产的组 = **阵营**（不是"阶段"）⇒ 待应用的 key 里
+   **带上阵营** ⇒ 两侧的改动互不串（同一资产可能两边都有）。
+   当前编辑的是**哪一方** = `SEL.theaterSide`（页面上有切换）。 */
+function theaterSide(){ return (SEL && SEL.theaterSide) || "player"; }
+/** 切换「你这一方 / 对手那一方」。 */
+function pickTheaterSide(sid){
+  SEL.theaterSide = (sid==="opponent") ? "opponent" : "player";
+  show("theater");
+}
+/** 当前那一方叫什么（"你这一方" / "对手那一方"）。 */
+function theaterSideCn(sid){
+  return (sid||theaterSide())==="opponent" ? L("对手那一方") : L("你这一方");
+}
+function theaterKey(asset){ return `theater_asset:${theaterSide()}:${asset}`; }
+function theaterAddKey(asset){ return `theater_asset_add:${theaterSide()}:${asset}`; }
+function theaterDelKey(asset){ return `theater_asset_remove:${theaterSide()}:${asset}`; }
+/** 当前选中那一方的资产列表（"player" = 你，"opponent" = 对手）。 */
+function theaterSideAssets(){
+  const s = theaterSide();
+  return (s==="opponent" ? ((VIEW&&VIEW.theater_assets_opponent)||[])
+                          : ((VIEW&&VIEW.theater_assets)||[]));
+}
 /** 现在**在不在战斗中**（能不能改）—— 不是「当前 phase 有没有资产」。 */
 function theaterEditable(){
   const m = VIEW && VIEW.theater_meta;
@@ -3334,13 +3353,14 @@ function theaterPend(kind, asset){
 }
 /** 这一项现在在不在当前 phase 里（**含待应用的增删**）。 */
 function theaterInCurrent(asset){
+  /* U143：判的是**当前选中那一方**（不再是"当前 phase 那一组"） */
   if(theaterPend("theater_asset_remove", asset)) return false;
   if(theaterPend("theater_asset_add", asset)) return true;
-  return ((VIEW&&VIEW.theater_assets)||[]).some(x=>x.asset===asset);
+  return theaterSideAssets().some(x=>x.asset===asset);
 }
 /** 当前显示的三个数（含待应用的改动）。 */
 function theaterCur(asset){
-  const a = ((VIEW&&VIEW.theater_assets)||[]).find(x=>x.asset===asset) || {};
+  const a = theaterSideAssets().find(x=>x.asset===asset) || {};
   const p = PENDING.find(x=>x.kind==="theater_asset" && x.key===theaterKey(asset));
   if(p) return {to_use:p.params.to_use, uses_total:p.params.uses_total,
                 uses_turn:p.params.uses_turn};
@@ -3364,9 +3384,11 @@ function theaterCur(asset){
       ⇒ 把一个字段改回原值会把**另外两个字段的改动一起丢掉**。
       ⇒ 现在**按字段**判断：三个字段都回到存档原值了才撤整条。 */
 function theaterSet(asset, field, value){
-  const a = ((VIEW&&VIEW.theater_assets)||[]).find(x=>x.asset===asset) || {};
+  const a = theaterSideAssets().find(x=>x.asset===asset) || {};
   const cur = theaterCur(asset);
-  const params = {asset, to_use:cur.to_use, uses_total:cur.uses_total, uses_turn:cur.uses_turn};
+  /* ⚠️ **U143**：params 里带上 `side` ⇒ 核心库知道改**哪一方** */
+  const params = {asset, side:theaterSide(), to_use:cur.to_use,
+                  uses_total:cur.uses_total, uses_turn:cur.uses_turn};
   params[field] = value;
   /* U108：按**字段**判断 —— 三个字段都回到存档原值了才撤掉整条待应用 */
   const allSame = (params.to_use === a.to_use)
@@ -3453,6 +3475,18 @@ function pageTheater(w){
     return;
   }
   const onCount = uni.filter(u=>theaterInCurrent(u.asset)).length;
+  /* ⚠️ **U143**：战区资产的组 = **两个阵营各一组** ⇒ 页面加一个阵营切换，
+     两组都能改（以前只显示"当前 phase 那一组" ⇒ 敌方那组根本看不见）。 */
+  const sides = (meta.sides && meta.sides.length) ? meta.sides : [];
+  const curSide = theaterSide();
+  const sideTabs = sides.length ? ('<div class="tabs">' + sides.map(sd=>{
+      const sid = sd.is_player ? "player" : "opponent";
+      const mark = sd.is_current ? L("（当前行动方）") : "";
+      const tip = sd.key ? (L("阵营")+"：" + sd.key) : "";
+      return '<div class="tb ' + (sid===curSide ? "on" : "") + '"'
+        + ' onclick="pickTheaterSide(\'' + sid + '\')" title="' + esc(tip) + '">'
+        + esc(theaterSideCn(sid)) + esc(mark) + '</div>';
+    }).join("") + '</div>') : "";
   const cards = uni.map(u=>{
     const asset = u.asset;
     const on = theaterInCurrent(asset);
@@ -3477,8 +3511,7 @@ function pageTheater(w){
               onclick="openTheaterAddModal('{5}')">{6}</button>
           </div>
         </div></div>`, imgTag(theaterTex(asset), theaterCn(asset)), head, u.scenario
-            ? L("（场景定义里有，多半是已经用完 / 被删了）") : L("（场景本来就没有）"), u.in_other ? L2("<div class=\"talt\">后面第 {0} 阶段里有这项（那边不生效）。</div>", (VIEW.theater_meta.phase_count||2)>1
-            ? "2" : "2") : "", editable?"":"disabled", jsq(asset), editable?L("添加这一项"):L("不在战斗中"));
+            ? L("（场景定义里有，多半是已经用完 / 被删了）") : L("（场景本来就没有）"), u.in_opponent ? L("<div class=\"talt\">对手那一方有这项（他们能用）。</div>") : "", editable?"":"disabled", jsq(asset), editable?L("添加这一项"):L("不在战斗中"));
     }
     return L2(`<div class="titem">
       {0}
@@ -3512,8 +3545,8 @@ function pageTheater(w){
              {1} 次 —— 回合开始会重置为
              {2} 次</div>`, cur.to_use, Math.min(cur.uses_turn, cur.uses_total), Math.min(cur.uses_turn, cur.uses_total)):"", editable?"":"disabled", jsq(asset));
   }).join("");
-  w.innerHTML = L2(`<div class="panel"><h3>战区资产 · 候选 {0} 种（当前战斗里有 {1} 种）</h3>
-    <div class="pbody"><div class="tgrid">{2}</div>
+  w.innerHTML = L2(`<div class="panel"><h3>战区资产 · 候选 {0} 种（{3}里有 {1} 种）</h3>
+    <div class="pbody">{4}<div class="tgrid">{2}</div>
       <div class="note">候选全集 = <b>游戏那 7 种</b>（<code>constants.theater_asset_types</code>）——
         存档里没有的也列出来，可以<b>添加</b>；有的可以<b>删除</b>。<br>
         战区资产是<b>两个 L3 写入例外之一</b>（写的是
@@ -3523,7 +3556,7 @@ function pageTheater(w){
         <b>本场景剩余 = 无限</b> 时，每回合恢复多少就永远有多少。<br>
         标 <b>新增</b> 的 = 场景本来没有、被加进来的（无中生有）；删掉的项会整个消失，
         游戏里那个按钮也就没了。</div>
-    </div></div>`, uni.length, onCount, cards);
+    </div></div>`, uni.length, onCount, cards, esc(theaterSideCn(curSide)), sideTabs);
 
   uni.forEach(u=>{
     const asset = u.asset;
@@ -3554,14 +3587,17 @@ function theaterToggleTotal(asset){
 function theaterRemove(asset){
   const cur = theaterCur(asset);
   const tot = (cur.uses_total===null||cur.uses_total===undefined) ? L("无限") : cur.uses_total;
-  setPending("theater_asset_remove", theaterDelKey(asset), {asset:asset},
+  setPending("theater_asset_remove", theaterDelKey(asset),
+    {asset:asset, side:theaterSide()},
     L2("删除战区资产 {0}（当前可用 {1}，本场景剩余 {2}）", theaterCn(asset), cur.to_use, tot));
   show("theater");
 }
 
 /* ---------- 添加一项（弹对话框：每回合恢复 / 本场景剩余） ---------- */
 function openTheaterAddModal(asset){
-  MODAL = {kind:"theater", asset:asset, uses_turn:1, uses_total:null};
+  /* ⚠️ U143：把**阵营**记进 MODAL（弹窗期间切了阵营也不串） */
+  MODAL = {kind:"theater", asset:asset, side:theaterSide(),
+           uses_turn:1, uses_total:null};
   renderTheaterAddModal();
 }
 function theaterAddToggleTotal(){
@@ -3573,6 +3609,10 @@ function renderTheaterAddModal(){
   const M = MODAL; if(!M) return;
   const u = ((VIEW&&VIEW.theater_universe)||[]).find(x=>x.asset===M.asset) || {};
   const inf = (M.uses_total===null||M.uses_total===undefined);
+  /* ⚠️ **U143**：参照值按**这一方**的设计取（玩家 / 对手各有一份） */
+  const isOpp = (M.side||theaterSide())==="opponent";
+  const refTotal = isOpp ? u.opponent_scenario_uses_total : u.scenario_uses_total;
+  const refTurn  = isOpp ? u.opponent_scenario_uses_turn  : u.scenario_uses_turn;
   openModal(L2(`<div class="mh">添加战区资产 · {0}
       <span class="ro">存进 games/&lt;场景&gt;/main.yml</span></div>
     <div class="mb">
@@ -3587,20 +3627,20 @@ function renderTheaterAddModal(){
         <span class="hint">{3}</span></div>
       <div class="modnote">{4}
         <br><br>
-        新加的资产<b>只对当前 phase 生效</b>；场景自己的定义不动，
+        新加的资产<b>只对这一方（{5}）生效</b>；场景自己的定义不动，
         下一场战斗会按场景重新初始化。<br>
         新增时会把 5 个字段<b>一次写全并保持自洽</b>，不会出现「次数全是 0」的死条目。</div>
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
       <button class="btn pri" onclick="theaterAddConfirm()">添加</button></div>`, esc(theaterCn(M.asset)), inf?L(`<span class="num inf">无限</span>`)
             : `<input class="numin" id="mp_tot" type="text" inputmode="numeric" autocomplete="off" value="${M.uses_total}" style="width:72px">`, inf?L("设成数字"):L("改成无限"), inf?L("无限 = 这场战斗随便用"):L("整场战斗一共能用几次"), u.scenario
-        ? L2(`这个场景<b>本来就有</b>这项战区资产（场景定义：每回合恢复 {0}，
-           本场景剩余 {1}），现在存档里没有 —— 多半是已经用完了。`, u.scenario_uses_turn, u.scenario_uses_total===null||u.scenario_uses_total===undefined
-             ? L("无限") : u.scenario_uses_total)
+        ? L2(`{2}<b>本来就有</b>这项战区资产（场景定义：每回合恢复 {0}，
+           本场景剩余 {1}），现在存档里没有 —— 多半是已经用完了。`, refTurn, refTotal===null||refTotal===undefined
+             ? L("无限") : refTotal, esc(theaterSideCn(M.side)))
         : L(`⚠️ <b>这个场景本来就没有</b>这项战区资产（无中生有）。<br>
            数据上安全（游戏只认这 7 种，贴图和中文名都齐全，游戏里会正常出现这个按钮），
            但<b>能不能用得起来要看地图</b> —— 比如「炮舰轰炸」要有海岸目标、
-           「空中补给」要有己方部队在补给中。`)),
+           「空中补给」要有己方部队在补给中。`), esc(theaterSideCn(M.side))),
     {onOpen:function(){
       bindModalSpin("mp_tut", ()=>MODAL.uses_turn, v=>MODAL.uses_turn=v, 1, 99);
       const pe = document.getElementById("mp_tot");
@@ -3619,8 +3659,8 @@ function theaterAddConfirm(){
     if(isNaN(tot)){ alertModal(L("「本场景剩余」要填整数，或点「改成无限」")); return; }
     if(tot < 1){ alertModal(L("「本场景剩余」不能是 0 —— 0 会让这个资产永远用不了")); return; }
   } else tot = null;
-  setPending("theater_asset_add", theaterAddKey(M.asset),
-    {asset:M.asset, uses_total:tot, uses_turn:ut},
+  setPending("theater_asset_add", theaterAddKey(M.asset, M.side),
+    {asset:M.asset, side:M.side||theaterSide(), uses_total:tot, uses_turn:ut},
     L2("添加战区资产 {0}（每回合恢复 {1}，本场景剩余 {2}）", theaterCn(M.asset), ut, tot===null?L("无限"):tot));
   closeModal();
 }

@@ -1049,9 +1049,9 @@ class Catalog:
         ⚠️ 场景定义里只有 **3 个字段**（`asset` / `uses_total` / `uses_turn`），
         **没有** `to_use` —— 那是运行时字段（`Game.new` 载入时现算）。
 
-        ⚠️ **U141**：给了 `phase`（= **当前战斗所在阶段**）就取**那一组** ——
-        场景定义里的资产是**按阶段分组**的，同名资产在不同阶段次数不同
-        ⇒ 不分组就会显示**另一个阶段**的参照值。
+        ⚠️ **U143（更正 U141）**：`phase` 这个参数其实是**组下标 = 阵营下标**
+        （历史命名，公开 API 不改）—— 场景定义里的资产是**按阵营分组**的，
+        同名资产在不同阵营次数不同 ⇒ 不分组就会显示**另一方**的参照值。
         """
         for main in self._scenario_mains(scenario_id, campaign_id, variant):
             data = self._yaml(main)

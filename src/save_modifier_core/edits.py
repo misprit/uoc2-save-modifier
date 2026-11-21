@@ -335,8 +335,16 @@ class Edit:
     @staticmethod
     def theater_asset(asset: str, *, to_use: Any = UNSET,
                       uses_total: Any = UNSET,
-                      uses_turn: Any = UNSET) -> "Edit":
+                      uses_turn: Any = UNSET,
+                      side: str | None = None) -> "Edit":
         """改战区资产（**只在当前进行中的战斗里有效**，L3 唯一白名单）。
+
+        ⚠️ **U143**：`side` = 改**哪一方**的战区资产 ——
+        `"player"`（默认，玩家那一方）/ `"opponent"`（对手那一方）/
+        `"current"`（当前行动方，旧语义）。
+        ⚠️ 存档里 `theater_assets` 的**两组 = 两个阵营各一组**
+        （战斗 `main.yml` 的 `factions` 第 i 项 = 第 i 组的拥有者，
+        `player: local` / `player: ai` 直接标出玩家是谁）。
 
         **三个字段都能单独改**，也能都不改（默认全是 `UNSET` = 不改）：
 
@@ -347,15 +355,21 @@ class Edit:
         ⚠️ `uses_total=None` 表示「改成无限」，**不是**「不改」——
         不改要传 `UNSET`（或者干脆不传这个参数）。
         """
-        return Edit("theater_asset", {
+        params = {
             "asset": asset, "to_use": to_use,
             "uses_total": uses_total, "uses_turn": uses_turn,
-        })
+        }
+        if side:
+            params["side"] = side
+        return Edit("theater_asset", params)
 
     @staticmethod
     def theater_asset_add(asset: str, *, uses_total: Any = None,
-                          uses_turn: int = 1) -> "Edit":
-        """往**当前 phase** 的战区资产组里**加**一项（U45）。
+                          uses_turn: int = 1,
+                          side: str | None = None) -> "Edit":
+        """往**某一方**的战区资产组里**加**一项（U45）。
+
+        ⚠️ **U143**：`side` 决定加到**哪一方**（默认玩家那一方）。
 
         ⚠️ `asset` 只能是游戏那 **7 种**之一（`THEATER_ASSET_TYPES`）——
         游戏的 `scenario_data_validation.theater_asset_dict` 是
@@ -367,18 +381,26 @@ class Edit:
 
         ⚠️ `uses_total=None` = **无限**（游戏自己的「空袭」就是无限）。
         """
-        return Edit("theater_asset_add", {
-            "asset": asset, "uses_total": uses_total, "uses_turn": uses_turn,
-        })
+        params = {"asset": asset, "uses_total": uses_total,
+                  "uses_turn": uses_turn}
+        if side:
+            params["side"] = side
+        return Edit("theater_asset_add", params)
 
     @staticmethod
-    def theater_asset_remove(asset: str) -> "Edit":
-        """从**当前 phase** 的战区资产组里**删掉**这一项（U45）。
+    def theater_asset_remove(asset: str,
+                              side: str | None = None) -> "Edit":
+        """从**某一方**的战区资产组里**删掉**这一项（U45）。
+
+        ⚠️ **U143**：`side` 决定从**哪一方**删（默认玩家那一方）。
 
         删的是**整项**，不是把次数清零 —— 清零会留下一个永远用不了的
         死条目，游戏里还白占一个按钮。
         """
-        return Edit("theater_asset_remove", {"asset": asset})
+        params = {"asset": asset}
+        if side:
+            params["side"] = side
+        return Edit("theater_asset_remove", params)
 
     # ---------------------------------------------------------------- 描述
 

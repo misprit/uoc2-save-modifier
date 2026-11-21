@@ -52,14 +52,19 @@ class SaveUnreadable(Exception):
 
 
 def theater_assets_by_phase(ta: Any) -> list[dict[str, dict]]:
-    """把 `theater_assets` 的**阶段分组**拆成 `[{资产: {uses_total, uses_turn}}, …]`。
+    """把 `theater_assets` 的**分组**拆成 `[{资产: {uses_total, uses_turn}}, …]`。
 
-    ⚠️ **U141**：`theater_assets` 是**按阶段分组**的
-    （`[[phase0 的资产…], [phase1 的资产…]]`），
-    **同一种资产可能在多个阶段出现、次数还不同**
+    ⚠️ **U143（更正 U141）**：这两组**不是"两个阶段"，而是「两个阵营各一组」**
+    —— 战斗 `main.yml` 的 `factions` 第 i 项 = 第 i 组的拥有者，
+    `phase` = 现在轮到哪一方（游戏读 `theater_assets[self.phase]`）。
+    ⇒ `theater_assets_by_phase` 这个名字是历史包袱（公开 API，不改），
+    但**返回的下标是阵营下标**。
+
+    ⚠️ **U141**（仍然成立）：**同一种资产可能在两组里都出现、次数还不同**
     （实测 71 个存档里 **60 个**有这种场景）⇒
-    **拍平**会让「后一组覆盖前一组」⇒ 显示的参照值可能是**另一个阶段**的。
-    ⇒ 保留分组，由调用方按**当前阶段**取那一组。
+    **拍平**会让「后一组覆盖前一组」⇒ 显示的参照值可能是**另一方**的。
+    ⇒ 保留分组，由调用方按**要改的那一方**取那一组
+    （`theater_group_index()`）。
     """
     out: list[dict[str, dict]] = []
     if not isinstance(ta, list):
@@ -78,11 +83,75 @@ def theater_assets_by_phase(ta: Any) -> list[dict[str, dict]]:
 
 
 def theater_assets_flat(groups: list[dict[str, dict]]) -> dict[str, dict]:
-    """把阶段分组**拍平**（兼容旧行为：**后一组覆盖前一组**）。"""
+    """把分组**拍平**（兼容旧行为：**后一组覆盖前一组**）。"""
     out: dict[str, dict] = {}
     for g in groups:
         out.update(g)
     return out
+
+
+def theater_sides(battle_data: Any) -> list[dict]:
+    """这场战斗里 `theater_assets` 的**两组分别属于哪一方**（U143）。
+
+    ⚠️ **U143（重要更正）**：这两组**不是"两个阶段"，而是「两个阵营各一组」**：
+
+    * 战斗 `main.yml` 的 `factions` 是**有序字典**，第 i 项 = 第 i 组的拥有者，
+      每项里 `player: local` / `player: ai` **直接标出哪一方是玩家**；
+    * `phase` = **现在轮到哪一方**（游戏读 `theater_assets[self.phase]`）；
+    * 字节码旁证：AI 代码 `is_ai = (self.phase != game.phase)`
+      ⇒ **phase ⇔ 阵营**，不是时间上的阶段。
+
+    返回 `[{"key": 阵营名, "index": 组下标, "is_player": bool,
+    "is_current": bool}]`；`factions` 缺失（旧存档 / 夹具）⇒ 空列表。
+    """
+    out: list[dict] = []
+    if not isinstance(battle_data, dict):
+        return out
+    fac = battle_data.get("factions")
+    if not isinstance(fac, dict) or not fac:
+        return out
+    phase = battle_data.get("phase")
+    for i, key in enumerate(fac.keys()):
+        info = fac.get(key)
+        info = info if isinstance(info, dict) else {}
+        out.append({
+            "key": str(key),
+            "index": i,
+            "is_player": info.get("player") == "local",
+            "is_current": (phase == i),
+        })
+    return out
+
+
+def theater_group_index(battle_data: Any, side: str = "player") -> int:
+    """要改**哪一组**（组下标）。
+
+    * `side="player"`（默认）⇒ **玩家那一方**（`player: local` 的下标）；
+    * `side="opponent"` ⇒ **对手那一方**；
+    * `side="current"` ⇒ 当前行动方（`phase`）—— 旧语义，保留兼容；
+    * `factions` 缺失（旧存档 / 合成夹具）⇒ 退回 `phase`（**不猜**）。
+    """
+    sides = theater_sides(battle_data)
+    if sides:
+        want_opponent = (side == "opponent")
+        want_current = (side == "current")
+        for sd in sides:
+            if want_current and sd["is_current"]:
+                return int(sd["index"])
+        for sd in sides:
+            if want_opponent and not sd["is_player"]:
+                return int(sd["index"])
+        for sd in sides:
+            if not want_opponent and sd["is_player"]:
+                return int(sd["index"])
+        return int(sides[0]["index"])
+    theater = (battle_data or {}).get("theater_assets")
+    phase = (battle_data or {}).get("phase")
+    if isinstance(theater, list) and theater:
+        if isinstance(phase, int) and not isinstance(phase, bool) \
+                and 0 <= phase < len(theater):
+            return phase
+    return 0
 
 
 # ---------------------------------------------------------------- 只读视图
@@ -498,9 +567,9 @@ class Save:
         ⚠️ 场景定义里只有 **3 个字段**（`asset` / `uses_total` / `uses_turn`），
         **没有** `to_use` —— 那是运行时字段。
 
-        ⚠️ **U141**：给了 `phase`（= **当前战斗所在阶段**）就取**那一组** ——
-        场景定义里的资产是**按阶段分组**的，同名资产在不同阶段次数不同
-        ⇒ 不分组就会显示**另一个阶段**的参照值。
+        ⚠️ **U143（更正 U141）**：`phase` 这个参数其实是**组下标 = 阵营下标**
+        （历史命名，公开 API 不改）—— 场景定义里的资产是**按阵营分组**的，
+        同名资产在不同阵营次数不同 ⇒ 不分组就会显示**另一方**的参照值。
         不给 `phase` ⇒ 拍平（**后一组覆盖前一组**，兼容旧行为）。
         """
         scen = self.current_scenario()

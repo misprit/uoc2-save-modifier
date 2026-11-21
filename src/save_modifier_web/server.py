@@ -43,6 +43,9 @@ if str(REPO_SRC) not in sys.path:
 
 #: U141：存档打不开（文件损坏）时用这个异常 ⇒ 界面显示一句人话
 from save_modifier_core import SaveUnreadable  # noqa: E402
+#: U143：战区资产的组 = **阵营**（不是"阶段"）⇒ 按 side 定位
+from save_modifier_core.container import (  # noqa: E402
+    theater_group_index, theater_sides)
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 
@@ -415,8 +418,10 @@ def api_view(save_id: str) -> dict:
             pass
 
         # ---- 6 个功能页各自要的东西（U33 补齐）----
-        # 战区资产：按当前 phase 取那一组（L3 例外的只读侧）
-        data["theater_assets"] = _theater_assets_of(save)
+        # 战区资产：**玩家那一方**（L3 例外的只读侧；U143：组 = 阵营）
+        data["theater_assets"] = _theater_assets_of(save, "player")
+        # 对手那一方（敌方也有战区资产 —— 存档里就在另一组）
+        data["theater_assets_opponent"] = _theater_assets_of(save, "opponent")
         # 战区资产**全量候选**（U45）：7 种全集 + 每种在存档里的状态
         # + 「这场战斗本来有没有」的场景定义对照。
         data["theater_universe"], data["theater_meta"] = _theater_universe_of(save, catalog)
@@ -799,7 +804,7 @@ def api_pickers(save_id: str, unit_type: str = "",
         }
 
 
-def _theater_assets_of(save) -> list:
+def _theater_assets_of(save, side: str = "player") -> list:
     """当前战斗的**战区资产**（按 `phase` 取当前那一组）。
 
     ⚠️ `theater_assets` 是按 phase 分组的（U20 实测）⇒ 只给当前 phase 那组，
@@ -814,9 +819,8 @@ def _theater_assets_of(save) -> list:
     theater = data.get("theater_assets")
     if not isinstance(theater, list) or not theater:
         return []
-    phase = data.get("phase")
-    idx = (phase if isinstance(phase, int) and not isinstance(phase, bool)
-           and 0 <= phase < len(theater) else 0)
+    # ⚠️ **U143**：组 = **阵营**（不是"阶段"）⇒ 按 side 定位
+    idx = theater_group_index(data, side)
     items = theater[idx]
     if not isinstance(items, list):
         return []
@@ -870,34 +874,48 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
                           if isinstance(grp, list) else [])
     idx = (phase if isinstance(phase, int) and not isinstance(phase, bool)
            and 0 <= phase < len(groups) else 0)
-    current = groups[idx] if groups else []
+    # ⚠️ **U143**：组 = **阵营**（不是"阶段"）⇒
+    #   `current` = **玩家那一方**（`factions` 里 `player: local` 的下标），
+    #   `other`   = **对手那一方**。
+    #   以前按 `phase`（当前行动方）⇒ 轮到 AI 时会把**敌方那组当成自己的**。
+    player_idx = theater_group_index(data, "player")
+    opponent_idx = theater_group_index(data, "opponent")
+    current = groups[player_idx] if groups else []
+    opponent = groups[opponent_idx] if groups else []
 
     other: dict[str, int] = {}
-    for i, grp in enumerate(groups):
-        if i == idx:
-            continue
-        for it in grp:
-            a = it.get("asset")
-            if isinstance(a, str):
-                other[a] = other.get(a, 0) + 1
+    for it in opponent:
+        a = it.get("asset")
+        if isinstance(a, str):
+            other[a] = other.get(a, 0) + 1
 
     # 场景定义：这场战斗**本来**有哪些战区资产
-    # ⚠️ **U141**：场景定义里的资产是**按阶段分组**的（同名资产在不同阶段
-    # 次数不同）⇒ 必须按**当前阶段**取那一组，否则显示的是**另一个阶段**的参照值。
-    scenario: dict = {}
-    try:
-        scenario = save.document_theater_assets(idx) or {}
-    except Exception:
-        scenario = {}
-    if not scenario:
+    # ⚠️ **U141 + U143**：场景定义里的资产**也是两组 = 两个阵营各一组**
+    # ⇒ 参照值必须取**玩家那一方**（不是"当前行动方"那一组，
+    #    否则轮到 AI 行动时给的是**敌方那方的设计**）。
+    player_idx = theater_group_index(data, "player")
+    opponent_idx = theater_group_index(data, "opponent")
+
+    def _scenario_of(idx: int) -> dict:
+        """某一方的**场景设计**（存档自带的副本优先，其次游戏包）。"""
+        out: dict = {}
         try:
-            scen = save.current_scenario()
-            if scen:
-                cid = getattr(save.info, "campaign_id", None) or None
-                scenario = catalog.scenario_theater_assets(scen, cid,
-                                                            phase=idx) or {}
+            out = save.document_theater_assets(idx) or {}
         except Exception:
-            scenario = {}
+            out = {}
+        if not out:
+            try:
+                scen = save.current_scenario()
+                if scen:
+                    cid = getattr(save.info, "campaign_id", None) or None
+                    out = catalog.scenario_theater_assets(scen, cid,
+                                                         phase=idx) or {}
+            except Exception:
+                out = {}
+        return out
+
+    scenario = _scenario_of(player_idx)          # 玩家那一方
+    scenario_opp = _scenario_of(opponent_idx)    # 对手那一方
 
     universe = []
     for it in catalog.theater_asset_universe():
@@ -907,12 +925,22 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
         universe.append({
             "asset": name,
             "has_texture": bool(it.get("has_texture")),
+            # U143：**玩家那一方 / 对手那一方**（旧的 in_current / in_other
+            #        保留为别名，语义同步改成"两方"）
+            "in_player": cur is not None,
+            "in_opponent": name in other,
             "in_current": cur is not None,
             "in_other": name in other,
             "other_count": other.get(name, 0),
             "scenario": defn is not None,
             "scenario_uses_total": (defn or {}).get("uses_total"),
             "scenario_uses_turn": (defn or {}).get("uses_turn"),
+            # U143：**对手那一方**的设计（各自的参照值，别混）
+            "opponent_scenario": (scenario_opp.get(name) is not None),
+            "opponent_scenario_uses_total":
+                (scenario_opp.get(name) or {}).get("uses_total"),
+            "opponent_scenario_uses_turn":
+                (scenario_opp.get(name) or {}).get("uses_turn"),
             "added": defn is None and cur is not None,
         })
 
@@ -921,6 +949,10 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
         "reason": reason,
         "phase": idx,
         "phase_count": len(groups),
+        # ⚠️ **U143**：两组分别属于哪一方（`player: local` / `player: ai`）
+        "sides": theater_sides(data),
+        "player_index": player_idx,
+        "opponent_index": opponent_idx,
         "groups": groups,
         "scenario_source": scenario,
         "scenario_found": bool(scenario),
