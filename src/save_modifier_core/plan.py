@@ -110,6 +110,9 @@ class Work:
         #: 同一批编辑是**依次执行**的 ⇒ 中间态会误报
         #: （U96 的兵力上限、U97 的总部 CP 都是这么来的）。
         self.batch_edits: list = []
+        #: U123：**解析失败**的条目（`YAML 解析失败`）——
+        #: 这一批**不许写盘**（见 `table()`）。
+        self.parse_errors: list[str] = []
 
     # ---- 条目读写 ----
 
@@ -123,7 +126,14 @@ class Work:
         else:
             try:
                 value = yamlio.load(raw)
-            except Exception:
+            except Exception as exc:
+                # ⚠️ **U123**：原来这里直接 `value = default` ——
+                # **静默**把一个解析失败的条目当成「空表」，
+                # 改完再写回去 = **残缺的存档**（外部审阅报告 P1-5）。
+                # ⇒ 记一条错误 ⇒ 这一批**整批不许写盘**。
+                self.parse_errors.append(
+                    "%s：YAML 解析失败（%s）—— 已阻止写入；"
+                    "请先把这个存档备份好，再检查该文件" % (entry, exc))
                 value = default
             if value is None:
                 value = default
@@ -244,6 +254,10 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
             plan.notes.append(oc.summary)
         plan.errors.extend(oc.errors)
         plan.warnings.extend(oc.warnings)
+
+    # U123：有条目**解析失败** ⇒ 这一批**整批不许写盘**
+    # （否则会把「空表」写回去 = 残缺存档）。
+    plan.errors.extend(w.parse_errors)
 
     # 生成每个被改条目的 diff
     for entry in sorted(w.touched):
