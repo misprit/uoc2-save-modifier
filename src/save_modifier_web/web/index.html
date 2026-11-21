@@ -1353,11 +1353,16 @@ let PICKCACHE = {};      /* unit_type → 候选池（"" = 通用那一份；换
 /* 贴图：必须走服务端代理（http 页面读不到 file://）—— U29
    `/surfaces/*` 要 token ⇒ 只能走 query（<img> 带不了 header）。 */
 function surf(p){
-  return "/surfaces/" + String(p||"") + "?t=" + encodeURIComponent(TOKEN);
+  /* ⚠️ **U125**：这个 URL 会进 `src="…"` 属性 ⇒ 必须**双重**防护：
+     ① 逐段 URL 编码（保留 "/" 分隔）；
+     ② 属性上下文转义（`esc`，在 `imgTag` / `avaImg` 里做）。
+     路径来自游戏包（mod 包是玩家自己放的）⇒ **当不可信输入**处理。 */
+  const enc = String(p||"").split("/").map(x=>encodeURIComponent(x)).join("/");
+  return "/surfaces/" + enc + "?t=" + encodeURIComponent(TOKEN);
 }
 function imgTag(p, alt, cls){
   /* `cls` = 额外 class（特种兵图标用 "spico" 走 200% 放大规则） */
-  return `<img src="${surf(p)}" alt="${esc(alt||"")}"${cls?(' class="'+cls+'"'):""} loading="lazy">`;
+  return `<img src="${esc(surf(p))}" alt="${esc(alt||"")}"${cls?(' class="'+cls+'"'):""} loading="lazy">`;
 }
 /* ---------- 单位头像：按画面内容居中（U63） ----------
    原始大图是横幅、主体偏右偏下（629 张实测内容中心 x 中位 0.59 / y 中位 0.60），
@@ -1379,7 +1384,7 @@ function avaStyle(type, box){
 }
 function avaImg(type, alt, box){
   if(!type) return "";
-  return `<img src="${surf(unitTex(type))}" alt="${esc(alt||"")}" data-t="${esc(type)}"
+  return `<img src="${esc(surf(unitTex(type)))}" alt="${esc(alt||"")}" data-t="${esc(type)}"
     loading="lazy"${avaStyle(type, box)}
     onload="avaFit(this)" onerror="this.style.visibility='visible'">`;
 }
@@ -1834,7 +1839,9 @@ function unitCombatFieldsHTML(u){
         const tip = dis
           ? L2("「{0}」只能挂装甲机动单位（游戏硬约束）", m.name||k)
           : (m.name||k);
-        return `<button class="orderbtn${on?" on":""}${dis?" dis":""}" onclick="event.stopPropagation();toggleUnitOrder(${u.id},'${k}')" title="${esc(tip)}"><img src="/surfaces/${m.icon||("sheet/special_defense_"+k+".png")}?t=${TOKEN}" alt="${esc(m.name||k)}"></button>`;
+        /* ⚠️ **U125**：`k`（特种兵类型）进 **JS 单引号字符串** ⇒ 用 `jsq`；
+           贴图走 `surf()`（URL 编码）+ `esc`（属性转义）。 */
+        return `<button class="orderbtn${on?" on":""}${dis?" dis":""}" onclick="event.stopPropagation();toggleUnitOrder(${u.id},'${jsq(k)}')" title="${esc(tip)}"><img src="${esc(surf(m.icon||("sheet/special_defense_"+k+".png")))}" alt="${esc(m.name||k)}"></button>`;
       }).join("")}</div>
       <div class="hintline">${L("HQ 技能下的命令 · 敌方下一回合结束前有效")}</div>
       <div class="hintline">${L("三个标记互斥：选新的会撤掉旧的")}</div>
@@ -3071,9 +3078,9 @@ function pageStore(w){
 
   const fcn = (VIEW.front_names)||{};
   const tabs = fronts.map(f=>`<div class="tb ${f.front===SEL.storeFront?'on':''}"
-    onclick="pickStoreFront('${f.front}')" title="${esc(f.front)}">${esc(fcn[f.front]||f.front)}</div>`).join("");
+    onclick="pickStoreFront('${jsq(f.front)}')" title="${esc(f.front)}">${esc(fcn[f.front]||f.front)}</div>`).join("");
   const subtabs = cur.subs.map(s=>L2(`<div class="tb {0}"
-    onclick="pickStoreSub('{1}')">{2}</div>`, s.sub===SEL.storeSub?'on':'', s.sub, esc(s.sub==="elite_store"?L("精英商店"):L("普通商店")))).join("");
+    onclick="pickStoreSub('{1}')">{2}</div>`, s.sub===SEL.storeSub?'on':'', jsq(s.sub), esc(s.sub==="elite_store"?L("精英商店"):L("普通商店")))).join("");
   const items = rows.filter(r=>r.e.front===SEL.storeFront && r.e.sub===SEL.storeSub);
   const body = items.map(({e,index})=>{
     const isSpec = !!e.spec;
@@ -3100,7 +3107,7 @@ function pageStore(w){
         inputmode="numeric" autocomplete="off" value="{12}"></td>
       <td class="num"><span class="spin" id="st_q_{13}_{14}_{15}"></span></td>
       <td><span class="rm" onclick="storeRemove('{16}','{17}',{18})">下架</span></td>
-    </tr>`, imgTag(tex, storeEntryCn(e), texCls), esc(nm), subLine, esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", isSpec?esc(st.artillery??"—"):"—", tags, e.front, e.sub, index, price, e.front, e.sub, index, e.front, e.sub, index);
+    </tr>`, imgTag(tex, storeEntryCn(e), texCls), esc(nm), subLine, esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", isSpec?esc(st.artillery??"—"):"—", tags, esc(e.front), esc(e.sub), index, price, esc(e.front), esc(e.sub), index, jsq(e.front), jsq(e.sub), index);
   }).join("");
 
   w.innerHTML = L2(`<div class="panel"><h3>商店</h3><div class="pbody">
@@ -3349,7 +3356,7 @@ function pageTheater(w){
           </div>
         </div></div>`, imgTag(theaterTex(asset), theaterCn(asset)), head, u.scenario
             ? L("（场景定义里有，多半是已经用完 / 被删了）") : L("（场景本来就没有）"), u.in_other ? L2("<div class=\"talt\">后面第 {0} 阶段里有这项（那边不生效）。</div>", (VIEW.theater_meta.phase_count||2)>1
-            ? "2" : "2") : "", editable?"":"disabled", asset, editable?L("添加这一项"):L("不在战斗中"));
+            ? "2" : "2") : "", editable?"":"disabled", jsq(asset), editable?L("添加这一项"):L("不在战斗中"));
     }
     return L2(`<div class="titem">
       {0}
@@ -3372,16 +3379,16 @@ function pageTheater(w){
             onclick="theaterRemove('{12}')">删除这一项</button>
           <span class="talt">删的是整项（不是把次数清零）</span>
         </div>
-      </div></div>`, imgTag(theaterTex(asset), theaterCn(asset)), head, asset, inf
-            ? L2("<span class=\"num inf\" id=\"th_tot_inf_{0}\">无限</span>", asset)
-            : `<input class="numin" id="th_tot_${asset}" type="text" inputmode="numeric" autocomplete="off" value="${tot}">`, asset, inf?L("设成数字"):L("改成无限"), asset, inf ? L2(`<div class="talt">「无限」= 每回合恢复 {0} 次、<b>只恢复到 {1} 次</b> —— 上一回合没用完的<b>不会累积</b>
+      </div></div>`, imgTag(theaterTex(asset), theaterCn(asset)), head, esc(asset), inf
+            ? L2("<span class=\"num inf\" id=\"th_tot_inf_{0}\">无限</span>", esc(asset))
+            : `<input class="numin" id="th_tot_${esc(asset)}" type="text" inputmode="numeric" autocomplete="off" value="${tot}">`, jsq(asset), inf?L("设成数字"):L("改成无限"), esc(asset), inf ? L2(`<div class="talt">「无限」= 每回合恢复 {0} 次、<b>只恢复到 {1} 次</b> —— 上一回合没用完的<b>不会累积</b>
           （游戏按 min(每回合恢复, 本场景剩余) 恢复；这是游戏自己的规则，不是显示问题）。</div>`, cur.uses_turn, cur.uses_turn) : "", (!inf && cur.to_use>cur.uses_total)
           ? L2("<div class=\"twarn\">当前可用 {0} 次 大于 本场景剩余 {1} 次 ⇒ 游戏读档会失败</div>", cur.to_use, cur.uses_total):"", (!inf && cur.uses_turn>cur.uses_total)
           ? L2(`<div class="twarn">每回合恢复 {0} 次 大于 本场景剩余 {1} 次 ——
              实际每回合只能用 {2} 次</div>`, cur.uses_turn, cur.uses_total, cur.uses_total):"", (!inf && cur.to_use > Math.min(cur.uses_turn, cur.uses_total))
           ? L2(`<div class="twarn">当前可用 {0} 次 大于 回合开始后的有效值
              {1} 次 —— 回合开始会重置为
-             {2} 次</div>`, cur.to_use, Math.min(cur.uses_turn, cur.uses_total), Math.min(cur.uses_turn, cur.uses_total)):"", editable?"":"disabled", asset);
+             {2} 次</div>`, cur.to_use, Math.min(cur.uses_turn, cur.uses_total), Math.min(cur.uses_turn, cur.uses_total)):"", editable?"":"disabled", jsq(asset));
   }).join("");
   w.innerHTML = L2(`<div class="panel"><h3>战区资产 · 候选 {0} 种（当前战斗里有 {1} 种）</h3>
     <div class="pbody"><div class="tgrid">{2}</div>
@@ -3811,8 +3818,8 @@ function renderHqPoolModal(){
         <select class="sel" onchange="hqPoolEquip('{2}','this.value')">
           {3}
         </select>
-        <span class="hint">兵种的国籍要**手选**（特种兵是自动跟着类型走的）</span></div>`, esc(M.equipType||"infantry"), (equipTypes||[]).map(eq=>`<option value="${eq}" ${
-            eq===(M.equipType||"infantry")?'selected':''}>${esc(hqEquipCn(eq))}</option>`).join(""), esc(M.equipType||"infantry"), (equipNats||[]).map(nt=>`<option value="${esc(nt)}" ${
+        <span class="hint">兵种的国籍要**手选**（特种兵是自动跟着类型走的）</span></div>`, jsq(M.equipType||"infantry"), (equipTypes||[]).map(eq=>`<option value="${esc(eq)}" ${
+            eq===(M.equipType||"infantry")?'selected':''}>${esc(hqEquipCn(eq))}</option>`).join(""), jsq(M.equipType||"infantry"), (equipNats||[]).map(nt=>`<option value="${esc(nt)}" ${
             nt===(M.equipNat||"german")?'selected':''}>${esc(natCn(nt))}</option>`).join(""))),
     {onOpen:function(){
       bindModalSpin("mp_q", ()=>MODAL.quantity, v=>MODAL.quantity=v, 0, 99);
@@ -4094,7 +4101,7 @@ function rosterHTML(){
   const units = (r.units||[]).map(u=>{
     const st = (u.act_st||0)+(u.sup_st||0);
     const specs = (u.specs||[]).map(s=>`<span class="spimg"><img class="spico"
-      src="${surf(specTex(s.type))}" alt="${esc(specCn(s.type))}"
+      src="${esc(surf(specTex(s.type)))}" alt="${esc(specCn(s.type))}"
       title="${esc(specCn(s.type))}"></span>`).join("");
     return L2(`<tr>
       <td>{0}</td>
@@ -4130,7 +4137,7 @@ function conferenceStoreHTML(){
     const isSpec = !!e.spec;
     const nm = isSpec ? specCn(e.spec) : hqEquipCn(e.equipment);
     const tex = isSpec ? specTex(e.spec) : "steps/step.png";
-    return `<div class="csrow"><img src="${surf(tex)}" alt="${esc(nm)}">
+    return `<div class="csrow"><img src="${esc(surf(tex))}" alt="${esc(nm)}">
       <span class="csn">${esc(nm)}</span>
       <span class="dim">${esc(natCn(e.nationality))}</span>
       <span class="csp">${e.price??0}¢</span>
@@ -4797,6 +4804,16 @@ bindDropZone();          /* U68：拖 .usg 进这一页 ⇒ 导入成副本 */
 
 function esc(s){ return String(s??"").replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ⚠️ **U125**：把值塞进 **JS 单引号字符串**（`onclick="f('…')"`）的安全写法。
+   `esc()` 只管 HTML（`& < > "`），**不管 `'` 和 `\`** ⇒ 值里有个 `'`
+   就能**提前闭合**字符串、把后面的内容当代码执行。
+   ⇒ 先按 JS 规则转义（`\` `'` `"`），再按 HTML 规则转义（`& < > "`）
+   —— HTML 实体是在 JS 解析**之前**还原的，所以两层顺序不能反。 */
+function jsq(s){
+  return esc(String(s??"")
+    .replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/"/g,'\\"'));
+}
 
 /* ---------- U111：JS 异常的**全局兜底** ----------
    ⚠️ **JS 的异常是静默的**：事件处理函数抛了异常，界面不报错、只是不响应
