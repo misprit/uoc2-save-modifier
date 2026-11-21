@@ -19,9 +19,40 @@ from pathlib import Path
 
 __all__ = ["CorePaths", "APP_DIR_NAME", "config_path", "read_config",
            "write_config", "detect_game_dir", "game_dir_candidates",
-           "looks_like_game_dir", "set_game_dir", "steam_libraries"]
+           "looks_like_game_dir", "set_game_dir", "steam_libraries",
+           "modifier_home", "backup_dir"]
 
 APP_DIR_NAME = ".uoc2"
+
+#: **备份存档**目录名（放在**修改器所在目录**下 —— U109）
+BACKUP_DIR_NAME = "bak"
+
+
+def modifier_home() -> Path:
+    """修改器自己的「家目录」= **装了它的那个目录**（exe / run.bat 所在处）。
+
+    ⚠️ `src/save_modifier_core/paths.py` 往上两级就是包根 ——
+    发布包里 = 解压出来的那个目录（exe 就在那儿）⇒
+    备份放 `<家目录>/bak/` ⇒ 玩家在**修改器旁边**就能找到（U109）。
+    """
+    return Path(__file__).resolve().parents[2]
+
+
+def backup_dir() -> Path:
+    """**备份存档**目录：`<修改器所在目录>/bak/`（U109）。
+
+    ⚠️ **为什么不再放在存档旁边**：
+    * 游戏只扫存档目录里的 `*.usg` ⇒ 备份放那儿会被**游戏当成存档**列出来
+      （修改器自己过滤掉了 `_BACKUP`，**游戏可不管**）⇒ 玩家可能手抖加载了备份；
+    * 改一次多一个文件 ⇒ 存档目录越来越乱。
+    ⇒ 统一放 `<修改器目录>/bak/`：**游戏看不到、也好找**。
+
+    环境变量 `UOC2_BAK_DIR` 可覆盖（测试用）。
+    """
+    env = os.environ.get("UOC2_BAK_DIR")
+    if env:
+        return Path(env).expanduser()
+    return modifier_home() / BACKUP_DIR_NAME
 
 #: 修改器自己的设置文件（放在**游戏数据目录**下，不进存档目录）
 #:

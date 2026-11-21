@@ -41,3 +41,6 @@ venv/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# U109：备份存档目录（`<修改器目录>/bak/`）—— 生成物，不进版本库
+bak/

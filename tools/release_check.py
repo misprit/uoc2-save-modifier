@@ -165,6 +165,9 @@ def step_real_save():
     tmp = Path(tempfile.mkdtemp(prefix="release_check_"))
     dst = tmp / "check.usg"
     shutil.copy2(src, dst)
+    # U109：备份改放 `<修改器目录>/bak/` ⇒ 演练时指到临时目录
+    # （别在仓库里留一个 bak/ 目录出来）。
+    os.environ["UOC2_BAK_DIR"] = str(tmp / "bak")
     cat = Catalog(paths)
     before = list_entries(dst)
     t0 = time.time()

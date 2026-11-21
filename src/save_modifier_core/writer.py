@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .packing import PackReport, repack_overlay, verify
+from .paths import backup_dir
 
 __all__ = [
     "WriteOutcome",
@@ -68,28 +69,58 @@ class WriteOutcome:
         return "❌ " + "；".join(self.errors[:3])
 
 
-def backup_path_for(save_path: Path) -> Path:
-    """备份文件的目标路径（`<存档名>_BACKUP.usg`）。
+def _next_free(folder: Path, stem: str, suffix: str) -> Path:
+    """`<folder>/<stem>_BACKUP[_n]<suffix>` —— **同名绝不覆盖**。
 
-    ⚠️ **同名已存在时不要覆盖** —— 用 `_BACKUP_2` / `_BACKUP_3`… 递增，
-    否则第二次修改会把第一次的救命备份冲掉（§6.4.1、§10 第 59 条）。
+    ⚠️ 递增是必须的：否则第二次修改会把第一次的救命备份冲掉
+    （§6.4.1、§10 第 59 条）。
     """
-    base = save_path.with_name(f"{save_path.stem}_BACKUP{save_path.suffix}")
+    base = folder / f"{stem}_BACKUP{suffix}"
     if not base.exists():
         return base
     n = 2
     while True:
-        cand = save_path.with_name(f"{save_path.stem}_BACKUP_{n}{save_path.suffix}")
+        cand = folder / f"{stem}_BACKUP_{n}{suffix}"
         if not cand.exists():
             return cand
         n += 1
 
 
+def backup_path_for(save_path: Path) -> Path:
+    """备份文件的目标路径（**`<修改器目录>/bak/<存档名>_BACKUP.usg`**，U109）。
+
+    ⚠️ **不再放在存档旁边**：游戏只扫存档目录里的 `*.usg` ⇒ 备份放那儿
+    会被**游戏当成存档**列出来；改一次多一个文件也把存档目录弄得很乱。
+    ⇒ 统一放 `<修改器目录>/bak/`（见 `paths.backup_dir()`）。
+
+    ⚠️ **同名已存在时不要覆盖** —— 用 `_BACKUP_2` / `_BACKUP_3`… 递增。
+    """
+    p = Path(save_path)
+    return _next_free(backup_dir(), p.stem, p.suffix)
+
+
+def legacy_backup_path_for(save_path: Path) -> Path:
+    """**老**位置（存档旁边的 `<存档名>_BACKUP.usg`）—— 只在 `bak/` 不可写时兜底。"""
+    p = Path(save_path)
+    return _next_free(p.parent, p.stem, p.suffix)
+
+
 def make_backup(save_path: Path) -> Path:
-    """生成备份（**原文件的字节拷贝**），返回备份路径。"""
+    """生成备份（**原文件的字节拷贝**），返回备份路径。
+
+    ⚠️ 优先放 `<修改器目录>/bak/`（U109）；那个目录**建不出来 / 不可写**
+    （例如整个修改器装在 Program Files 下）⇒ **退回存档旁边**（老位置），
+    绝不因为「备份没地方放」就拒绝写入。
+    """
     target = backup_path_for(save_path)
-    shutil.copy2(save_path, target)
-    return target
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(save_path, target)
+        return target
+    except OSError:
+        legacy = legacy_backup_path_for(save_path)
+        shutil.copy2(save_path, legacy)
+        return legacy
 
 
 def read_entries(save_path: Path, names) -> dict[str, bytes]:

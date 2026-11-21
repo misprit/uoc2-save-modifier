@@ -1654,14 +1654,29 @@ def api_undo_stack(save_id: str) -> dict:
         records, _ = load_stack(path)
         stack = [{"id": r.id, "time": r.time, "summary": r.summary,
                   "entries": [e.entry for e in r.entries]} for r in reversed(records)]
-        # 备份文件：存档旁边的 <名字>_BACKUP.usg / _BACKUP_2.usg …
+        # 备份文件：U109 起放在 `<修改器目录>/bak/`（游戏看不到、存档目录也干净）；
+        # **老位置**（存档旁边）留下的备份也一并列出来（升级前生成的）。
         backups = []
         try:
-            for p in sorted(path.parent.glob(path.stem + "_BACKUP*.usg")):
-                backups.append({"name": p.name, "size": p.stat().st_size,
-                                "mtime": _mtime(p.stat().st_mtime)})
-        except OSError:
-            pass
+            from save_modifier_core.paths import backup_dir
+            bak = backup_dir()
+        except Exception:
+            bak = None
+        seen = set()
+        for folder in ([bak] if bak is not None else []) + [path.parent]:
+            try:
+                for p in sorted(folder.glob(path.stem + "_BACKUP*.usg")):
+                    key = str(p)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    backups.append({"name": p.name, "path": key,
+                                    "size": p.stat().st_size,
+                                    "mtime": _mtime(p.stat().st_mtime)})
+            except OSError:
+                pass
+        # 新的在前（备份列表按时间倒序 ⇒ 一眼看到最近那次）
+        backups.sort(key=lambda b: b.get("mtime") or "", reverse=True)
         return {"stack": stack, "backups": backups,
                 "undo_available": bool(records),
                 "count": len(records)}
@@ -1675,10 +1690,15 @@ def api_plan(payload) -> dict:
     catalog = Catalog(CorePaths.discover())
     with open_save(save_id) as save:
         plan = save.plan_edit(_edits_from(payload), catalog=catalog)
-        # 备份文件名提前算出来给确认框显示（写盘前就能告诉玩家备份叫什么）
+        # 备份文件**在哪里**提前算出来给确认框显示（写盘前就能告诉玩家）
         try:
             from save_modifier_core.writer import backup_path_for
-            backup = backup_path_for(Path(save.path)).name
+            bp = backup_path_for(Path(save.path))
+            try:
+                from save_modifier_core.paths import modifier_home
+                backup = str(bp.relative_to(modifier_home()))
+            except Exception:
+                backup = str(bp)
         except Exception:
             backup = ""
         return {

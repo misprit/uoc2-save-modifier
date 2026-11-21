@@ -4019,10 +4019,11 @@ function conferenceStoreHTML(){
 function backupStackHTML(){
   const u = USTACK||{};
   /* U56：三栏 —— 标签 | 主内容 | 右侧小字（名字过长省略号截断，hover 有全文） */
+  /* U109：备份在 `<修改器目录>/bak/` 下 ⇒ 悬停给**完整路径**（玩家找得到） */
   const bks = (u.backups||[]).map(b=>L2(`<div class="bkrow">
     <span class="bt">备份</span>
     <span class="bn" title="{0}">{1}</span>
-    <span class="bm">{2} · {3}</span></div>`, esc(b.name), esc(b.name), esc(b.mtime||""), esc(b.size||""))).join("");
+    <span class="bm">{2} · {3}</span></div>`, esc(b.path||b.name), esc(b.name), esc(b.mtime||""), esc(b.size||""))).join("");
   const st = (u.stack||[]).map((r,i)=>{
     const sum = r.summary||((r.entries||[]).join("、"));
     return L2(`<div class="bkrow">
