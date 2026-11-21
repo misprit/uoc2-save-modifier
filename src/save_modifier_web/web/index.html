@@ -2402,8 +2402,21 @@ function removeSpec(unitId, specType, idx){
    总部页（U35）
    =================================================================== */
 const BRANCHES = ["engineering", "force_pool", "intel", "logistics", "operations"];
-const BRANCH_CN = {engineering:L("工程"), force_pool:L("兵库"), intel:L("情报"),
-  logistics:L("后勤"), operations:L("作战")};
+/* ⚠️ **U127**：原来这里写的是
+   `const BRANCH_CN = {engineering:L("工程"), …}` ——
+   那是**模块级求值**：页面加载那一刻语言还是中文 ⇒
+   玩家后来切到英文 ⇒ 总部页的分支名**永远是中文**。
+   ⇒ 改成**函数**：每次用的时候才翻译。 */
+function branchCn(br){
+  switch(br){
+    case "engineering": return L("工程");
+    case "force_pool":   return L("兵库");
+    case "intel":        return L("情报");
+    case "logistics":    return L("后勤");
+    case "operations":   return L("作战");
+    default: return br;
+  }
+}
 const TRUCK_RANGE = [5, 8, 10, 11, 12];
 const hqKey = (id, field) => `hq_field:${id}:${field}`;
 const hqBrKey = (id, br) => `hq_branch_level:${id}:${br}`;
@@ -2532,7 +2545,7 @@ function hqMatrixHTML(h){
           <button onclick="hqSuppress({6},'{7}',-1)">−</button>
           <b class="{8}">{9}</b>
           <button onclick="hqSuppress({10},'{11}',1)">+</button></div>
-      </div>{12}</div>`, esc(BRANCH_CN[br]||br), h.id, br, lvl, h.id, br, h.id, br, sup?'on':'', sup, h.id, br, cells);
+      </div>{12}</div>`, esc(branchCn(br)), h.id, br, lvl, h.id, br, h.id, br, sup?'on':'', sup, h.id, br, cells);
   }).join("");
   return L2(`<div class="matrix">
     <div class="mx-head"><div class="h-branch">分支 / 等级</div><div>1 级</div>
@@ -2775,7 +2788,7 @@ function hqBranchLevel(id, br, d){
      「压制」会改生效等级 ⇒ 用存档原值会把「等级 +1」误判成「改回原值」
      ⇒ 整条待应用被撤掉（U112 实测）。 */
   queueEdit("hq_branch_level", hqBrKey(id,br),
-    {hq_id:id, branch:br, level:v}, st.level, v, L2("总部 {0} {1} 等级", id, BRANCH_CN[br]||br));
+    {hq_id:id, branch:br, level:v}, st.level, v, L2("总部 {0} {1} 等级", id, branchCn(br)));
   refreshHqLocal(id, true);
 }
 function hqSuppress(id, br, d){
@@ -2789,7 +2802,7 @@ function hqSuppress(id, br, d){
   /* `base` = 投影出来的当前被压制数（同上：不是存档原值） */
   queueEdit("hq_branch_suppressed", hqBrKey(id,br)+":sup",
     {hq_id:id, branch:br, suppressed:v}, st.suppressed, v,
-    L2("总部 {0} {1} 被压制等级", id, BRANCH_CN[br]||br));
+    L2("总部 {0} {1} 被压制等级", id, branchCn(br)));
   refreshHqLocal(id, true);
 }
 function hqSpecialize(id, br, act, used, avail){
