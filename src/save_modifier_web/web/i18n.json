@@ -752,7 +752,8 @@
   "<button class=\"btn\" onclick=\"closeModal()\">取消</button>\n      <button class=\"btn pri\" onclick=\"applyStep()\">应用更改</button>": "<button class=\"btn\" onclick=\"closeModal()\">Cancel</button>\n      <button class=\"btn pri\" onclick=\"applyStep()\">Apply changes</button>",
   "<div class=\"fine\">下面还有 <b>{0}</b> 条软警告 —— 点「应用更改」后会**逐条**弹出来问你；全部同意才写盘。</div>": "<div class=\"fine\">There are still <b>{0}</b> soft warnings — after you click \"Apply changes\" they are shown <b>one by one</b> for you to agree to; the save is written only after all of them are accepted.</div>",
   "<div><div class=\"wrow\">⚠ {0}</div></div>\n      <div class=\"fine\">软警告：照写，只是提醒。同意后继续下一条；全部同意才会写盘。</div>": "<div><div class=\"wrow\">⚠ {0}</div></div>\n      <div class=\"fine\">A soft warning: it is written all the same, it is only a reminder. Agree to continue with the next one; the save is written only after all of them are accepted.</div>",
-  "⚠ 软警告（第 {0}/{1} 条）": "⚠ Soft warning ({0}/{1})"
+  "⚠ 软警告（第 {0}/{1} 条）": "⚠ Soft warning ({0}/{1})",
+  "特种兵候选池读取失败：": "Failed to load the specialist pool: "
  },
  "errors": {
   "**取消专精**（{old_used} → {sp_used}）—— 该技能发动时的 CP 消耗会涨回去": "**Specialisation removed** ({old_used} → {sp_used}) — the CP cost of activating that skill goes back up",

@@ -1349,6 +1349,10 @@ let CATALOG = null;      /* /api/catalog —— 游戏包目录（静态，进�
 let PICK = null;         /* /api/pickers —— 当前选择器的候选 */
 let SEL = {};            /* 每页当前选中项 */
 let PICKCACHE = {};      /* unit_type → 候选池（"" = 通用那一份；换存档时清空） */
+/* ⚠️ **U128**：候选池**读取失败**的原因（unit_type → 错误文字）。
+   以前失败被 `catch(()=>{})` 吞掉 ⇒ 界面永远停在「正在读取…」
+   ⇒ 玩家只看到「转圈」，不知道是**读失败**了。 */
+let PICKERR = {};
 
 /* 贴图：必须走服务端代理（http 页面读不到 file://）—— U29
    `/surfaces/*` 要 token ⇒ 只能走 query（<img> 带不了 header）。 */
@@ -1739,8 +1743,15 @@ function ensureUnitPool(u){
     /* 只在「选中的还是这个单位」时才重画。
        ⚠️ 不看 PAGE —— 换页时这个函数也会被调，refreshUnitLocal 内部
        自带「元素在不在」的判断 ⇒ 换页后是无害的空操作。 */
+    delete PICKERR[type];
     if(SEL.units===uid) refreshUnitLocal(uid);
-  }).catch(()=>{});
+  }).catch(e=>{
+    /* ⚠️ **U128**：别再把失败**吞掉**（原来 `.catch(()=>{})`）——
+       吞掉 ⇒ 界面永远「正在读取…」。⇒ 记下原因 + 让玩家看见。 */
+    PICKERR[type] = (e && e.message) ? e.message : String(e);
+    if(SEL.units===uid) refreshUnitLocal(uid);
+    showJsError(PICKERR[type], "读取特种兵候选池");
+  });
 }
 
 /* U104：把这个存档里**所有单位类型**的候选池**一次拉齐**
@@ -2089,8 +2100,13 @@ function unitDetailHTML(u){
     /* 「显示所有特种兵」走**类型表**（catalog），不依赖候选池 ⇒ 照旧。 */
     poolHTML = fullPoolHTML(u, specs);
   } else if(!pool){
-    /* 这个类型的池还没拉到 ⇒ 明说「在读」，别拿上一个单位的池子糊弄。 */
-    poolHTML = L(`<div style="padding:12px;color:var(--muted);font-size:12px">正在读取这个单位类型的可用特种兵…</div>`);
+    /* 这个类型的池还没拉到 ⇒ 明说「在读」，别拿上一个单位的池子糊弄。
+       ⚠️ **U128**：但如果是**读失败**了，要说清楚是失败（不然永远「正在读取…」）。 */
+    const perr = PICKERR[u.type];
+    poolHTML = perr
+      ? `<div style="padding:12px;color:var(--muted);font-size:12px">`
+        + esc(L("特种兵候选池读取失败：")+perr) + `</div>`
+      : L(`<div style="padding:12px;color:var(--muted);font-size:12px">正在读取这个单位类型的可用特种兵…</div>`);
   } else {
     /* U48：同一种特种兵**可以挂多个** ⇒ 已挂的不再灰掉，
        改成角标「已挂 N 个」；只有**槽位满了**才不让再挂。 */
@@ -4865,11 +4881,13 @@ async function openSave(sid){
   document.getElementById("splash").style.display = "none";
   document.getElementById("app").style.display = "flex";
   /* 目录是异步的 ⇒ 到位后**重绘一次**，否则中文名与卡牌贴图一开始全是 id / 404 */
-  loadCatalog().then(()=>{ if(VIEW) show(PAGE); }).catch(()=>{});
+  loadCatalog().then(()=>{ if(VIEW) show(PAGE); })
+    .catch(e=>showJsError(e, "读取游戏目录"));
   /* 选择器候选（战役池 / 商店可上架范围 / 卡牌白名单）**每个存档加载一次** ——
      商店页与卡牌页都要用（之前只有单位页按需加载 ⇒ 模态框里 0 种）。 */
   PICKCACHE = {};
-  loadPickers("").then(()=>{ if(VIEW) show(PAGE); }).catch(()=>{});
+  loadPickers("").then(()=>{ if(VIEW) show(PAGE); })
+    .catch(e=>showJsError(e, "读取选择器候选"));
   paintHeader();
   paintRail();
   document.getElementById("status").innerHTML =
