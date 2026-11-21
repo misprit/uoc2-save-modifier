@@ -1860,6 +1860,26 @@ card data_validation     : card_types ×2
 改名的正确做法：**直接写明文**到 `name_brief` / `name_full`，改完存 `.usg` 即可生效，**不需要重启游戏**，也不需要写任何 temp mod（`<game>/_packages/` 与 `%LOCALAPPDATA%\.uoc2\_packages\` 两个位置都不用碰）。
 （`name_brief` 允许 `null`；`name_full` 允许 `null`。）
 
+⚠️ **U148（2026-11-21）**：改名要**两份表都写** ——
+存档里有**两份**单位/总部表：
+
+| 表 | 内容 | 谁在显示 |
+|---|---|---|
+| 根 `units.yml` / `hqs.yml` | **已经登场过**的（实测 354 / 23 条） | **战斗中**（`game_world`） |
+| `document/units.yml` / `document/hqs.yml` | **整场战役的全部**（实测 835 / 47 条） | **战役地图 / 主界面**（`main_screen`） |
+
+两份表的 id 是**同一套编号**、同 id 的 `name_brief` **完全一致**（实测 9 个存档 100% 一致）。
+
+* 战役地图：`campaign_doc._load` → `add_campaign_unit(unit_id, type, name_brief, name_full)`
+  ⇒ 名字来自**名册**，**原样**带进去（**不**按 id 反查）；
+* 战斗中：`gamelike._load_entities` → `HQState.load` / `UnitState.load` ⇒ 来自**根表**；
+* 显示时统一 `app.locale.get(name_brief)`（`unit_sheet.py:101` / `scalables.py:601` /
+  `campaign_ctrl.py:1784`）；`LocalizationManager.get`（`tools/localization.py:198`）
+  对**不以 `id_`/`idp_` 开头**的字符串**原样返回** ⇒ 明文可用；
+* **游戏自己的改名**（`campaign.py::_rename_hqs`）改的正是**名册**那份 ⇒ 佐证。
+
+⇒ **只改根表 ⇒ 战役地图上完全看不到变化**（朋友 2026-11-21 反馈"改名没生效"）。
+
 ---
 
 ## 6. 三块功能的具体改法
