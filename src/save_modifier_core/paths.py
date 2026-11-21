@@ -50,6 +50,19 @@ def modifier_home() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def fallback_backup_dir() -> Path:
+    """**备用**备份目录：`<游戏数据目录>/bak/`（U132）。
+
+    ⚠️ **为什么不用「存档旁边」**：游戏只扫存档目录里的 `*.usg`
+    ⇒ 备份放那儿会被**游戏当成存档**列出来（U109 的教训）。
+    ⇒ 兜底也放在**游戏数据目录**里（游戏不扫那儿）。
+
+    ⚠️ 这个目录**建不出来**时 ⇒ 宁可**拒绝写盘**（没有备份就不写），
+    也不要把备份丢给游戏（外部审阅报告 P2-13）。
+    """
+    return appdata_dir() / BACKUP_DIR_NAME
+
+
 def backup_dir() -> Path:
     """**备份存档**目录：`<修改器所在目录>/bak/`（U109）。
 

@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .packing import PackReport, repack_overlay, verify
-from .paths import backup_dir
+from .paths import backup_dir, fallback_backup_dir
 
 __all__ = [
     "WriteOutcome",
@@ -109,18 +109,30 @@ def make_backup(save_path: Path) -> Path:
     """生成备份（**原文件的字节拷贝**），返回备份路径。
 
     ⚠️ 优先放 `<修改器目录>/bak/`（U109）；那个目录**建不出来 / 不可写**
-    （例如整个修改器装在 Program Files 下）⇒ **退回存档旁边**（老位置），
-    绝不因为「备份没地方放」就拒绝写入。
+    （例如整个修改器装在 Program Files 下）⇒ 退到 `<游戏数据目录>/bak/`。
+
+    ⚠️ **U132**：**不再退回「存档旁边」** —— 游戏只扫存档目录里的 `*.usg`
+    ⇒ 备份放那儿会被**游戏当成存档**列出来（U109 的问题又回来了；
+    外部审阅报告 P2-13）。⇒ 两处都不行就**报错**
+    （写盘流程会因此停下 ⇒ **绝不出现「没备份就写存档」**）。
     """
     target = backup_path_for(save_path)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(save_path, target)
         return target
-    except OSError:
-        legacy = legacy_backup_path_for(save_path)
-        shutil.copy2(save_path, legacy)
-        return legacy
+    except OSError as exc:
+        first = exc
+    # 兜底：`<游戏数据目录>/bak/`（游戏不扫那儿）
+    alt_dir = fallback_backup_dir()
+    try:
+        alt_dir.mkdir(parents=True, exist_ok=True)
+        p = Path(save_path)
+        alt = _next_free(alt_dir, p.stem, p.suffix)
+        shutil.copy2(save_path, alt)
+        return alt
+    except OSError as exc:
+        raise OSError("备份放不下（%s；备用目录也不行：%s）" % (first, exc))
 
 
 def read_entries(save_path: Path, names) -> dict[str, bytes]:

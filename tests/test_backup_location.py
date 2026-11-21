@@ -112,17 +112,49 @@ class TestBackupLocation(BackupLocationTestBase):
         self.assertEqual(self.bak, want.parent)
         self.assertEqual("s_BACKUP.usg", want.name)
 
-    def test_falls_back_to_the_save_folder_when_bak_is_unusable(self):
-        """⚠️ `bak/` 建不出来（装在 Program Files 下）⇒ **退回存档旁边**，
-        写盘**照常成功** —— 绝不因为「备份没地方放」就拒绝写入。"""
+    def test_falls_back_to_the_appdata_bak_when_bak_is_unusable(self):
+        """⚠️ `bak/` 建不出来（装在 Program Files 下）⇒ **退到
+        `<游戏数据目录>/bak/`**（U132）。
+
+        ⚠️ **不再退回存档旁边** —— 游戏只扫存档目录里的 `*.usg`
+        ⇒ 备份放那儿会被**游戏当成存档**（U109 的问题又回来了；
+        外部审阅报告 P2-13）。
+        """
         blocker = self.tmp / "not_a_dir"
         blocker.write_text("x", encoding="utf-8")
         os.environ["UOC2_BAK_DIR"] = str(blocker)
-        res = self.commit([Edit.progress("prestige", 5)])
+        appdata = self.tmp / "appdata"
+        old_app = os.environ.get("UOC2_APPDATA")
+        os.environ["UOC2_APPDATA"] = str(appdata)
+        try:
+            res = self.commit([Edit.progress("prestige", 5)])
+        finally:
+            if old_app is None:
+                os.environ.pop("UOC2_APPDATA", None)
+            else:
+                os.environ["UOC2_APPDATA"] = old_app
         self.assertIsNotNone(res.backup)
-        self.assertEqual(self.tmp, res.backup.parent,
-                         "bak/ 不可用时应退回存档旁边")
+        self.assertEqual(appdata / "bak", res.backup.parent,
+                         "bak/ 不可用时应退到 <游戏数据目录>/bak/")
         self.assertTrue(res.backup.is_file())
+
+    def test_the_save_folder_never_gets_a_backup(self):
+        """⭐ 存档目录里**一个备份都不许留**（游戏会把它当存档）。"""
+        blocker = self.tmp / "not_a_dir"
+        blocker.write_text("x", encoding="utf-8")
+        os.environ["UOC2_BAK_DIR"] = str(blocker)
+        appdata = self.tmp / "appdata"
+        old_app = os.environ.get("UOC2_APPDATA")
+        os.environ["UOC2_APPDATA"] = str(appdata)
+        try:
+            self.commit([Edit.progress("prestige", 5)])
+        finally:
+            if old_app is None:
+                os.environ.pop("UOC2_APPDATA", None)
+            else:
+                os.environ["UOC2_APPDATA"] = old_app
+        self.assertEqual([], self.usgs_in_save_dir(),
+                         "兜底也不许把备份放进存档目录（游戏会把它当存档）")
 
 
 class TestUndoStillWorks(BackupLocationTestBase):
