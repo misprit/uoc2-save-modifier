@@ -701,8 +701,36 @@ def api_pickers(save_id: str, unit_type: str = "",
 
         universe = catalog.store_item_universe(campaign_id, conference)
         wl = catalog.card_whitelist(save)
+        # U107：玩家「挂得上的」特种兵 —— 与**单位页挂载特种兵**同一个函数
+        # （`specialist_candidates`）：玩家**自己阵营**的每个单位类型的候选池取并集。
+        # ⚠️ 存档里**也有 AI 的单位**（west 存档 45 个单位里有德国 / 意大利的）
+        # ⇒ 必须按 `player_faction` 过滤，否则会把敌方的也带进来。
+        # ⚠️ 只收 scope == "campaign" 的 —— 「仅规则」的兜底会把敌方的也带进来。
+        player_faction = wl.player_faction
+        player_specs: set[str] = set()
+        try:
+            unit_types = {u.get("type") for u in save.root_units()
+                          if isinstance(u, dict) and u.get("type")}
+        except Exception:
+            unit_types = set()
+        for ut in sorted(x for x in unit_types if x):
+            if player_faction:
+                ut_obj = catalog.unit_type(ut)
+                if ut_obj is not None and ut_obj.faction \
+                        and ut_obj.faction != player_faction:
+                    continue
+            try:
+                names, scope = catalog.specialist_candidates(ut, campaign_id=campaign_id)
+            except Exception:
+                continue
+            if scope != "campaign":
+                continue
+            player_specs.update(names)
         return {
             "unit_type": unit_type,
+            # U107：玩家阵营 + 「挂得上的」特种兵（商店上架 / 兵库加条目用）
+            "player_faction": player_faction,
+            "player_specs": sorted(player_specs),
             "specialists_for_unit": {"candidates": list(names), "scope": scope},
             # U104：批量拿到的「每种单位类型的候选池」
             "specialists_by_unit": by_unit,

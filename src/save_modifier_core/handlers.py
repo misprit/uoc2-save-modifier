@@ -206,6 +206,17 @@ TRUCK_MIN, TRUCK_MAX = 1, len(TRUCK_RANGES)
 #: 商店的两个子商店（`store.yml` 是两层结构，`e154` 实证）
 STORE_SUBS = ("store", "elite_store")
 
+#: 游戏定义过的**兵种**（商店 / 兵库条目的 `equipment` 字段只能填这两个）。
+#: 依据 = 游戏的存档 schema（`state/entities/data_validation/force_pool.pyc`，
+#: U107 字节码实证）：
+#: ```python
+#: _all_eq = constants.unit_equipments + (constants.unit_equipment_none,)
+#: _equipment_schema = In(_all_eq)        # = In(('armor', 'infantry'))
+#: ```
+#: ⚠️ 之前核心库拿「本次会议商店在售的兵种」当门 ⇒ **过严**
+#: （某个会议只卖 infantry 时，写 armor 明明游戏能读却被拒）。
+GAME_EQUIPMENTS = ("armor", "infantry")
+
 
 def _level_of(w) -> str:
     """存档难度（`main.yml.level`）；取不到就返回空串。"""
@@ -1614,45 +1625,49 @@ def _entry_label(entry) -> str:
 def _check_store_universe(w, entry) -> list[str]:
     """商品本身必须是**游戏定义过的**（schema 是枚举校验）。
 
-    依据 = 战役包该会议所有战线的默认商店 + 存档自己的商店 + 游戏包的特种兵表。
+    依据 = 游戏的存档 schema（`state/entities/data_validation/force_pool.pyc`，
+    U107 字节码实证）：
+
+    | 字段 | 游戏怎么校验 | 合法范围 |
+    |---|---|---|
+    | `spec` | `Exclusive('spec','t')` + `specialist_types.id_validation_schema` | **全部** 375 个特种兵类型 |
+    | `equipment` | `Exclusive('equipment','t')` + `In(constants.unit_equipments + (unit_equipment_none,))` | **全部** `('armor','infantry')` |
+    | `nationality` | `Required('nationality')` + `nationality_types.id_validation_schema` | **全部** 40 个国籍 id |
+
+    ⚠️ **U107：之前这里拿「本次会议商店在售的兵种 / 国籍」当门 ⇒ 过严** ——
+    west 存档里 free_french 的 3 个特种兵游戏明明能读，却被核心库拒了
+    ⇒ 玩家「部分无法正常上架」。现在按**游戏定义过的**判（与游戏 schema 一致）。
     拿不到游戏包就不查（只提示，不拦）。
     """
     if w.catalog is None:
         return []
-    main = w.table("main.yml", {})
-    in_state = (main.get("in_state") or {}) if isinstance(main, dict) else {}
-    campaign_id = main.get("campaign_id") if isinstance(main, dict) else None
-    universe = w.catalog.store_item_universe(campaign_id, in_state.get("conference"))
-
-    save_equip: set[str] = set()
-    save_nat: set[str] = set()
-    for blob in w.save.root_store().values():
-        if not isinstance(blob, dict):
-            continue
-        for items in blob.values():
-            if not isinstance(items, list):
-                continue
-            for e in items:
-                if not isinstance(e, dict):
-                    continue
-                if e.get("equipment"):
-                    save_equip.add(str(e["equipment"]))
-                if e.get("nationality"):
-                    save_nat.add(str(e["nationality"]))
-    equips = universe["equipment"] | save_equip
-    nats = universe["nationality"] | save_nat
-
     errs: list[str] = []
     spec = entry.get("spec")
-    if spec and universe["spec"] and spec not in universe["spec"]:
+    if spec and not w.catalog.has_spec_type(spec):
         errs.append(f"特种兵 {spec!r} 游戏里没有 —— 不能凭空新增种类")
     eq = entry.get("equipment")
-    if eq and equips and eq not in equips:
-        errs.append(f"兵种 {eq!r} 游戏里没有（可选：{', '.join(sorted(equips))}）")
+    if eq and eq not in GAME_EQUIPMENTS:
+        errs.append(f"兵种 {eq!r} 游戏里没有（可选：{', '.join(GAME_EQUIPMENTS)}）")
     nat = entry.get("nationality")
-    if nat and nats and nat not in nats:
-        errs.append(f"国籍 {nat!r} 游戏里没有（可选：{', '.join(sorted(nats)[:12])} …）")
+    if nat and w.catalog.nationality(str(nat)) is None:
+        errs.append(f"国籍 {nat!r} 游戏里没有（可选：{', '.join(w.catalog.nationality_names()[:12])} …）")
     return errs
+
+
+def _player_faction(w) -> str | None:
+    """玩家阵营（存档 `document/main.yml` 的 `player_faction`，L5 只读）。
+
+    拿不到就返回 None（不猜）。
+    """
+    try:
+        doc = w.save.read_yaml("document/main.yml", None)
+    except Exception:
+        doc = None
+    if isinstance(doc, dict):
+        pf = doc.get("player_faction")
+        if pf:
+            return str(pf)
+    return None
 
 
 def _shelf_of(w):
@@ -1957,6 +1972,17 @@ def _store_add(w, e: Edit) -> Outcome:
     w.touch("store.yml")
     oc.summary = (f"上架商品 {new.get('spec') or new.get('equipment')}"
                   f"（{front}/{sub}，价格 {new.get('price')}，库存 {new.get('quantity')}）")
+    # U107：**软警告** —— 游戏允许上架敌方阵营的特种兵（存档能读），
+    # 但玩家买回来挂不到自己的单位上（阵营 / 国籍不匹配）⇒ 白花钱。
+    pf = _player_faction(w)
+    spec = new.get("spec")
+    if pf and spec and w.catalog is not None:
+        st = w.catalog.spec_type(spec)
+        fac = st.faction if st is not None else None
+        if fac and fac != pf:
+            oc.warnings.append(
+                f"这个特种兵是 {fac} 阵营的（玩家是 {pf}）—— "
+                "游戏能读，但买回来**挂不到自己的单位上**（U107）")
     return oc
 
 
