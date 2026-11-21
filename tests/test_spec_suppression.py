@@ -132,7 +132,7 @@ class TestSpecSuppression(SpecSuppressionTestBase):
         self.assertTrue(any("恢复" in w for w in plan.warnings), plan.warnings)
 
     def test_same_value_is_a_no_op(self):
-        """本来就活�� ⇒ **没事可做**（不是错误，也不该产生多余的备份）。"""
+        """本来就活跃 ⇒ **没事可做**（不是错误，也不该产生多余的备份）。"""
         plan, res = self.commit([Edit.unit_spec_active(1, "ger_arty_40", 0, True)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertEqual(plan.changes, [], "没有变化就不该产生任何写入")
@@ -196,11 +196,15 @@ class TestSpecSuppressionUi(unittest.TestCase):
         """待应用里改过压制状态 ⇒ 界面要立刻反映（不能等写盘）。"""
         self.assertIn('pendingVal("unit_spec_active"', self.html)
 
-    def test_only_real_slots_get_the_button(self):
-        """还没写盘的新增件（临时负数 idx）不给按钮 —— 写盘后槽位才定。"""
+    def test_pending_slots_also_get_the_button(self):
+        """U105：**新增件（还没写盘）也要有**压制按钮 ——
+        存档里原有的特种兵和我们新增的用**同一套逻辑**、**同一个 UI 卡片**
+        （旧行为「只有 idx≥0 的才有按钮」已被 U105 取代）。"""
         body = self.html[self.html.index("function specSlotHTML"):
                          self.html.index("function toggleSpecSuppressed")]
-        self.assertIn("s.idx>=0", body)
+        self.assertNotIn("const btn = (s.idx>=0)", body,
+                         "压制按钮不能只给存档里原有的")
+        self.assertIn("toggleSpecSuppressed", body)
 
     def test_english_words_exist(self):
         ui = self.table["ui"]
