@@ -1000,7 +1000,7 @@ tr.oldrow{opacity:.6}
     <button class="save" id="hSave" onclick="openSaveMenu()"><span class="nm">—</span></button>
     <span class="hint">改动会先备份原存档</span>
     <span class="sp"></span>
-    <button class="btn" onclick="doUndo()">↶ 撤销</button>
+    <button class="btn" id="btnUndo" onclick="doUndo()">↶ 撤销</button>
     <button class="btn pri" id="btnApply" onclick="doApply()">应用更改<span class="badge-n" id="hPending">0</span></button>
   </div>
   <div class="body">
@@ -1194,6 +1194,16 @@ function paintHeader(){
 function paintRail(){
   if(!VIEW) return;
   const set = (id, v)=>{ const e=document.getElementById(id); if(e) e.textContent = v; };
+  /* ⚠️ **U134**（外部审阅 P2-1）：撤销按钮**能不能点**要看「真的还有几条能撤」
+     —— 栈顶可能撤不了（存档后来又被改过）⇒ 别让玩家反复点一个注定失败的按钮。 */
+  const ub = document.getElementById("btnUndo");
+  if(ub){
+    const st = USTACK || {};
+    const n = (typeof st.undoable==="number") ? st.undoable : ((st.stack||[]).length);
+    ub.disabled = !n;
+    ub.title = n ? L("撤销上一次应用")
+                  : L("没有能撤销的修改了（记录已过期 —— 存档后来又被改过）");
+  }
   set("ctUnits", (VIEW.units||[]).length || "");
   set("ctHqs", (VIEW.hqs||[]).length || "");
   set("ctCards", (VIEW.hand||[]).length || "");
@@ -4124,6 +4134,15 @@ async function loadUndoStack(){
   catch(e){ USTACK = {stack:[], backups:[], count:0}; }
   paintRail();
 }
+/* ⚠️ **U135**（外部审阅 P2-2）：写盘 / 撤销之后，
+   **撤销栈与备份列表都变了** ⇒ 必须重新拉一次。
+   （以前不拉 ⇒ 概览页列的还是旧记录、Rail 上的条数也没变，
+     空栈了「撤销」按钮还是能点。） */
+async function refreshUndoStack(){
+  USTACK = null;
+  await loadUndoStack();
+  if(PAGE==="overview") show("overview");
+}
 
 /* ---------- 路线图 ---------- */
 function routeHTML(){
@@ -4207,12 +4226,17 @@ function backupStackHTML(){
     <span class="bt">备份</span>
     <span class="bn" title="{0}">{1}</span>
     <span class="bm">{2} · {3}</span></div>`, esc(b.path||b.name), esc(b.name), esc(b.mtime||""), esc(b.size||""))).join("");
+  /* ⚠️ **U134**：`undoable` = 从栈顶往下还有几条真的能撤 ⇒ 后面的是「已过期」。 */
+  const nok = (typeof u.undoable==="number") ? u.undoable : (u.stack||[]).length;
   const st = (u.stack||[]).map((r,i)=>{
     const sum = r.summary||((r.entries||[]).join("、"));
+    const stale = i >= nok;
     return L2(`<div class="bkrow">
     <span class="bt">撤销 {0}</span>
     <span class="bn" title="{1}">{2}</span>
-    <span class="bm">{3}</span></div>`, i+1, esc(sum), esc(sum), esc((r.time||"").replace("T"," ")));
+    <span class="bm">{3}{4}</span></div>`, i+1, esc(sum), esc(sum),
+      esc((r.time||"").replace("T"," ")),
+      stale ? L(" · 已过期，撤不了") : "");
   }).join("");
   if(!bks && !st) return L(`<div class="bkempty">还没有备份，也没有撤销记录</div>`);
   return bks + st;
@@ -4440,6 +4464,8 @@ async function reallyApply(){
     PENDING = [];
     paintPending();
     await openSave(VIEW._save_id);
+    /* U135：写完盘 ⇒ 撤销栈多了一条、备份多了一份 ⇒ 重新拉。 */
+    await refreshUndoStack();
     /* U55：底栏没了 ⇒ 写入结果改成**弹窗**提示（含软警告）。 */
     const warns = (d.warnings||[]);
     const warnHTML = warns.map(function(w){
@@ -4467,6 +4493,9 @@ async function reallyApply(){
 async function doUndo(){
   const r = await post("/api/undo", {save_id: VIEW._save_id});
   const d = r.data;
+  /* U135：撤销之后撤销栈变了 ⇒ 重新拉
+     （**失败**也要拉 —— 撤不了的记录会被丢掉，列表得跟着变）。 */
+  await refreshUndoStack();
   if(d.ok){ await openSave(VIEW._save_id); }
   else {
     /* U55：底栏删了 ⇒ 撤销失败改成**弹窗**。 */

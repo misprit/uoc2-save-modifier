@@ -297,6 +297,15 @@ def _baseline_errors(save_path: Path, record: UndoRecord) -> list[str]:
     return errs
 
 
+def baseline_ok(save_path: Path, record: UndoRecord) -> bool:
+    """这条记录**现在**还能撤吗？（基准校验的公开入口，U134）
+
+    ⚠️ 栈顶可能**撤不了**（存档后来又被改过）⇒ 界面要如实说
+    （`api_undo_stack` 的 `undoable`），别让玩家反复点一个注定失败的按钮。
+    """
+    return not _baseline_errors(save_path, record)
+
+
 def undo_save(save_path: Path) -> UndoResult:
     """撤销上一次 commit。
 
@@ -321,6 +330,11 @@ def undo_save(save_path: Path) -> UndoResult:
     record = records[-1]
 
     # 基准校验 —— 不过就拒绝，绝不硬改
+    # ⚠️ **U134**（外部审阅 P2-1）：这条记录**撤不了**了（存档后来又被改过），
+    # 但**不弹栈** —— 玩家把存档从备份还原回来之后，它又能撤了
+    # （仓库护栏：`tests/test_undo.py::test_stack_survives_rejected_undo`）。
+    # ⇒ 改成让**界面知道**：服务端算「还有几条能撤」（`undoable`），
+    #   界面据此禁用撤销按钮、标出「已过期」的记录。
     bad = _baseline_errors(save_path, record)
     if bad:
         res.errors.append(

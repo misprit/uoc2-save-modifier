@@ -1724,6 +1724,19 @@ def api_undo_stack(save_id: str) -> dict:
         records, _ = load_stack(path)
         stack = [{"id": r.id, "time": r.time, "summary": r.summary,
                   "entries": [e.entry for e in r.entries]} for r in reversed(records)]
+        # ⚠️ **U134**（外部审阅 P2-1）：栈顶可能**撤不了**（存档后来又被改过）
+        # ⇒ 如实告诉界面「从栈顶往下还有几条真的能撤」，
+        #   界面据此禁用撤销按钮、标出「已过期」的记录
+        #   （玩家就不会反复点一个注定失败的按钮）。
+        undoable = 0
+        try:
+            from save_modifier_core.undo import baseline_ok
+            for rec in reversed(records):
+                if not baseline_ok(path, rec):
+                    break
+                undoable += 1
+        except Exception:
+            undoable = len(records)
         # 备份文件：U109 起放在 `<修改器目录>/bak/`（游戏看不到、存档目录也干净）；
         # **老位置**（存档旁边）留下的备份也一并列出来（升级前生成的）。
         backups = []
@@ -1748,7 +1761,8 @@ def api_undo_stack(save_id: str) -> dict:
         # 新的在前（备份列表按时间倒序 ⇒ 一眼看到最近那次）
         backups.sort(key=lambda b: b.get("mtime") or "", reverse=True)
         return {"stack": stack, "backups": backups,
-                "undo_available": bool(records),
+                "undo_available": bool(records) and undoable > 0,
+                "undoable": undoable,
                 "count": len(records)}
 
 
