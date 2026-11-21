@@ -22,8 +22,9 @@
 
 **修法**：
 * 前端：兵库条目一律带 `_o`（**存档原始下标**）⇒ 移除 / 改数量都用它；
-* 前端：`pendingEdits()` 把删除排最后，并按 index **降序**；
-* 核心库：`plan_edit()` 也按同样规则排序（`order_edits`）⇒ 顺序无关。
+* 核心库：`plan_edit()` 按规则排序（`order_edits`）⇒ **顺序无关**。
+  ⚠️ **U136**：前端**不再排**（以前排了两份 ⇒ 同一条规则两处实现 ⇒ 漂移就出 bug：
+  U91 只排了兵库、商店漏了 ⇒ 外部审阅的 P0-2）。
 
 **这些测试守什么**：
 ① 玩家**按顺序**点两条（哪种顺序都行）⇒ 两条都删掉、且**不误删**别的；
@@ -118,12 +119,13 @@ def hq_pool_remove(pending, raw, target):
 
 
 def pending_edits(pending):
-    """index.html: pendingEdits() —— 删除排最后 + 按 index 降序。"""
-    edits = [{"kind": p["kind"], "params": p["params"]} for p in pending]
-    others = [e for e in edits if e["kind"] != "hq_force_pool_remove"]
-    removes = sorted([e for e in edits if e["kind"] == "hq_force_pool_remove"],
-                      key=lambda e: e["params"].get("index") or 0, reverse=True)
-    return others + removes
+    """index.html: `pendingEdits()` —— **只把待应用变成请求体**。
+
+    ⚠️ **U136**：前端**不排**任何顺序 —— 「按下标删除的排在最后、同组按 index 降序」
+    这条规则**只在核心库 `plan.py::order_edits` 一处**（`/api/plan`、`/api/commit`
+    都会重新规划）⇒ 下面这些用例正是靠「前端不排」来验证核心库扛得住乱序。
+    """
+    return [{"kind": p["kind"], "params": p["params"]} for p in pending]
 
 
 # ======================================================================
@@ -291,17 +293,29 @@ class TestHqPoolUiCode(unittest.TestCase):
         self.assertIn("_o", body)
         self.assertNotIn("pool[index]", body)
 
-    def test_removes_are_sorted_descending(self):
-        """提交时删除类编辑必须按 index 降序（多条删除不错位）。
+    def test_the_sorting_rule_lives_only_in_the_core_library(self):
+        """删除类编辑按下标降序 —— 但**只在核心库一处**（`plan.py::order_edits`）。
 
-        ⚠️ **U121**：以前只排了兵库那一种删除 ⇒ 商店下架（`store_remove`）
-        同属「按下标删除」，**也**要排 ⇒ 现在按**组**（兵库按总部 id、
-        商店按 战线/子商店）分组，组内按 index 降序。
+        ⚠️ **U136**：前端以前也排了一份 ⇒ **同一条规则两处实现** ⇒ 漂移就出 bug
+        （U91 只排了兵库、商店漏了 ⇒ 外部审阅的 P0-2）。
+        而且前端那份**对结果没有任何影响**（确认框列的是服务端返回的
+        `changes` / `notes`，已经是核心库的顺序）⇒ 纯重复，删掉更安全。
         """
         body = self.slice("function pendingEdits", "async function doApply")
-        self.assertIn("hq_force_pool_remove", body)
-        self.assertIn("store_remove", body)
-        self.assertIn("rmIdx(b)-rmIdx(a)", body)
+        self.assertNotIn("hq_force_pool_remove", body,
+                         "前端不该再排删除顺序（规则只在核心库一处）")
+        self.assertNotIn("store_remove", body)
+        self.assertNotIn(".sort(", body, "前端不该再排序")
+
+    def test_the_core_library_does_the_sorting(self):
+        """核心库那一份在（护栏在 `tests/test_delete_order.py`）。"""
+        with io.open(os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "src", "save_modifier_core", "plan.py"),
+                encoding="utf-8", newline="") as f:
+            plan_src = f.read()
+        self.assertIn("_DELETE_BY_INDEX", plan_src)
+        self.assertIn("def order_edits(", plan_src)
 
     def test_new_entry_can_be_cancelled(self):
         """还没写盘的条目可以撤销（`dropPendingByKey`）。"""
