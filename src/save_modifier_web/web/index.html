@@ -1274,6 +1274,16 @@ function patchPendingParams(kind, key, params, label){
   return true;
 }
 
+/* ⭐ **U139**：找「还没写盘的新条目」对应的待应用编辑。
+   —— 对它做修改（改价 / 改免费 / 换牌 / 删掉）**必须改这条待应用本身**，
+   **不能**发「改已有 / 删已有」的编辑：核心库只认存档里**真实存在**的东西
+   ⇒ 那样的编辑会报错，并**把整批改动都拦下**（外部审阅的新 P1：
+   上架商品后在表格里调价 ⇒ 「没有第 -1 条商品」⇒ 整批写不进去）。 */
+function pendingAddOf(kind, position){
+  return PENDING.find(p=>p.kind===kind && p.params
+    && p.params.position===position) || null;
+}
+
 /* 按 kind + key 撤掉一条挂起（U91：撤掉刚加的兵库条目） */
 function dropPendingByKey(kind, key){
   const i = PENDING.findIndex(x=>x.kind===kind && x.key===key);
@@ -2993,6 +3003,14 @@ function cardAdd(type){
   show("cards");
 }
 function cardRemove(position){
+  /* ⭐ **U139**：待加的卡**还没进存档** ⇒ 撤掉那条「加卡」即可
+     （发 `card_remove` 会让核心库报「没有槽位号为 N 的卡」⇒ 整批被拦）。 */
+  const pend = pendingAddOf("card_add", position);
+  if(pend){
+    dropPendingByKey("card_add", pend.key);
+    show("cards");
+    return;
+  }
   const c = (VIEW.hand||[]).find(x=>x.position===position);
   setPending("card_remove", `card_remove:${position}`,
     {position}, L2("手牌移除 {0}", c?cardCn(c.card_type):(L("槽位 ")+position)));
@@ -3005,12 +3023,29 @@ function cardStoreAdd(position, type){
   show("cards");
 }
 function cardStoreRemove(position){
+  /* ⭐ **U139**：待上架的卡**还没进存档** ⇒ 撤掉那条「上架」即可。 */
+  const pend = pendingAddOf("card_store_add", position);
+  if(pend){
+    dropPendingByKey("card_store_add", pend.key);
+    show("cards");
+    return;
+  }
   const c = (VIEW.shelf||[]).find(x=>x.position===position);
   setPending("card_store_remove", `card_store_remove:${position}`,
     {position}, L2("下架 {0}", c?cardCn(c.card_type):(L("槽位 ")+position)));
   show("cards");
 }
 function cardStoreSet(position, type){
+  /* ⭐ **U139**：待上架的卡**还没写盘** ⇒ 改那条「上架」待应用里的 card_type
+     （发 `card_store_set` 会让核心库报「货架上没有槽位 N 的卡」⇒ 整批被拦）。 */
+  const pend = pendingAddOf("card_store_add", position);
+  if(pend){
+    patchPendingParams("card_store_add", pend.key,
+      Object.assign({}, pend.params, {card_type:type}), pend.label);
+    SEL.cardPicker = null;
+    show("cards");
+    return;
+  }
   setPending("card_store_set", `card_store_set:${position}`,
     {position, card_type:type}, L2("货架槽位 {0} 换成 {1}", position, cardCn(type)));
   SEL.cardPicker = null;
@@ -3187,17 +3222,36 @@ function pageStore(w){
       <b>库存不能填 0</b> —— 游戏没有「售罄」标记，下架请用「下架」按钮删条目。</div>
   </div></div>`, tabs, subtabs, esc(fcn[SEL.storeFront]||SEL.storeFront), esc(SEL.storeSub==="elite_store"?L("精英商店"):L("普通商店")), items.length, SEL.storePicker?L("收起"):L("上架新商品"), body || L(`<tr><td colspan="8" class="dim">这个商店是空的</td></tr>`));
 
-  items.forEach(({e,index})=>{
+  items.forEach((row)=>{
+    const {e,index} = row;
+    /* ⭐ **U139**：待上架的行**还没有存档下标**（U118 用的负数下标）⇒
+       **不能**用 `store_set` 改它 —— 核心库只认真实下标 ⇒
+       报「战线 X 的 store 没有第 -1 条商品」并**把整批改动都拦下**
+       （外部审阅的新 P1）⇒ 直接改那条「上架」待应用里的 entry。 */
+    const isNew = index < 0;
+    const setNewEntry = (field, v)=>{
+      const p = row._key
+        ? PENDING.find(x=>x.key===row._key && x.kind==="store_add") : null;
+      if(!p || !p.params || !p.params.entry) return;
+      patchPendingParams("store_add", p.key,
+        Object.assign({}, p.params,
+          {entry:Object.assign({}, p.params.entry, {[field]:v})}), p.label);
+      /* ⚠️ **不要**整页重绘：价格框正在输入 ⇒ 重绘会**丢焦点**（第二个字打不进去）。
+         投影在下次渲染时自然就更新了。 */
+    };
     const pEl = document.getElementById("st_p_"+e.front+"_"+e.sub+"_"+index);
     if(pEl) bindNumIn(pEl, {base:e.price||0, cur:pendingVal("store_set", storeKey(e.front,e.sub,index,"price"), e.price||0),
       min:0, max:null, kind:"store_set", key:storeKey(e.front,e.sub,index,"price"),
       params:{front:e.front, sub:e.sub, index, field:"price", value:pEl.value},
-      onChange(v){ queueEdit("store_set", storeKey(e.front,e.sub,index,"price"),
-        {front:e.front, sub:e.sub, index, field:"price", value:v}, e.price||0, v,
-        L2("商店 {0}/{1} 第 {2} 条价格", e.front, e.sub, index+1)); }});
+      onChange(v){
+        if(isNew){ setNewEntry("price", v); return; }
+        queueEdit("store_set", storeKey(e.front,e.sub,index,"price"),
+          {front:e.front, sub:e.sub, index, field:"price", value:v}, e.price||0, v,
+          L2("商店 {0}/{1} 第 {2} 条价格", e.front, e.sub, index+1)); }});
     const qEl = document.getElementById("st_q_"+e.front+"_"+e.sub+"_"+index);
     if(qEl) bindSpin(qEl, {base:e.quantity||0, cur:pendingVal("store_set", storeKey(e.front,e.sub,index,"quantity"), e.quantity||0),
       min:1, max:null, onChange(v){
+        if(isNew){ setNewEntry("quantity", v); show("store"); return; }
         queueEdit("store_set", storeKey(e.front,e.sub,index,"quantity"),
           {front:e.front, sub:e.sub, index, field:"quantity", value:v}, e.quantity||0, v,
           L2("商店 {0}/{1} 第 {2} 条库存", e.front, e.sub, index+1));
@@ -4244,6 +4298,15 @@ function backupStackHTML(){
 
 /* ---------- 卡牌：改成免费 / 改成收费 ---------- */
 function cardSetFree(position, free){
+  /* ⭐ **U139**：待加的卡**还没写盘** ⇒ 改那条「加卡」待应用本身
+     （发 `card_set` 会让核心库报「手牌里没有槽位号为 N 的卡」⇒ 整批被拦）。 */
+  const pend = pendingAddOf("card_add", position);
+  if(pend){
+    patchPendingParams("card_add", pend.key,
+      Object.assign({}, pend.params, {is_free:!!free}), pend.label);
+    show("cards");
+    return;
+  }
   const c = (VIEW.hand||[]).find(x=>x.position===position);
   const key = `card_set:${position}`;
   queueEdit("card_set", key,
@@ -4252,6 +4315,14 @@ function cardSetFree(position, free){
   show("cards");
 }
 function cardStoreSetFree(position, free){
+  /* ⭐ **U139**：待上架的卡**还没写盘** ⇒ 改那条「上架」待应用本身。 */
+  const pend = pendingAddOf("card_store_add", position);
+  if(pend){
+    patchPendingParams("card_store_add", pend.key,
+      Object.assign({}, pend.params, {is_free:!!free}), pend.label);
+    show("cards");
+    return;
+  }
   const c = (VIEW.shelf||[]).find(x=>x.position===position);
   const key = `card_store_set:${position}:is_free`;
   queueEdit("card_store_set", key,

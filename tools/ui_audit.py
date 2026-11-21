@@ -125,6 +125,29 @@ WALK = r"""
     await step('商店页-渲染', async()=>{ PAGE='store'; show('store'); await sleep(1200); });
     await step('商店页-上架新商品', async()=>{ openStoreAddModal(); await sleep(500);
                                               closeModal(); await sleep(200); });
+    /* U139：上架一条之后，在表格里改它的价格 ——
+       旧写法会发出 `store_set(index=-1)` ⇒ 核心库报错 ⇒ **整批**写不进去。
+       这里断言：① 没有负下标的 store_set；② 待上架那条的 entry.price 真的改了。 */
+    await step('商店页-上架后调价', async()=>{
+      const first = projectedStore()[0];
+      if(!first) return;
+      storeAddEquip('armor','german');
+      await sleep(500);
+      const rows = projectedStore();
+      const nr = rows[rows.length-1];
+      if(!nr || nr.index>=0) return;              /* 没有待上架行 ⇒ 跳过 */
+      const el = document.getElementById('st_p_'+nr.e.front+'_'+nr.e.sub+'_'+nr.index);
+      if(!el) throw new Error('待上架那行没有价格输入框');
+      el.value='23';
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      await sleep(500);
+      const bad = PENDING.filter(p=>p.kind==='store_set' && p.params && p.params.index<0);
+      if(bad.length) throw new Error('发出了负下标的 store_set ⇒ 整批会被拦');
+      const adds = PENDING.filter(p=>p.kind==='store_add');
+      if(!adds.length) throw new Error('待上架那条不见了');
+      const ep = adds[adds.length-1].params.entry;
+      if(Number(ep.price)!==23) throw new Error('待上架那条的价格没被改成 23（实际 '+ep.price+'）');
+    });
     await step('商店页-下架', async()=>{
       const rows=projectedStore(); const r=rows[0];
       if(r) storeRemove(r.e.front, r.e.sub, r.index); await sleep(400); });
