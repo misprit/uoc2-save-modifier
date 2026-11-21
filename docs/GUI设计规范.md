@@ -5613,6 +5613,30 @@ by 烟柳边城 misprit           ← .by（灰、小字；"by " 由 CSS ::befor
 
 **护栏**：`tests/test_backup_location.py`（8 项）。
 
+#### 10.10.66 ★ 单位详情的「工事等级」点不动（U110）
+
+> **【2026-11-21 · U110 用户反馈】**
+> 「单位明细修改界面里的工事等级（单位驻垒等级），目前点不动，没法修改。」
+
+**两个根因（都是静默失败 ⇒ 界面看着正常、就是不动）**
+
+| # | 问题 | 后果 |
+|---|---|---|
+| ① | `/* U87：…` 注释**没闭合** ⇒ `function setUnitEntr` 整个被注释掉 | 按钮的 onclick 报 `ReferenceError: setUnitEntr is not defined` |
+| ② | `refreshUnitCombatFields` 遍历**活的** `tmp.children`（`replaceWith` 会把元素移出集合）| 下标错位 ⇒ 要换的卡被跳过 ⇒ `TypeError`（静默）⇒ 卡片不刷新 |
+
+**改法**
+
+* 补上漏掉的 `*/`；
+* `Array.from(tmp.children)` —— 先拷成静态数组再遍历；
+* `setUnitEntr` / `setUnitAp` 的 `queueEdit` `base` 改成**存档原值**
+  ⇒「改回原值」会撤掉那条待应用。
+
+**实测**：点等级 1 ⇒ 高亮切到 1 + 进待应用；点回 0 ⇒ 待应用撤掉 + 高亮回 0 ✔
+
+**护栏**：`tests/test_js_handlers.py`（8 项，含「onclick 指向的函数必须存在」
+的一般化护栏）+ `tests/test_js_live_collection.py`（3 项）。
+
 ## 11. 实施路线
 
 | 阶段 | 内容 | 验收 | 状态 |
