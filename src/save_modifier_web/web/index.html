@@ -4317,15 +4317,32 @@ function toggleFullPool(){ SEL.fullPool = !SEL.fullPool; refreshUnitLocal(SEL.un
    删了会让后面条目的下标整体前移，先删再改数量就会改错行，U35） */
 function pendingEdits(){
   const edits = PENDING.map(p=>({kind:p.kind, params:p.params}));
-  /* 兵库**删条目**要排在最后，且**按下标降序** ——
+  /* **按下标删除**的编辑（兵库删条目 `hq_force_pool_remove` /
+     商店下架 `store_remove`）要排在最后，且**同一份列表内**按 index 降序 ——
      删了会让后面条目的下标整体前移，先删再改数量就会改错行（U35）；
      ⚠️ 多条删除若**升序**执行会**删错条目**（删了 idx0 之后原 idx1 前移，
-     再删 idx1 就删到了别的条目）—— U91 实测（顺序 A 会删掉步兵那条）。
-     ⇒ 删除类编辑统一按 index 降序 ⇒ 跟玩家点按钮的先后无关。 */
-  const isRm = e=>e.kind==="hq_force_pool_remove";
+     再删 idx1 就删到了别的条目）—— U91 实测（顺序 A 会删掉步兵那条），
+     U121：商店下架**同款**（以前前端只排了兵库那一种）。
+     ⇒ 删除类编辑统一按 index 降序 ⇒ 跟玩家点按钮的先后无关。
+     ⚠️ 核心库 `order_edits` 也会排一次（那儿才是权威）—— 两边口径一致。 */
+  const isRm = e=>e.kind==="hq_force_pool_remove" || e.kind==="store_remove";
+  /* 同一份列表 = 同一个组：兵库按总部 id，商店按 战线/子商店 */
+  const rmGroup = e=>{
+    const p = e.params||{};
+    return e.kind==="store_remove"
+        ? ("store|"+(p.front??"")+"|"+(p.sub??""))
+        : ("hq|"+(p.hq_id??""));
+  };
+  const rmIdx = e=>{
+    const v = (e.params||{}).index;
+    return (typeof v==="number" && isFinite(v)) ? v : 0;
+  };
   const others = edits.filter(e=>!isRm(e));
-  const removes = edits.filter(isRm)
-      .sort((a,b)=>(b.params.index||0)-(a.params.index||0));
+  const removes = edits.filter(isRm).sort((a,b)=>{
+    const ga = rmGroup(a), gb = rmGroup(b);
+    if(ga!==gb) return ga<gb ? 1 : -1;      /* 不同组：互不影响 */
+    return rmIdx(b)-rmIdx(a);               /* 同组：下标降序 */
+  });
   return others.concat(removes);
 }
 async function doApply(){

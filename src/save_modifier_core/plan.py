@@ -158,21 +158,60 @@ def _layer_of(entry: str) -> str:
     return "L1"
 
 
+#: **按下标删除**的编辑 —— 删的是**某个列表里的第 N 项**。
+#:
+#: | kind | 删的是哪份列表 |
+#: |---|---|
+#: | `hq_force_pool_remove` | 某个总部的 `force_pool` |
+#: | `store_remove` | 某个 战线/子商店 的商品列表 |
+#:
+#: ⚠️ **U121**：以前只把 `hq_force_pool_remove` 当成「按下标删除」，
+#: **`store_remove` 漏了** ⇒ 一次改两个商店条目时**删错行**
+#: （外部审阅报告 P0-2）。
+#:
+#: ⇒ 用 `kind` 分组（同组 = 同一份列表），**组内按 index 降序**。
+#: （不同组之间互不影响，先后随便。）
+#:
+#: ⚠️ `unit_spec_remove` / `card_remove` / `card_store_remove` /
+#: `theater_asset_remove` **不在此列** —— 它们是**按属性匹配**删的
+#: （特种按 `idx`、卡牌按 `position`、战区资产按 `asset` 名），
+#: 删别人**不会**让它们的下标漂移。
+_DELETE_BY_INDEX = {
+    "hq_force_pool_remove": lambda p: "hq|%s" % (p.get("hq_id"),),
+    "store_remove": lambda p: "store|%s|%s" % (p.get("front"), p.get("sub")),
+}
+
+
+def _delete_group(e) -> str:
+    """这条删除属于**哪份列表**（同组的才会互相影响下标）。"""
+    key = _DELETE_BY_INDEX.get(e.kind)
+    if key is None:
+        return ""
+    return key(e.params or {})
+
+
+def _delete_index(e) -> int:
+    idx = (e.params or {}).get("index")
+    if isinstance(idx, bool) or not isinstance(idx, int):
+        return 0
+    return idx
+
+
 def order_edits(edits):
     """把编辑**按安全顺序**排好再执行。
 
-    * **按下标删除**的编辑（兵库删条目）要排在**最后** ——
+    * **按下标删除**的编辑（兵库删条目 / 商店下架）要排在**最后** ——
       删了会让后面条目的下标整体前移，先删再改数量就会改错行（U35）；
-    * 同类删除之间要按 index **降序** ——
+    * 同一份列表里的多条删除之间要按 index **降序** ——
       删了 idx0 之后原 idx1 前移到 idx1，再删 idx1 就**删到了别的条目**
-      （U91 实测：升序删两条 ⇒ 步兵那条被误删）。
+      （U91 实测：升序删两条 ⇒ 步兵那条被误删；U121：商店下架同款）。
       ⇒ 降序 ⇒ 顺序与玩家点按钮的先后**无关**。
 
     其余编辑保持原顺序（Python 的 sort 是稳定的）。
     """
-    removes = [e for e in edits if e.kind == "hq_force_pool_remove"]
-    others = [e for e in edits if e.kind != "hq_force_pool_remove"]
-    removes.sort(key=lambda e: (e.params or {}).get("index") or 0, reverse=True)
+    removes = [e for e in edits if e.kind in _DELETE_BY_INDEX]
+    others = [e for e in edits if e.kind not in _DELETE_BY_INDEX]
+    removes.sort(key=lambda e: (_delete_group(e), _delete_index(e)), reverse=True)
     return others + removes
 
 
