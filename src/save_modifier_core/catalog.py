@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import yamlio
+from .container import theater_assets_by_phase, theater_assets_flat
 from .paths import CorePaths
 
 __all__ = ["Catalog", "UnitType", "SpecialistType", "Nationality",
@@ -1039,13 +1040,18 @@ class Catalog:
 
     def scenario_theater_assets(self, scenario_id: str,
                                 campaign_id: str | None = None,
-                                variant: str | None = None) -> dict:
+                                variant: str | None = None,
+                                phase: int | None = None) -> dict:
         """**游戏包**里这个场景本来有哪些战区资产。
 
         返回 `{asset: {"uses_total": …, "uses_turn": …}}`；找不到返回 `{}`。
 
         ⚠️ 场景定义里只有 **3 个字段**（`asset` / `uses_total` / `uses_turn`），
         **没有** `to_use` —— 那是运行时字段（`Game.new` 载入时现算）。
+
+        ⚠️ **U141**：给了 `phase`（= **当前战斗所在阶段**）就取**那一组** ——
+        场景定义里的资产是**按阶段分组**的，同名资产在不同阶段次数不同
+        ⇒ 不分组就会显示**另一个阶段**的参照值。
         """
         for main in self._scenario_mains(scenario_id, campaign_id, variant):
             data = self._yaml(main)
@@ -1054,17 +1060,11 @@ class Catalog:
             ta = data.get("theater_assets")
             if not isinstance(ta, list):
                 continue
-            out: dict[str, dict] = {}
-            for grp in ta:
-                if not isinstance(grp, list):
-                    continue
-                for it in grp:
-                    if isinstance(it, dict) and it.get("asset"):
-                        out[str(it["asset"])] = {
-                            "uses_total": it.get("uses_total"),
-                            "uses_turn": it.get("uses_turn"),
-                        }
+            groups = theater_assets_by_phase(ta)
+            out = theater_assets_flat(groups)
             if out:
+                if phase is not None and 0 <= phase < len(groups) and groups[phase]:
+                    return groups[phase]     # ← 当前阶段那一组
                 return out
         return {}
 

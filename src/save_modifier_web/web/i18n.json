@@ -1064,7 +1064,8 @@
   "备份放不下（{arg0}；备用目录也不行：{arg1}）": "no place to put the backup ({arg0}; the fallback directory also failed: {arg1})",
   "这个存档正在被写入（另一个写盘还没结束）—— 请稍后再试": "this save is being written right now (another write is still running) — please try again in a moment",
   "已从撤销栈移除 {arg0} 条撤不了的记录（存档后来又被改过）": "removed {arg0} record(s) that can no longer be undone (the save changed again afterwards)",
-  "撤销基准已过期：存档在你改完之后又被动过（可能是在游戏里手动改的）—— 这些记录已经撤不了了": "the undo baseline is stale: the save changed after your edit (maybe you changed it in the game) — these records can no longer be undone"
+  "撤销基准已过期：存档在你改完之后又被动过（可能是在游戏里手动改的）—— 这些记录已经撤不了了": "the undo baseline is stale: the save changed after your edit (maybe you changed it in the game) — these records can no longer be undone",
+  "这个存档打不开（文件损坏，或它不是 .usg 存档）—— 试试把修改器目录里 bak 文件夹中的 _BACKUP.usg 复制回来": "this save cannot be opened (the file is damaged, or it is not a .usg save) — try copying _BACKUP.usg from the bak folder next to the modifier back over it"
  },
  "values": {
   "arg1": {

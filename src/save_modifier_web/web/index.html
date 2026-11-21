@@ -1165,7 +1165,17 @@ function encOnce(s){
 
 async function api(path){
   const r = await fetch(path, {headers:{"X-Token":TOKEN}});
-  if(!r.ok) throw new Error(await r.text());
+  if(!r.ok){
+    /* ⚠️ **U141**：错误正文是 JSON（`{"error": "…"}`）⇒ 直接扔给用户会看到
+       一串花括号 ⇒ 拆出来，只显示**人话**那一句。 */
+    const txt = await r.text();
+    let msg = txt;
+    try{
+      const j = JSON.parse(txt);
+      msg = (j && (j.error || (j.errors||[]).join("；") || (j.summary||""))) || txt;
+    }catch(e){ /* 不是 JSON ⇒ 原样显示 */ }
+    throw new Error(msg);
+  }
   return r.json();
 }
 async function post(path, body){

@@ -35,9 +35,54 @@ if TYPE_CHECKING:                      # pragma: no cover
     from .plan import Plan
     from .undo import UndoResult
 
-__all__ = ["Save", "View", "UnitView", "HqView", "CardView", "StoreEntryView"]
+__all__ = ["Save", "SaveUnreadable", "View", "UnitView", "HqView", "CardView",
+           "StoreEntryView"]
 
 _TURN_RE = re.compile(r"^turn_(\d+)")
+
+
+class SaveUnreadable(Exception):
+    """存档**打不开**（文件损坏 / 不是 .usg / 读不出来）。
+
+    ⚠️ **U141**：以前这里直接把 `zipfile.BadZipFile` 抛穿 ⇒ 服务端变成
+    HTTP 500、界面只显示「BadZipFile: File is not a zip file」——
+    玩家既看不懂，也**不知道下一步该干什么**（其实答案就摆着：
+    修改器目录里 `bak` 文件夹中的 `_BACKUP.usg`）。
+    """
+
+
+def theater_assets_by_phase(ta: Any) -> list[dict[str, dict]]:
+    """把 `theater_assets` 的**阶段分组**拆成 `[{资产: {uses_total, uses_turn}}, …]`。
+
+    ⚠️ **U141**：`theater_assets` 是**按阶段分组**的
+    （`[[phase0 的资产…], [phase1 的资产…]]`），
+    **同一种资产可能在多个阶段出现、次数还不同**
+    （实测 71 个存档里 **60 个**有这种场景）⇒
+    **拍平**会让「后一组覆盖前一组」⇒ 显示的参照值可能是**另一个阶段**的。
+    ⇒ 保留分组，由调用方按**当前阶段**取那一组。
+    """
+    out: list[dict[str, dict]] = []
+    if not isinstance(ta, list):
+        return out
+    for grp in ta:
+        g: dict[str, dict] = {}
+        if isinstance(grp, list):
+            for it in grp:
+                if isinstance(it, dict) and it.get("asset"):
+                    g[str(it["asset"])] = {
+                        "uses_total": it.get("uses_total"),
+                        "uses_turn": it.get("uses_turn"),
+                    }
+        out.append(g)
+    return out
+
+
+def theater_assets_flat(groups: list[dict[str, dict]]) -> dict[str, dict]:
+    """把阶段分组**拍平**（兼容旧行为：**后一组覆盖前一组**）。"""
+    out: dict[str, dict] = {}
+    for g in groups:
+        out.update(g)
+    return out
 
 
 # ---------------------------------------------------------------- 只读视图
@@ -296,7 +341,15 @@ class Save:
 
     def _zip(self) -> zipfile.ZipFile:
         if self._zf is None:
-            self._zf = zipfile.ZipFile(self.info.path, "r")
+            try:
+                self._zf = zipfile.ZipFile(self.info.path, "r")
+            except (zipfile.BadZipFile, OSError) as exc:
+                # ⚠️ **U141**：别把 `BadZipFile` 原样抛穿（玩家看不懂，
+                # 也不知道下一步该干什么）⇒ 换成一句人话。
+                raise SaveUnreadable(
+                    "这个存档打不开（文件损坏，或它不是 .usg 存档）—— "
+                    "试试把修改器目录里 bak 文件夹中的 _BACKUP.usg 复制回来"
+                ) from exc
         return self._zf
 
     def close(self) -> None:
@@ -433,7 +486,7 @@ class Save:
                     out.setdefault(uid, []).append(key)
         return out
 
-    def document_theater_assets(self) -> dict:
+    def document_theater_assets(self, phase: int | None = None) -> dict:
         """存档自带的**场景定义**里，这场战斗本来有哪些战区资产。
 
         数据源：战役存档里带着**整份战役的场景副本**
@@ -444,6 +497,11 @@ class Save:
 
         ⚠️ 场景定义里只有 **3 个字段**（`asset` / `uses_total` / `uses_turn`），
         **没有** `to_use` —— 那是运行时字段。
+
+        ⚠️ **U141**：给了 `phase`（= **当前战斗所在阶段**）就取**那一组** ——
+        场景定义里的资产是**按阶段分组**的，同名资产在不同阶段次数不同
+        ⇒ 不分组就会显示**另一个阶段**的参照值。
+        不给 `phase` ⇒ 拍平（**后一组覆盖前一组**，兼容旧行为）。
         """
         scen = self.current_scenario()
         if not scen:
@@ -462,18 +520,13 @@ class Save:
             ta = data.get("theater_assets")
             if not isinstance(ta, list):
                 continue
-            out: dict[str, dict] = {}
-            for grp in ta:
-                if not isinstance(grp, list):
-                    continue
-                for it in grp:
-                    if isinstance(it, dict) and it.get("asset"):
-                        out[str(it["asset"])] = {
-                            "uses_total": it.get("uses_total"),
-                            "uses_turn": it.get("uses_turn"),
-                        }
-            if out:
-                return out
+            groups = theater_assets_by_phase(ta)
+            flat = theater_assets_flat(groups)
+            if not flat:
+                continue
+            if phase is not None and 0 <= phase < len(groups) and groups[phase]:
+                return groups[phase]        # ← 当前阶段那一组
+            return flat
         return {}
 
     def battle_main(self) -> dict:

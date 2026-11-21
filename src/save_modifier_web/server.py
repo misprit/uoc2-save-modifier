@@ -41,6 +41,9 @@ REPO_SRC = Path(__file__).resolve().parents[1]
 if str(REPO_SRC) not in sys.path:
     sys.path.insert(0, str(REPO_SRC))
 
+#: U141：存档打不开（文件损坏）时用这个异常 ⇒ 界面显示一句人话
+from save_modifier_core import SaveUnreadable  # noqa: E402
+
 WEB_DIR = Path(__file__).resolve().parent / "web"
 
 #: ⚠️ **预热导入核心库**（U74 踩到的坑）
@@ -879,9 +882,11 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
                 other[a] = other.get(a, 0) + 1
 
     # 场景定义：这场战斗**本来**有哪些战区资产
+    # ⚠️ **U141**：场景定义里的资产是**按阶段分组**的（同名资产在不同阶段
+    # 次数不同）⇒ 必须按**当前阶段**取那一组，否则显示的是**另一个阶段**的参照值。
     scenario: dict = {}
     try:
-        scenario = save.document_theater_assets() or {}
+        scenario = save.document_theater_assets(idx) or {}
     except Exception:
         scenario = {}
     if not scenario:
@@ -889,7 +894,8 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
             scen = save.current_scenario()
             if scen:
                 cid = getattr(save.info, "campaign_id", None) or None
-                scenario = catalog.scenario_theater_assets(scen, cid) or {}
+                scenario = catalog.scenario_theater_assets(scen, cid,
+                                                            phase=idx) or {}
         except Exception:
             scenario = {}
 
@@ -1919,6 +1925,10 @@ class _Handler(BaseHTTPRequestHandler):
                     self._json(api_i18n())
                 else:
                     self._json({"error": "未知接口"}, 404)
+            except SaveUnreadable as exc:
+                # ⚠️ **U141**：存档**打不开**（文件坏了）⇒ 这是用户的文件坏了，
+                # 不是服务器出错 ⇒ 400 + 一句人话（别甩 BadZipFile 给他看）。
+                self._json({"error": str(exc)}, 400)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务
                 import traceback
                 _log("[500] %s: %s" % (type(exc).__name__, exc))
@@ -1991,6 +2001,9 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(_jsonable(api_language_set(payload)))
             else:
                 self._json({"ok": False, "errors": ["未知接口"]}, 404)
+        except SaveUnreadable as exc:
+            # ⚠️ **U141**：存档**打不开**（文件坏了）⇒ 400 + 一句人话
+            self._json({"ok": False, "errors": [str(exc)]}, 400)
         except ValueError as exc:
             # 请求体不合法（非法 kind / params 不是字典 …）⇒ 400，不是 500
             self._json({"ok": False, "errors": [str(exc)]}, 400)
