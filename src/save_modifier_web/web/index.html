@@ -3423,6 +3423,47 @@ function theaterFieldCn(field){
           uses_turn:L("每回合恢复")}[field] || field;
 }
 
+/* ---------- 战区资产的「回合预算」（U144） ----------
+   游戏的规则（字节码 `state/game/game.py:1823` 回合开始 / `:1841` 消耗）：
+     回合开始：to_use = uses_turn（uses_total 为 None = 无限）
+                to_use = min(uses_turn, uses_total)（有限时）
+     用掉一次：to_use -= 1；uses_total -= 1
+   ⇒ `uses_total` 是**整场战斗的总预算**（游戏自己的文案：
+     「阵营N**总共**可使用次数」），`uses_turn` 是**每回合恢复**的额度；
+   ⇒ 「前 N 个回合能用空袭」= 总预算 = N × 每回合额度
+     （设计者对空袭**全部**这么写：游戏包里 46 个有限值、存档里 203 个，
+       **100% 整除**；其它资产 88%–99%）；
+   ⇒ 总次数**除不尽**每回合次数时，最后一个可用回合**用不满**
+     （可用回合数 = ceil(总次数 / 每回合次数)，多出来的额度浪费掉）。
+   ⚠️ 这**不是错误**（游戏 schema：uses_total ∈ {None} ∪ 非负整数）
+     ⇒ 只提示、不拦。 */
+function theaterBudgetInfo(uses_total, uses_turn){
+  if(uses_total===null || uses_total===undefined) return null;
+  const tot = parseInt(uses_total,10);
+  const turn = parseInt(uses_turn,10);
+  if(isNaN(tot) || isNaN(turn) || turn < 1 || tot <= 0) return null;
+  const rem = tot % turn;
+  if(rem === 0) return null;
+  return {total:tot, turn:turn, rem:rem, rounds:Math.floor(tot / turn) + 1, last:rem};
+}
+/** 战区资产卡片上的提示（只有"除不尽"时才有内容）。 */
+function theaterBudgetTipHTML(uses_total, uses_turn){
+  const b = theaterBudgetInfo(uses_total, uses_turn);
+  if(!b) return "";
+  return L2(`<div class="twarn">本场景剩余 {0} 次 除不尽 每回合恢复 {1} 次 ⇒ 这项资产一共能用 {2} 个回合，最后一个回合只能再来 {3} 次。想要整数个回合？把「本场景剩余」设成「回合数 × 每回合恢复」。</div>`, b.total, b.turn, b.rounds, b.last);
+}
+/** 添加弹窗里的提示（短版；跟着弹窗里填的数字实时变）。 */
+function theaterModalBudgetTipHTML(){
+  const M = MODAL; if(!M) return "";
+  const b = theaterBudgetInfo(M.uses_total, M.uses_turn);
+  if(!b) return "";
+  return L2(`<b>本场景剩余 {0} 次 除不尽 每回合恢复 {1} 次</b> ⇒ 一共能用 {2} 个回合，最后一个回合只能再来 {3} 次`, b.total, b.turn, b.rounds, b.last);
+}
+function theaterModalBudgetTipRefresh(){
+  const tip = document.getElementById("mp_budget_tip");
+  if(tip) tip.innerHTML = theaterModalBudgetTipHTML();
+}
+
 /* ---------- 难度（U64） ---------- */
 function levelList(){
   return (CATALOG && CATALOG.levels) || [];
@@ -3538,9 +3579,10 @@ function pageTheater(w){
             ? L2("<span class=\"num inf\" id=\"th_tot_inf_{0}\">无限</span>", esc(asset))
             : `<input class="numin" id="th_tot_${esc(asset)}" type="text" inputmode="numeric" autocomplete="off" value="${tot}">`, jsq(asset), inf?L("设成数字"):L("改成无限"), esc(asset), inf ? L2(`<div class="talt">「无限」= 每回合恢复 {0} 次、<b>只恢复到 {1} 次</b> —— 上一回合没用完的<b>不会累积</b>
           （游戏按 min(每回合恢复, 本场景剩余) 恢复；这是游戏自己的规则，不是显示问题）。</div>`, cur.uses_turn, cur.uses_turn) : "", (!inf && cur.to_use>cur.uses_total)
-          ? L2("<div class=\"twarn\">当前可用 {0} 次 大于 本场景剩余 {1} 次 ⇒ 游戏读档会失败</div>", cur.to_use, cur.uses_total):"", (!inf && cur.uses_turn>cur.uses_total)
+          ? L2("<div class=\"twarn\">当前可用 {0} 次 大于 本场景剩余 {1} 次 ⇒ 游戏读档会失败</div>", cur.to_use, cur.uses_total):"", ((!inf && cur.uses_turn>cur.uses_total)
           ? L2(`<div class="twarn">每回合恢复 {0} 次 大于 本场景剩余 {1} 次 ——
-             实际每回合只能用 {2} 次</div>`, cur.uses_turn, cur.uses_total, cur.uses_total):"", (!inf && cur.to_use > Math.min(cur.uses_turn, cur.uses_total))
+             实际每回合只能用 {2} 次</div>`, cur.uses_turn, cur.uses_total, cur.uses_total):"")
+          + theaterBudgetTipHTML(cur.uses_total, cur.uses_turn), (!inf && cur.to_use > Math.min(cur.uses_turn, cur.uses_total))
           ? L2(`<div class="twarn">当前可用 {0} 次 大于 回合开始后的有效值
              {1} 次 —— 回合开始会重置为
              {2} 次</div>`, cur.to_use, Math.min(cur.uses_turn, cur.uses_total), Math.min(cur.uses_turn, cur.uses_total)):"", editable?"":"disabled", jsq(asset));
@@ -3633,7 +3675,7 @@ function renderTheaterAddModal(){
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
       <button class="btn pri" onclick="theaterAddConfirm()">添加</button></div>`, esc(theaterCn(M.asset)), inf?L(`<span class="num inf">无限</span>`)
-            : `<input class="numin" id="mp_tot" type="text" inputmode="numeric" autocomplete="off" value="${M.uses_total}" style="width:72px">`, inf?L("设成数字"):L("改成无限"), inf?L("无限 = 这场战斗随便用"):L("整场战斗一共能用几次"), u.scenario
+            : `<input class="numin" id="mp_tot" type="text" inputmode="numeric" autocomplete="off" value="${M.uses_total}" style="width:72px">`, inf?L("设成数字"):L("改成无限"), inf?L("无限 = 这场战斗随便用"):(L("整场战斗一共能用几次") + '<span id="mp_budget_tip">' + theaterModalBudgetTipHTML() + '</span>'), u.scenario
         ? L2(`{2}<b>本来就有</b>这项战区资产（场景定义：每回合恢复 {0}，
            本场景剩余 {1}），现在存档里没有 —— 多半是已经用完了。`, refTurn, refTotal===null||refTotal===undefined
              ? L("无限") : refTotal, esc(theaterSideCn(M.side)))
@@ -3642,11 +3684,13 @@ function renderTheaterAddModal(){
            但<b>能不能用得起来要看地图</b> —— 比如「炮舰轰炸」要有海岸目标、
            「空中补给」要有己方部队在补给中。`), esc(theaterSideCn(M.side))),
     {onOpen:function(){
-      bindModalSpin("mp_tut", ()=>MODAL.uses_turn, v=>MODAL.uses_turn=v, 1, 99);
+      bindModalSpin("mp_tut", ()=>MODAL.uses_turn,
+                    v=>{MODAL.uses_turn=v; theaterModalBudgetTipRefresh();}, 1, 99);
       const pe = document.getElementById("mp_tot");
       if(pe) pe.addEventListener("input", function(){
         MODAL.uses_total = parseInt(this.value,10);
         if(isNaN(MODAL.uses_total)) MODAL.uses_total = 0;
+        theaterModalBudgetTipRefresh();
       });
     }});
 }
