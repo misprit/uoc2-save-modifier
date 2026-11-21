@@ -165,6 +165,14 @@ class Work:
 #: **根层（L1）**允许改写的条目 —— 只有这五张表。
 ROOT_WRITABLE = ("main.yml", "units.yml", "hqs.yml", "cards.yml", "store.yml")
 
+#: **战役名册**那两张表（**U148**）—— 改名必须**两份都改**：
+#: 战役地图显示的名字来自名册（`document/`），战斗中显示的来自根表
+#: ⇒ 只改一份 ⇒ 玩家在一处看到名字变了、另一处没变（实测：只改根表 ⇒ 战役地图上完全没变化）。
+#:
+#: ⚠️ **只有这两张**可以写 —— `document/` 下别的条目（战役文档 / 上次会议的检查点）
+#: 仍然**只读**（U124 的结论不变）。
+ROSTER_WRITABLE = ("document/units.yml", "document/hqs.yml")
+
 #: **战斗层（L3）**条目的形状 —— 战役是 `games/<场景>/main.yml`，
 #: **独立场景是 `game/main.yml`（单数目录！）**。
 _BATTLE_MAIN_RE = re.compile(r"^(?:games/[^/]+|game)/main\.yml$")
@@ -189,14 +197,17 @@ def writable_entries(save) -> set:
     """**写盘白名单**：这个存档里哪些条目允许被改写。
 
     * 根层那五张表（`ROOT_WRITABLE`）；
+    * **战役名册**那两张表（`ROSTER_WRITABLE`）—— 改名要两份都改（U148）；
     * **当前战斗**的那张 `main.yml`（战役 `games/<场景>/main.yml`，
       独立场景 `game/main.yml`）。
 
     ⚠️ **U124**：以前**没有白名单** ⇒ 理论上能往存档里写**任意条目**
     （`document/`、`last_conference/`、`last_game/` …）——
     那些是**只读**的（战役文档 / 上次会议的检查点，改了游戏会出问题）。
+    ⚠️ **U148**：名册那两张是**唯一的例外**（只放行改名字要用的那两张）。
     """
     out = set(ROOT_WRITABLE)
+    out.update(ROSTER_WRITABLE)
     try:
         battle_dir = save.battle_dir()
     except Exception:
@@ -324,8 +335,10 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
     illegal = sorted({c.entry for c in plan.changes if c.entry not in allowed})
     if illegal:
         plan.errors.append(
-            "这些条目不允许写入：%s（只允许改根层的 %s 与当前战斗层的那张 main.yml）"
-            % ("、".join(illegal), "、".join(ROOT_WRITABLE)))
+            "这些条目不允许写入：%s（只允许改根层的 %s、战役名册的 %s "
+            "与当前战斗层的那张 main.yml）"
+            % ("、".join(illegal), "、".join(ROOT_WRITABLE),
+               "、".join(ROSTER_WRITABLE)))
 
     # 有错误就不该有任何"改动"可提交
     if plan.errors:

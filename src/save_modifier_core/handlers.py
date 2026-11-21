@@ -345,6 +345,77 @@ def _level(w, e: Edit) -> Outcome:
     return oc
 
 
+#: **战役名册**（campaign_doc）里与根表同名的两张表 —— **U148**。
+#:
+#: 存档里有**两份**单位/总部表：
+#:
+#: | 表 | 内容 | 谁在显示 |
+#: |---|---|---|
+#: | 根 `units.yml` / `hqs.yml` | **已经登场过**的（实测 354 / 23 条） | **战斗中**（`game_world`） |
+#: | `document/units.yml` / `document/hqs.yml` | **整场战役的全部**（实测 835 / 47 条） | **战役地图 / 主界面**（`main_screen`） |
+#:
+#: 两份表的 id 是**同一套编号**、同 id 的 `name_brief` **完全一致**
+#: （实测 9 个存档 100% 一致）⇒ 改名按 id 同步即可。
+#:
+#: ⚠️ **U148**：以前只改根表 ⇒ **战役地图上完全看不到变化**
+#: ⇒ 玩家以为"改名没生效"（朋友 2026-11-21 反馈）。
+ROSTER_ENTRY = {"units.yml": "document/units.yml",
+                "hqs.yml": "document/hqs.yml"}
+
+
+def _rename_fields(obj: dict, field: str, value) -> dict:
+    """改名要**一并**改掉哪些字段。
+
+    * `name_brief` —— 显示名（**必改**）；
+    * `name_super_brief` —— 战役条上总部的简称标签（**只有总部有**）
+      ⇒ **总是**一起改，否则战役地图顶上那个 HQ 标签是空的
+      （游戏 `campaign_ctrl._hq_bar_button` 读的就是它）；
+    * `name_full` —— 完整名：**原来不是 null 才改**
+      （null = "没有另一个名字"，别凭空造一个）。
+
+    ⚠️ 依据（字节码）：显示名的取值点几乎全是 `name_brief`
+    （`unit_sheet.py:101` / `scalables.py:601` / `campaign_ctrl.py:1784`），
+    但 `name_full` 会出现在 tooltip 里、`name_super_brief` 在战役条上
+    ⇒ 只改 `name_brief` 会留下"有的地方还是旧名"。
+
+    ⚠️ 根表与名册**各按自己的原值判断**（同一套规则、两个对象）。
+    """
+    out = {field: value}
+    if field == "name_brief":
+        for k in ("name_full", "name_super_brief"):
+            if k == "name_full" and not isinstance(obj.get(k), str):
+                continue
+            if k in obj:
+                out[k] = value
+    return out
+
+
+def _sync_rename_to_roster(w, entry: str, obj_id, field: str, value) -> bool:
+    """把改名**同步**到战役名册（`document/` 那份）。返回是否真的改了。
+
+    ⚠️ 名册可能**没有这个 id**（这个单位还没登场）或**整个文件不存在**
+    （独立场景存档没有 `document/`）⇒ 静默跳过、**不报错**
+    （那不是错误，只是没有第二份要改）。
+    """
+    doc_entry = ROSTER_ENTRY.get(entry)
+    if not doc_entry:
+        return False
+    roster = w.table(doc_entry, [])
+    if not isinstance(roster, list):
+        return False
+    item = _find_by_id(roster, obj_id)
+    if item is None:
+        return False
+    changed = False
+    for k, v in _rename_fields(item, field, value).items():
+        if k in item and item.get(k) != v:
+            item[k] = v
+            changed = True
+    if changed:
+        w.touch(doc_entry)
+    return changed
+
+
 def _unit_field(w, e: Edit) -> Outcome:
     """单位的某个字段（根 `units.yml`）。"""
     oc = Outcome()
@@ -386,6 +457,13 @@ def _unit_field(w, e: Edit) -> Outcome:
     old = unit.get(field)
     unit[field] = value
     w.touch("units.yml")
+    # ⚠️ **U148**：改名要**两份都改** —— 战役地图显示的是**名册**那份
+    # （`document/units.yml`），只改根表 ⇒ 玩家在战役地图上看不到变化。
+    if field in ("name_brief", "name_full"):
+        for k, v in _rename_fields(unit, field, value).items():
+            if k in unit and unit.get(k) != v:
+                unit[k] = v
+        _sync_rename_to_roster(w, "units.yml", unit_id, field, value)
 
     # ⚠️ U96：写入时**自动配平**「普通部队」（活跃 + 被压制）。
     #
@@ -913,6 +991,12 @@ def _hq_field(w, e: Edit) -> Outcome:
     hq[field] = value
     w.touch("hqs.yml")
     oc.summary = f"总部 {hq_id} 的 {field}：{old} → {value}"
+    # ⚠️ **U148**：同单位 —— 战役地图显示的是**名册**那份（`document/hqs.yml`）。
+    if field in ("name_brief", "name_full"):
+        for k, v in _rename_fields(hq, field, value).items():
+            if k in hq and hq.get(k) != v:
+                hq[k] = v
+        _sync_rename_to_roster(w, "hqs.yml", hq_id, field, value)
 
     # ⚠️ U97：判定要看**这一批改完之后**的值，不能看中间态
     #（同一批编辑依次执行 ⇒ 先改 CP 时上限可能还没改 ⇒ 误报）。

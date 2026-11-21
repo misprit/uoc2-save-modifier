@@ -15,6 +15,11 @@
 ② `document/` / `last_conference/` / `last_game/` / 别的场景 ⇒ **都不许写**；
 ③ 碰到白名单外的条目 ⇒ 这一批**被拦住**（有错误、没有可写回的改动）；
 ④ `_layer_of`：独立场景 `game/main.yml` ⇒ **L3**；根层 ⇒ L1。
+
+⚠️ **U148**：白名单多了**唯一的一个例外** —— 战役名册那两张表
+（`document/units.yml` / `document/hqs.yml`）也能写：
+**改名必须两份都改**（战役地图显示的是名册那份，见 §5.1bb）。
+`document/` 下**其余**条目仍然只读。
 """
 
 import os
@@ -33,8 +38,8 @@ if REPO_SRC not in sys.path:
 from save_modifier_core import Catalog, CorePaths, Edit, open_save  # noqa: E402
 from save_modifier_core.handlers import Outcome  # noqa: E402
 from save_modifier_core import plan as plan_mod  # noqa: E402
-from save_modifier_core.plan import (ROOT_WRITABLE, _layer_of,  # noqa: E402
-                                    writable_entries)
+from save_modifier_core.plan import (ROOT_WRITABLE, ROSTER_WRITABLE,  # noqa: E402
+                                    _layer_of, writable_entries)
 
 from ._fixtures import make_save  # noqa: E402
 
@@ -58,12 +63,24 @@ class WriteWhitelistTest(unittest.TestCase):
     def test_read_only_entries_are_not_writable(self):
         with open_save(str(self.save_path), self.paths) as save:
             allowed = writable_entries(save)
-        for e in ("document/main.yml", "document/units.yml",
+        for e in ("document/main.yml", "document/locale.yml",
+                  "document/store.yml", "document/conferences/x.yml",
                   "last_conference/main.yml", "last_conference/units.yml",
                   "last_game/main.yml", "last_game/store.yml",
                   "games/other_scenario/main.yml",
                   "games/avalanche/units.yml"):
             self.assertNotIn(e, allowed, "只读的条目不该能写：%r" % e)
+
+    def test_the_two_roster_tables_are_the_only_exception(self):
+        """⚠️ **U148**：战役名册那两张表**可以**写（改名要两份都改）；
+        `document/` 下**其余**条目仍然只读。"""
+        with open_save(str(self.save_path), self.paths) as save:
+            allowed = writable_entries(save)
+        for e in ROSTER_WRITABLE:
+            self.assertIn(e, allowed,
+                          "战役名册那张必须能写，否则改名在战役地图上看不到")
+        self.assertEqual(("document/units.yml", "document/hqs.yml"),
+                         ROSTER_WRITABLE)
 
     def test_a_plan_touching_a_forbidden_entry_is_blocked(self):
         """⭐ 模拟某个 handler 改了只读条目 ⇒ 整批**不许写盘**。"""
