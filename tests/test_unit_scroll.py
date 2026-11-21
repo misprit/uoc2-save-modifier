@@ -87,10 +87,18 @@ class UnitScrollTest(unittest.TestCase):
             self.assertNotIn('show("units")', _code(body), start)
 
     def test_pickers_load_does_not_repaint_whole_page(self):
-        """候选表到位（异步）也不许整页重绘。"""
-        body = _body(self.html, "if(cur && cur.type && PICKCACHE[cur.type] === undefined)")
-        self.assertIn("refreshUnitLocal", body)
-        self.assertNotIn('show("units")', _code(body))
+        """候选表到位（异步）也不许整页重绘。
+
+        U104：这段改成 `ensureUnitPool(cur)`（同一个入口，pickUnit 也走它），
+        到位后仍然只重画详情。
+        ⚠️ `pageUnits` 里**搜索框 / 筛选器**那几处 `show("units")` 是合法的
+        （列表内容真的变了 ⇒ 必须重绘），所以这里只盯**候选池那两个入口**。
+        """
+        page = _body(self.html, "function pageUnits(w)")
+        self.assertIn("ensureUnitPool(cur)", page)
+        self.assertIn("prefetchUnitPools(", page)
+        for fn in ("function ensureUnitPool(u)", "function prefetchUnitPools(types)"):
+            self.assertNotIn('show("units")', _code(_body(self.html, fn)), fn)
 
     def test_rename_does_not_repaint_whole_page(self):
         body = _body(self.html, "function commitRename(id)")
