@@ -1531,6 +1531,14 @@ function bindNumIn(el, opts){
   const base = opts.base;      /* 存档原值 */
   let init = true;             /* 初始化时**不触发回调** */
   function apply(){
+    /* ⚠️ **U130**：`init` 必须**在这次调用开头**就消费掉 ——
+       原来它是在「值合法」之后才置 false ⇒ **初始值非法**时
+       （比如存档里 quantity=0 而下限是 1）初始化那次 `apply()` 提前 return
+       ⇒ `init` 仍是 true ⇒ 玩家敲进去的**第一个合法值被吞掉**
+       （界面不动，看起来像「没反应」）。
+       ⇒ 现在：初始化那一次在开头就被标记掉，之后每次输入都真的回调。 */
+    const isInit = init;
+    init = false;
     const raw = String(el.value??"").trim();
     const v = Number(raw);
     let bad = null;
@@ -1545,7 +1553,7 @@ function bindNumIn(el, opts){
     el.classList.toggle("dirty", v!==base);
     /* ⚠️ 初始化**不**触发回调 —— 回调里往往会重绘页面，
        初始化就回调 ⇒ 重绘 → 重新 bind → 再回调 ⇒ **无限递归**（U38 实测）。 */
-    if(init){ init = false; return; }
+    if(isInit) return;
     opts.onChange(v);
   }
   el.addEventListener("input", apply);
