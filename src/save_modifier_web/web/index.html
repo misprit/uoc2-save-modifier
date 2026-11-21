@@ -3114,17 +3114,52 @@ function theaterCur(asset){
   }
   return {to_use:a.to_use, uses_total:a.uses_total, uses_turn:a.uses_turn};
 }
+/* U108：改战区资产的**某个字段**（三个字段共用一条待应用）。
+   ⚠️ **两个坑**（U108：朋友反馈「调数量没反应 / 多次操作后界面不更新」）：
+   ① `theaterFieldCn` 以前是**对象**，这里却当**函数**调 ⇒ 每次都抛
+      `TypeError: theaterFieldCn is not a function` ⇒ **改动根本没进待应用**，
+      页面也不重绘（删除 / 添加走别的路径 ⇒ 它们正常，与反馈完全对上）。
+      ⇒ 现在它是**函数**（顺带：`L()` 改成调用时求值 ⇒ 英文界面也对）。
+   ② 三个字段共用一条待应用 ⇒ 以前用 `queueEdit`（值 == 存档原值 ⇒ **撤掉整条**）
+      ⇒ 把一个字段改回原值会把**另外两个字段的改动一起丢掉**。
+      ⇒ 现在**按字段**判断：三个字段都回到存档原值了才撤整条。 */
 function theaterSet(asset, field, value){
   const a = ((VIEW&&VIEW.theater_assets)||[]).find(x=>x.asset===asset) || {};
   const cur = theaterCur(asset);
   const params = {asset, to_use:cur.to_use, uses_total:cur.uses_total, uses_turn:cur.uses_turn};
   params[field] = value;
-  const base = a[field];
-  queueEdit("theater_asset", theaterKey(asset), params, base, value,
-    L2("战区资产 {0} {1}", theaterCn(asset), theaterFieldCn(field)));
+  /* U108：按**字段**判断 —— 三个字段都回到存档原值了才撤掉整条待应用 */
+  const allSame = (params.to_use === a.to_use)
+               && (params.uses_total === a.uses_total)
+               && (params.uses_turn === a.uses_turn);
+  if(allSame){
+    dropPendingKind("theater_asset", theaterKey(asset));
+  }else{
+    const fmt = (v)=> (v===null||v===undefined) ? L("无限") : v;
+    setPending("theater_asset", theaterKey(asset), params,
+      L2("战区资产 {0} {1}", theaterCn(asset), theaterFieldCn(field))
+        + " " + fmt(a[field]) + " → " + fmt(value),
+      value);
+  }
+  /* U108：整页重绘会把**正在输入的那个框**换掉 ⇒ 玩家打「12」只会进「1」
+     ⇒ 重绘后把焦点与光标**放回原处**。 */
+  const act = document.activeElement;
+  const aid = act ? act.id : "";
+  const caret = (act && act.selectionStart!==undefined) ? act.selectionStart : null;
   show("theater");
+  if(aid){
+    const again = document.getElementById(aid);
+    if(again){
+      try{ again.focus(); }catch(e){}
+      if(caret!==null){ try{ again.setSelectionRange(caret, caret); }catch(e){} }
+    }
+  }
 }
-const theaterFieldCn = {to_use:L("当前可用"), uses_total:L("本场景剩余"), uses_turn:L("每回合恢复")};
+/* U108：字段名（**函数**，不是对象 —— 以前当函数调 ⇒ 抛异常 ⇒ 改动没进待应用）。 */
+function theaterFieldCn(field){
+  return {to_use:L("当前可用"), uses_total:L("本场景剩余"),
+          uses_turn:L("每回合恢复")}[field] || field;
+}
 
 /* ---------- 难度（U64） ---------- */
 function levelList(){
