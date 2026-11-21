@@ -1083,7 +1083,8 @@
   "这一方（第 {idx} 组）删完是空的 —— 游戏里这一方就没有战区资产了": "this side (group {idx}) is empty after the deletion — this side has no theater assets in the game",
   "这一方（第 {idx} 组）已经有战区资产 {asset} —— 同一个组里不能有同名（游戏按名字取第一个匹配）": "this side (group {idx}) already has theater asset {asset} — names must be unique within a group (the game takes the first match)",
   "这一方（第 {idx} 组）没有战区资产 {asset}；本组有：{avail_or}": "this side (group {idx}) has no theater asset {asset}; this group has: {avail_or}",
-  "这些条目不允许写入：{arg0}（只允许改根层的 {arg1}、战役名册的 {arg2} 与当前战斗层的那张 main.yml）": "These entries are not writable: {arg0} (only the root tables {arg1}, the campaign roster tables {arg2} and the current battle's main.yml may be changed)"
+  "这些条目不允许写入：{arg0}（只允许改根层的 {arg1}、战役名册的 {arg2} 与当前战斗层的那张 main.yml）": "These entries are not writable: {arg0} (only the root tables {arg1}, the campaign roster tables {arg2} and the current battle's main.yml may be changed)",
+  "⚠️ 游戏**开着**时改盘 ⇒ 退出游戏时它会把内存里的存档写回去 ⇒ 你的改动会被覆盖 ⇒ **改之前先退出游戏**": "⚠️ If the game is **running** while you edit the save, it writes its in-memory copy back when it exits ⇒ your change is overwritten ⇒ **quit the game before editing**"
  },
  "values": {
   "arg1": {

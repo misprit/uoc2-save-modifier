@@ -363,6 +363,18 @@ ROSTER_ENTRY = {"units.yml": "document/units.yml",
                 "hqs.yml": "document/hqs.yml"}
 
 
+#: ⚠️ **游戏开着**时改盘 ⇒ 退出游戏时它会把**内存里的存档**写回去 ⇒ 你的改动被覆盖。
+#:
+#: ⚠️ **U149**：改名特别容易踩这个坑 —— 改完切回游戏 ⇒ 退出时覆盖 ⇒
+#: 玩家看到的就是"改名没生效"（与 U148 的"只改了一半的表"是**两个独立的坑**）。
+#:
+#: ⇒ 按 U146 的判据（"这次改的东西会不会白改"）**会**白改 ⇒ 该报。
+#: 文案与 `_unit_orders` 那条保持一致（同一件事、同一套措辞）。
+GAME_RUNNING_WARNING = (
+    "⚠️ 游戏**开着**时改盘 ⇒ 退出游戏时它会把内存里的存档写回去 ⇒ "
+    "你的改动会被覆盖 ⇒ **改之前先退出游戏**")
+
+
 def _rename_fields(obj: dict, field: str, value) -> dict:
     """改名要**一并**改掉哪些字段。
 
@@ -464,6 +476,8 @@ def _unit_field(w, e: Edit) -> Outcome:
             if k in unit and unit.get(k) != v:
                 unit[k] = v
         _sync_rename_to_roster(w, "units.yml", unit_id, field, value)
+        # ⚠️ **U149**：游戏开着 ⇒ 退出时它把内存里的存档写回去 ⇒ 改名被覆盖。
+        oc.warnings.append(GAME_RUNNING_WARNING)
 
     # ⚠️ U96：写入时**自动配平**「普通部队」（活跃 + 被压制）。
     #
@@ -997,6 +1011,8 @@ def _hq_field(w, e: Edit) -> Outcome:
             if k in hq and hq.get(k) != v:
                 hq[k] = v
         _sync_rename_to_roster(w, "hqs.yml", hq_id, field, value)
+        # ⚠️ **U149**：同上（游戏开着 ⇒ 退出时覆盖）。
+        oc.warnings.append(GAME_RUNNING_WARNING)
 
     # ⚠️ U97：判定要看**这一批改完之后**的值，不能看中间态
     #（同一批编辑依次执行 ⇒ 先改 CP 时上限可能还没改 ⇒ 误报）。

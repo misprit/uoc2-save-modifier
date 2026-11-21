@@ -31,7 +31,9 @@
 ③ 写盘白名单**只**多放行名册那两张表（`document/` 其余条目仍只读）；
 ④ 名字字段的规则（`name_brief` 必改 / `name_super_brief` 一起改 /
    `name_full` 原来不是 null 才改）；
-⑤ **真实存档实测**：改名后两份都变了。
+⑤ **真实存档实测**：改名后两份都变了；
+⑥ 改名会提醒「**先退出游戏**」（U149）—— 游戏开着的话，它退出时会把
+   内存里的存档写回去 ⇒ 改名被覆盖 ⇒ 这是"没生效"的**第二个**坑。
 """
 
 import shutil
@@ -202,6 +204,31 @@ class RenameRosterTest(unittest.TestCase):
         roster = _by_id(self.read(p, "document/hqs.yml"), 5)
         self.assertEqual("改名了", root["name_super_brief"])
         self.assertEqual("改名了", roster["name_super_brief"])
+
+    # ---------------------------------------------------- ⑥ 先退出游戏
+
+    def test_rename_warns_to_quit_the_game_first(self):
+        """游戏开着 ⇒ 退出时它把内存里的存档写回去 ⇒ 改名被覆盖。"""
+        p = self.make()
+        plan, res = self.commit(p, [Edit.unit_field(1, "name_brief", "新名字")])
+        self.assertTrue(res.ok, res.errors)
+        self.assertTrue(any("先退出游戏" in w for w in plan.warnings),
+                        plan.warnings)
+
+    def test_hq_rename_warns_too(self):
+        p = self.make()
+        plan, res = self.commit(p, [Edit.hq_field(5, "name_brief", "新名字")])
+        self.assertTrue(res.ok, res.errors)
+        self.assertTrue(any("先退出游戏" in w for w in plan.warnings),
+                        plan.warnings)
+
+    def test_other_fields_are_not_warned(self):
+        """⚠️ 这条提醒**只**跟改名有关（U146 的判据：别的操作不适用就别报）。"""
+        p = self.make()
+        plan, res = self.commit(p, [Edit.unit_field(1, "xp", 300)])
+        self.assertTrue(res.ok, res.errors)
+        self.assertFalse(any("先退出游戏" in w for w in plan.warnings),
+                         plan.warnings)
 
     # ----------------------------------------------------- ⑤ 真实存档实测
 
