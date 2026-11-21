@@ -532,6 +532,8 @@ table.spec-tbl .thumb img.spico,.fptab .thumb img.spico{
 .spick .spc{font-size:11.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
 .spick .spgrid{display:flex;flex-wrap:wrap;gap:6px;padding:10px 11px;max-height:190px;overflow:auto}
 .spick .spgrid .pcell{position:relative}
+/* U145：分组视图（阵营带 + 国籍组）—— .spgrid 是 flex 容器 ⇒ 整块要占满一行 */
+.spick .spgroups{width:100%;margin:-10px -11px}
 .spick .spgrid .pcell.on{border-color:var(--accent);background:var(--accent-light);
   box-shadow:0 0 0 2px rgba(36,91,143,.35)}
 .spick .spfoot{padding:9px 11px;background:var(--surface);border-top:1px solid var(--border)}
@@ -867,6 +869,7 @@ tr.oldrow{opacity:.6}
 .modal .spick .spc{font-size:11.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
 .modal .spick .spgrid{display:flex;flex-wrap:wrap;gap:6px;padding:10px 11px;max-height:186px;overflow:auto}
 .modal .spick .spgrid .pcell{position:relative}
+.modal .spick .spgroups{width:100%;margin:-10px -11px}
 .modal .spick .spgrid .pcell.on{border-color:var(--accent);background:var(--accent-light);
   box-shadow:0 0 0 2px rgba(36,91,143,.35)}
 .modal .spick .spgrid .pcell .dup{position:absolute;right:0;bottom:0;font-size:9.5px;line-height:1;
@@ -1725,6 +1728,48 @@ function specNotUsableText(t){
    ⚠️ U113：**不再灰掉** —— 核心库的门已经是「游戏定义过的全集」
    （U107 改的）⇒ 游戏本来就接受 ⇒ 灰掉反而是多余的拦截；
    挂不上的只在**悬停**里写明原因（是信息，不是拦截）。 */
+/* ---------- 特种兵候选的**阵营 → 国籍**分组（U145） ----------
+   ⚠️ 单位明细页的「显示所有特种兵」与商店/兵库的「显示全部」
+   **共用这一套组织逻辑** —— 同一条规则只留**一处**
+   （U136 的教训：同一类规则两处实现 ⇒ 迟早漂移）。
+   ① 先按**阵营**分带（`.facband`），**本方阵营排最前**，其余按 id 排；
+   ② 带内按**国籍**分组（`.grphead` + `.grpbody`，**默认折叠**）；
+   ③ 国籍排序 = 该国籍里「本方挂得上的」数量**降序** → 国籍中文名；
+   ④ 国籍内按特种兵**中文名**排（直接用目录表的原始顺序 ⇒ 看起来乱）。
+   ⚠️ 单位明细页数的是「能挂到**这个单位**上的」，商店/兵库数的是
+   「玩家挂得上的」（`playerSpecs()`）—— 口径不同，逻辑同构。 */
+function specNatGroups(items, usableFn, firstFac){
+  const cat = (CATALOG&&CATALOG.spec_types)||{};
+  const facs = {};
+  (items||[]).forEach(it=>{
+    const f = (cat[it.id]||{}).faction || "?";
+    (facs[f]=facs[f]||[]).push(it);
+  });
+  const facKeys = Object.keys(facs).sort((a,b)=>{
+    if(a===firstFac) return -1;
+    if(b===firstFac) return 1;
+    return a.localeCompare(b);
+  });
+  return facKeys.map(f=>{
+    const nats = {};
+    facs[f].forEach(it=>{
+      const n = (cat[it.id]||{}).nationality || "?";
+      (nats[n]=nats[n]||[]).push(it);
+    });
+    const natKeys = Object.keys(nats).sort((a,b)=>{
+      const ca = nats[a].filter(usableFn).length;
+      const cb = nats[b].filter(usableFn).length;
+      if(cb!==ca) return cb-ca;
+      return natCn(a).localeCompare(natCn(b),"zh");
+    });
+    return {fac:f, nats:natKeys.map(n=>({nat:n, items:nats[n].slice().sort(
+      (x,y)=>specCn(x.id).localeCompare(specCn(y.id),"zh"))}))};
+  });
+}
+/** 阵营名（盟军 / 轴心 / 苏联 …）—— 单位明细页与商店/兵库共用。 */
+function facCn(f){
+  return f==="allies"?L("盟军"):f==="axis"?L("轴心"):f==="soviet"?L("苏联"):(f||"");
+}
 function specPickItems(have, forStore){
   const ok = playerSpecs();
   const okSet = ok ? new Set(ok) : null;
@@ -1739,6 +1784,8 @@ function specPickItems(have, forStore){
     const dup = have.filter(e=>e.spec===t).length;
     const why = usable ? "" : specNotUsableText(t);
     out.push({id:t, name:specCn(t), tex:specTex(t), nat:natCn(st.nationality),
+      /* U145：国籍分组排序用「玩家挂得上的数量」⇒ 得带上这个标记 */
+      usable:usable,
       attack:st.attack, defense:st.defense, armor:st.armor, artillery:st.artillery,
       flags:st.flags||[],
       /* U113：不拦（游戏都接受）—— 只在悬停里说明 */
@@ -3891,6 +3938,8 @@ function spickMatch(it, q){
   return hay.indexOf(q) >= 0;
 }
 function spickCellsHTML(items, onPick, q){
+  /* U145：「显示全部」⇒ 按**阵营 → 国籍**分组（与单位明细页「显示所有特种兵」同一套）。 */
+  if(spickGroupedMode()) return spickGroupedHTML(items, onPick, q);
   const list = (items||[]).filter(it=>spickMatch(it, q));
   if(!list.length){
     return L2(`<div style="padding:14px;color:var(--muted);font-size:12px">
@@ -3899,6 +3948,50 @@ function spickCellsHTML(items, onPick, q){
   return list.map(it=>`<div class="pcell ${it.blocked?'blocked':''} ${it.sel?'on':''}"
     title="${esc(it.title||it.name)}" onclick="${it.blocked?'void 0':onPick.replace("@ID", esc(JSON.stringify(it.id)))}">
     ${imgTag(it.tex, it.name, "spico")}${it.dup?`<span class="dup">${esc(it.dup)}</span>`:""}</div>`).join("");
+}
+/* U145：什么时候用分组视图？—— 只有「显示全部」+ **特种兵**模式
+   （兵种模式没有国籍分组这回事；「显示全部」本来也只管特种兵）。 */
+function spickGroupedMode(){
+  return !!(MODAL && MODAL.all && MODAL.mode!=="equip");
+}
+/* U145：分组视图（阵营带 → 国籍组，默认折叠；搜索时自动展开有结果的组）。 */
+function spickGroupedHTML(items, onPick, q){
+  const list = (items||[]).filter(it=>spickMatch(it, q));
+  if(!list.length){
+    return L2(`<div style="padding:14px;color:var(--muted);font-size:12px">
+      {0}</div>`, q?(L("没有匹配「")+esc(q)+L("」的条目")):L("没有可选的条目"));
+  }
+  const groups = specNatGroups(list, it=>!!it.usable, playerFaction());
+  let out = "";
+  groups.forEach(g=>{
+    const facAll = [];
+    g.nats.forEach(n=>facAll.push.apply(facAll, n.items));
+    out += L2(`<div class="facband"><span>{0}</span>
+      <span class="fline"></span><span>{1} 种</span></div>`, esc(facCn(g.fac)), facAll.length);
+    g.nats.forEach(n=>{
+      const cells = n.items.map(it=>`<div class="pcell ${it.blocked?'blocked':''} ${it.sel?'on':''}"
+        title="${esc(it.title||it.name)}" onclick="${it.blocked?'void 0':onPick.replace("@ID", esc(JSON.stringify(it.id)))}">
+        ${imgTag(it.tex, it.name, "spico")}${it.dup?`<span class="dup">${esc(it.dup)}</span>`:""}</div>`).join("");
+      const canN = n.items.filter(it=>it.usable).length;
+      /* 搜索时**自动展开**有结果的组 —— 否则输入了关键词却什么都看不见 */
+      const open = q ? true : spickGroupOpen(n.nat);
+      out += L2(`<div class="grphead{0}" onclick="spickToggleGroup('{1}')">
+        <span class="caret">▼</span>{2}
+        <span class="gcount">· {3} 种</span>
+        <span class="gcan">{4} {5}</span></div>
+        <div class="grpbody" {6}>{7}</div>`, open?'':' closed', esc(n.nat), esc(natCn(n.nat)),
+        n.items.length, canN, L("可用"), open?'':'style="display:none"', cells);
+    });
+  });
+  return `<div class="spgroups">${out}</div>`;
+}
+/* U145：国籍组的折叠状态（存在 MODAL 里 ⇒ 重绘 / 搜索都不丢）。 */
+function spickGroupOpen(nat){ return !!(MODAL && MODAL.poolOpen && MODAL.poolOpen[nat]); }
+function spickToggleGroup(nat){
+  if(!MODAL) return;
+  MODAL.poolOpen = MODAL.poolOpen||{};
+  MODAL.poolOpen[nat] = !spickGroupOpen(nat);
+  if(MODAL._spickRefresh) MODAL._spickRefresh();
 }
 /* U47：搜索框 ↔ 网格联动（**只重绘网格与详情卡**，输入框不失焦）
    —— `items` / `onPick` / `footFn` 由各模态框在 onOpen 时传进来。 */
@@ -3920,6 +4013,8 @@ function bindSpickSearch(items, onPick, footFn){
     }
   };
   qi.addEventListener("input", apply);
+  /* U145：国籍组折叠/展开要能就地重画网格 ⇒ 把重画函数存起来 */
+  if(MODAL) MODAL._spickRefresh = apply;
   apply();
 }
 /* 详情卡（复用 .slot 样式，但去掉「点击=卸下」的语义） */
@@ -3962,7 +4057,7 @@ function openHqPoolModal(hqId){
   const h = (VIEW.hqs||[]).find(x=>x.id===hqId); if(!h) return;
   const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[]};
   MODAL = {kind:"hqpool", hqId:hqId, mode:"spec", sel:null, quantity:1, delay:0,
-    all:false,
+    all:false, poolOpen:{},   /* U145：国籍组的折叠状态 */
     equipType:(uni.equipment||["infantry"])[0], equipNat:(uni.nationality||["german"])[0]};
   renderHqPoolModal();
 }
@@ -4142,7 +4237,9 @@ function cardPickConfirm(){
 
 /* ---------- ③ 上架新商品 ---------- */
 function openStoreAddModal(){
-  MODAL = {kind:"store", mode:"spec", sel:null, price:10, quantity:1, all:false};
+  /* U145：poolOpen = 国籍组的折叠状态（默认全折叠） */
+  MODAL = {kind:"store", mode:"spec", sel:null, price:10, quantity:1, all:false,
+    poolOpen:{}};
   renderStoreAddModal();
 }
 function storeAddItems(){
@@ -4488,37 +4585,20 @@ function fullPoolHTML(u, selected){
   /* U48：槽位上限（`min(3, max_spec)`）—— 满了才不让再挂 */
   const cap = u.max_spec || ((cat.unit_types||{})[u.type]||{}).max_spec || 3;
   const used = selected.length;
-  /* 按阵营分组 */
-  const facs = {};
-  all.forEach(t=>{
-    const f = (cat.spec_types[t]||{}).faction || "?";
-    (facs[f]=facs[f]||[]).push(t);
-  });
-  /* 阵营顺序：本方阵营排最前 */
+  /* ⚠️ **U145**：分组与排序**走共享的那套**（商店/兵库的「显示全部」也用它）
+     ⇒ 同一条规则只留一处（U136 的教训）。 */
   const myFac = (cat.unit_types||{})[u.type] ? ((cat.unit_types[u.type]||{}).faction||"") : "";
-  const facKeys = Object.keys(facs).sort((a,b)=>{
-    if(a===myFac) return -1; if(b===myFac) return 1;
-    return a.localeCompare(b);
-  });
+  const groups = specNatGroups(all.map(t=>({id:t})),
+                               it=>specCanAttach(it.id, u.type), myFac);
   let out = "";
-  facKeys.forEach(f=>{
-    const list = facs[f];
-    /* 按国籍分组 */
-    const nats = {};
-    list.forEach(t=>{
-      const n = (cat.spec_types[t]||{}).nationality || "?";
-      (nats[n]=nats[n]||[]).push(t);
-    });
-    const natKeys = Object.keys(nats).sort((a,b)=>{
-      const ca = nats[a].filter(t=>specCanAttach(t,u.type)).length;
-      const cb = nats[b].filter(t=>specCanAttach(t,u.type)).length;
-      if(cb!==ca) return cb-ca;
-      return (cat.nationalities[b]||{}).cn > (cat.nationalities[a]||{}).cn ? 1 : -1;
-    });
+  groups.forEach(g=>{
+    const list = [];
+    g.nats.forEach(n=>list.push.apply(list, n.items));
     out += L2(`<div class="facband"><span>{0}</span>
-      <span class="fline"></span><span>{1} 种</span></div>`, esc(f==="allies"?L("盟军"):f==="axis"?L("轴心"):f==="soviet"?L("苏联"):f), list.length);
-    natKeys.forEach(n=>{
-      const items = nats[n].map(t=>{
+      <span class="fline"></span><span>{1} 种</span></div>`, esc(facCn(g.fac)), list.length);
+    g.nats.forEach(n=>{
+      const items = n.items.map(it=>{
+        const t = it.id;
         const chk = specAttachCheck(t,u.type);
         const can = chk.ok;
         /* U48：同一种可以挂多个 ⇒ 已挂的不灰掉，角标显示「已挂 N 个」 */
@@ -4533,7 +4613,7 @@ function fullPoolHTML(u, selected){
           onclick="${can&&!full ? ('addSpec('+u.id+','+esc(JSON.stringify(t))+')') : 'void 0'}">
           ${imgTag(specTex(t), specCn(t), "spico")}${cnt?`<span class="dup">${cnt}</span>`:""}</div>`;
       }).join("");
-      const canN = nats[n].filter(t=>specCanAttach(t,u.type)).length;
+      const canN = n.items.filter(it=>specCanAttach(it.id, u.type)).length;
       /* U49：全量视图的各国分组**默认折叠** —— 375 种全铺开没法看 */
       const open = poolGroupOpen(n);
       out += L2(`<div class="grphead{0}"
@@ -4541,7 +4621,7 @@ function fullPoolHTML(u, selected){
         <span class="caret">▼</span>{2}
         <span class="gcount">· {3} 种</span>
         <span class="gcan">可挂 {4}</span></div>
-        <div class="grpbody" {5}>{6}</div>`, open?'':' closed', esc(n), esc(natCn(n)), nats[n].length, canN, open?'':'style="display:none"', items);
+        <div class="grpbody" {5}>{6}</div>`, open?'':' closed', esc(n.nat), esc(natCn(n.nat)), n.items.length, canN, open?'':'style="display:none"', items);
     });
   });
   return out;
