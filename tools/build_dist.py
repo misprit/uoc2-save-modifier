@@ -88,7 +88,10 @@ INCLUDE_FILES = ("run.bat", "run_web.bat", "run_tests.bat", "使用说明.txt")
 #: ⚠️ `_edge_profile` 是 **U26 Web GUI 的运行时 profile**（Edge 自己的
 #:    独立用户目录）—— 它是**缓存**，不进包。
 SKIP_DIRS = {"__pycache__", ".git", ".gitignore", "dist",
-             ".pytest_cache", ".idea", ".vscode", "_edge_profile"}
+             ".pytest_cache", ".idea", ".vscode", "_edge_profile",
+             # U142：只读审阅通道的目录（.review/）与它的写权限探针（_probe*）
+             # —— **绝不**进成品（`python/`、`src/`、`tests/`、`docs/` 都会被打包）。
+             ".review"}
 
 #: 只在**仓库根层级**跳过的目录名
 SKIP_DIRS_ROOT = {"data"}
@@ -147,6 +150,9 @@ SKIP_NAMES = {"v6_check.txt", "Thumbs.db", "desktop.ini", ".DS_Store"}
 
 def _skip_file(rel: Path) -> bool:
     if rel.name in SKIP_NAMES:
+        return True
+    # U142：审阅通道的写权限探针（`_probe.py` 之类）—— 不是产品的一部分
+    if rel.name.startswith("_probe"):
         return True
     if rel.suffix.lower() in SKIP_SUFFIXES:
         return True
