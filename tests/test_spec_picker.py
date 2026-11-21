@@ -154,6 +154,17 @@ class TestPickersPayload(unittest.TestCase):
         self.save_path = make_save(self.tmp / "s.usg")
         self.paths = CorePaths.discover()
         self.catalog = Catalog(self.paths)
+        # ⚠️ **U126**：服务端的 `save_id` 必须落在**游戏数据目录**之内
+        # ⇒ 这个临时目录就当「游戏数据目录」用。
+        self._old_app = os.environ.get("UOC2_APPDATA")
+        os.environ["UOC2_APPDATA"] = str(self.tmp)
+        self.addCleanup(self._restore_app)
+
+    def _restore_app(self):
+        if self._old_app is None:
+            os.environ.pop("UOC2_APPDATA", None)
+        else:
+            os.environ["UOC2_APPDATA"] = self._old_app
 
     def test_payload_has_player_faction_and_specs(self):
         d = server.api_pickers(str(self.save_path))

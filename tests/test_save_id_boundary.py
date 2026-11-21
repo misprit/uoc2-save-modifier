@@ -78,10 +78,28 @@ class SaveIdBoundaryTest(unittest.TestCase):
 
     # -------------------------------------------------- ③ `..` 越界
     def test_dotdot_is_rejected(self):
-        for bad in ("../secret.usg", "campaigns/../../secret.usg",
-                    "campaigns/../../../secret.usg"):
+        """`..` 爬出**游戏数据目录** ⇒ 拒绝。"""
+        for bad in ("campaigns/../../../secret.usg",
+                    "../../secret.usg",
+                    "../../../secret.usg"):
             with self.assertRaises(ValueError, msg="不该放行：%r" % bad):
                 server._save_id_checked(bad)
+
+    def test_the_import_folder_is_allowed(self):
+        """⭐ 导入 .usg 生成的副本在 `<游戏数据目录>/modifier_imports/`
+        —— **不在存档根里**，但它是合法流程 ⇒ 必须放行。"""
+        imp = self.appdata / "modifier_imports"
+        imp.mkdir(parents=True)
+        copy = imp / "imported.usg"
+        copy.write_bytes(b"PK")
+        got = server._save_id_checked(str(copy))
+        self.assertTrue(got.endswith("imported.usg"), got)
+
+    def test_the_game_data_dir_is_the_sandbox(self):
+        """边界 = **游戏数据目录**（`<本地应用数据>/.uoc2`）——
+        目录**里面**的东西（游戏自己的设置、撤销栈…）不算越界。"""
+        got = server._save_id_checked("../settings.yml")
+        self.assertTrue(got.endswith("settings.yml"), got)
 
     def test_a_dotdot_that_stays_inside_the_root_is_fine(self):
         """`campaigns/../x.usg` 解析后**仍在存档根里** ⇒ 不是越界。"""

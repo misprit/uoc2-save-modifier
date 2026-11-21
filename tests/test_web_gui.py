@@ -137,6 +137,10 @@ class TestWriteApi(WebGuiTestBase):
             self.skipTest("本机没有存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
+        # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
+        # ⇒ 把这个临时目录当成游戏数据目录用（见 `_use_tmp_appdata`）。
+        self._old_app = _use_tmp_appdata(self.tmp)
+        self.addCleanup(_restore_appdata, self._old_app)
 
     def post(self, path, body):
         import json
@@ -334,9 +338,17 @@ class TestPathEncoding(WebGuiTestBase):
                 break
         if src is None:
             self.skipTest("本机没有存档")
-        copy = str(tmp / "copy usg.usg")
+        # ⚠️ **U126**：副本放在一个**临时游戏数据目录**里（服务端只认
+        # 游戏数据目录之内的 save_id）—— 目录名带空格，保留本用例的用意。
+        appdir = tmp / ".uoc2"
+        appdir.mkdir(parents=True, exist_ok=True)
+        copy = str(appdir / "copy usg.usg")
         shutil.copyfile(src, copy)
-        data = self._get_view(copy)
+        old_app = _use_tmp_appdata(appdir)
+        try:
+            data = self._get_view(copy)
+        finally:
+            _restore_appdata(old_app)
         self.assertIn("units", data)
         self.assertIn("_features", data)
 
@@ -498,6 +510,10 @@ class TestUnitWriteApi(WebGuiTestBase):
             self.skipTest("本机没有存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
+        # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
+        # ⇒ 把这个临时目录当成游戏数据目录用（见 `_use_tmp_appdata`）。
+        self._old_app = _use_tmp_appdata(self.tmp)
+        self.addCleanup(_restore_appdata, self._old_app)
 
     def post(self, path, body):
         import json
@@ -634,6 +650,10 @@ class TestHqWriteApi(WebGuiTestBase):
             self.skipTest("本机没有存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
+        # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
+        # ⇒ 把这个临时目录当成游戏数据目录用（见 `_use_tmp_appdata`）。
+        self._old_app = _use_tmp_appdata(self.tmp)
+        self.addCleanup(_restore_appdata, self._old_app)
 
     def post(self, path, body):
         import json
@@ -789,6 +809,38 @@ def _save_has_hand_cards(path):
         return False
 
 
+def _use_tmp_appdata(tmp):
+    """让服务端把 `tmp` 当作**游戏数据目录**（U126）。
+
+    ⚠️ 服务端的 `save_id` 必须落在**游戏数据目录**之内
+    （`<本地应用数据>/.uoc2`）⇒ 测试用的副本也得在这样一个目录里，
+    否则服务端会（正确地）拒绝它。
+
+    ⇒ 把 `UOC2_APPDATA` 指到测试的临时目录，并把玩家的
+    `modifier_config.json`（游戏本体目录的设置）复制过去
+    （不然临时目录里没有设置 ⇒ 找不到游戏本体目录）。
+    """
+    import os
+    import shutil
+    from pathlib import Path
+    from save_modifier_core.paths import appdata_dir
+    real = Path(appdata_dir())
+    cfg = real / "modifier_config.json"
+    if cfg.exists():
+        shutil.copy2(cfg, Path(tmp) / "modifier_config.json")
+    old = os.environ.get("UOC2_APPDATA")
+    os.environ["UOC2_APPDATA"] = str(tmp)
+    return old
+
+
+def _restore_appdata(old):
+    import os
+    if old is None:
+        os.environ.pop("UOC2_APPDATA", None)
+    else:
+        os.environ["UOC2_APPDATA"] = old
+
+
 class TestCardStoreWriteApi(WebGuiTestBase):
     """U36：卡牌页的写操作（手牌 / 货架）。**只用副本**。"""
 
@@ -814,6 +866,10 @@ class TestCardStoreWriteApi(WebGuiTestBase):
             self.skipTest("本机没有带手牌数据的存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
+        # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
+        # ⇒ 把这个临时目录当成游戏数据目录用（见 `_use_tmp_appdata`）。
+        self._old_app = _use_tmp_appdata(self.tmp)
+        self.addCleanup(_restore_appdata, self._old_app)
 
     def post(self, path, body):
         import json
@@ -924,6 +980,10 @@ class TestStoreWriteApi(WebGuiTestBase):
             self.skipTest("本机没有存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
+        # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
+        # ⇒ 把这个临时目录当成游戏数据目录用（见 `_use_tmp_appdata`）。
+        self._old_app = _use_tmp_appdata(self.tmp)
+        self.addCleanup(_restore_appdata, self._old_app)
 
     def post(self, path, body):
         import json
@@ -1031,6 +1091,10 @@ class TestTheaterWriteApi(WebGuiTestBase):
             self.skipTest("本机没有正在战斗的存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
+        # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
+        # ⇒ 把这个临时目录当成游戏数据目录用（见 `_use_tmp_appdata`）。
+        self._old_app = _use_tmp_appdata(self.tmp)
+        self.addCleanup(_restore_appdata, self._old_app)
 
     def post(self, path, body):
         import json
@@ -1200,6 +1264,10 @@ class TestWriteConfirmGate(WebGuiTestBase):
             self.skipTest("本机没有存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
+        # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
+        # ⇒ 把这个临时目录当成游戏数据目录用（见 `_use_tmp_appdata`）。
+        self._old_app = _use_tmp_appdata(self.tmp)
+        self.addCleanup(_restore_appdata, self._old_app)
         self.before = os.path.getmtime(self.copy)
 
     def post(self, path, body):
@@ -2272,6 +2340,10 @@ class _SaveCopyBase(WebGuiTestBase):
             self.skipTest("本机没有存档")
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
+        # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
+        # ⇒ 把这个临时目录当成游戏数据目录用（见 `_use_tmp_appdata`）。
+        self._old_app = _use_tmp_appdata(self.tmp)
+        self.addCleanup(_restore_appdata, self._old_app)
 
     def post(self, path, body):
         import json
