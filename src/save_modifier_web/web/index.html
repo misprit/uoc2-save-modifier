@@ -1903,14 +1903,18 @@ function toggleUnitOrder(unitId, key){
   refreshUnitCombatFields(u);
 }
 
-/* U87：解除敌方控制区的锁定。
+/* U87：解除敌方控制区的锁定。 */
 function setUnitEntr(unitId, lv){
   const u = (VIEW.units||[]).find(x=>x.id===unitId); if(!u) return;
   const key = uKey(unitId,"entr");
   const cur = pendingVal("unit_field", key, (u.entr==null)?0:u.entr);
   if(cur===lv) return;
+  /* ⚠️ U110：`queueEdit` 的 `base` 必须是**存档原值**（它的约定：
+     「值等于原值就撤掉这条待应用」）⇒ 改回原值才不会留一条
+     「改了等于没改」的待应用。 */
+  const base = (u.entr==null)?0:u.entr;
   queueEdit("unit_field", key, {unit_id:unitId, field:"entr", value:lv},
-    cur, lv, L2("单位 {0} 工事等级", unitId));
+    base, lv, L2("单位 {0} 工事等级", unitId));
   refreshUnitCombatFields(u);
 }
 /* 切换行动力（四档） */
@@ -1921,15 +1925,22 @@ function setUnitAp(unitId, v){
   const key = uKey(unitId,"ap");
   const cur = pendingVal("unit_field", key, (u.ap==null)?0:u.ap);
   if(cur===nv) return;
+  /* U110：`base` = **存档原值**（见 `setUnitEntr` 的说明） */
+  const base = (u.ap==null)?0:u.ap;
   queueEdit("unit_field", key, {unit_id:unitId, field:"ap", value:nv},
-    cur, nv, L2("单位 {0} 行动力", unitId));
+    base, nv, L2("单位 {0} 行动力", unitId));
   refreshUnitCombatFields(u);
 }
 /* 只重画这三张卡（不动经验输入框、不重画整页） */
 function refreshUnitCombatFields(u){
   const tmp = document.createElement("div");
   tmp.innerHTML = unitCombatFieldsHTML(u);
-  Array.prototype.forEach.call(tmp.children, function(child){
+  /* ⚠️ U110：必须用 `Array.from` **先拷成静态数组** ——
+     `tmp.children` 是**活的** HTMLCollection，而循环体里的
+     `old.replaceWith(child)` 会把 `child` **移出** tmp ⇒ 集合当场缩短 ⇒
+     下一轮的下标**错位**（要换的那张卡被跳过）⇒ 最后取到 `undefined`
+     ⇒ `child.id` 抛 TypeError ⇒ **异常静默**、界面就是不刷新。 */
+  Array.from(tmp.children).forEach(function(child){
     const old = document.getElementById(child.id);
     if(old) old.replaceWith(child);
   });
