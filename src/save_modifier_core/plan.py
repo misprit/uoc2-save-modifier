@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import difflib
+import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
@@ -161,11 +162,48 @@ class Work:
         return False
 
 
+#: **根层（L1）**允许改写的条目 —— 只有这五张表。
+ROOT_WRITABLE = ("main.yml", "units.yml", "hqs.yml", "cards.yml", "store.yml")
+
+#: **战斗层（L3）**条目的形状 —— 战役是 `games/<场景>/main.yml`，
+#: **独立场景是 `game/main.yml`（单数目录！）**。
+_BATTLE_MAIN_RE = re.compile(r"^(?:games/[^/]+|game)/main\.yml$")
+
+
 def _layer_of(entry: str) -> str:
-    """条目属于哪一层。L3 里只有 `games/<场景>/main.yml` 可能被写（战区资产）。"""
-    if entry.startswith("games/") and entry.endswith("/main.yml"):
+    """条目属于哪一层。
+
+    * **L1** = 根层（`main.yml` / `units.yml` / `hqs.yml` / `cards.yml` / `store.yml`）；
+    * **L3** = 战斗层 —— 战役是 `games/<场景>/main.yml`，
+      **独立场景是 `game/main.yml`**（单数目录）。
+
+    ⚠️ **U124**：原来只认 `games/*/main.yml` ⇒ **独立场景**的战斗层被标成 L1
+    （外部审阅报告 P1-7）。
+    """
+    if _BATTLE_MAIN_RE.match(entry):
         return "L3"
     return "L1"
+
+
+def writable_entries(save) -> set:
+    """**写盘白名单**：这个存档里哪些条目允许被改写。
+
+    * 根层那五张表（`ROOT_WRITABLE`）；
+    * **当前战斗**的那张 `main.yml`（战役 `games/<场景>/main.yml`，
+      独立场景 `game/main.yml`）。
+
+    ⚠️ **U124**：以前**没有白名单** ⇒ 理论上能往存档里写**任意条目**
+    （`document/`、`last_conference/`、`last_game/` …）——
+    那些是**只读**的（战役文档 / 上次会议的检查点，改了游戏会出问题）。
+    """
+    out = set(ROOT_WRITABLE)
+    try:
+        battle_dir = save.battle_dir()
+    except Exception:
+        battle_dir = None
+    if battle_dir:
+        out.add("%s/main.yml" % battle_dir)
+    return out
 
 
 #: **按下标删除**的编辑 —— 删的是**某个列表里的第 N 项**。
@@ -280,6 +318,14 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
         ))
         plan._payload[entry] = after
         plan._before_raw[entry] = w._raws.get(entry, b"")
+
+    # U124：**写盘白名单** —— 只允许改根层那五张表 + 当前战斗层那张 main.yml
+    allowed = writable_entries(save)
+    illegal = sorted({c.entry for c in plan.changes if c.entry not in allowed})
+    if illegal:
+        plan.errors.append(
+            "这些条目不允许写入：%s（只允许改根层的 %s 与当前战斗层的那张 main.yml）"
+            % ("、".join(illegal), "、".join(ROOT_WRITABLE)))
 
     # 有错误就不该有任何"改动"可提交
     if plan.errors:
