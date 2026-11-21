@@ -5848,6 +5848,7 @@ function branchCn(br){
 | 名字字段 | `name_brief` 必改 · `name_super_brief`（战役条标签）一起改 · `name_full` 原来不是 null 才改 |
 | 名册缺条目 | 名册里没这个 id / 没有 `document/` ⇒ **静默跳过、不报错** |
 | 写盘白名单 | `document/` 下**只**多放行那两张表（U124 的只读结论不变） |
+| 还要提醒 | **改之前先退出游戏**（U149）—— 游戏开着的话，它退出时会把内存里的存档写回去 ⇒ 改名被覆盖 |
 
 ⚠️ 读档**不会**按 id 反查名字（`campaign_doc._load` / `HQState.load` 都**原样**带进去）；
 显示时走 `app.locale.get(name_brief)`，**非 `id_`/`idp_` 形态的字符串原样返回**
