@@ -292,11 +292,16 @@ class TestHqPoolUiCode(unittest.TestCase):
         self.assertNotIn("pool[index]", body)
 
     def test_removes_are_sorted_descending(self):
-        """提交时删除类编辑必须按 index 降序（多条删除不错位）。"""
+        """提交时删除类编辑必须按 index 降序（多条删除不错位）。
+
+        ⚠️ **U121**：以前只排了兵库那一种删除 ⇒ 商店下架（`store_remove`）
+        同属「按下标删除」，**也**要排 ⇒ 现在按**组**（兵库按总部 id、
+        商店按 战线/子商店）分组，组内按 index 降序。
+        """
         body = self.slice("function pendingEdits", "async function doApply")
         self.assertIn("hq_force_pool_remove", body)
-        self.assertIn("b.params.index", body)
-        self.assertIn("a.params.index", body)
+        self.assertIn("store_remove", body)
+        self.assertIn("rmIdx(b)-rmIdx(a)", body)
 
     def test_new_entry_can_be_cancelled(self):
         """还没写盘的条目可以撤销（`dropPendingByKey`）。"""

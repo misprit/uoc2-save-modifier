@@ -1052,7 +1052,11 @@
   "国籍 {nat} 游戏里没有（可选：{join_w_catalog_nationality_names} …）": "nationality {nat} does not exist in the game (options: {join_w_catalog_nationality_names} …)",
   "这个特种兵是 {fac} 阵营的（玩家是 {pf}）—— 游戏能读，但买回来**挂不到自己的单位上**（U107）": "this special force belongs to the {fac} faction (the player is {pf}) — the game can read it, but it **cannot be mounted on your units** once bought (U107)",
   "等级 {level} + 被压制 {eff_supp} 超过上限 {HQ_BRANCH_MAX}（游戏内部「解锁到几级」= 等级 + 被压制）": "level {level} + suppressed {eff_supp} is above the limit {HQ_BRANCH_MAX} (in the game, \"unlocked up to level\" = level + suppressed)",
-  "提示：可以把 bak 文件夹里的 `_BACKUP.usg` 复制回去作为回退": "Tip: you can copy `_BACKUP.usg` from the bak folder back over it to roll back"
+  "提示：可以把 bak 文件夹里的 `_BACKUP.usg` 复制回去作为回退": "Tip: you can copy `_BACKUP.usg` from the bak folder back over it to roll back",
+  "{arg0}：YAML 解析失败（{arg1}）—— 已阻止写入；请先把这个存档备份好，再检查该文件": "{arg0}: YAML parsing failed ({arg1}) — writing has been blocked; back this save up and check that file first",
+  "这些条目不允许写入：{arg0}（只允许改根层的 {arg1} 与当前战斗层的那张 main.yml）": "these entries must not be written: {arg0} (only the root-layer {arg1} and the current battle layer's main.yml may be changed)",
+  "存档不在存档目录里（拒绝越界访问）：{arg0}": "the save is not inside the save folder (out-of-bounds access refused): {arg0}",
+  "存档路径打不开：{arg0}": "cannot open the save path: {arg0}"
  },
  "values": {
   "arg1": {
