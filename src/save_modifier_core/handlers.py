@@ -991,11 +991,6 @@ def _hq_branch_level(w, e: Edit) -> Outcome:
             oc.errors.append(
                 f"被压制的等级数必须在 0–{HQ_BRANCH_MAX} 之间，收到 {suppressed!r}")
             return oc
-        if level + suppressed > HQ_BRANCH_MAX:
-            oc.errors.append(
-                f"等级 {level} + 被压制 {suppressed} 超过上限 {HQ_BRANCH_MAX}"
-                "（游戏内部「解锁到几级」= 等级 + 被压制）")
-            return oc
 
     hqs = w.table("hqs.yml", [])
     hq = _find_by_id(hqs, hq_id)
@@ -1016,6 +1011,16 @@ def _hq_branch_level(w, e: Edit) -> Outcome:
     old_supp = node.get("suppressed")
     if not isinstance(old_supp, int) or isinstance(old_supp, bool):
         old_supp = 0
+    # ⚠️ U112：**不管有没有传 suppressed**，都要检查「等级 + 被压制 ≤ 3」
+    #（游戏内部「解锁到几级」= 等级 + 被压制；超了**游戏读档会失败**）。
+    #   以前只在传了 suppressed 时才查 ⇒ 界面那条「只改等级」的路绕过了
+    #   ⇒ 能写出「等级 3 + 被压制 1」这种**打不开的存档**。
+    eff_supp = old_supp if suppressed is None else suppressed
+    if level + eff_supp > HQ_BRANCH_MAX:
+        oc.errors.append(
+            f"等级 {level} + 被压制 {eff_supp} 超过上限 {HQ_BRANCH_MAX}"
+            "（游戏内部「解锁到几级」= 等级 + 被压制）")
+        return oc
     node["level"] = level
     if suppressed is not None:
         node["suppressed"] = suppressed

@@ -1042,7 +1042,8 @@
   "单位 {unit_id} 加特种 {spec_type}（槽位 {free}，新增即被压制）": "unit {unit_id}: added special force {spec_type} (slot {free}, added already suppressed)",
   "兵种 {eq} 游戏里没有（可选：{join_GAME_EQUIPMENTS}）": "troop type {eq} does not exist in the game (options: {join_GAME_EQUIPMENTS})",
   "国籍 {nat} 游戏里没有（可选：{join_w_catalog_nationality_names} …）": "nationality {nat} does not exist in the game (options: {join_w_catalog_nationality_names} …)",
-  "这个特种兵是 {fac} 阵营的（玩家是 {pf}）—— 游戏能读，但买回来**挂不到自己的单位上**（U107）": "this special force belongs to the {fac} faction (the player is {pf}) — the game can read it, but it **cannot be mounted on your units** once bought (U107)"
+  "这个特种兵是 {fac} 阵营的（玩家是 {pf}）—— 游戏能读，但买回来**挂不到自己的单位上**（U107）": "this special force belongs to the {fac} faction (the player is {pf}) — the game can read it, but it **cannot be mounted on your units** once bought (U107)",
+  "等级 {level} + 被压制 {eff_supp} 超过上限 {HQ_BRANCH_MAX}（游戏内部「解锁到几级」= 等级 + 被压制）": "level {level} + suppressed {eff_supp} is above the limit {HQ_BRANCH_MAX} (in the game, \"unlocked up to level\" = level + suppressed)"
  },
  "values": {
   "arg1": {

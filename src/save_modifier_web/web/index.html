@@ -2478,8 +2478,8 @@ function hqSkillHTML(h, br, it){
   const dots = [];
   const n = (typeof avail==="number") ? avail : 0;
   for(let i=0;i<n;i++) dots.push(`<i class="${i<used?'on':''}"></i>`);
-  const brLevel = pendingVal("hq_branch_level", hqBrKey(h.id,br),
-    ((h.branch_levels||{})[br]||{}).level||0);
+  /* U112：技能解锁看的是**生效等级**（压制会把它降下来）⇒ 走投影 */
+  const brLevel = hqBranchState(h.id, br).level;
   const locked = (it.level||1) > brLevel;
   return L2(`<div class="sk {0}" title="{1} · CP 消耗 {2}{3}"
     {4}"
@@ -2497,8 +2497,10 @@ function hqMatrixHTML(h){
   const brs = h.branches||{};
   const rows = BRANCHES.map(br=>{
     const node = bl[br]||{};
-    const lvl = pendingVal("hq_branch_level", hqBrKey(h.id,br), node.level||0);
-    const sup = pendingVal("hq_branch_level", hqBrKey(h.id,br)+":sup", node.suppressed||0);
+    /* U112：用投影（生效等级 / 被压制数，含待应用） */
+    const st = hqBranchState(h.id, br);
+    const lvl = st.level;
+    const sup = st.suppressed;
     const cells = [1,2,3].map(lv=>{
       const items = (brs[br]||[]).filter(it=>it && it.level===lv);
       if(!items.length) return `<div class="mx-cell na">—</div>`;
@@ -2717,25 +2719,60 @@ function hqTrucks(id, n){
   refreshHqLocal(id, true);
 }
 
+/* U112：某个 HQ 分支当前的「生效等级 / 被压制数 / 真实等级」（**含待应用**）。
+   ⚠️ 游戏的语义（`branch_suppress`，e166 字节码）：
+      压制 N 级 ⇒ **生效等级 −N**、被压制数 **+N**，
+      而「真实等级 = 等级 + 被压制」**不变**。
+   ⇒ ① 压制按钮走核心库的 `hq_branch_suppressed`（它自动重算 level）；
+      ② 等级按钮要把「等级 + 被压制」压在 3 以内（游戏的硬上限，
+         超了游戏读档会失败）。
+   ⚠️ U112 之前：界面把这两个数当**独立的** ⇒ 点「压制」= 生效等级不变、
+      被压制 +1 ⇒ **反而白送玩家一级**；「压制 +1」再「等级 +1」还能写出
+      「等级 3 + 被压制 1 = 4」⇒ 游戏读档会失败。 */
+function hqBranchState(id, br){
+  const h = (VIEW.hqs||[]).find(x=>x.id===id);
+  const node = (((h&&h.branch_levels)||{})[br])||{};
+  const oldLevel = node.level||0;
+  const oldSuppressed = node.suppressed||0;
+  const real = oldLevel + oldSuppressed;      /* 真实等级（= 解锁到几级） */
+  let level = oldLevel, suppressed = oldSuppressed;
+  /* 按**待应用的先后顺序**重放（核心库也是这个顺序应用） */
+  PENDING.forEach(p=>{
+    if(p.kind==="hq_branch_suppressed" && p.key===hqBrKey(id,br)+":sup"){
+      suppressed = p.params.suppressed;
+      level = real - suppressed;               /* 核心库的重算口径 */
+    }else if(p.kind==="hq_branch_level" && p.key===hqBrKey(id,br)){
+      level = p.params.level;
+    }
+  });
+  return {level:level, suppressed:suppressed, real:real,
+          oldLevel:oldLevel, oldSuppressed:oldSuppressed};
+}
 function hqBranchLevel(id, br, d){
   const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
-  const node = ((h.branch_levels||{})[br]||{});
-  const cur = pendingVal("hq_branch_level", hqBrKey(id,br), node.level||0);
-  let v = cur + d;
-  if(v<0) v=0; if(v>3) v=3;
+  const st = hqBranchState(id, br);
+  let v = st.level + d;
+  if(v<0) v=0;
+  /* U112：游戏的硬上限 = 「等级 + 被压制 ≤ 3」 */
+  if(v > 3 - st.suppressed) v = 3 - st.suppressed;
+  /* ⚠️ `base` = **投影出来的当前生效等级**（不是存档原值）——
+     「压制」会改生效等级 ⇒ 用存档原值会把「等级 +1」误判成「改回原值」
+     ⇒ 整条待应用被撤掉（U112 实测）。 */
   queueEdit("hq_branch_level", hqBrKey(id,br),
-    {hq_id:id, branch:br, level:v}, node.level||0, v, L2("总部 {0} {1} 等级", id, BRANCH_CN[br]||br));
+    {hq_id:id, branch:br, level:v}, st.level, v, L2("总部 {0} {1} 等级", id, BRANCH_CN[br]||br));
   refreshHqLocal(id, true);
 }
 function hqSuppress(id, br, d){
   const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
-  const node = ((h.branch_levels||{})[br]||{});
-  const cur = pendingVal("hq_branch_level", hqBrKey(id,br)+":sup", node.suppressed||0);
-  const lvl = pendingVal("hq_branch_level", hqBrKey(id,br), node.level||0);
-  let v = cur + d;
-  if(v<0) v=0; if(v>3-lvl) v=3-lvl;      /* 等级 + 压制 ≤ 3 */
-  queueEdit("hq_branch_level", hqBrKey(id,br)+":sup",
-    {hq_id:id, branch:br, level:lvl, suppressed:v}, node.suppressed||0, v,
+  const st = hqBranchState(id, br);
+  let v = st.suppressed + d;
+  if(v<0) v=0;
+  if(v > st.real) v = st.real;               /* 压制数不能超过真实等级 */
+  /* U112：走核心库**专门的** `hq_branch_suppressed` ——
+     它按游戏的语义**自动重算 level**（生效等级 −N、被压制 +N、真实等级不变）。 */
+  /* `base` = 投影出来的当前被压制数（同上：不是存档原值） */
+  queueEdit("hq_branch_suppressed", hqBrKey(id,br)+":sup",
+    {hq_id:id, branch:br, suppressed:v}, st.suppressed, v,
     L2("总部 {0} {1} 被压制等级", id, BRANCH_CN[br]||br));
   refreshHqLocal(id, true);
 }
