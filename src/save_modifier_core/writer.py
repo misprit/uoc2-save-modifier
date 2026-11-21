@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import hashlib
 import os
+import secrets
 import shutil
+import time
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -135,6 +137,74 @@ def make_backup(save_path: Path) -> Path:
         raise OSError("备份放不下（%s；备用目录也不行：%s）" % (first, exc))
 
 
+class _LockBusy(Exception):
+    """同一个存档**已经有另一个写盘在进行**。"""
+
+
+class _SaveLock:
+    """同一存档的**写盘互斥锁**（U133）。
+
+    ⚠️ 为什么要锁：服务端是多线程的 ⇒ 玩家**连点两下「应用更改」**
+    就可能有两次写盘同时进行 ⇒ 临时文件、备份、`os.replace` 全都撞车
+    ⇒ 存档可能损坏。
+
+    ⚠️ 锁文件叫 `<存档名>.usg.lock` ⇒ **不是 `*.usg`** ⇒ 游戏不会把它
+    当存档（游戏只认 `*.usg`）。
+
+    ⚠️ **陈旧锁**：进程崩了会留下锁文件 ⇒ 超过 `stale_after` 秒
+    就当它过期（可以直接拿走），否则玩家会永远写不了盘。
+    """
+
+    def __init__(self, save_path: Path, stale_after: float = 300.0):
+        p = Path(save_path)
+        self.path = p.with_name(p.name + ".lock")
+        self.stale_after = stale_after
+        self._fd = None
+
+    def acquire(self) -> None:
+        try:
+            if self.path.exists() and \
+                    (time.time() - self.path.stat().st_mtime) > self.stale_after:
+                self.path.unlink()          # 陈旧锁 ⇒ 拿走
+        except OSError:
+            pass
+        try:
+            self._fd = os.open(str(self.path),
+                               os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            raise _LockBusy("这个存档正在被写入（另一个写盘还没结束）—— 请稍后再试")
+        try:
+            os.write(self._fd, str(os.getpid()).encode("ascii"))
+        except OSError:
+            pass
+
+    def release(self) -> None:
+        try:
+            if self._fd is not None:
+                os.close(self._fd)
+                self._fd = None
+        except OSError:
+            pass
+        try:
+            if self.path.exists():
+                self.path.unlink()
+        except OSError:
+            pass
+
+
+def _temp_path_for(save_path: Path) -> Path:
+    """写盘用的**临时文件**路径（**必须唯一**，U133）。
+
+    ⚠️ 原来固定叫 `<存档名>.usg.new` ⇒ 两个写盘同时进行时会**写进同一个
+    文件** ⇒ 互相踩 ⇒ 存档可能损坏。
+    ⇒ 加上进程号 + 随机串（名字仍以 `.new` 结尾 ⇒ **不是 `*.usg`**，
+    游戏不会把它当存档）。
+    """
+    p = Path(save_path)
+    return p.with_name("%s.%d.%s.new" % (p.name, os.getpid(),
+                                         secrets.token_hex(4)))
+
+
 def read_entries(save_path: Path, names) -> dict[str, bytes]:
     """从存档里读出指定条目的**原始字节**（读不到的条目不出现在字典里）。"""
     out: dict[str, bytes] = {}
@@ -158,6 +228,9 @@ def write_overlay(save_path: Path, overlay: dict[str, bytes]) -> WriteOutcome:
     overlay   : {条目名: 新内容}。**只装真正被改过的条目**。
 
     返回 `WriteOutcome`；`ok` 为真才代表存档已被替换。
+
+    ⚠️ **U133**：整个流程在**互斥锁**里跑 ⇒ 同一个存档不会有两个写盘
+    同时进行（玩家连点「应用更改」也不会撞车）。
     """
     res = WriteOutcome()
     save_path = Path(save_path)
@@ -166,6 +239,21 @@ def write_overlay(save_path: Path, overlay: dict[str, bytes]) -> WriteOutcome:
         res.errors.append("没有要写入的内容")
         return res
 
+    lock = _SaveLock(save_path)
+    try:
+        lock.acquire()
+    except _LockBusy as exc:
+        res.errors.append(str(exc))
+        return res
+    try:
+        return _write_overlay_locked(save_path, overlay, res)
+    finally:
+        lock.release()
+
+
+def _write_overlay_locked(save_path: Path, overlay: dict[str, bytes],
+                           res: WriteOutcome) -> WriteOutcome:
+    """真正的四步（**调用方必须已经拿到锁**）。"""
     # 1) 备份
     try:
         res.backup = make_backup(save_path)
@@ -173,8 +261,8 @@ def write_overlay(save_path: Path, overlay: dict[str, bytes]) -> WriteOutcome:
         res.errors.append(f"备份失败：{exc}")
         return res
 
-    # 2) 写临时文件
-    tmp = save_path.with_name(save_path.name + ".new")
+    # 2) 写临时文件（**唯一名字**，U133）
+    tmp = _temp_path_for(save_path)
     try:
         res.report = repack_overlay(save_path, overlay, tmp)
     except Exception as exc:
