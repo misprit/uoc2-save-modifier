@@ -2881,6 +2881,13 @@ function cardTileHTML(c, kind){
      ⇒ 英文用短词（Free / Paid），完整说明放进 title。 */
   const freeBtn = free ? L("改收费") : L("改免费");
   const freeTip = free ? L("改成收费") : L("改成免费");
+  /* U114：货架上有牌时也能**换牌** —— 点卡面（跟空槽位「点此上架」对称）。
+     ⚠️ 按钮行放不下第三个按钮（卡宽 104px，中文三个按钮就超宽了）⇒ 用卡面。 */
+  const img = imgTag(cardImg(c.card_type), cardCn(c.card_type));
+  const ci = (kind==="shelf")
+    ? `<div class="ci" style="cursor:pointer" title="${esc(L("点击换成别的牌"))}"
+         onclick="openCardPicker('shelf',${c.position},'set')">${img}</div>`
+    : `<div class="ci">${img}</div>`;
   return L2(`<div class="hcard">
     <div class="ci">{0}</div>
     <div class="cp"><b>{1}</b></div>
@@ -2892,7 +2899,7 @@ function cardTileHTML(c, kind){
       <button class="btn rm" onclick="{7}" title="{9}">
         {8}</button>
     </div>
-  </div>`, imgTag(cardImg(c.card_type), cardCn(c.card_type)), esc(cardCn(c.card_type)),
+  </div>`, ci, esc(cardCn(c.card_type)),
      esc(cardInfo(c.card_type).subtitle||""),
      free?"free":"paid", free?L("免费"):L("收费"),
      kind==="hand"
@@ -2901,8 +2908,11 @@ function cardTileHTML(c, kind){
         : ("cardStoreSetFree("+c.position+","+(free?"false":"true")+")"), freeBtn, freeTip);
 }
 
-/* 卡牌选择器现在走**模态框**（U40b） */
-function openCardPicker(kind, position){ openCardPickerModal(kind, position); }
+/* 卡牌选择器现在走**模态框**（U40b）
+   ⚠️ U114：`act` = 「上架」/「换牌」——
+   空槽位上架 ⇒ add；有卡的格子换牌 ⇒ set（核心库也是这么分的：
+   `card_store_add` 要求槽位空，`card_store_set` 要求槽位有卡）。 */
+function openCardPicker(kind, position, act){ openCardPickerModal(kind, position, act); }
 function closeCardPicker(){ closeModal(); }
 
 function cardAdd(type){
@@ -2952,12 +2962,21 @@ function pageCards(w){
         手牌是<b>你手里已经拿到的牌</b>（会议阶段才发牌）——
         用下面的「加一张到手牌」可以直接放一张进来。</div>`);
   const shelfLimit = VIEW.shelf_limit || 5;
-  const shelfSlots = Array.from({length:shelfLimit}, (_,i)=>i+1).map(pos=>{
-    const c = shelf.find(x=>x.position===pos);
-    if(c) return cardTileHTML(c,"shelf");
-    return L2(`<div class="slotempty" onclick="openCardPicker('shelf',{0})">
+  /* U114：货架只存在于**会议界面**（根 main.yml 里有 card_store）——
+     没有货架时**别显示 5 个空槽位**（点了上架也会被核心库拒：
+     「当前不在会议界面，没有卡牌商店货架」）⇒ 直接说清楚。 */
+  const shelfFeat = ((VIEW&&VIEW._features)||[]).find(f=>f.name==="shelf");
+  const shelfOK = !shelfFeat || shelfFeat.ok;
+  const shelfSlots = !shelfOK
+    ? L2(`<div class="placeholder"><div class="big">{0}</div>
+        <div>{1}</div></div>`, L("这个存档现在没有卡牌商店货架"),
+           esc(shelfFeat.reason||""))
+    : Array.from({length:shelfLimit}, (_,i)=>i+1).map(pos=>{
+        const c = shelf.find(x=>x.position===pos);
+        if(c) return cardTileHTML(c,"shelf");
+        return L2(`<div class="slotempty" onclick="openCardPicker('shelf',{0},'add')">
       第 {1} 格 · <span style="font-size:10.5px">点此上架</span></div>`, pos, pos);
-  }).join("");
+      }).join("");
   w.innerHTML = L2(`<div class="cols-half" style="display:grid;gap:14px">
     <div class="panel"><h3>手牌 · {0} 张</h3>
       <div class="pbody">
@@ -2985,6 +3004,8 @@ function pageCards(w){
         <div class="costs">
           <span>货架只管<b>这一场会议</b> —— 进入新会议时游戏会按权重重掷</span>
         </div>
+        <div class="note">空格子「点此上架」= <b>上架一张新卡</b>；
+          已有卡的格子：<b>点卡面 = 换成别的卡</b>，或先「下架」清空、再点空格位上架。</div>
       </div></div>
   </div>`, hand.length, handHTML, esc(wl.conference||"—"), esc(VIEW.level||"—"), VIEW.prestige??"—", VIEW.hand_limit||5, esc(VIEW.level||"—"), (wl.allowed||[]).length, Object.keys(wl.blocked||{}).length, esc(wl.conference||"—"), SEL.cardErr?`<div class="err">${esc(SEL.cardErr)}</div>`:"", shelf.length, shelfLimit, shelfSlots);
 }
@@ -3804,11 +3825,21 @@ function hqPoolConfirm(){
   closeModal();
 }
 
-/* ---------- ② 换掉货架上的一张卡 ---------- */
-function openCardPickerModal(kind, position){
+/* ---------- ② 选一张卡（上架 / 换牌） ---------- */
+function openCardPickerModal(kind, position, act){
   const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
   const types = Object.keys(CATALOG&&CATALOG.card_types ? CATALOG.card_types : {}).sort();
-  MODAL = {kind:"card", mode:kind, position:position, sel:null};
+  /* U114：**上架**与**换牌**是两件事 —— 没传 act 就**按槽位有没有牌自动判断**
+     （空 ⇒ 上架；有 ⇒ 换牌）⇒ 不会再出现「空槽位点上架却被当成换牌」。 */
+  let a = act;
+  if(!a){
+    if(kind==="hand") a = "add";
+    else{
+      const shelf = projectedCards(VIEW.shelf, "shelf");
+      a = shelf.some(x=>x.position===position) ? "set" : "add";
+    }
+  }
+  MODAL = {kind:"card", mode:kind, act:a, position:position, sel:null};
   renderCardPickerModal();
 }
 function renderCardPickerModal(){
@@ -3824,6 +3855,11 @@ function renderCardPickerModal(){
   });
   const sel = items.find(i=>i.id===M.sel);
   const isHand = M.mode==="hand";
+  /* U114：标题与按钮按「上架 / 换牌」分别说清楚 */
+  const isAdd = (M.act==="add");
+  const mhTitle = isHand ? L("加一张到手牌")
+                : (isAdd ? L("上架一张新卡") : L("换掉位置 ")+M.position+L(" 的卡"));
+  const okLabel = isHand ? L("加到手牌") : (isAdd ? L("上架") : L("换牌"));
   openModal(L2(`<div class="mh">{0}
       <span class="ro">{1}</span></div>
     <div class="mb">
@@ -3844,13 +3880,13 @@ function renderCardPickerModal(){
         用卡时游戏会崩。</div>
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
-      <button class="btn pri" onclick="cardPickConfirm()">{10}</button></div>`, isHand?L("加一张到手牌"):L("换掉位置 ")+M.position+L(" 的卡"), isHand?"cards.yml":"main.yml · card_store", esc(wl.player_faction||"—"), (wl.allowed||[]).length, Object.keys(wl.blocked||{}).length, esc(M.q||""), types.length, (wl.allowed||[]).length, spickCellsHTML(items, "cardPick(@ID)", M.q||""), sel?L2(`<div class="slot spcard">
+      <button class="btn pri" onclick="cardPickConfirm()">{10}</button></div>`, mhTitle, isHand?"cards.yml":"main.yml · card_store", esc(wl.player_faction||"—"), (wl.allowed||[]).length, Object.keys(wl.blocked||{}).length, esc(M.q||""), types.length, (wl.allowed||[]).length, spickCellsHTML(items, "cardPick(@ID)", M.q||""), sel?L2(`<div class="slot spcard">
           <span class="sq">{0}</span>
           <span class="slotinfo"><span class="slotname">{1}</span>
             <span class="slotflags">{2}</span></span>
           <span class="slotstats"><span class="st"><i>费</i><b>{3}</b></span></span>
         </div>`, imgTag(sel.tex, sel.name), esc(sel.name), sel.sub?`<span class="ftag">${esc(sel.sub)}</span>`:
-              '<span class="none">—</span>', sel.cost??"—"):L(`<div class="slot empty" style="justify-content:center">还没选</div>`), isHand?L("加到手牌"):L("换牌")),
+              '<span class="none">—</span>', sel.cost??"—"):L(`<div class="slot empty" style="justify-content:center">还没选</div>`), okLabel),
     {onOpen:function(){
       bindSpickSearch(items, "cardPick(@ID)", (s2)=>s2?L2(`<div class="slot spcard">
           <span class="sq">{0}</span>
@@ -3865,7 +3901,8 @@ function cardPick(id){ MODAL.sel = id; renderCardPickerModal(); }
 function cardPickConfirm(){
   const M = MODAL; if(!M || !M.sel){ alertModal(L("请先选一张卡")); return; }
   if(M.mode==="hand") cardAdd(M.sel);
-  else cardStoreSet(M.position, M.sel);
+  else if(M.act==="add") cardStoreAdd(M.position, M.sel);   /* U114：空槽位 = 上架 */
+  else cardStoreSet(M.position, M.sel);                       /* 有卡的格子 = 换牌 */
   closeModal();
 }
 
