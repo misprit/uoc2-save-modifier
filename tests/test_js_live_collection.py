@@ -50,7 +50,7 @@ class TestLiveCollectionGuard(unittest.TestCase):
         """注释少写一个 `*/` ⇒ 整个函数被注释掉 ⇒ onclick 报 ReferenceError。"""
         self.assertIn("function setUnitEntr(unitId, lv)", self.html)
         # 注释里不能出现「未闭合」：函数定义前后的注释必须成对
-        i = self.html.index("/* U87：解除敌方控制区的锁定。")
+        i = self.html.index("/* 解除敌方控制区的锁定。")
         line = self.html[i:self.html.index("\n", i)]
         self.assertTrue(line.rstrip().endswith("*/"),
                         "U87 那条注释必须闭合（少一个 */ ⇒ 整个函数被注释掉）")

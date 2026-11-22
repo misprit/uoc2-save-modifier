@@ -38,11 +38,9 @@ class Outcome:
 
 #: **允许改**的单位字段。`type` 不在其中 —— 它是只读信息（§5.4、§7.5）。
 #:
-#: U94（2026-11-20 · 全面审查）：**`uv`（单位在地图上的坐标）也删掉了** ——
-#: ① 改坐标极易造出非法局面（单位落到地图外 / 与别的单位同格）；
-#: ② 游戏的 `uv_schema` 要求它是 `[int, int]`，写错**存档直接打不开**；
-#: ③ 界面本来就没有改坐标的入口（玩家用不到）⇒
-#: 与「改总部经验」同理 —— 没把握就不给，宁可不写也不写坏。
+#: **`uv`（单位在地图上的坐标）也不在其中** —— 改坐标极易造出非法局面
+#: （单位落到地图外 / 与别的单位同格）；游戏的 `uv_schema` 要求它是 `[int, int]`，
+#: 写错**存档直接打不开**；界面本来也没有改坐标的入口 ⇒ 没把握就不给，宁可不写也不写坏。
 UNIT_FIELD_ALLOWED = {
     "xp", "act_st", "sup_st", "name_brief", "name_full",
     "entr", "supply", "ap", "mp",
@@ -50,8 +48,6 @@ UNIT_FIELD_ALLOWED = {
 
 #: 字段的**中文名**（变更说明里用，别让玩家对着 `entr` 猜）。
 #:
-#: U85（2026-11-20）：`entr` / `ap` / `mp` / `supply` 原本只写字段名，
-#: 玩家根本不知道 `entr` 是工事等级 ⇒ 变更清单里全是天书。
 UNIT_FIELD_CN = {
     "entr": "工事等级",
     "ap": "行动力",
@@ -100,7 +96,7 @@ HQ_FIELD_ALLOWED = {
     "name_brief", "name_full",
 }
 
-#: U94：**总部经验与经验目标不能手改**（用户 2026-11-20 决定删掉这个功能）。
+#: 总部经验与经验目标不可改（游戏每次战役推进都重算，写了也白写）。
 #:
 #: 取证（游戏字节码）：`state/campaign/campaign.pyc::Campaign._set_hqs_xp_target`
 #: —— 每次**战役推进**都会按「该总部在战役里的单位数 × 场景回合数 ×
@@ -340,8 +336,6 @@ def _level(w, e: Edit) -> Outcome:
     main["level"] = value
     w.touch("main.yml")
     oc.summary = f"难度：{_level_cn(old) if old else '（空）'} → {_level_cn(value)}"
-    # ⚠️ **U146**：这两条是**说明性**的（"都在上限内" / "以后开的新会议"）
-    # ⇒ 每次改难度都弹 ⇒ 噪音 ⇒ 删掉（手牌超上限那种**硬伤**在上面的 errors 里）。
     return oc
 
 
@@ -357,19 +351,15 @@ def _level(w, e: Edit) -> Outcome:
 #: 两份表的 id 是**同一套编号**、同 id 的 `name_brief` **完全一致**
 #: （实测 9 个存档 100% 一致）⇒ 改名按 id 同步即可。
 #:
-#: ⚠️ **U148**：以前只改根表 ⇒ **战役地图上完全看不到变化**
-#: ⇒ 玩家以为"改名没生效"（朋友 2026-11-21 反馈）。
+    # ⚠️ 改名要**两份都改** —— 战役地图显示的是**名册**那份。
 ROSTER_ENTRY = {"units.yml": "document/units.yml",
                 "hqs.yml": "document/hqs.yml"}
 
 
 #: ⚠️ **游戏开着**时改盘 ⇒ 退出游戏时它会把**内存里的存档**写回去 ⇒ 你的改动被覆盖。
 #:
-#: ⚠️ **U149**：改名特别容易踩这个坑 —— 改完切回游戏 ⇒ 退出时覆盖 ⇒
-#: 玩家看到的就是"改名没生效"（与 U148 的"只改了一半的表"是**两个独立的坑**）。
+                # ⚠️ 游戏开着时改盘 ⇒ 退出时它会把内存里的存档写回去 ⇒ 改名被覆盖。
 #:
-#: ⇒ 按 U146 的判据（"这次改的东西会不会白改"）**会**白改 ⇒ 该报。
-#: 文案与 `_unit_orders` 那条保持一致（同一件事、同一套措辞）。
 GAME_RUNNING_WARNING = (
     "⚠️ 游戏**开着**时改盘 ⇒ 退出游戏时它会把内存里的存档写回去 ⇒ "
     "你的改动会被覆盖 ⇒ **改之前先退出游戏**")
@@ -469,27 +459,24 @@ def _unit_field(w, e: Edit) -> Outcome:
     old = unit.get(field)
     unit[field] = value
     w.touch("units.yml")
-    # ⚠️ **U148**：改名要**两份都改** —— 战役地图显示的是**名册**那份
+    # ⚠️ 改名要**两份都改** —— 战役地图显示的是**名册**那份
     # （`document/units.yml`），只改根表 ⇒ 玩家在战役地图上看不到变化。
     if field in ("name_brief", "name_full"):
         for k, v in _rename_fields(unit, field, value).items():
             if k in unit and unit.get(k) != v:
                 unit[k] = v
         _sync_rename_to_roster(w, "units.yml", unit_id, field, value)
-        # ⚠️ **U149**：游戏开着 ⇒ 退出时它把内存里的存档写回去 ⇒ 改名被覆盖。
+        # ⚠️ 游戏开着 ⇒ 退出时它把内存里的存档写回去 ⇒ 改名被覆盖。
         oc.warnings.append(GAME_RUNNING_WARNING)
 
-    # ⚠️ U96：写入时**自动配平**「普通部队」（活跃 + 被压制）。
+    # 写入时**自动配平**「普通部队」（活跃 + 被压制）。
     #
     # 背景：上限 `max_st` 约束的是**普通部队**（游戏读档时也只查这两项：
     # `UnitState.check_data_consistency`），**特种兵不占名额**
     # （特种兵另占「总战力」，而总战力超上限游戏是允许的 —— 真实存档里
     #   就有 166 个这样的单位 ⇒ 7 兵 + 2 特种兵是合法的）。
     #
-    # 为什么必须在这里配平：前端滚轮调兵力时会**同时**改 act_st 与 sup_st
-    # （夹到上限时要从压制里扣），但两条编辑是**依次执行**的 ⇒
-    # 先执行 act_st 那条时 sup_st 还是旧值 ⇒ 「活跃 + 压制」算出来超上限
-    # ⇒ **误报**「普通部队合计超过上限」（用户 2026-11-20 报告）。
+    # 为什么必须在这里配平：前端滚轮会**同时**改 act_st 与 sup_st，但两条编辑依次执行 ⇒ 先改 act_st 时 sup_st 还是旧值 ⇒ 会**误报**超上限。
     #
     # 配平口径与前端夹取、与游戏读档修复（`UnitState._repair_data`）一致：
     # 先从**压制**里扣，不够再截**活跃**。
@@ -520,10 +507,6 @@ def _unit_field(w, e: Edit) -> Outcome:
                         f"该单位普通部队合计（活跃 + 被压制）不能超过类型上限 "
                         f"{limit}（{unit.get('type')} 的 max_st）—— "
                         f"活跃兵力已按上限截断（{a_old} → {a}）")
-    #: U85：变更说明里给几个字段**中文名**（`entr` → 工事等级），
-    #: 字段名也带上，方便对照存档。
-    #: ⚠️ **分字段写死**（不走变量）—— 这样每条都能单独翻译，
-    #: 英文界面不会夹着中文。
     if field == "entr":
         oc.summary = f"单位 {unit_id} 的工事等级（entr）：{old!r} → {value!r}"
     elif field == "ap":
@@ -535,8 +518,6 @@ def _unit_field(w, e: Edit) -> Outcome:
     else:
         oc.summary = f"单位 {unit_id} 的 {field}：{old!r} → {value!r}"
     if field in UNIT_FIELD_RISKY:
-        # ⚠️ U85：分字段写死中文名（`entr` → 工事等级）——
-        #    玩家不该在警告里看到英文字段名；分字段写才能各自翻译。
         if field == "entr":
             oc.warnings.append(
                 f"单位 {unit_id} 的工事等级在战斗外改，"
@@ -561,9 +542,7 @@ def _unit_field(w, e: Edit) -> Outcome:
             oc.warnings.append(
                 f"{value!r} 看起来是本地化 id，游戏会去本地化表里查它；"
                 "想显示固定文字请直接写明文（§5.5）")
-    # U96：上面已经**自动配平**过了 ⇒ 这里不该再报「超过上限」。
-    # 兜底：万一配平没兜住（类型上限拿不到之类），说清楚后果 ——
-    # 游戏的读档修复（`UnitState._repair_data`）会把超出的部分**截回上限**。
+    # 上面已经**自动配平**过了 ⇒ 这里只兜底（类型上限拿不到时）说清后果：游戏读档修复（`UnitState._repair_data`）会把超出的部分**截回上限**。
     if field in ("act_st", "sup_st") and w.catalog is not None:
         limit = w.catalog.max_st(unit.get("type"))
         if limit is not None:
@@ -581,10 +560,7 @@ def _unit_spec_add(w, e: Edit) -> Outcome:
     oc = Outcome()
     unit_id = e.params.get("unit_id")
     spec_type = e.params.get("spec_type")
-    # U105：新挂的特种兵可以**一上来就是被压制的**（`active=False`）——
-    # 游戏里「被压制」就是 `active=False`（没有独立的 suppressed 字段，
-    # 见 `_unit_spec_active` 的字节码实证）⇒ 与「先挂再压制」写出来的
-    # 存档**完全一样**（存档里原有的和我们新增的走同一套逻辑）。
+    # 新挂的特种兵可以**一上来就是被压制的**（`active=False`）——游戏里「被压制」就是 `active=False`（没有独立的 suppressed 字段）⇒ 与「先挂再压制」写出来的存档**完全一样**。
     active = e.params.get("active", True)
     if not isinstance(active, bool):
         oc.errors.append(
@@ -607,11 +583,7 @@ def _unit_spec_add(w, e: Edit) -> Outcome:
         oc.errors.append(f"存档里没有 id 为 {unit_id} 的单位")
         return oc
 
-    # U49：**挂载合法性硬拦** —— 照抄游戏自己的 `_can_add_specialist_no_len`
-    # （`e162` 字节码 / 规范 §7.3.2）：阵营必须相同；国籍相同，
-    # 或**单位国籍的 parent_nationality == 特种兵国籍**（**单向**：
-    # 罗马尼亚人能用德军装备，德军用不了罗马尼亚装备）。
-    # ⚠ 前端判定曾经写反（拿特种兵国籍的 parent 去比）⇒ 这里再兜一道底。
+    # **挂载合法性硬拦** —— 照抄游戏自己的 `_can_add_specialist_no_len`：阵营必须相同；国籍相同，或**单位国籍的 parent_nationality == 特种兵国籍**（**单向**）。
     unit_type = unit.get("type")
     # 存档 `units.yml` 顶层实测**没有** captured 字段（只有 `specs[].captured`）
     # ⇒ 实测恒为 False；有的话按游戏逻辑（captured 跳过阵营/国籍检查）处理。
@@ -660,7 +632,6 @@ def _unit_spec_add(w, e: Edit) -> Outcome:
                       f"（槽位 {free}，新增即被压制）")
     oc.warnings.append(
         "登陆/空降单位进战斗时会按场景目标对账，多余的特种会被退回总部兵库（§3.5.5）")
-    # ⚠️ **U146**：「被压制的特种兵不提供效果」是**通用说明** ⇒ 删掉。
     return oc
 
 
@@ -735,7 +706,6 @@ def _unit_spec_active(w, e: Edit) -> Outcome:
     oc.summary = (f"单位 {unit_id} 的特种 {spec_type}"
                   + (f"（槽位 {target.get('idx')}）" if target.get("idx") is not None else "")
                   + ("：设为被压制" if not active else "：恢复活跃"))
-    # ⚠️ **U146**：「被压制的特种兵不提供效果」是**通用说明** ⇒ 删掉。
     return oc
 
 
@@ -815,8 +785,8 @@ def _unit_orders(w, e: Edit) -> Outcome:
         return oc
     orders = [o for o in ORDER_LISTS if o in orders]     # 去重 + 按固定顺序
 
-    # U102：游戏里这三个标记**互斥** —— 一个单位同时只能有一个。
-    # 字节码依据（三条独立路径共同维持）：
+    # 游戏里这三个标记**互斥** —— 一个单位同时只能有一个。
+    #   字节码依据（三条独立路径共同维持）：
     #   ① `Gamelike.has_any_defense_flag`（gamelike.pyc:1452-1455）
     #      = 该单位在三个列表**任意一个**里；
     #   ② 三个 `can_make_*`（entities_view/unit.pyc:84/91/98）的最后一个条件
@@ -833,7 +803,7 @@ def _unit_orders(w, e: Edit) -> Outcome:
             % "、".join(orders))
         return oc
 
-    # U92：游戏硬约束 —— **「反击」只允许装甲机动单位**
+    # 游戏硬约束 —— **「反击」只允许装甲机动单位**
     # （`can_make_elastic_defense` 的第一个条件就是 `armor_mobile`）。
     # ⚠️ 只拦**新增**；撤除已有标记不受影响（存档里原本就有的也不主动清理）。
     if "elastic_defense" in orders:
@@ -949,7 +919,7 @@ def _hq_field(w, e: Edit) -> Outcome:
     if not w.require(w.caps.can_edit_hqs, "hqs", "hqs.yml"):
         return oc
     if field in HQ_XP_FIELDS:
-        # U94：经验 / 经验目标**不能手改**（游戏会重算，写了也白写）。
+        # 经验 / 经验目标**不能手改**（游戏会重算，写了也白写）。
         oc.errors.append(
             "总部经验（xp）与经验目标（xp_target）**不能手改** —— "
             "经验目标是游戏按战役规模动态重算的"
@@ -973,7 +943,7 @@ def _hq_field(w, e: Edit) -> Outcome:
         oc.errors.append(f"{field} 必须是非负整数，收到 {value!r}")
         return oc
 
-    # ⚠️ 合法区间比「非负整数」严 —— 游戏 schema 是硬范围（U19 / U25 字节码取证）
+    # ⚠️ 合法区间比「非负整数」严 —— 游戏 schema 是硬范围（字节码取证）；
     #    超范围**不是显示异常，是 voluptuous 校验失败 ⇒ 存档直接打不开**。
     if field == "max_cp" and not (HQ_MAX_CP_MIN <= value <= HQ_MAX_CP_MAX):
         oc.errors.append(
@@ -983,9 +953,8 @@ def _hq_field(w, e: Edit) -> Outcome:
         oc.errors.append(
             f"cp 必须在 {HQ_CP_MIN}–{HQ_CP_MAX} 之间（游戏的硬范围），收到 {value}")
         return oc
-    # ⚠️ U25：trucks / supply 也是**硬范围**，原先只校验「非负整数」——
-    #    于是 `hq_field(hq, "trucks", 999)` 能绕过 `_hq_trucks` 的 1–5 拦截，
-    #    写出来的存档**打不开**。两个入口现在用同一套规则。
+    # ⚠️ trucks / supply 也是**硬范围**（游戏 schema 限制，不是我们的选择）——
+    #    越界写出来的存档**打不开**，所以两个入口用同一套规则。
     if field == "trucks" and not (TRUCK_MIN <= value <= TRUCK_MAX):
         oc.errors.append(
             f"trucks 必须在 {TRUCK_MIN}–{TRUCK_MAX} 之间（游戏的硬范围），收到 {value}")
@@ -1005,16 +974,16 @@ def _hq_field(w, e: Edit) -> Outcome:
     hq[field] = value
     w.touch("hqs.yml")
     oc.summary = f"总部 {hq_id} 的 {field}：{old} → {value}"
-    # ⚠️ **U148**：同单位 —— 战役地图显示的是**名册**那份（`document/hqs.yml`）。
+    # ⚠️ 同单位 —— 战役地图显示的是**名册**那份（`document/hqs.yml`）。
     if field in ("name_brief", "name_full"):
         for k, v in _rename_fields(hq, field, value).items():
             if k in hq and hq.get(k) != v:
                 hq[k] = v
         _sync_rename_to_roster(w, "hqs.yml", hq_id, field, value)
-        # ⚠️ **U149**：同上（游戏开着 ⇒ 退出时覆盖）。
+        # ⚠️ 同上（游戏开着 ⇒ 退出时覆盖）。
         oc.warnings.append(GAME_RUNNING_WARNING)
 
-    # ⚠️ U97：判定要看**这一批改完之后**的值，不能看中间态
+    # ⚠️ 判定要看**这一批改完之后**的值，不能看中间态。
     #（同一批编辑依次执行 ⇒ 先改 CP 时上限可能还没改 ⇒ 误报）。
     _cp_final = _batch_final_hq_field(w, hq_id, "cp")
     _maxcp_final = _batch_final_hq_field(w, hq_id, "max_cp")
@@ -1028,8 +997,6 @@ def _hq_field(w, e: Edit) -> Outcome:
         oc.warnings.append(
             f"CP 上限降到 {value}，但当前 CP 是 {_cp_now} —— 游戏读档时按上限截断"
             f"（`HQState._repair_data`）")
-    # ⚠️ U94 之后 **xp / xp_target 已经不能改**（上面直接拦掉了）
-    # ⇒ 原来那两条「降低经验 / 降低目标」的警告**永远不会触发** ⇒ U97 删掉（死代码）。
     if field in ("prisoners", "loss_count", "intels_revealed"):
         oc.warnings.append(
             f"{field} 是游戏自己累计的统计值，改了不会被重算，但界面可能对不上")
@@ -1094,7 +1061,7 @@ def _hq_branch_level(w, e: Edit) -> Outcome:
     old_supp = node.get("suppressed")
     if not isinstance(old_supp, int) or isinstance(old_supp, bool):
         old_supp = 0
-    # ⚠️ U112：**不管有没有传 suppressed**，都要检查「等级 + 被压制 ≤ 3」
+    # ⚠️ **不管有没有传 suppressed**，都要检查「等级 + 被压制 ≤ 3」
     #（游戏内部「解锁到几级」= 等级 + 被压制；超了**游戏读档会失败**）。
     #   以前只在传了 suppressed 时才查 ⇒ 界面那条「只改等级」的路绕过了
     #   ⇒ 能写出「等级 3 + 被压制 1」这种**打不开的存档**。
@@ -1192,7 +1159,6 @@ def _hq_branch_suppressed(w, e: Edit) -> Outcome:
         oc.warnings.append(
             "压制期间，这个分支的**生效等级**会下降"
             f"（{old_level} → {new_level}）；游戏在一局结束时会把压制还原")
-    # ⚠️ **U146**：「解除压制」是**好消息** ⇒ 不该当警告弹出来。
     return oc
 
 
@@ -1329,7 +1295,6 @@ def _hq_branch_sp(w, e: Edit) -> Outcome:
         oc.warnings.append(
             f"**取消专精**（{old_used} → {sp_used}）—— "
             "该技能发动时的 CP 消耗会涨回去")
-    # ⚠️ **U146**：「专精让 CP 消耗降低」是**好消息** ⇒ 不该当警告弹出来。
     return oc
 
 
@@ -1376,7 +1341,7 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
     # 条目字段补齐：游戏自己写的是 {delay, nationality, quantity, spec?|equipment?}
     new = dict(entry)
     new.setdefault("delay", 0)
-    # ⚠️ U94：游戏的 `force_pool_schema` 里 `delay` 是**非负整数**
+    # ⚠️ 游戏的 `force_pool_schema` 里 `delay` 是**非负整数**
     #   （`state/entities/data_validation/force_pool.pyc`）⇒ 写负数**存档打不开**。
     _delay = new.get("delay")
     if not isinstance(_delay, int) or isinstance(_delay, bool) or _delay < 0:
@@ -1384,8 +1349,7 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
             "delay 必须是非负整数（游戏的硬范围），收到 %r" % (_delay,))
         return oc
     if not new.get("nationality"):
-        # ⚠️ 原来这里 setdefault 成空串 —— 游戏读不出来（U22 修）。
-        # 实测（U22）：真实存档里 商店 1043 条 + 兵库 1747 条 spec 条目，
+        # 实测：真实存档里 商店 1043 条 + 兵库 1747 条 spec 条目，
         # 国籍 **100% 等于该特种兵类型自身的 nationality**，0 条例外
         # ⇒ 给了 spec 就自动把国籍填成类型国籍。
         nat = _spec_nationality(w, new.get("spec"))
@@ -1393,10 +1357,7 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
             new["nationality"] = nat
         else:
             new.setdefault("nationality", "")
-    # ★ 同身份 + **同延迟**不许并存（U23 用户口径）：
-    #   「肯定不允许同时出现两个 0 延迟的同样特种兵」；
-    #   延迟不同**可以共存**（X 回合延迟 = 那个部队等几个回合才能部署，是合法机制）。
-    #   判重范围**只限这一个总部** —— 每个总部的兵库独立。
+    # ★ 同身份 + **同延迟**不许并存。
     ident = _entry_identity(new)
     delay = new.get("delay", 0)
     others = []
@@ -1414,9 +1375,6 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
             f"**同一个总部里不能有两条延迟同为 {delay} 的同样条目**；"
             "延迟不同的可以共存")
         return oc
-    # ⚠️ **U146**：游戏自己的合并键 = (delay, nationality, spec|equipment)
-    #   ⇒ **延迟不同可以共存**（分批上线）—— 这只是**解释为什么没拦**，
-    #   不是"你改的东西可能不生效" ⇒ 噪音 ⇒ 删掉。
 
     pool.insert(index, new)
     hq["force_pool"] = pool
@@ -1522,9 +1480,9 @@ def _card_add(w, e: Edit) -> Outcome:
     if not isinstance(cards, list):
         oc.errors.append("根 cards.yml 结构异常")
         return oc
-    # ⚠️ U25：手牌槽位有上限（`card_deck_limit[难度]`），超限的槽位**游戏读不到**
-    #    （游戏的 card schema 里压根没有 position 字段，是按槽位索引读的）
-    #    ⇒ 写进去不会让存档打不开，但那张卡等于白写 ⇒ 必须拦。
+    # 手牌槽位有上限（`card_deck_limit[难度]`），超限的槽位**游戏读不到**
+    #（游戏的 card schema 里压根没有 position 字段，是按槽位索引读的）
+    # ⇒ 写进去不会让存档打不开，但那张卡等于白写 ⇒ 必须拦。
     limit = CARD_DECK_LIMIT.get(_level_of(w), 5)
     if position is None:
         used = {c.get("position") for c in cards
@@ -1568,7 +1526,7 @@ def _card_add(w, e: Edit) -> Outcome:
         oc.errors.append(f"卡牌 {card_type} 不召唤单位，unit_id 必须是 None")
         return oc
 
-    # ⚠️ **U131**：别用 `bool(...)` 强转（`"false"` 会被当成 True）
+    # ⚠️ 别用 `bool(...)` 强转（`"false"` 会被当成 True）。
     is_free = e.params.get("is_free")
     flag = _as_bool(is_free)
     if flag is None:
@@ -1848,8 +1806,6 @@ def _card_store_set(w, e: Edit) -> Outcome:
                           f"（原来 {old_free}）")
 
     w.touch("main.yml")
-    # ⚠️ **U146**：这两条都是**说明性**的（玩家刚做的选择的复述 / 通用规则）
-    # ⇒ 噪音 ⇒ 删掉。
     return oc
 
 
@@ -1884,7 +1840,7 @@ def _card_store_add(w, e: Edit) -> Outcome:
     oc = Outcome()
     position = e.params.get("position")
     card_type = e.params.get("card_type")
-    # ⚠️ **U131**：别用 `bool(...)` 强转（`"false"` 会被当成 True）
+    # ⚠️ 别用 `bool(...)` 强转（`"false"` 会被当成 True）。
     is_free = e.params.get("is_free")
     flag = _as_bool(is_free)
     if flag is None:
@@ -1937,7 +1893,6 @@ def _card_store_add(w, e: Edit) -> Outcome:
                   "position": position, "unit_id": unit_id, "used": False})
     w.touch("main.yml")
     oc.summary = f"上架卡 {card_type}（槽位 {position}）"
-    # ⚠️ **U146**：同上（说明性）⇒ 删掉。
     return oc
 
 
@@ -2058,8 +2013,7 @@ def _store_add(w, e: Edit) -> Outcome:
     if new["equipment"] is None:
         new.pop("equipment")
 
-    # ★ 同一个 (战线, 子商店) 里**不允许重复条目**（U23 用户口径）。
-    #   判重范围**只限这一个商店** —— 多个前线彼此库存独立，不能混着判。
+    # ★ 同一个 (战线, 子商店) 里**不允许重复条目**。
     ident = _entry_identity(new)
     for i, e in enumerate(entries):
         if not isinstance(e, dict):
@@ -2076,8 +2030,7 @@ def _store_add(w, e: Edit) -> Outcome:
     w.touch("store.yml")
     oc.summary = (f"上架商品 {new.get('spec') or new.get('equipment')}"
                   f"（{front}/{sub}，价格 {new.get('price')}，库存 {new.get('quantity')}）")
-    # U107：**软警告** —— 游戏允许上架敌方阵营的特种兵（存档能读），
-    # 但玩家买回来挂不到自己的单位上（阵营 / 国籍不匹配）⇒ 白花钱。
+    # **软警告** —— 游戏允许上架敌方阵营的特种兵（存档能读），
     pf = _player_faction(w)
     spec = new.get("spec")
     if pf and spec and w.catalog is not None:

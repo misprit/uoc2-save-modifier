@@ -135,7 +135,7 @@ class UnitType:
     #: **不是**能反冲锋的机动装甲 ⇒ 决定「反击」能不能挂。
     armor_def: bool | None = None
     #: 战力上限 —— **上限在类型定义里，不在存档里**（规范 §5.3）
-    #: ⚠️ U60：类型 yml **没写** `max_st` 时，游戏按 schema 默认 **7** 处理
+    #: ⚠️ 类型 yml **没写** `max_st` 时，游戏按 schema 默认 **7** 处理
     #: （`unit_types.pyc::_unit_type_schema`: `Required('max_st', default=7)`）
     #: ⇒ 这里也填 7，**不是 None**（None 只表示「这个类型根本查不到」）。
     max_st: int | None = None
@@ -433,7 +433,7 @@ class Catalog:
                     name = p.stem
                     if name not in idx:      # 先到先得 ⇒ 用户包优先
                         idx[name] = p
-            # U71：**Steam 创意工坊里的 mod**（还没解压进游戏目录的也算）
+            # **Steam 创意工坊里的 mod**（还没解压进游戏目录的也算）
             # ⇒ 它们的 `data/entity_types/…` 也要能读到。
             # ⚠️ 优先级排在磁盘包**之后** ⇒ 游戏真正在用的数据永远优先，
             #    创意工坊里没安装的 mod 只是「补充参考」。
@@ -478,7 +478,7 @@ class Catalog:
             defense=_as_int(d.get("defense")),
             armor=_as_int(d.get("armor")),
             armor_def=d.get("armor_def"),      # U92：防御装甲（决定能不能挂反击）
-            # U60：缺 max_st 字段 ⇒ 用游戏 schema 的默认值 7（**不是 None**）
+            # 缺 max_st 字段 ⇒ 用游戏 schema 的默认值 7（**不是 None**）
             max_st=(_as_int(d.get("max_st"))
                    if d.get("max_st") is not None else UNIT_TYPE_MAX_ST_DEFAULT),
             max_spec=_as_int(d.get("max_spec")),
@@ -596,7 +596,7 @@ class Catalog:
                 for k, v in data.items():
                     if isinstance(v, dict) and k not in out:
                         out[k] = v
-        # U71：创意工坊 mod（没解压进游戏目录的）里的国籍表也读进来
+        # 创意工坊 mod（没解压进游戏目录的）里的国籍表也读进来
         for src in self.workshop_sources:
             for fn, member in _pkg_nationality_members(src).items():
                 try:

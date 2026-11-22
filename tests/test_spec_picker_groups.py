@@ -128,14 +128,14 @@ class SpecPickerGroupsTest(unittest.TestCase):
 
     def test_grouped_only_in_show_all_spec_mode(self):
         body = self._body(self.html, "function spickGroupedMode(",
-                          "/* U145：分组视图")
+                          "/* 分组视图")
         self.assertIn("MODAL.all", body)
         self.assertIn('MODAL.mode!=="equip"', body)
 
     def test_flat_list_still_exists_for_the_default_view(self):
         """默认视图（玩家挂得上的）保持平铺 —— 与单位明细页一致。"""
         body = self._body(self.html, "function spickCellsHTML(",
-                          "/* U145：什么时候用分组视图")
+                          "/* 什么时候用分组视图")
         self.assertIn("spickGroupedMode()", body)
         self.assertIn("spickMatch(", body)
 
@@ -159,7 +159,7 @@ class SpecPickerGroupsTest(unittest.TestCase):
     def test_search_auto_expands_groups(self):
         """搜索时**自动展开**有结果的组 —— 否则输入关键词却什么都看不见。"""
         body = self._body(self.html, "function spickGroupedHTML(",
-                          "/* U145：国籍组的折叠状态")
+                          "/* 国籍组的折叠状态")
         self.assertIn("const open = q ? true : spickGroupOpen(n.nat);", body)
 
     def test_both_modals_start_with_a_fresh_state(self):

@@ -8,7 +8,7 @@
 
 **取证**（游戏字节码，U92）：
 
-* `state/entities_view/unit.py:45`
+# ⚠️ trucks / supply 也是**硬范围**（游戏 schema 限制，不是我们的选择）。
 
   ```python
   armor_mobile = property(lambda self: self.armor
@@ -16,7 +16,7 @@
                                            and self.movement == 'mobile')
   ```
 
-* `state/entities_view/unit.py:98` `can_make_elastic_defense` 的
+# ⚠️ 同单位 —— 战役地图显示的是**名册**那份（`document/hqs.yml`）。
   **第一个条件**就是 `self.armor_mobile`
   ⇒ **非装甲机动单位挂不了「反击」**；
 * `can_make_no_retreat` / `can_make_rearguard` **没有**这条条件

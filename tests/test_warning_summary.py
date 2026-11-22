@@ -104,7 +104,7 @@ class WarningSummaryTest(unittest.TestCase):
 
     def test_the_reminders_button_follows_the_pending_count(self):
         body = self._body(self.html, "function paintPending(",
-                           "/* U55：在确认弹窗里移除某一条")
+                           "/* 在确认弹窗里移除某一条")
         self.assertIn("btnWarn", body)
 
 

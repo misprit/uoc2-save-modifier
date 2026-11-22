@@ -104,7 +104,7 @@ button,input,select{font:inherit}
   color:var(--text);font-size:15px;cursor:pointer;transition:background .12s}
 .rail .nav:hover{background:var(--surface-alt)}
 .rail .nav.on{background:var(--accent);color:#fff;font-weight:600}
-/* U62：导航图标改成**两字母徽标**（自绘，纯 CSS）——
+/* 导航图标改成**两字母徽标**（自绘，纯 CSS）——
    原来那套 ▤▥▦▧▨▩▪◈ 是视觉稿的占位符，一直没换成正经图标。
    游戏包里凑不齐一套一致的（只有 hq_icon / battle_icon 等零星几个），
    ⇒ 按用户口味自绘：22×22 圆角方块 + 两个字母（OV/UN/HQ/CD/ST/TA/CP）。 */
@@ -136,7 +136,7 @@ button,input,select{font:inherit}
 #splash{min-height:100%;display:flex;flex-direction:column;align-items:center;
   padding:56px 32px 32px}
 #splash h1{font-size:34px;font-weight:800;color:var(--accent-dark);margin:0 0 4px}
-/* U98：启动页署名（作者名**不翻译** —— 词表里没有它，中英文都显示「烟柳边城 misprit」） */
+/* 启动页署名（作者名**不翻译** —— 词表里没有它，中英文都显示「烟柳边城 misprit」） */
 #splash .by{color:var(--muted);font-size:12.5px;margin:-2px 0 8px;letter-spacing:.2px}
 #splash .by::before{content:"by ";font-size:11px;opacity:.7}
 #splash .sub{color:var(--muted);margin-bottom:22px}
@@ -188,14 +188,14 @@ table.list td.k{color:var(--muted)}
 .rail .nav{display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;font-size:15px}
 .rail .nav:hover{background:var(--accent-light)}
 .rail .nav.on{background:var(--selection);color:var(--accent-dark);font-weight:600}
-/* U62：同上（第二套 .rail 规则）——见上面那条注释。 */
+/* 同上（第二套 .rail 规则）——见上面那条注释。 */
 .rail .nav .ic{width:22px;height:22px;flex:none;border-radius:6px;
   background:var(--surface-alt);border:1px solid var(--border);color:var(--muted);
   font:700 10.5px/20px var(--mono);text-align:center;letter-spacing:.4px}
 .rail .nav.on .ic{background:rgba(255,255,255,.16);border-color:transparent;
   color:#fff}
 .work{flex:1;min-width:0;display:flex;flex-direction:column;overflow:auto;padding-bottom:8px}
-/* U56：`.work` 是 column flex ⇒ 直接子项默认能压缩 ⇒ 内容超出视口时
+/* `.work` 是 column flex ⇒ 直接子项默认能压缩 ⇒ 内容超出视口时
    **面板被压扁**（`.panel{overflow:hidden}` 顺手裁掉）而不是容器滚动
    ⇒ 底部被截断、而且没有滚动条能拉到。⇒ 锁死子项不缩：高度按内容走，
    超出由 `.work` 自己滚。 */
@@ -207,7 +207,7 @@ table.list td.k{color:var(--muted)}
 .pbody{padding:14px}
 .placeholder{padding:34px;text-align:center;color:var(--muted)}
 .placeholder .big{font-size:17px;color:var(--text);margin-bottom:6px}
-/* U64：难度按钮（一行四个，括号里是手牌上限） */
+/* 难度按钮（一行四个，括号里是手牌上限） */
 .lvrow{display:flex;gap:8px;flex-wrap:wrap}
 .lvbtn{display:flex;flex-direction:column;align-items:center;gap:2px;
   padding:7px 16px;border:1px solid var(--border);border-radius:8px;
@@ -218,7 +218,7 @@ table.list td.k{color:var(--muted)}
 .lvbtn .lvlim{font:400 11px/1.2 var(--mono);opacity:.75}
 .lvbtn:disabled{opacity:.45;cursor:not-allowed}
 
-/* U56：概览页统一排版 —— 两栏面板；能力位卡片列数按**断点**定死。
+/* 概览页统一排版 —— 两栏面板；能力位卡片列数按**断点**定死。
    （原来用 `auto-fill` ⇒ 窗口一放大，列数说变就变、卡片被拉得极宽
      ⇒ 「位移和大小变化比较随意」。现在只在 1240 / 760 两个断点上换列。） */
 .ovwrap{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);
@@ -256,7 +256,7 @@ table.list td.k{color:var(--muted)}
   padding:10px 12px;font-size:12.5px;color:var(--muted);line-height:1.6}
 .note b{color:var(--text)}
 /* 数值控件（U54：大数字=输入框；小数字用滚轮 ±1） */
-/* U56：战役进度 —— 两行并排成「卡片」，外观和上面的能力位卡统一 */
+/* 战役进度 —— 两行并排成「卡片」，外观和上面的能力位卡统一 */
 .tungrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media (max-width:760px){ .tungrid{grid-template-columns:minmax(0,1fr)} }
 .tun{display:flex;flex-direction:column;gap:7px;padding:10px 12px;
@@ -264,7 +264,7 @@ table.list td.k{color:var(--muted)}
 .tun .thr{display:flex;align-items:baseline;gap:8px}
 .tun .tvr{display:flex;align-items:center;gap:10px}
 .tun .k{color:var(--muted)}
-/* U54：数值控件 —— 大数字给输入框；小数字只给滚轮 ±1 */
+/* 数值控件 —— 大数字给输入框；小数字只给滚轮 ±1 */
 .tun .num{width:112px;text-align:center;padding:6px 10px;border:1px dashed var(--border);
   border-radius:6px;background:var(--surface);font-family:var(--mono);
   font-weight:700;font-size:22px;color:var(--accent-dark);font-variant-numeric:tabular-nums;
@@ -281,13 +281,13 @@ table.list td.k{color:var(--muted)}
    =================================================================== */
 :root{--stage-edge:#c7d2dd; --stage-sup:#8fa3b8}
 .cols{display:grid;grid-template-columns:minmax(290px,0.6fr) minmax(430px,1.4fr);gap:14px}
-/* U57：两栏页的**间距统一** —— 栏间隔 = 面板到边缘的间隔（都 14px）。
+/* 两栏页的**间距统一** —— 栏间隔 = 面板到边缘的间隔（都 14px）。
    原来 `.cols{gap:14px}` + `.panel{margin:14px}` ⇒ 栏间隔 14+14+14 = 42px，
    边缘却只有 14px ⇒ 「两个卡贴得比它们离边缘还远」。
    ⇒ 间距改由 grid 的 gap 负责，面板在 grid 里 margin:0。 */
 .cols{margin:14px}
 .cols > .panel{margin:0}
-/* U57：主从两栏页 —— 两栏**撑满可用高度**，清单在卡内滚。
+/* 主从两栏页 —— 两栏**撑满可用高度**，清单在卡内滚。
    （原来 `.hqlist` 写死 `max-height:430px` ⇒ 下面空一大片也看不到更多总部。） */
 .work > .cols-fill{flex:1 1 auto;min-height:0}
 .cols-fill > .panel{display:flex;flex-direction:column;min-height:0}
@@ -297,7 +297,7 @@ table.list td.k{color:var(--muted)}
 .cols>*{min-width:0}
 .cols-wide{grid-template-columns:minmax(520px,1.45fr) minmax(340px,1fr)}
 .cols-half{grid-template-columns:minmax(300px,1fr) minmax(300px,1fr)}
-/* U50：**工具条不许横向溢出** —— 单位页的「总部」下拉框宽度由
+/* **工具条不许横向溢出** —— 单位页的「总部」下拉框宽度由
    **最长那个总部名**决定（存档不同 ⇒ 名字长短不同 ⇒ 宽度不同），
    窄窗口下两件控件的最小宽度加起来超过工具条 ⇒ select 撑出工具条、
    压掉右侧内边距，搜索框的 placeholder 也被挤没。
@@ -309,15 +309,15 @@ table.list td.k{color:var(--muted)}
   font:inherit;font-size:14px;color:var(--text)}
 .inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(36,91,143,.13)}
 .toolbar .sp{flex:1}
-/* U53：单位页的工具条**横跨整页**（放在两栏之上）——
+/* 单位页的工具条**横跨整页**（放在两栏之上）——
    搜索框 + 总部筛选 + 「仅当前场景激活」**一行**排得下，
    不用再窄了就换行。左右 14px 与下方面板对齐。 */
-/* U58：顶部工具条**上边距也要 14px**（原来 0 ⇒ 顶到边缘，和左右不一致） */
+/* 顶部工具条**上边距也要 14px**（原来 0 ⇒ 顶到边缘，和左右不一致） */
 .toolbar-top{margin:14px 14px 12px}
 .toolbar .tbcount{font-size:12.5px;color:var(--muted);white-space:nowrap}
-/* U53：单位页两栏 —— 列表列加宽，栏间**不留那道空档**
+/* 单位页两栏 —— 列表列加宽，栏间**不留那道空档**
    （gap 0 ⇒ 两个面板的 margin 相接 = 28px）。 */
-/* U58：单位页两栏 —— 栏间隔与其它两栏页**统一**（14px，与边缘同宽）。
+/* 单位页两栏 —— 栏间隔与其它两栏页**统一**（14px，与边缘同宽）。
    U53 当初把栏间隔去掉是为了「列表别被挤」，现在面板 margin 归零、
    间距改由 grid 的 gap 负责 ⇒ 列表比原来还宽一点，视觉也统一了。 */
 .cols-units{grid-template-columns:minmax(320px,0.64fr) minmax(430px,1.36fr);gap:14px;margin:14px}
@@ -335,9 +335,9 @@ table.list td.k{color:var(--muted)}
 .tabs .tb .n{font-family:var(--mono);font-size:12px;opacity:.75;margin-left:4px}
 /* 单位行 */
 .rows{overflow:auto}
-/* U58：两栏撑满可用高度 ⇒ 列表在卡内滚（能显示更多单位） */
+/* 两栏撑满可用高度 ⇒ 列表在卡内滚（能显示更多单位） */
 .cols-fill .rows{max-height:none;height:100%;overflow:auto}
-/* U58：详情卡里的特种兵区**跟着长高**（原来是写死的 240px ⇒ 下面空一大片） */
+/* 详情卡里的特种兵区**跟着长高**（原来是写死的 240px ⇒ 下面空一大片） */
 .cols-fill #udetail{display:flex;flex-direction:column}
 .cols-fill #udetail .dhead{flex:none}
 .cols-fill #udetail .specbox{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -346,7 +346,7 @@ table.list td.k{color:var(--muted)}
   border-bottom:1px solid #f0f3f6;cursor:pointer}
 .urow:hover{background:var(--accent-light)}
 .urow.sel{background:var(--selection)}
-/* U63：头像框要当**定位参照**（JS 把内容按 contain 摆到正中） */
+/* 头像框要当**定位参照**（JS 把内容按 contain 摆到正中） */
 .ava{width:58px;height:58px;border-radius:6px;background:var(--stage);
   border:1px solid var(--stage-edge);flex:none;display:grid;place-items:center;
   overflow:hidden;position:relative}
@@ -366,7 +366,7 @@ table.list td.k{color:var(--muted)}
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;flex:none}
 /* 详情抬头 */
 .detail{padding:14px}
-/* U58：详情抬头 —— 窄栏时数字卡**整块换到第二行**，不许把标题挤成竖排
+/* 详情抬头 —— 窄栏时数字卡**整块换到第二行**，不许把标题挤成竖排
    （原来 `.dhead` 不换行 + `.stats` 固定 440px ⇒ 栏宽不够时标题被压成
     「第21步兵师」一字一行）。用**容器查询**按**栏宽**判，不按窗口宽。 */
 .dhead{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;container-type:inline-size}
@@ -384,7 +384,7 @@ table.list td.k{color:var(--muted)}
   border-radius:5px;padding:1px 7px;cursor:pointer}
 .dtitle .edit:hover{border-color:var(--accent);color:var(--accent)}
 .dsub{font-size:13px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
-/* U85：卡片多了（工事等级 / 移动力 / 行动力）⇒ 按**栏宽**自动换行
+/* 卡片多了（工事等级 / 移动力 / 行动力）⇒ 按**栏宽**自动换行
    （`auto-fit` + 最小列宽；窄栏 2 列、宽栏 3 列，不用手动断点）。 */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .stat{background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:9px 11px}
@@ -393,13 +393,13 @@ table.list td.k{color:var(--muted)}
 .stat .v{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--accent-dark);margin-top:2px;
   min-height:34px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 .stat .v small{font-size:12.5px;color:var(--muted);font-weight:400}
-/* U85：工事等级的「三档」按钮组（0 / 1 / 2） */
+/* 工事等级的「三档」按钮组（0 / 1 / 2） */
 .lvlrow{display:flex;gap:6px;margin-top:4px}
 .lvlbtn{flex:1;border:1px solid var(--border);background:var(--surface);color:var(--muted);
   border-radius:6px;font-size:15px;font-weight:600;padding:6px 0;cursor:pointer;line-height:1.3}
 .lvlbtn:hover{border-color:var(--accent);color:var(--accent-dark)}
 .lvlbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
-/* U89：作战标记（HQ 技能的三种命令）—— 用游戏原图 */
+/* 作战标记（HQ 技能的三种命令）—— 用游戏原图 */
 .orderrow{display:flex;gap:6px;margin-top:4px}
 .orderbtn{flex:1;height:34px;border:1px solid var(--border);background:var(--surface);
   border-radius:6px;padding:3px;cursor:pointer;display:grid;place-items:center}
@@ -407,17 +407,17 @@ table.list td.k{color:var(--muted)}
 .orderbtn:hover{border-color:var(--accent)}
 .orderbtn.on{border-color:var(--warn);background:#fff}
 .orderbtn.on img{opacity:1;filter:none}
-/* U92：「反击」不适用于这个单位（非装甲机动）⇒ 置灰（已有标记仍可点掉） */
+/* 「反击」不适用于这个单位（非装甲机动）⇒ 置灰（已有标记仍可点掉） */
 .orderbtn.dis{opacity:.4;cursor:not-allowed;filter:grayscale(1)}
-/* U94：只读数值（总部经验 / 经验目标 —— 不能手改） */
+/* 只读数值（总部经验 / 经验目标 —— 不能手改） */
 .roval{display:inline-block;min-width:30px;font-family:var(--mono);font-size:16px;
   font-weight:600;color:var(--text)}
 .orderbtn.dis:hover{border-color:var(--border)}
-/* U49：兵力卡与经验卡的内容行**对齐** —— 两张卡的数值控件必须一样高
+/* 兵力卡与经验卡的内容行**对齐** —— 两张卡的数值控件必须一样高
    （`.spin` 与 `.numin` 统一 26px / 行高 22px），否则两卡的数字不在同一条基线上。 */
 .stat .v .spin,.stat .v .numin{height:34px;box-sizing:border-box;line-height:30px;flex:none}
 .stat .lb .capw{font-size:11.5px;color:var(--muted)}
-/* U50：血量条（段格条）**是控件不是装饰** ——
+/* 血量条（段格条）**是控件不是装饰** ——
    U54：它是**唯一的调整入口**（数字区已删）：
    普通滚轮 = 调**活跃**兵力（超上限就消减压制）；
    Alt+滚轮 = 调**压制**兵力（两者之和不变）。 */
@@ -427,7 +427,7 @@ table.list td.k{color:var(--muted)}
 .blood .bar{display:flex;gap:4px;padding:4px 7px;border-radius:5px;
   border:1px solid var(--border);background:var(--surface)}
 .blood .bar .pip{width:19px;height:19px}
-/* U54：大数字用输入框、小数字用滚轮 ±1 —— 两套控件 */
+/* 大数字用输入框、小数字用滚轮 ±1 —— 两套控件 */
 .numin{width:100px;text-align:center;padding:5px 9px;border:1px dashed var(--border);
   border-radius:6px;background:var(--surface);font-family:var(--mono);font-weight:700;
   font-size:22px;color:var(--accent-dark);font-variant-numeric:tabular-nums;outline:none}
@@ -443,7 +443,7 @@ table.list td.k{color:var(--muted)}
 .spin.dirty{border-color:var(--accent);background:var(--accent-light)}
 .spin.bad{border-color:var(--danger);background:var(--danger-light);color:var(--danger)}
 .spin .u{font-size:10.5px;color:var(--muted);font-weight:400}
-/* U50：提示行与血量条**同高**（21px）⇒ 两张卡的第三行底边对齐 */
+/* 提示行与血量条**同高**（21px）⇒ 两张卡的第三行底边对齐 */
 .hintline{font-size:11.5px;color:var(--muted);margin-top:6px;min-height:29px;
   display:flex;align-items:flex-end}
 /* 特种兵区 */
@@ -455,7 +455,7 @@ table.list td.k{color:var(--muted)}
 .sbhead .sbm{font-size:12.5px;color:var(--muted);white-space:nowrap}
 .sbhead .sp{flex:1}
 .sbhead .sbsep{width:1px;height:13px;background:var(--border);flex:none}
-/* U49：备选池窗口**固定高度** —— 勾不勾「显示全部」窗口大小不许变；
+/* 备选池窗口**固定高度** —— 勾不勾「显示全部」窗口大小不许变；
    两列各自内部滚动（之前高度跟着内容长，勾上「显示全部」就整块撑高）。 */
 .specsplit{display:flex;align-items:stretch;height:240px;min-height:0}
 .specslots{display:flex;flex-direction:column;gap:7px;padding:10px 12px;width:292px;flex:none;
@@ -464,7 +464,7 @@ table.list td.k{color:var(--muted)}
   border-radius:7px;background:var(--surface-alt);cursor:pointer}
 .slot:hover{border-color:var(--danger);background:var(--danger-light)}
 .slot:hover .slotname{color:var(--danger)}
-/* U46：图标**不再单独套一个方框底** —— 整张特种兵卡片自带边框，
+/* 图标**不再单独套一个方框底** —— 整张特种兵卡片自带边框，
    再框一层是多余的视觉符号；去掉后图标可以更大。 */
 .slot .sq{position:relative;width:46px;height:46px;display:grid;place-items:center;
   overflow:hidden;flex:none}
@@ -490,7 +490,7 @@ table.spec-tbl .thumb img.spico,.fptab .thumb img.spico{
   font-variant-numeric:tabular-nums}
 .slot.empty{border-style:dashed;background:var(--surface);color:var(--muted);cursor:default;
   padding:5px 24px;justify-content:center}
-/* U84：**被压制**的特种兵（存档字段 `active=false`）—— 图标变灰 + 一个「恢复」按钮。
+/* **被压制**的特种兵（存档字段 `active=false`）—— 图标变灰 + 一个「恢复」按钮。
    游戏里被压制的特种兵不提供效果（`specialist/<类型>/status_sup` 遮罩）。 */
 .slot.sup{background:var(--surface);border-style:dashed;border-color:var(--warn)}
 .slot.sup .sq img{filter:grayscale(1) brightness(.85);opacity:.45}
@@ -515,7 +515,7 @@ table.spec-tbl .thumb img.spico,.fptab .thumb img.spico{
 .grpbody{display:flex;flex-wrap:wrap;gap:6px;padding:9px 12px}
 .pcell{position:relative;width:48px;height:48px;border-radius:6px;background:var(--stage);
   border:1px solid var(--stage-edge);display:grid;place-items:center;overflow:hidden;cursor:pointer}
-/* U48：角标「已挂 N 个」（同一种特种兵可以挂多个） */
+/* 角标「已挂 N 个」（同一种特种兵可以挂多个） */
 .pcell .dup{position:absolute;right:0;bottom:0;font-size:10px;line-height:1;padding:2px 4px;
   border-radius:3px 0 5px 0;background:var(--accent-dark);color:#fff;font-family:var(--mono)}
 .pcell:hover{border-color:var(--accent);box-shadow:0 0 0 2px rgba(36,91,143,.2)}
@@ -525,14 +525,14 @@ table.spec-tbl .thumb img.spico,.fptab .thumb img.spico{
 .spick{border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);overflow:hidden}
 .spick .sphd{display:flex;align-items:center;gap:9px;padding:8px 11px;
   background:var(--surface);border-bottom:1px solid var(--border)}
-/* U47：选择网格加**搜索框** —— 375 种特种兵没法靠翻图标找 */
+/* 选择网格加**搜索框** —— 375 种特种兵没法靠翻图标找 */
 .spick .sphd .inp{flex:1;min-width:110px;height:26px;font-size:13px;padding:2px 8px}
 .spick .sphd .inp.narrow{min-width:90px}
 .spick .spt{font-size:13.5px;font-weight:700;color:var(--accent-dark);white-space:nowrap}
 .spick .spc{font-size:11.5px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
 .spick .spgrid{display:flex;flex-wrap:wrap;gap:6px;padding:10px 11px;max-height:190px;overflow:auto}
 .spick .spgrid .pcell{position:relative}
-/* U145：分组视图（阵营带 + 国籍组）—— .spgrid 是 flex 容器 ⇒ 整块要占满一行 */
+/* 分组视图（阵营带 + 国籍组）—— .spgrid 是 flex 容器 ⇒ 整块要占满一行 */
 .spick .spgroups{width:100%;margin:-10px -11px}
 .spick .spgrid .pcell.on{border-color:var(--accent);background:var(--accent-light);
   box-shadow:0 0 0 2px rgba(36,91,143,.35)}
@@ -584,7 +584,7 @@ table.spec-tbl .spin{font-size:16px;padding:4px 9px;min-width:40px}
 .titem .xnum .num.inf{color:var(--muted);font-size:14px;min-width:26px}
 .titem .xnum .sep{color:var(--muted);font-weight:400}
 .titem .twarn{font-size:11px;color:var(--danger);margin-top:4px;line-height:1.35;white-space:normal}
-/* U45：不在当前 phase 里的候选（可添加） */
+/* 不在当前 phase 里的候选（可添加） */
 .titem.off{background:var(--surface-alt);border-style:dashed}
 .titem.off>img{opacity:.62}
 .titem .thead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px}
@@ -663,7 +663,7 @@ table.spec-tbl .spin{font-size:16px;padding:4px 9px;min-width:40px}
 /* 真的装不下的块，标题栏上给个「↕」提示（只有溢出的块才有） */
 .storegrp.has-scroll .storetitle::after{content:"↕";font-size:12px;
   color:var(--muted);opacity:.85}
-/* U56：备份/撤销行统一成三栏：标签 | 主内容（过长省略号截断）| 右侧小字
+/* 备份/撤销行统一成三栏：标签 | 主内容（过长省略号截断）| 右侧小字
    （原来大小被 `margin-left:auto` 甩到面板最右边，和名字隔了一整屏） */
 .bkrow{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;
   padding:5px 0;font-size:13px;color:var(--muted);border-bottom:1px solid var(--surface-alt)}
@@ -730,7 +730,7 @@ tr.oldrow{opacity:.6}
 .card.blocked:hover{border-color:var(--border);box-shadow:none}
 .card.on{border-color:var(--accent);background:var(--accent-light);
   box-shadow:0 0 0 2px rgba(36,91,143,.3)}
-/* U59：卡牌**恢复横排** —— 容器 `.hand` 之前**根本没有 CSS**
+/* 卡牌**恢复横排** —— 容器 `.hand` 之前**根本没有 CSS**
    （`.cardgrid` 那条横排规则定义了却从没用过）⇒ 里面的卡按 block 逐个换行 = 竖排。
    现在：一排放得下就一排，放不下自动换行（手牌 5 张 / 货架 5 格都排成一行）。 */
 .hand{display:flex;flex-wrap:wrap;gap:9px;padding:10px 12px;align-items:flex-start}
@@ -741,12 +741,12 @@ tr.oldrow{opacity:.6}
 .hcard .cp{font-size:12px;color:var(--muted);text-align:center;margin-top:4px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hcard .cp b{font-family:var(--mono);color:var(--accent-dark)}
-/* U90：**免费 / 收费** 单独一行（不再当卡名后缀 —— 卡名一长就看不见了） */
+/* **免费 / 收费** 单独一行（不再当卡名后缀 —— 卡名一长就看不见了） */
 .hcard .freeline{font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:visible;
   text-overflow:clip;font-weight:600}
 .hcard .freeline.free{color:var(--ok)}
 .hcard .freeline.paid{color:var(--muted);font-weight:400}
-/* U47：手牌的两个操作**并成一行**（原来一卡两行，卡片区被撑得很高） */
+/* 手牌的两个操作**并成一行**（原来一卡两行，卡片区被撑得很高） */
 .hcard .acts{text-align:center;white-space:nowrap}
 .hcard .rm{display:inline-block;width:auto;margin:5px 2px 0;font-size:11px;padding:2px 6px}
 .slotempty{width:104px;height:124px;flex:none;border:1px dashed var(--border);border-radius:7px;
@@ -769,7 +769,7 @@ tr.oldrow{opacity:.6}
 .expbar{height:9px;border-radius:5px;background:var(--surface-alt);
   border:1px solid var(--border);overflow:hidden;margin-top:6px}
 .expbar i{display:block;height:100%;background:var(--accent)}
-/* U57：详情首行 —— 三块（基本信息 / 经验 / 总部 CP）顶边对齐、体内行对齐。
+/* 详情首行 —— 三块（基本信息 / 经验 / 总部 CP）顶边对齐、体内行对齐。
    原来 `.idblk` 是 `justify-content:space-between` ⇒ 名称被顶到最上、
    将领被甩到最下 ⇒ 两者隔了 ~96px，而且和两张卡完全不对齐。 */
 .hqhead{display:flex;gap:16px;align-items:stretch;min-height:78px;margin-bottom:12px}
@@ -780,7 +780,7 @@ tr.oldrow{opacity:.6}
 .hqhead .hqcards{flex:none;display:flex;gap:10px;align-items:stretch}
 .hqhead .stat{width:214px;min-width:214px}
 .hqhead .cphint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.35}
-/* U57：数值框**统一尺寸**（主值 72×34 / 次值 56×26）—— 原来四个框四种大小
+/* 数值框**统一尺寸**（主值 72×34 / 次值 56×26）—— 原来四个框四种大小
    （经验 100px / CP 滚轮 ~52px / 目标 62px13px / 补给 ~52px），互不对齐。
    数字一律在框里居中。 */
 .hqhead .stat .v .numin,.hqhead .stat .v .spin{width:72px;height:34px;box-sizing:border-box;
@@ -877,7 +877,7 @@ tr.oldrow{opacity:.6}
 .modal .spick .spgrid .pcell.blocked{opacity:.42;filter:grayscale(.9);cursor:not-allowed}
 .modal .spick .spgrid .pcell.blocked .dup{background:var(--danger)}
 .modal .spick .spfoot{padding:9px 11px;background:var(--surface);border-top:1px solid var(--border)}
-/* U147：软警告**汇总区**（一页列全，相同的合并 + 「×N」） */
+/* 软警告**汇总区**（一页列全，相同的合并 + 「×N」） */
 .warnbox{border:1px solid #e3d3a4;background:var(--warn-light);border-radius:8px;padding:9px 11px;margin-top:10px}
 .warnbox .wh{font-weight:700;color:var(--warn);font-size:13px;margin-bottom:7px}
 .warnbox .wl{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:6px}
@@ -920,7 +920,7 @@ tr.oldrow{opacity:.6}
 .modal .erow{color:var(--danger);font-size:13px;padding:3px 0}
 .modal .wrow{color:var(--warn);font-size:13px;padding:3px 0}
 .modal .fine{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
-/* U111：JS 异常的兜底提示条 —— 这类失败本来**完全静默**（U108/U110），
+/* JS 异常的兜底提示条 —— 这类失败本来**完全静默**（U108/U110），
    玩家只看到「没反应」⇒ 现在让他一眼看到「出错了」并能截图反馈。 */
 .jserr{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
   max-width:min(760px,92vw);z-index:999;display:none;background:#2a1b1b;
@@ -933,10 +933,10 @@ tr.oldrow{opacity:.6}
 .modal .ro{font-size:10.5px;padding:1px 6px;border:1px dashed var(--border);border-radius:4px;
   color:var(--muted);font-family:var(--mono);font-weight:400}
 
-/* U55：**主体锁定** —— `.body` 独占剩余高度（内部自己滚），
+/* **主体锁定** —— `.body` 独占剩余高度（内部自己滚），
    底部的状态栏高度恒定 ⇒ 改任何东西都不会再让上方卡片变形。
    `.body{overflow:hidden}` 防止内容溢出到窗口外。 */
-/* U55：待应用**明细**（现在在「应用更改」的弹窗里） */
+/* 待应用**明细**（现在在「应用更改」的弹窗里） */
 .plist{margin:8px 0;border:1px solid var(--border);border-radius:7px;
   padding:2px 10px;max-height:190px;overflow:auto;background:var(--surface-alt)}
 .plist .ph{font-size:11.5px;color:var(--muted);padding:5px 0 2px}
@@ -1139,7 +1139,7 @@ let UQUERY = "", UHQFILTER = "", UONLY = false;   /* UONLY = 只看当前场景�
 let HQSTATE = {};
 let MODAL = null;      /* 模态框的状态（U40） */
 
-/* ⚠️ **U74：这里存中文，用的时候再 `L()`** ——
+/* ⚠️ 这里存中文，用的时候再 `L()`** ——
    模块级常量会在 `loadI18n()` **之前**求值 ⇒ 里面调 `L()` 永远拿不到英文。 */
 const FEATURE_CN = {units:"单位", hqs:"总部", hand:"手牌", shelf:"货架",
   store:"商店", theater_assets:"战区资产", restore_hand:"恢复上次会议牌局"};
@@ -1148,7 +1148,7 @@ const PAGE_CN = {overview:"概览", units:"单位", hqs:"总部", cards:"卡牌"
 /* 深链 `?page=单位页名` */
 if(OPEN_PAGE && PAGE_CN[OPEN_PAGE]) PAGE = OPEN_PAGE;
 
-/* U32：禁掉 Edge 的 **Ctrl+滚轮缩放** —— 浏览器默认行为，页面可以阻止。
+/* 禁掉 Edge 的 **Ctrl+滚轮缩放** —— 浏览器默认行为，页面可以阻止。
    实测（2026-11-18 · 本机 Edge 157）：
      · Ctrl+滚轮 ⇒ 页面缩放（devicePixelRatio 变化）⇒ **全局禁掉**；
      · 普通滚轮 ⇒ **不缩放**、事件照常到达页面
@@ -1179,7 +1179,7 @@ function encOnce(s){
 async function api(path){
   const r = await fetch(path, {headers:{"X-Token":TOKEN}});
   if(!r.ok){
-    /* ⚠️ **U141**：错误正文是 JSON（`{"error": "…"}`）⇒ 直接扔给用户会看到
+    /* ⚠️ 错误正文是 JSON（`{"error": "…"}`）⇒ 直接扔给用户会看到
        一串花括号 ⇒ 拆出来，只显示**人话**那一句。 */
     const txt = await r.text();
     let msg = txt;
@@ -1207,7 +1207,7 @@ function paintHeader(){
   if(!el || !VIEW) return;
   const save = VIEW.save||{};
   const inBattle = theaterEditable();
-  /* U67：当前存档是个**按钮** —— 点开是菜单（切换存档 / 另存为 / 放弃改动）。 */
+  /* 当前存档是个**按钮** —— 点开是菜单（切换存档 / 另存为 / 放弃改动）。 */
   const imported = String(VIEW._save_id||"").indexOf("modifier_imports") >= 0;
   el.innerHTML = L2(`<span class="nm">{0}</span>
     {1}
@@ -1217,7 +1217,7 @@ function paintHeader(){
 function paintRail(){
   if(!VIEW) return;
   const set = (id, v)=>{ const e=document.getElementById(id); if(e) e.textContent = v; };
-  /* ⚠️ **U134**（外部审阅 P2-1）：撤销按钮**能不能点**要看「真的还有几条能撤」
+  /* ⚠️ 撤销按钮**能不能点**要看「真的还有几条能撤」
      —— 栈顶可能撤不了（存档后来又被改过）⇒ 别让玩家反复点一个注定失败的按钮。 */
   const ub = document.getElementById("btnUndo");
   if(ub){
@@ -1270,7 +1270,7 @@ function setPending(kind, key, params, label, value){
   paintPending();
 }
 function paintPending(){
-  /* U55：底栏删了 ⇒ 明细只在「应用更改」的弹窗里画（见 openConfirm）。
+  /* 底栏删了 ⇒ 明细只在「应用更改」的弹窗里画（见 openConfirm）。
      状态只留在顶栏徽章 + 底部状态栏。 */
   const hp = document.getElementById("hPending");
   if(hp) hp.textContent = PENDING.length;
@@ -1279,17 +1279,17 @@ function paintPending(){
       ? L2("有 {0} 条未应用的改动", PENDING.length) : L("就绪 · 未改动磁盘");
   const ba = document.getElementById("btnApply");
   if(ba) ba.disabled = !PENDING.length;
-  /* U147：「看提醒」也要跟着待应用数走（没有待应用 ⇒ 没什么可提醒的） */
+  /* 「看提醒」也要跟着待应用数走（没有待应用 ⇒ 没什么可提醒的） */
   const bw = document.getElementById("btnWarn");
   if(bw) bw.disabled = !PENDING.length;
 }
-/* U55：在确认弹窗里移除某一条 ⇒ 撤掉它并**刷新确认框** */
+/* 在确认弹窗里移除某一条 ⇒ 撤掉它并**刷新确认框** */
 function dropPendingFromModal(i){
   dropPending(i);
   if(!PENDING.length){ closeModal(); return; }
   doApply();          /* 重新 plan，把确认框刷新一遍 */
 }
-/* U105：改一条**已有**待应用的参数（不新增条目）——
+/* 改一条**已有**待应用的参数（不新增条目）——
    用途：新增特种兵的「压制状态」挂在「加特种」这条待应用上。 */
 function patchPendingParams(kind, key, params, label){
   const e = PENDING.find(x=>x.kind===kind && x.key===key);
@@ -1354,7 +1354,7 @@ function bindTun(){
     el.value = base;
     document.getElementById("o_"+f).textContent = L("原值 ") + base;
 
-    /* U54：声望 / 分数**只允许直接输入**，不再有滚轮（用户拍板） */
+    /* 声望 / 分数**只允许直接输入**，不再有滚轮（用户拍板） */
 
     function apply(){
       const raw = String(el.value??"").trim();
@@ -1395,7 +1395,7 @@ let CATALOG = null;      /* /api/catalog —— 游戏包目录（静态，进�
 let PICK = null;         /* /api/pickers —— 当前选择器的候选 */
 let SEL = {};            /* 每页当前选中项 */
 let PICKCACHE = {};      /* unit_type → 候选池（"" = 通用那一份；换存档时清空） */
-/* ⚠️ **U128**：候选池**读取失败**的原因（unit_type → 错误文字）。
+/* ⚠️ 候选池**读取失败**的原因（unit_type → 错误文字）。
    以前失败被 `catch(()=>{})` 吞掉 ⇒ 界面永远停在「正在读取…」
    ⇒ 玩家只看到「转圈」，不知道是**读失败**了。 */
 let PICKERR = {};
@@ -1403,7 +1403,7 @@ let PICKERR = {};
 /* 贴图：必须走服务端代理（http 页面读不到 file://）—— U29
    `/surfaces/*` 要 token ⇒ 只能走 query（<img> 带不了 header）。 */
 function surf(p){
-  /* ⚠️ **U125**：这个 URL 会进 `src="…"` 属性 ⇒ 必须**双重**防护：
+  /* ⚠️ 这个 URL 会进 `src="…"` 属性 ⇒ 必须**双重**防护：
      ① 逐段 URL 编码（保留 "/" 分隔）；
      ② 属性上下文转义（`esc`，在 `imgTag` / `avaImg` 里做）。
      路径来自游戏包（mod 包是玩家自己放的）⇒ **当不可信输入**处理。 */
@@ -1419,9 +1419,9 @@ function imgTag(p, alt, cls){
    直接 contain 进方框 ⇒ 人物不在正中、还被压小。
    ⇒ 运行时量一次 alpha 内容框，把内容 contain 到方框正中；按类型缓存。 */
 const AVA_BBOX = {};                 /* type -> {x0,y0,x1,y1,w,h} 或 null（量不出来） */
-/* U65：头像框的边长 —— **必须与 CSS 一致**（`.ava` 58px / `.dhead .ava` 84px）。 */
+/* 头像框的边长 —— **必须与 CSS 一致**（`.ava` 58px / `.dhead .ava` 84px）。 */
 const AVA_BOX_LIST = 58, AVA_BOX_DETAIL = 84;
-/** U65：内容框已知 ⇒ **生成时就写好定位**（首帧就位 ⇒ 整页重绘时不再闪、不跳）。 */
+/** 内容框已知 ⇒ **生成时就写好定位**（首帧就位 ⇒ 整页重绘时不再闪、不跳）。 */
 function avaStyle(type, box){
   const bb = AVA_BBOX[type];
   if(!bb || !box) return ' style="visibility:hidden"';
@@ -1513,7 +1513,7 @@ async function loadCatalog(){
   }
   return CATALOG;
 }
-/* U47：这几页要**游戏目录**（中文名 / 贴图 / 候选池）——
+/* 这几页要**游戏目录**（中文名 / 贴图 / 候选池）——
    目录到位前**不渲染半成品**，否则会先闪一遍 type id + 空图标。 */
 const NEEDS_CATALOG = {units:1, hqs:1, cards:1, store:1, campaign:1};
 async function loadPickers(unitType){
@@ -1552,7 +1552,7 @@ function dropPendingKind(kind, key){
 function bindSpin(el, opts){
   const base = opts.base;
   const cur0 = (opts.cur===undefined) ? base : opts.cur;
-  /* U52：滚轮控件要**一眼看得出能改** ⇒ 悬停给一句说明 */
+  /* 滚轮控件要**一眼看得出能改** ⇒ 悬停给一句说明 */
   el.title = opts.tip || L("滚轮 ±1（也可按住上下拖）");
   function show(v){
     el.textContent = v;
@@ -1577,7 +1577,7 @@ function bindNumIn(el, opts){
   const base = opts.base;      /* 存档原值 */
   let init = true;             /* 初始化时**不触发回调** */
   function apply(){
-    /* ⚠️ **U130**：`init` 必须**在这次调用开头**就消费掉 ——
+    /* ⚠️ `init` 必须**在这次调用开头**就消费掉 ——
        原来它是在「值合法」之后才置 false ⇒ **初始值非法**时
        （比如存档里 quantity=0 而下限是 1）初始化那次 `apply()` 提前 return
        ⇒ `init` 仍是 true ⇒ 玩家敲进去的**第一个合法值被吞掉**
@@ -1629,7 +1629,7 @@ function projectedSpecs(u){
   const specs = (u.specs||[]).map(s => Object.assign({}, s));
   PENDING.forEach(p=>{
     if(p.kind==="unit_spec_add" && p.params.unit_id===u.id){
-      /* ⚠️ U48：**同一种特种兵可以挂多个**（游戏规则只有「阵营 + 国籍 + 容量」
+      /* ⚠️ **同一种特种兵可以挂多个**（游戏规则只有「阵营 + 国籍 + 容量」
          三条，没有「不能重复」这一条 —— 规范 §7.3.2）⇒ 每次待应用的 add
          都要 push 一个，不能因为「已经有同类型」就跳过。
          临时 idx 用**负数**，避免与存档里的真实 idx（0..2）撞。 */
@@ -1643,12 +1643,12 @@ function projectedSpecs(u){
       if(i>=0) specs.splice(i,1);
     }
   });
-  /* U84：**被压制** = 存档里的 `active=false`（游戏里特种兵条目只有
+  /* **被压制** = 存档里的 `active=false`（游戏里特种兵条目只有
      type / active / captured / idx 四个字段，没有独立的 suppressed 字段）。
      「待应用」里改过的优先显示。 */
   specs.forEach(s=>{
     if(s._pending){
-      /* U105：新增件**也能压制** —— 状态挂在**那条「加特种」的待应用**上
+      /* 新增件**也能压制** —— 状态挂在**那条「加特种」的待应用**上
          （写盘时一起生效 ⇒ 与「先挂再压制」写出来的存档完全一样）。 */
       s.active = !(s._params && s._params.active===false);
     }else{
@@ -1659,19 +1659,19 @@ function projectedSpecs(u){
   return specs;
 }
 
-/* U84：压制状态的待应用 key（同一目标只挂一条） */
+/* 压制状态的待应用 key（同一目标只挂一条） */
 function specSupKey(unitId, specType, idx){
   return `unit_spec_active:${unitId}:${specType}:${idx}`;
 }
 
-/* U105：槽位的**稳定标识** ——
+/* 槽位的**稳定标识** ——
    存档里已有的 ⇒ 「s:<idx>」；还没写盘的新增件 ⇒ 「p:<待应用的 key>」。
    ⚠️ 新增件的临时负数 idx 会随清单变化（增删别的件就重排）⇒ 不能当标识用。 */
 function specSlotId(s){
   return s._pending ? ("p:"+s._key) : ("s:"+s.idx);
 }
 
-/* U65：血量条的段格条（列表行与详情卡共用一份逻辑） */
+/* 血量条的段格条（列表行与详情卡共用一份逻辑） */
 function bloodPipsHTML(act, sup, max){
   const out = [];
   for(let i=0;i<Math.max(max||0, act+sup);i++){
@@ -1705,9 +1705,9 @@ function unitRowHTML(u){
         u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id))), hq?(L(" · 总部 ")+esc(hq.name_cn||hq.name_brief||hq.name_full||hq.id)):"", u.xp!==null&&u.xp!==undefined?(L(" · 经验 ")+u.xp):"", u.entr?(L(" · 被压制 ")+u.entr):"", pips, badges);
 }
 
-/* U103：列表行里的特种兵徽章（最多 3 个）——
+/* 列表行里的特种兵徽章（最多 3 个）——
    列表行与局部刷新共用一份，别写两遍。 */
-/* U107：玩家阵营（存档 `document/main.yml` 的 `player_faction`）。
+/* 玩家阵营（存档 `document/main.yml` 的 `player_faction`）。
    实测 west 存档：玩家 = allies，商店里的特种兵 100% 是 allies
    ⇒ 商店只卖自己阵营的；HQ 兵库里敌方阵营的是**缴获件**。 */
 function playerFaction(){
@@ -1718,14 +1718,14 @@ function playerFaction(){
   const c = VIEW && VIEW.card_whitelist && VIEW.card_whitelist.player_faction;
   return c || null;
 }
-/* U107：玩家「挂得上的」特种兵（服务端用**单位页那套** `specialist_candidates`
+/* 玩家「挂得上的」特种兵（服务端用**单位页那套** `specialist_candidates`
    算的：玩家自己阵营的单位类型取并集）。
    返回 null = 不知道（没有战役文档 / 没有游戏包）⇒ 不筛。 */
 function playerSpecs(){
   const s = PICK && PICK.player_specs;
   return Array.isArray(s) ? s : null;
 }
-/* U107：为什么这个特种兵「玩家挂不上」 */
+/* 为什么这个特种兵「玩家挂不上」 */
 function specNotUsableText(t){
   const st = (CATALOG&&CATALOG.spec_types[t])||{};
   const pf = playerFaction();
@@ -1733,7 +1733,7 @@ function specNotUsableText(t){
   if(pf && fac && fac!==pf) return L("不是玩家阵营")+"（"+fac+" ≠ "+pf+"）";
   return L("挂不到玩家的任何单位上");
 }
-/* U107：特种兵候选（兵库 / 商店共用）——
+/* 特种兵候选（兵库 / 商店共用）——
    **默认只列玩家挂得上的**（与单位页挂载特种兵同一套逻辑）。
    ⚠️ U113：「显示全部」= **游戏定义过的全部特种兵**（与单位页的
    「显示所有特种兵」同一套范围）—— 以前只给**战役池**（west 才 45 种）
@@ -1797,23 +1797,23 @@ function specPickItems(have, forStore){
     const dup = have.filter(e=>e.spec===t).length;
     const why = usable ? "" : specNotUsableText(t);
     out.push({id:t, name:specCn(t), tex:specTex(t), nat:natCn(st.nationality),
-      /* U145：国籍分组排序用「玩家挂得上的数量」⇒ 得带上这个标记 */
+      /* 国籍分组排序用「玩家挂得上的数量」⇒ 得带上这个标记 */
       usable:usable,
       attack:st.attack, defense:st.defense, armor:st.armor, artillery:st.artillery,
       flags:st.flags||[],
-      /* U113：不拦（游戏都接受）—— 只在悬停里说明 */
+      /* 不拦（游戏都接受）—— 只在悬停里说明 */
       blocked: false,
       dup: dup?(L("已有 ")+dup):"",
       title: specCn(t)+" · "+natCn(st.nationality)+(why?("："+why):"")});
   });
   return out;
 }
-/* U113：游戏定义过的**全部**特种兵类型（与单位页的「显示所有特种兵」同一套）。 */
+/* 游戏定义过的**全部**特种兵类型（与单位页的「显示所有特种兵」同一套）。 */
 function allSpecTypes(){
   const cat = (CATALOG && CATALOG.spec_types) || {};
   return Object.keys(cat).sort((a,b)=>specCn(a).localeCompare(specCn(b),"zh"));
 }
-/* U107：切换「显示全部」 */
+/* 切换「显示全部」 */
 function spickToggleAll(){
   if(!MODAL) return;
   MODAL.all = !MODAL.all;
@@ -1821,7 +1821,7 @@ function spickToggleAll(){
   else if(MODAL.kind==="store") renderStoreAddModal();
 }
 
-/* U104：这个单位类型的候选池（**按类型**取，不看全局 PICK）。
+/* 这个单位类型的候选池（**按类型**取，不看全局 PICK）。
    `/api/pickers?unit_type=X` 返回的 `specialists_for_unit` 是**按单位类型**算的
    （战役池 ∩ 游戏规则）⇒ 换单位类型必须换池子。
    全局 `PICK` 只是「最后一次拉的那份」⇒ 用它会显示**上一个单位**的候选。
@@ -1833,7 +1833,7 @@ function unitPoolFor(u){
   if(c && c.specialists_for_unit) return c.specialists_for_unit;
   return null;
 }
-/* U104：确保这个单位类型的候选池已到位；到位后**只重画当前详情**。 */
+/* 确保这个单位类型的候选池已到位；到位后**只重画当前详情**。 */
 function ensureUnitPool(u){
   if(!u || !u.type) return;
   if(PICKCACHE[u.type]) return;            /* 缓存里有 ⇒ 直接用 */
@@ -1845,7 +1845,7 @@ function ensureUnitPool(u){
     delete PICKERR[type];
     if(SEL.units===uid) refreshUnitLocal(uid);
   }).catch(e=>{
-    /* ⚠️ **U128**：别再把失败**吞掉**（原来 `.catch(()=>{})`）——
+    /* ⚠️ 别再把失败**吞掉**（原来 `.catch(()=>{})`）——
        吞掉 ⇒ 界面永远「正在读取…」。⇒ 记下原因 + 让玩家看见。 */
     PICKERR[type] = (e && e.message) ? e.message : String(e);
     if(SEL.units===uid) refreshUnitLocal(uid);
@@ -1853,7 +1853,7 @@ function ensureUnitPool(u){
   });
 }
 
-/* U104：把这个存档里**所有单位类型**的候选池**一次拉齐**
+/* 把这个存档里**所有单位类型**的候选池**一次拉齐**
    （服务端一个请求算完 ⇒ 之后切单位是**即时**的）。
    单次 /api/pickers 要 ~370 ms；逐个类型拉就是 N 次往返 ⇒ 切单位要等。 */
 async function prefetchUnitPools(types){
@@ -1881,7 +1881,7 @@ function unitBadgesHTML(u){
     `<span class="ubadge" title="${esc(specCn(s.type))}">${imgTag(specTex(s.type), specCn(s.type), "spico")}</span>`).join("");
 }
 
-/* U103：**局部刷新** —— 只重画【详情】+【这一行的特种兵徽章】。
+/* **局部刷新** —— 只重画【详情】+【这一行的特种兵徽章】。
    列表与头像原位不动 ⇒ 不跳顶、不闪（整页重绘会重建滚动容器与几百个 <img>）。 */
 function refreshUnitLocal(unitId){
   const u = (VIEW.units||[]).find(x=>x.id===unitId);
@@ -1891,7 +1891,7 @@ function refreshUnitLocal(unitId){
   const row = document.querySelector('#work .urow[data-uid="'+unitId+'"]');
   const box = row ? row.querySelector(".ubadges") : null;
   if(box) box.innerHTML = unitBadgesHTML(u);
-  /* ⚠️ **U129**：改名是**待应用**的改动 ⇒ 左侧列表那一行也要跟着显示新名字
+  /* ⚠️ 改名是**待应用**的改动 ⇒ 左侧列表那一行也要跟着显示新名字
      （原来只刷徽章 ⇒ 名字看着还是旧的，像是没改）。 */
   const nm = row ? row.querySelector(".unm") : null;
   if(nm && u){
@@ -1903,7 +1903,7 @@ function refreshUnitLocal(unitId){
 
 function pickUnit(id){
   SEL.units = id;
-  /* U82：只重画**详情**，列表原位不动 ——
+  /* 只重画**详情**，列表原位不动 ——
      原来走 `show("units")`（整页重绘）⇒ 列表滚动位置被重置
      ⇒ 每选一个单位都要重新滚回去（用户反馈：反人类）。
      列表里除了 `.sel` 高亮，选中时本来就不会变
@@ -1916,12 +1916,12 @@ function pickUnit(id){
   if(det) det.innerHTML = unitDetailHTML(cur);
   if(cur) bindUnitControls(cur);
   paintPending();
-  /* U104：换单位 ⇒ **候选池跟着换**（这个类型的池没拉到就拉，拉到后重画详情）。
+  /* 换单位 ⇒ **候选池跟着换**（这个类型的池没拉到就拉，拉到后重画详情）。
      ⚠️ U82 把这里改成局部刷新之后，候选池就没人拉了 ⇒ 显示的是上一个单位的。 */
   ensureUnitPool(cur);
 }
 
-/* U85：**工事等级 / 移动力 / 行动力** 三张卡（单位详情，血量那行之后、特种兵之前）。
+/* **工事等级 / 移动力 / 行动力** 三张卡（单位详情，血量那行之后、特种兵之前）。
    ⚠️ 三个字段的语义（游戏字节码实证，见开发上下文 §5.1qqq）：
      · `entr` 工事等级 —— 0/1/2（游戏的 `unit_max_entr_level = 2`），**战役存档里持久**；
      · `mp`  移动力 —— **剩余**移动点（状态量：游戏按类型的 `move` 重算）；
@@ -1933,15 +1933,15 @@ function unitCombatFieldsHTML(u){
   const ap   = pendingVal("unit_field", uKey(u.id,"ap"),   (u.ap==null)?0:u.ap);
   const on = (b)=> b?" on":"";
   const sel = (b)=> b?" selected":"";
-  /* U87：类型的基础移动力（`unit_types/<类型>.yml` 的 `move`）——
+  /* 类型的基础移动力（`unit_types/<类型>.yml` 的 `move`）——
      控制区锁定把存档里的 mp 清零了，"解除锁定"就是按它恢复。 */
   const ut = (CATALOG&&CATALOG.unit_types&&CATALOG.unit_types[u.type])||{};
   const baseMove = (ut.move===undefined||ut.move===null)?null:ut.move;
-  /* U89：作战标记（HQ 技能的三种命令）—— 只在**当前战斗**里有 */
+  /* 作战标记（HQ 技能的三种命令）—— 只在**当前战斗**里有 */
   const orderMeta = (VIEW&&VIEW.orders_meta)||{};
   const orderKeys = Object.keys(orderMeta);
   const myOrders = specOrders(u);
-  /* U92：游戏硬约束 —— **「反击」只允许装甲机动单位**
+  /* 游戏硬约束 —— **「反击」只允许装甲机动单位**
      （`can_make_elastic_defense` 的第一个条件就是 `armor_mobile`）；
      「死守」「后卫部队」没有这条限制。 */
   const armorMobile = unitArmorMobile(u);
@@ -1951,12 +1951,12 @@ function unitCombatFieldsHTML(u){
       <div class="orderrow">${orderKeys.map(k=>{
         const m = orderMeta[k]||{};
         const on = myOrders.indexOf(k)>=0;
-        /* U92：不适用 ⇒ 置灰（但**已经挂着**的仍可点掉） */
+        /* 不适用 ⇒ 置灰（但**已经挂着**的仍可点掉） */
         const dis = (k==="elastic_defense" && !armorMobile && !on);
         const tip = dis
           ? L2("「{0}」只能挂装甲机动单位（游戏硬约束）", m.name||k)
           : (m.name||k);
-        /* ⚠️ **U125**：`k`（特种兵类型）进 **JS 单引号字符串** ⇒ 用 `jsq`；
+        /* ⚠️ `k`（特种兵类型）进 **JS 单引号字符串** ⇒ 用 `jsq`；
            贴图走 `surf()`（URL 编码）+ `esc`（属性转义）。 */
         return `<button class="orderbtn${on?" on":""}${dis?" dis":""}" onclick="event.stopPropagation();toggleUnitOrder(${u.id},'${jsq(k)}')" title="${esc(tip)}"><img src="${esc(surf(m.icon||("sheet/special_defense_"+k+".png")))}" alt="${esc(m.name||k)}"></button>`;
       }).join("")}</div>
@@ -2004,7 +2004,7 @@ function bindUnitCombatFields(u){
         {unit_id:u.id, field:"mp", value:v}, base, v, L2("单位 {0} 移动力", u.id));
     }});
 }
-/* U89：单位的**作战标记**（HQ 技能的三种命令）。
+/* 单位的**作战标记**（HQ 技能的三种命令）。
    ⚠️ 数据在**战斗层**（`games/<场景>/main.yml` 的三个单位 id 列表）——
    标记是**命令**，敌方下一回合结束前有效。 */
 function specOrders(u){
@@ -2017,7 +2017,7 @@ function specOrders(u){
   }
   return base;
 }
-/* U92：单位是不是**装甲机动单位**（「反击」的硬约束）。
+/* 单位是不是**装甲机动单位**（「反击」的硬约束）。
    后端视图已经算好（`u.armor_mobile`）；没有就按类型目录现算。 */
 function unitArmorMobile(u){
   if(!u) return false;
@@ -2029,10 +2029,10 @@ function unitArmorMobile(u){
 function toggleUnitOrder(unitId, key){
   const u = (VIEW.units||[]).find(x=>x.id===unitId); if(!u) return;
   const cur = specOrders(u);
-  /* U92：给非装甲机动单位挂「反击」⇒ 游戏不允许 ⇒ 不做
+  /* 给非装甲机动单位挂「反击」⇒ 游戏不允许 ⇒ 不做
      （撤除已有标记不受限制）。 */
   if(key==="elastic_defense" && cur.indexOf(key)<0 && !unitArmorMobile(u)) return;
-  /* U102：三个标记**互斥** —— 游戏里下达命令是「先把这个单位从三个列表全清掉、
+  /* 三个标记**互斥** —— 游戏里下达命令是「先把这个单位从三个列表全清掉、
      再加进其中一个」（`UnitSetFlags._set_flags`），且 `can_make_*` 都要求
      「该单位没有别的标记」⇒ 这里点新的 = **替换**旧的，不是叠加。
      点当前生效的那个 = 撤除（游戏允许「没下命令」这个状态）。 */
@@ -2048,13 +2048,13 @@ function toggleUnitOrder(unitId, key){
   refreshUnitCombatFields(u);
 }
 
-/* U87：解除敌方控制区的锁定。 */
+/* 解除敌方控制区的锁定。 */
 function setUnitEntr(unitId, lv){
   const u = (VIEW.units||[]).find(x=>x.id===unitId); if(!u) return;
   const key = uKey(unitId,"entr");
   const cur = pendingVal("unit_field", key, (u.entr==null)?0:u.entr);
   if(cur===lv) return;
-  /* ⚠️ U110：`queueEdit` 的 `base` 必须是**存档原值**（它的约定：
+  /* ⚠️ `queueEdit` 的 `base` 必须是**存档原值**（它的约定：
      「值等于原值就撤掉这条待应用」）⇒ 改回原值才不会留一条
      「改了等于没改」的待应用。 */
   const base = (u.entr==null)?0:u.entr;
@@ -2070,7 +2070,7 @@ function setUnitAp(unitId, v){
   const key = uKey(unitId,"ap");
   const cur = pendingVal("unit_field", key, (u.ap==null)?0:u.ap);
   if(cur===nv) return;
-  /* U110：`base` = **存档原值**（见 `setUnitEntr` 的说明） */
+  /* `base` = **存档原值**（见 `setUnitEntr` 的说明） */
   const base = (u.ap==null)?0:u.ap;
   queueEdit("unit_field", key, {unit_id:unitId, field:"ap", value:nv},
     base, nv, L2("单位 {0} 行动力", unitId));
@@ -2080,7 +2080,7 @@ function setUnitAp(unitId, v){
 function refreshUnitCombatFields(u){
   const tmp = document.createElement("div");
   tmp.innerHTML = unitCombatFieldsHTML(u);
-  /* ⚠️ U110：必须用 `Array.from` **先拷成静态数组** ——
+  /* ⚠️ 必须用 `Array.from` **先拷成静态数组** ——
      `tmp.children` 是**活的** HTMLCollection，而循环体里的
      `old.replaceWith(child)` 会把 `child` **移出** tmp ⇒ 集合当场缩短 ⇒
      下一轮的下标**错位**（要换的那张卡被跳过）⇒ 最后取到 `undefined`
@@ -2093,13 +2093,13 @@ function refreshUnitCombatFields(u){
   paintPending();
 }
 
-/* U84：已挂特种兵的槽位卡 —— 含「设为被压制 / 恢复活跃」按钮。
+/* 已挂特种兵的槽位卡 —— 含「设为被压制 / 恢复活跃」按钮。
    ⚠️ 被压制 = 存档里的 `active=false`（游戏里特种兵条目只有
    type / active / captured / idx 四个字段，没有独立的 suppressed 字段）。 */
 function specSlotHTML(u, s, sameSpecs){
   const st = (CATALOG&&CATALOG.spec_types[s.type])||{};
   const flag = (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("");
-  /* U48：同类型可能挂着好几个 ⇒ 槽位卡要标出「第几个」，
+  /* 同类型可能挂着好几个 ⇒ 槽位卡要标出「第几个」，
      否则两张一模一样的卡，玩家不知道点哪张卸哪个。 */
   const same = (sameSpecs||projectedSpecs(u)).filter(x=>x.type===s.type);
   const nth = same.indexOf(s)+1;
@@ -2109,7 +2109,7 @@ function specSlotHTML(u, s, sameSpecs){
     ? (L("点击卸下这个特种兵（第 ")+nth+"/"+same.length+L(" 个 · 槽位 ")+slotNo+L("）"))
     : (L("点击卸下这个特种兵（槽位 ")+slotNo+L("）"));
   const sup = (s.active===false);
-  /* U105：**存档里原有的**和**我们新增的（还没写盘）**用**同一张卡片**、
+  /* **存档里原有的**和**我们新增的（还没写盘）**用**同一张卡片**、
      同一个按钮 ⇒ 压制状态对两者都能调。
      新增件的槽位还没定，但压制状态照样能先定下来（写盘时一起生效）。 */
   const btn = `<button class="supbtn" onclick="event.stopPropagation();toggleSpecSuppressed(${u.id},${esc(JSON.stringify(s.type))},${esc(JSON.stringify(specSlotId(s)))})" title="${esc(L("切换这个特种兵是否被压制（被压制时不提供效果；游戏会按该单位的恢复步数逐步恢复）"))}">${sup ? L("恢复活跃") : L("设为被压制")}</button>`;
@@ -2158,7 +2158,7 @@ function toggleSpecSuppressed(unitId, specType, slotId){
     return;
   }
   const key = specSupKey(unitId, specType, s.idx);
-  /* U111：`base` 必须是**存档原值**（`queueEdit` 的约定：值等于原值就撤掉这条
+  /* `base` 必须是**存档原值**（`queueEdit` 的约定：值等于原值就撤掉这条
      待应用）⇒ 以前传的是「当前显示值」⇒ 改回原值撤不掉（留一条改了等于
      没改的待应用）。 */
   const u0 = (VIEW.units||[]).find(x=>x.id===unitId);
@@ -2188,7 +2188,7 @@ function unitDetailHTML(u){
   const specs = projectedSpecs(u);
   const xp  = pendingVal("unit_field", uKey(u.id,"xp"), u.xp||0);
   const max = u.max_st || ut.max_st || 0;
-  /* U50：兵力改成**两层**（规范 §6.1b）——
+  /* 兵力改成**两层**（规范 §6.1b）——
      当前血量 tot = 未被压制 act + 被压制 sup；上限 = max_st（游戏定死）。 */
   const act = pendingVal("unit_field", uKey(u.id,"act_st"), u.act_st||0);
   const sup = pendingVal("unit_field", uKey(u.id,"sup_st"), u.sup_st||0);
@@ -2199,7 +2199,7 @@ function unitDetailHTML(u){
     ? specs.map(s=>specSlotHTML(u, s, specs)).join("")
     : L(`<div class="slot empty">还没有挂特种兵</div>`);
 
-  /* U104：候选池**按单位类型**取（全局 PICK 只是最后一次拉的那份）。 */
+  /* 候选池**按单位类型**取（全局 PICK 只是最后一次拉的那份）。 */
   const pool = unitPoolFor(u);
   let poolHTML;
   if(SEL.fullPool){
@@ -2214,7 +2214,7 @@ function unitDetailHTML(u){
         + esc(L("特种兵候选池读取失败：")+perr) + `</div>`
       : L(`<div style="padding:12px;color:var(--muted);font-size:12px">正在读取这个单位类型的可用特种兵…</div>`);
   } else {
-    /* U48：同一种特种兵**可以挂多个** ⇒ 已挂的不再灰掉，
+    /* 同一种特种兵**可以挂多个** ⇒ 已挂的不再灰掉，
        改成角标「已挂 N 个」；只有**槽位满了**才不让再挂。 */
     const cap = u.max_spec || ut.max_spec || 3;
     const used = specs.length;
@@ -2290,7 +2290,7 @@ function pageUnits(w){
   if(!cur){ cur = units[0]; SEL.units = cur ? cur.id : null; }
   const q = (UQUERY||"").trim().toLowerCase();
   const hqf = UHQFILTER;
-  /* U53：过滤器 #2「当前场景（战斗）已激活的单位」——
+  /* 过滤器 #2「当前场景（战斗）已激活的单位」——
      名单 = `games/<场景>/units.yml`（扁平的 id 列表，规范 §7.2）。
      ⚠️ **只在战斗进行中才存在** ⇒ 不在战斗里置灰 + 悬停说明原因。 */
   const battleIds = new Set((VIEW.battle_unit_ids||[]).map(Number));
@@ -2344,7 +2344,7 @@ function pageUnits(w){
   });
   const uh = document.getElementById("uhq");
   if(uh) uh.addEventListener("change", function(){ UHQFILTER = this.value; show("units"); });
-  /* U53：过滤器 #2 —— 只看当前场景已激活的单位 */
+  /* 过滤器 #2 —— 只看当前场景已激活的单位 */
   const ub = document.getElementById("ubattle");
   if(ub) ub.addEventListener("change", function(){ UONLY = this.checked; show("units"); });
 
@@ -2353,7 +2353,7 @@ function pageUnits(w){
      U104：走 `ensureUnitPool`（与 pickUnit 同一个入口），
      到位后只重画详情（U103：整页重绘会跳顶）。 */
   ensureUnitPool(cur);
-  /* U104：把列表里**所有单位类型**的候选池一次拉齐 ⇒ 切单位即时。 */
+  /* 把列表里**所有单位类型**的候选池一次拉齐 ⇒ 切单位即时。 */
   const types = [];
   list.forEach(u=>{ if(u && u.type && types.indexOf(u.type)<0) types.push(u.type); });
   if(types.length){
@@ -2364,7 +2364,7 @@ function pageUnits(w){
   }
 }
 
-/* U65：血量变化后**只更新受影响的两处**（详情卡血量条 + 列表该行段格条）。
+/* 血量变化后**只更新受影响的两处**（详情卡血量条 + 列表该行段格条）。
    以前是 `show("units")` ⇒ 整页 innerHTML 重写 ⇒ 几百个头像全部重建
    ⇒ 每个头像闪一下、而且明显卡。 */
 function refreshUnitBlood(u, a, s){
@@ -2391,7 +2391,7 @@ function bindUnitControls(u){
   const ut  = (CATALOG&&CATALOG.unit_types[u.type])||{};
   const max = u.max_st || ut.max_st || 0;      /* 0 = 拿不到上限 ⇒ 不夹上界 */
 
-  /* U54：**数字区删掉**，血量条成为唯一的调整入口（规范 §6.1c）。
+  /* **数字区删掉**，血量条成为唯一的调整入口（规范 §6.1c）。
      ⚠️ **血量条是全局唯一保留 Alt 的控件**：
         · **普通滚轮 = 调活跃兵力**（act_st）：+1 / −1；
           超过上限（act+sup > max）就**消减压制兵力**补上
@@ -2407,7 +2407,7 @@ function bindUnitControls(u){
       const s0 = pendingVal("unit_field", uKey(u.id,"sup_st"), baseSup);
       let a = a0, s = s0;
       if(ev.altKey){
-        /* U82：Alt+滚轮 = 调压制（两者之和不变）。
+        /* Alt+滚轮 = 调压制（两者之和不变）。
            ⚠️ **方向跟活跃一致**：`d = deltaY>0 ? -1 : 1`（向上滚 d=+1）
            ⇒ 向上滚 = 活跃 +1 / 压制 −1，向下滚 = 活跃 −1 / 压制 +1。
            原来两个分支是反的（向上滚反而让活跃减少），跟人的直觉相反，
@@ -2430,7 +2430,7 @@ function bindUnitControls(u){
         }
       }
       if(a===a0 && s===s0) return;
-      /* ⚠️ U96：**压制在前、活跃在后** ——
+      /* ⚠️ **压制在前、活跃在后** ——
          核心库是**依次执行**这两条编辑的；先改活跃的话，
          那一刻「压制」还是旧值 ⇒ 「活跃 + 压制」算出来超过上限 ⇒ **误报警告**。
          （核心库也会自动配平，但顺序对了变更说明才准确。） */
@@ -2469,21 +2469,21 @@ function commitRename(id){
   if(v) queueEdit("unit_field", uKey(id,"name_brief"),
     {unit_id:id, field:"name_brief", value:v},
     u.name_cn||u.name_brief||"", v, L2("单位 {0} 改名", id));
-  /* U103：局部刷新（重画详情 = 退出改名输入框）—— 整页重绘会跳顶。 */
+  /* 局部刷新（重画详情 = 退出改名输入框）—— 整页重绘会跳顶。 */
   refreshUnitLocal(id);
 }
 
-/* U48：同一种特种兵可以挂**多个** ⇒ 待应用的 key 必须带序号，
+/* 同一种特种兵可以挂**多个** ⇒ 待应用的 key 必须带序号，
    否则第二次点同一个种会**覆盖**第一条（setPending 是同 key 替换语义）。 */
 let SPECSEQ = 0;
 function addSpec(unitId, specType){
-  /* U49：前端也拦一道 —— 非法挂载（阵营不同 / 国籍不匹配且不是父国籍）
+  /* 前端也拦一道 —— 非法挂载（阵营不同 / 国籍不匹配且不是父国籍）
      根本不该进「待应用」列表（核心库 `_unit_spec_add` 还有一道硬拦）。 */
   const u = (VIEW.units||[]).find(x=>x.id===unitId);
   if(u && u.type){
     const chk = specAttachCheck(specType, u.type);
     if(!chk.ok){
-      /* U55：底栏删了 ⇒ 提示改成**弹窗**（原来写在抽屉里的 errBox）。 */
+      /* 底栏删了 ⇒ 提示改成**弹窗**（原来写在抽屉里的 errBox）。 */
       openModal(L2(`<div class="mh">✕ 不能挂这个特种兵</div>
         <div class="mb"><div class="erow">{0}</div>
         <div class="fine">按游戏自己的规则：<b>阵营必须相同</b>，且
@@ -2497,11 +2497,11 @@ function addSpec(unitId, specType){
   setPending("unit_spec_add", `unit_spec_add:${unitId}:${specType}:${seq}`,
     {unit_id:unitId, spec_type:specType, seq:seq, active:true},
     L2("单位 {0} 加特种 {1}", unitId, specCn(specType)));
-  /* U103：局部刷新 —— 原来 `show("units")` 整页重绘 ⇒
+  /* 局部刷新 —— 原来 `show("units")` 整页重绘 ⇒
      **单位列表跳回顶部** + 几百个头像重新加载（闪一下）。 */
   refreshUnitLocal(unitId);
 }
-/* U48：卸哪一个 ⇒ 必须按 **idx** 定位（同一类型可能挂着好几个） */
+/* 卸哪一个 ⇒ 必须按 **idx** 定位（同一类型可能挂着好几个） */
 function removeSpec(unitId, specType, idx){
   const u = (VIEW.units||[]).find(x=>x.id===unitId);
   const all = u ? projectedSpecs(u) : [];
@@ -2525,7 +2525,7 @@ function removeSpec(unitId, specType, idx){
    总部页（U35）
    =================================================================== */
 const BRANCHES = ["engineering", "force_pool", "intel", "logistics", "operations"];
-/* ⚠️ **U127**：原来这里写的是
+/* ⚠️ 原来这里写的是
    `const BRANCH_CN = {engineering:L("工程"), …}` ——
    那是**模块级求值**：页面加载那一刻语言还是中文 ⇒
    玩家后来切到英文 ⇒ 总部页的分支名**永远是中文**。
@@ -2582,7 +2582,7 @@ function projectedPool(h){
 function hqRowHTML(h){
   const cp = pendingVal("hq_field", hqKey(h.id,"cp"), h.cp||0);
   const mx = pendingVal("hq_field", hqKey(h.id,"max_cp"), h.max_cp||0);
-  /* U94：经验 / 经验目标**只读**（游戏每次战役推进都重算目标） */
+  /* 经验 / 经验目标**只读**（游戏每次战役推进都重算目标） */
   const xp = h.xp||0;
   const xt = h.xp_target||0;
   const pct = xt ? Math.max(0, Math.min(100, Math.round(xp*100/xt))) : 0;
@@ -2593,7 +2593,7 @@ function hqRowHTML(h){
   </div>`, h.id===SEL.hqs?'on':'', h.id, esc(pendingVal("hq_field", hqKey(h.id,"name_brief"),
         h.name_cn||h.name_brief||(L("总部 ")+h.id))), cp, mx, xp, xt||"—", pct);
 }
-/* U106：**局部刷新** —— 选中总部只重画【详情】+【清单里的这一行】，
+/* **局部刷新** —— 选中总部只重画【详情】+【清单里的这一行】，
    清单本身**不重建** ⇒ 滚动位置天然不动（原来走 `show("hqs")` 整页重绘
    ⇒ `.hqlist` 被重建 ⇒ scrollTop 归零 ⇒ 清单跳回顶部）。 */
 function pickHq(id){
@@ -2606,7 +2606,7 @@ function pickHq(id){
 }
 function pickHqTab(t){ SEL.hqTab = t; refreshHqLocal(SEL.hqs); }
 
-/* U106：**局部刷新** —— 只重画【详情】+【清单里的这一行】。
+/* **局部刷新** —— 只重画【详情】+【清单里的这一行】。
    ⚠️ 清单**不重建** ⇒ 滚动位置天然不动（不再靠滚动保位兜底）。
    `keepScroll=true` ⇒ 详情区的滚动位置也保住（**改完详情不跳**）。
    ⚠️ 清单里那一行也要跟着更新（CP 等显示的是**待应用**的值）——
@@ -2631,7 +2631,7 @@ function hqSkillHTML(h, br, it){
   const dots = [];
   const n = (typeof avail==="number") ? avail : 0;
   for(let i=0;i<n;i++) dots.push(`<i class="${i<used?'on':''}"></i>`);
-  /* U112：技能解锁看的是**生效等级**（压制会把它降下来）⇒ 走投影 */
+  /* 技能解锁看的是**生效等级**（压制会把它降下来）⇒ 走投影 */
   const brLevel = hqBranchState(h.id, br).level;
   const locked = (it.level||1) > brLevel;
   return L2(`<div class="sk {0}" title="{1} · CP 消耗 {2}{3}"
@@ -2650,7 +2650,7 @@ function hqMatrixHTML(h){
   const brs = h.branches||{};
   const rows = BRANCHES.map(br=>{
     const node = bl[br]||{};
-    /* U112：用投影（生效等级 / 被压制数，含待应用） */
+    /* 用投影（生效等级 / 被压制数，含待应用） */
     const st = hqBranchState(h.id, br);
     const lvl = st.level;
     const sup = st.suppressed;
@@ -2734,7 +2734,7 @@ function hqDetailHTML(h){
   const cp = pendingVal("hq_field", hqKey(h.id,"cp"), h.cp||0);
   const mx = pendingVal("hq_field", hqKey(h.id,"max_cp"), h.max_cp||0);
   const sup = pendingVal("hq_field", hqKey(h.id,"supply"), h.supply||0);
-  /* U94：经验 / 经验目标**只读**（游戏每次战役推进都重算目标） */
+  /* 经验 / 经验目标**只读**（游戏每次战役推进都重算目标） */
   const xp = h.xp||0;
   const xt = h.xp_target||0;
   /* ⚠️ 卡车数走的是 **hq_trucks** 这个 kind（不是 hq_field）——
@@ -2824,7 +2824,7 @@ function bindHqControls(h){
   spin("h_mcp_"+h.id, "max_cp", mxc, 3, 9, L("CP 上限"), h.max_cp||0);
   spin("h_sup_"+h.id, "supply", spc, 0, 3, L("补给"), h.supply||0);
 
-  /* U94：**不再提供「改总部经验 / 经验目标」** ——
+  /* **不再提供「改总部经验 / 经验目标」** ——
      经验目标由游戏按战役规模动态重算（`campaign._set_hqs_xp_target`），
      手改会被覆盖；升级请直接用下面的**分支等级 / 技能专精**。 */
 
@@ -2866,14 +2866,14 @@ function commitRenameHq(id){
 
 function hqTrucks(id, n){
   const h = (VIEW.hqs||[]).find(x=>x.id===id); if(!h) return;
-  /* U111：`base` = **存档原值**（见 `toggleSpecSuppressed` 的说明） */
+  /* `base` = **存档原值**（见 `toggleSpecSuppressed` 的说明） */
   const base = h.trucks||0;
   queueEdit("hq_trucks", `hq_trucks:${id}`,
     {hq_id:id, trucks:n}, base, n, L2("总部 {0} 补给卡车", id));
   refreshHqLocal(id, true);
 }
 
-/* U112：某个 HQ 分支当前的「生效等级 / 被压制数 / 真实等级」（**含待应用**）。
+/* 某个 HQ 分支当前的「生效等级 / 被压制数 / 真实等级」（**含待应用**）。
    ⚠️ 游戏的语义（`branch_suppress`，e166 字节码）：
       压制 N 级 ⇒ **生效等级 −N**、被压制数 **+N**，
       而「真实等级 = 等级 + 被压制」**不变**。
@@ -2907,7 +2907,7 @@ function hqBranchLevel(id, br, d){
   const st = hqBranchState(id, br);
   let v = st.level + d;
   if(v<0) v=0;
-  /* U112：游戏的硬上限 = 「等级 + 被压制 ≤ 3」 */
+  /* 游戏的硬上限 = 「等级 + 被压制 ≤ 3」 */
   if(v > 3 - st.suppressed) v = 3 - st.suppressed;
   /* ⚠️ `base` = **投影出来的当前生效等级**（不是存档原值）——
      「压制」会改生效等级 ⇒ 用存档原值会把「等级 +1」误判成「改回原值」
@@ -2922,7 +2922,7 @@ function hqSuppress(id, br, d){
   let v = st.suppressed + d;
   if(v<0) v=0;
   if(v > st.real) v = st.real;               /* 压制数不能超过真实等级 */
-  /* U112：走核心库**专门的** `hq_branch_suppressed` ——
+  /* 走核心库**专门的** `hq_branch_suppressed` ——
      它按游戏的语义**自动重算 level**（生效等级 −N、被压制 +N、真实等级不变）。 */
   /* `base` = 投影出来的当前被压制数（同上：不是存档原值） */
   queueEdit("hq_branch_suppressed", hqBrKey(id,br)+":sup",
@@ -2948,7 +2948,7 @@ function hqPoolAdd(id, specType){
     {hq_id:id, entry}, L2("总部 {0} 兵库加 {1}", id, specCn(specType)));
   refreshHqLocal(id, true);
 }
-/* ⚠️ U91：`origin` = 该条目在**存档里的原始下标**（不是界面上的行号）。
+/* ⚠️ `origin` = 该条目在**存档里的原始下标**（不是界面上的行号）。
    界面行号会因挂起的删除而前移，拿它当下标会：
    ① 两次移除撞同一个 key ⇒ 后一次把前一次覆盖掉 ⇒ 看着「没反应」；
    ② 应用时按下标删 ⇒ 删错条目。 */
@@ -2999,7 +2999,7 @@ function projectedCards(list, kind){
       const i = out.findIndex(c=>c.position===p.params.position);
       if(i>=0) out.splice(i,1);
     }
-    /* U90：**免费 / 收费** 的挂起改动也要立即反映到界面上 ——
+    /* **免费 / 收费** 的挂起改动也要立即反映到界面上 ——
        以前只处理了新增 / 移除 ⇒ 点「改免费」后卡片看着没变
        （要等应用后才变），和修改器「改动立即可视」的规矩不一致。 */
     if(p.kind==="card_set" && kind==="hand" && p.params.field==="is_free"){
@@ -3020,13 +3020,13 @@ function projectedCards(list, kind){
 }
 
 function cardTileHTML(c, kind){
-  /* U90：卡名与「免费 / 收费」**分开两行** —— 卡名被截断时状态照样看得见。 */
+  /* 卡名与「免费 / 收费」**分开两行** —— 卡名被截断时状态照样看得见。 */
   const free = !!c.is_free;
-  /* U93：英文按钮词太长会被**截断**（"Make paid" → "Make pa…"）
+  /* 英文按钮词太长会被**截断**（"Make paid" → "Make pa…"）
      ⇒ 英文用短词（Free / Paid），完整说明放进 title。 */
   const freeBtn = free ? L("改收费") : L("改免费");
   const freeTip = free ? L("改成收费") : L("改成免费");
-  /* U114：货架上有牌时也能**换牌** —— 点卡面（跟空槽位「点此上架」对称）。
+  /* 货架上有牌时也能**换牌** —— 点卡面（跟空槽位「点此上架」对称）。
      ⚠️ 按钮行放不下第三个按钮（卡宽 104px，中文三个按钮就超宽了）⇒ 用卡面。 */
   const img = imgTag(cardImg(c.card_type), cardCn(c.card_type));
   const ci = (kind==="shelf")
@@ -3132,7 +3132,7 @@ function pageCards(w){
         手牌是<b>你手里已经拿到的牌</b>（会议阶段才发牌）——
         用下面的「加一张到手牌」可以直接放一张进来。</div>`);
   const shelfLimit = VIEW.shelf_limit || 5;
-  /* U114：货架只存在于**会议界面**（根 main.yml 里有 card_store）——
+  /* 货架只存在于**会议界面**（根 main.yml 里有 card_store）——
      没有货架时**别显示 5 个空槽位**（点了上架也会被核心库拒：
      「当前不在会议界面，没有卡牌商店货架」）⇒ 直接说清楚。 */
   const shelfFeat = ((VIEW&&VIEW._features)||[]).find(f=>f.name==="shelf");
@@ -3204,7 +3204,7 @@ function projectedStore(){
   let added = 0;
   PENDING.forEach(p=>{
     if(p.kind==="store_add"){
-      /* ⚠️ U118：必须把 front / sub 带进投影 —— 否则这一行**匹配不上**
+      /* ⚠️ 必须把 front / sub 带进投影 —— 否则这一行**匹配不上**
          当前选中的 (战线, 子商店) ⇒ 新上架的商品在界面上**根本看不见**
          （要等写盘后才会出现）。
          下标用**负数** ⇒ 不会和存档里的真实下标（≥ 0）撞。 */
@@ -3254,7 +3254,7 @@ function pageStore(w){
     const tags = isSpec ? (st.flags||[]).map(f=>`<span class="ftag">${esc(flagCn(f))}</span>`).join("") : "";
     const tex = isSpec ? specTex(e.spec) : "steps/step.png";
     const texCls = isSpec ? "spico" : "";
-    /* U93：英文界面下**游戏自己的英文名恰好等于 id**（infantry / armor）
+    /* 英文界面下**游戏自己的英文名恰好等于 id**（infantry / armor）
        ⇒ 原来那两行会一模一样 ⇒ 相同就不画第二行。 */
     const nm = storeEntryCn(e);
     const idTxt = e.spec||e.equipment||"";
@@ -3358,7 +3358,7 @@ function storeRemove(front, sub, index){
   const rows = projectedStore();
   const r = rows.find(x=>x.e.front===front && x.e.sub===sub && x.index===index);
   if(r && r._new){
-    /* ⚠️ U118：这条**还没写进存档** ⇒ 撤掉那条「上架」的待应用就行，
+    /* ⚠️ 这条**还没写进存档** ⇒ 撤掉那条「上架」的待应用就行，
        不必（也不能）去删存档里的第 index 条 —— 那会删错行。 */
     dropPendingByKey("store_add", r._key);
     show("store");
@@ -3381,7 +3381,7 @@ function storeRemove(front, sub, index){
      * 待应用里删掉的 ⇒ 标 **待删除**。
    =================================================================== */
 function theaterCn(a){ return (VIEW.theater_cn||{})[a] || a; }
-/* ⚠️ **U143**：战区资产的组 = **阵营**（不是"阶段"）⇒ 待应用的 key 里
+/* ⚠️ 战区资产的组 = **阵营**（不是"阶段"）⇒ 待应用的 key 里
    **带上阵营** ⇒ 两侧的改动互不串（同一资产可能两边都有）。
    当前编辑的是**哪一方** = `SEL.theaterSide`（页面上有切换）。 */
 function theaterSide(){ return (SEL && SEL.theaterSide) || "player"; }
@@ -3415,7 +3415,7 @@ function theaterPend(kind, asset){
 }
 /** 这一项现在在不在当前 phase 里（**含待应用的增删**）。 */
 function theaterInCurrent(asset){
-  /* U143：判的是**当前选中那一方**（不再是"当前 phase 那一组"） */
+  /* 判的是**当前选中那一方**（不再是"当前 phase 那一组"） */
   if(theaterPend("theater_asset_remove", asset)) return false;
   if(theaterPend("theater_asset_add", asset)) return true;
   return theaterSideAssets().some(x=>x.asset===asset);
@@ -3436,7 +3436,7 @@ function theaterCur(asset){
   }
   return {to_use:a.to_use, uses_total:a.uses_total, uses_turn:a.uses_turn};
 }
-/* U108：改战区资产的**某个字段**（三个字段共用一条待应用）。
+/* 改战区资产的**某个字段**（三个字段共用一条待应用）。
    ⚠️ **两个坑**（U108：朋友反馈「调数量没反应 / 多次操作后界面不更新」）：
    ① `theaterFieldCn` 以前是**对象**，这里却当**函数**调 ⇒ 每次都抛
       `TypeError: theaterFieldCn is not a function` ⇒ **改动根本没进待应用**，
@@ -3448,11 +3448,11 @@ function theaterCur(asset){
 function theaterSet(asset, field, value){
   const a = theaterSideAssets().find(x=>x.asset===asset) || {};
   const cur = theaterCur(asset);
-  /* ⚠️ **U143**：params 里带上 `side` ⇒ 核心库知道改**哪一方** */
+  /* ⚠️ params 里带上 `side` ⇒ 核心库知道改**哪一方** */
   const params = {asset, side:theaterSide(), to_use:cur.to_use,
                   uses_total:cur.uses_total, uses_turn:cur.uses_turn};
   params[field] = value;
-  /* U108：按**字段**判断 —— 三个字段都回到存档原值了才撤掉整条待应用 */
+  /* 按**字段**判断 —— 三个字段都回到存档原值了才撤掉整条待应用 */
   const allSame = (params.to_use === a.to_use)
                && (params.uses_total === a.uses_total)
                && (params.uses_turn === a.uses_turn);
@@ -3465,7 +3465,7 @@ function theaterSet(asset, field, value){
         + " " + fmt(a[field]) + " → " + fmt(value),
       value);
   }
-  /* U108：整页重绘会把**正在输入的那个框**换掉 ⇒ 玩家打「12」只会进「1」
+  /* 整页重绘会把**正在输入的那个框**换掉 ⇒ 玩家打「12」只会进「1」
      ⇒ 重绘后把焦点与光标**放回原处**。 */
   const act = document.activeElement;
   const aid = act ? act.id : "";
@@ -3479,7 +3479,7 @@ function theaterSet(asset, field, value){
     }
   }
 }
-/* U108：字段名（**函数**，不是对象 —— 以前当函数调 ⇒ 抛异常 ⇒ 改动没进待应用）。 */
+/* 字段名（**函数**，不是对象 —— 以前当函数调 ⇒ 抛异常 ⇒ 改动没进待应用）。 */
 function theaterFieldCn(field){
   return {to_use:L("当前可用"), uses_total:L("本场景剩余"),
           uses_turn:L("每回合恢复")}[field] || field;
@@ -3578,7 +3578,7 @@ function pageTheater(w){
     return;
   }
   const onCount = uni.filter(u=>theaterInCurrent(u.asset)).length;
-  /* ⚠️ **U143**：战区资产的组 = **两个阵营各一组** ⇒ 页面加一个阵营切换，
+  /* ⚠️ 战区资产的组 = **两个阵营各一组** ⇒ 页面加一个阵营切换，
      两组都能改（以前只显示"当前 phase 那一组" ⇒ 敌方那组根本看不见）。 */
   const sides = (meta.sides && meta.sides.length) ? meta.sides : [];
   const curSide = theaterSide();
@@ -3700,7 +3700,7 @@ function theaterRemove(asset){
 
 /* ---------- 添加一项（弹对话框：每回合恢复 / 本场景剩余） ---------- */
 function openTheaterAddModal(asset){
-  /* ⚠️ U143：把**阵营**记进 MODAL（弹窗期间切了阵营也不串） */
+  /* ⚠️ 把**阵营**记进 MODAL（弹窗期间切了阵营也不串） */
   MODAL = {kind:"theater", asset:asset, side:theaterSide(),
            uses_turn:1, uses_total:null};
   renderTheaterAddModal();
@@ -3714,7 +3714,7 @@ function renderTheaterAddModal(){
   const M = MODAL; if(!M) return;
   const u = ((VIEW&&VIEW.theater_universe)||[]).find(x=>x.asset===M.asset) || {};
   const inf = (M.uses_total===null||M.uses_total===undefined);
-  /* ⚠️ **U143**：参照值按**这一方**的设计取（玩家 / 对手各有一份） */
+  /* ⚠️ 参照值按**这一方**的设计取（玩家 / 对手各有一份） */
   const isOpp = (M.side||theaterSide())==="opponent";
   const refTotal = isOpp ? u.opponent_scenario_uses_total : u.scenario_uses_total;
   const refTurn  = isOpp ? u.opponent_scenario_uses_turn  : u.scenario_uses_turn;
@@ -3880,7 +3880,7 @@ document.getElementById("mask").addEventListener("mousedown", function(ev){
 });
 
 /* ---------- 写盘确认框（设计稿 §9） ---------- */
-/* ⚠️ **U147**：软警告**一页列全**（U118 那套"一条一条弹、逐个同意"太吵）。
+/* ⚠️ 软警告**一页列全**（U118 那套"一条一条弹、逐个同意"太吵）。
    相同的**合并成一条** + 「×N」徽标 ⇒ 一屏就能看完。 */
 function mdBold(s){
   /* 先转义再加粗 ⇒ 文案里的 `**粗体**` 不会变成注入点 */
@@ -3920,7 +3920,7 @@ function openConfirm(mode, info){
       <button class="btn pri" disabled>应用更改</button>`);
   } else {
     title = L2("⚠ 应用 {0} 处改动？", files.length);
-    /* U55：待应用**明细**（逐条）在这里 —— 底栏不再常驻展开。
+    /* 待应用**明细**（逐条）在这里 —— 底栏不再常驻展开。
        明细用普通字符串拼好再拼进来（别写成嵌套反引号）。 */
     let detail = "";
     if(PENDING.length){
@@ -3935,7 +3935,7 @@ function openConfirm(mode, info){
       detail = L('<div class="plist"><div class="ph">待应用明细（') + PENDING.length + L(' 条）</div>')
              + items + '</div>';
     }
-    /* ⚠️ **U147**：软警告**一页列全**（不再逐条弹）⇒ 一次确认就够。 */
+    /* ⚠️ 软警告**一页列全**（不再逐条弹）⇒ 一次确认就够。 */
     const warnBox = warnBoxHTML(info.warnings||[]);
     body = detail + L2(`<div>将改动存档 <b>{0}</b> 里的：</div>
       <div class="elist">{1}</div>
@@ -3963,7 +3963,7 @@ function spickMatch(it, q){
   return hay.indexOf(q) >= 0;
 }
 function spickCellsHTML(items, onPick, q){
-  /* U145：「显示全部」⇒ 按**阵营 → 国籍**分组（与单位明细页「显示所有特种兵」同一套）。 */
+  /* 「显示全部」⇒ 按**阵营 → 国籍**分组（与单位明细页「显示所有特种兵」同一套）。 */
   if(spickGroupedMode()) return spickGroupedHTML(items, onPick, q);
   const list = (items||[]).filter(it=>spickMatch(it, q));
   if(!list.length){
@@ -3974,12 +3974,12 @@ function spickCellsHTML(items, onPick, q){
     title="${esc(it.title||it.name)}" onclick="${it.blocked?'void 0':onPick.replace("@ID", esc(JSON.stringify(it.id)))}">
     ${imgTag(it.tex, it.name, "spico")}${it.dup?`<span class="dup">${esc(it.dup)}</span>`:""}</div>`).join("");
 }
-/* U145：什么时候用分组视图？—— 只有「显示全部」+ **特种兵**模式
+/* 什么时候用分组视图？—— 只有「显示全部」+ **特种兵**模式
    （兵种模式没有国籍分组这回事；「显示全部」本来也只管特种兵）。 */
 function spickGroupedMode(){
   return !!(MODAL && MODAL.all && MODAL.mode!=="equip");
 }
-/* U145：分组视图（阵营带 → 国籍组，默认折叠；搜索时自动展开有结果的组）。 */
+/* 分组视图（阵营带 → 国籍组，默认折叠；搜索时自动展开有结果的组）。 */
 function spickGroupedHTML(items, onPick, q){
   const list = (items||[]).filter(it=>spickMatch(it, q));
   if(!list.length){
@@ -4010,7 +4010,7 @@ function spickGroupedHTML(items, onPick, q){
   });
   return `<div class="spgroups">${out}</div>`;
 }
-/* U145：国籍组的折叠状态（存在 MODAL 里 ⇒ 重绘 / 搜索都不丢）。 */
+/* 国籍组的折叠状态（存在 MODAL 里 ⇒ 重绘 / 搜索都不丢）。 */
 function spickGroupOpen(nat){ return !!(MODAL && MODAL.poolOpen && MODAL.poolOpen[nat]); }
 function spickToggleGroup(nat){
   if(!MODAL) return;
@@ -4018,7 +4018,7 @@ function spickToggleGroup(nat){
   MODAL.poolOpen[nat] = !spickGroupOpen(nat);
   if(MODAL._spickRefresh) MODAL._spickRefresh();
 }
-/* U47：搜索框 ↔ 网格联动（**只重绘网格与详情卡**，输入框不失焦）
+/* 搜索框 ↔ 网格联动（**只重绘网格与详情卡**，输入框不失焦）
    —— `items` / `onPick` / `footFn` 由各模态框在 onOpen 时传进来。 */
 function bindSpickSearch(items, onPick, footFn){
   const qi = document.getElementById("spick_q");
@@ -4038,7 +4038,7 @@ function bindSpickSearch(items, onPick, footFn){
     }
   };
   qi.addEventListener("input", apply);
-  /* U145：国籍组折叠/展开要能就地重画网格 ⇒ 把重画函数存起来 */
+  /* 国籍组折叠/展开要能就地重画网格 ⇒ 把重画函数存起来 */
   if(MODAL) MODAL._spickRefresh = apply;
   apply();
 }
@@ -4075,7 +4075,7 @@ function bindModalSpin(id, get, set, min, max){
 
 /* ---------- ① 给总部兵库加一条 ---------- */
 function hqPoolItems(h){
-  /* U107：走统一的那套（默认只列玩家挂得上的，「显示全部」可展开） */
+  /* 走统一的那套（默认只列玩家挂得上的，「显示全部」可展开） */
   return specPickItems(projectedPool(h), false);
 }
 function openHqPoolModal(hqId){
@@ -4183,7 +4183,7 @@ function hqPoolConfirm(){
 function openCardPickerModal(kind, position, act){
   const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
   const types = Object.keys(CATALOG&&CATALOG.card_types ? CATALOG.card_types : {}).sort();
-  /* U114：**上架**与**换牌**是两件事 —— 没传 act 就**按槽位有没有牌自动判断**
+  /* **上架**与**换牌**是两件事 —— 没传 act 就**按槽位有没有牌自动判断**
      （空 ⇒ 上架；有 ⇒ 换牌）⇒ 不会再出现「空槽位点上架却被当成换牌」。 */
   let a = act;
   if(!a){
@@ -4209,7 +4209,7 @@ function renderCardPickerModal(){
   });
   const sel = items.find(i=>i.id===M.sel);
   const isHand = M.mode==="hand";
-  /* U114：标题与按钮按「上架 / 换牌」分别说清楚 */
+  /* 标题与按钮按「上架 / 换牌」分别说清楚 */
   const isAdd = (M.act==="add");
   const mhTitle = isHand ? L("加一张到手牌")
                 : (isAdd ? L("上架一张新卡") : L("换掉位置 ")+M.position+L(" 的卡"));
@@ -4262,7 +4262,7 @@ function cardPickConfirm(){
 
 /* ---------- ③ 上架新商品 ---------- */
 function openStoreAddModal(){
-  /* U145：poolOpen = 国籍组的折叠状态（默认全折叠） */
+  /* poolOpen = 国籍组的折叠状态（默认全折叠） */
   MODAL = {kind:"store", mode:"spec", sel:null, price:10, quantity:1, all:false,
     poolOpen:{}};
   renderStoreAddModal();
@@ -4270,7 +4270,7 @@ function openStoreAddModal(){
 function storeAddItems(){
   const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[]};
   const have = projectedStore().filter(r=>r.e.front===SEL.storeFront && r.e.sub===SEL.storeSub);
-  /* U107：走统一的那套（默认只列玩家挂得上的，「显示全部」可展开） */
+  /* 走统一的那套（默认只列玩家挂得上的，「显示全部」可展开） */
   const specs = specPickItems(have, true);
   const equips = [];
   (uni.equipment||[]).forEach(eq=>{
@@ -4340,7 +4340,7 @@ function renderStoreAddModal(){
       const pe = document.getElementById("mp_price");
       if(pe) pe.addEventListener("input", function(){ MODAL.price = parseInt(this.value,10)||0; });
       bindModalSpin("mp_qty", ()=>MODAL.quantity, v=>MODAL.quantity=v, 1, 99);
-      /* U107：「显示全部」只管**特种兵**候选 ⇒ 兵种模式下用不上，置灰。 */
+      /* 「显示全部」只管**特种兵**候选 ⇒ 兵种模式下用不上，置灰。 */
       const allcb = document.getElementById("spick_all");
       if(allcb && MODAL.mode!=="spec"){
         allcb.disabled = true;
@@ -4404,7 +4404,7 @@ async function loadUndoStack(){
   catch(e){ USTACK = {stack:[], backups:[], count:0}; }
   paintRail();
 }
-/* ⚠️ **U135**（外部审阅 P2-2）：写盘 / 撤销之后，
+/* ⚠️ 写盘 / 撤销之后，
    **撤销栈与备份列表都变了** ⇒ 必须重新拉一次。
    （以前不拉 ⇒ 概览页列的还是旧记录、Rail 上的条数也没变，
      空栈了「撤销」按钮还是能点。） */
@@ -4449,7 +4449,7 @@ function rosterHTML(){
       <td>{5}</td>
     </tr>`, esc(u.name_cn||u.name_brief||(L("单位 ")+u.id)), esc(hqName[u.hq_id]||u.hq_id||"—"), st||"—", u.entr!==undefined?u.entr:"—", u.xp!==undefined?u.xp:"—", specs||"—");
   }).join("");
-  /* U99：名册表可能有几十行 ⇒ 限高 + 框内滚动（表头吸顶）。
+  /* 名册表可能有几十行 ⇒ 限高 + 框内滚动（表头吸顶）。
      ⚠ **不改 L2 的模板字面量** —— 那个字面量就是词表 key，改了英文界面会掉回中文。
      这里只对**翻译完的结果字符串**做替换（中英文的 `<table class="rlist">` 一致）。 */
   const html = L2(`<div class="note" style="margin:0 0 10px">
@@ -4490,13 +4490,13 @@ function conferenceStoreHTML(){
 /* ---------- 概览页：备份与撤销栈 ---------- */
 function backupStackHTML(){
   const u = USTACK||{};
-  /* U56：三栏 —— 标签 | 主内容 | 右侧小字（名字过长省略号截断，hover 有全文） */
-  /* U109：备份在 `<修改器目录>/bak/` 下 ⇒ 悬停给**完整路径**（玩家找得到） */
+  /* 三栏 —— 标签 | 主内容 | 右侧小字（名字过长省略号截断，hover 有全文） */
+  /* 备份在 `<修改器目录>/bak/` 下 ⇒ 悬停给**完整路径**（玩家找得到） */
   const bks = (u.backups||[]).map(b=>L2(`<div class="bkrow">
     <span class="bt">备份</span>
     <span class="bn" title="{0}">{1}</span>
     <span class="bm">{2} · {3}</span></div>`, esc(b.path||b.name), esc(b.name), esc(b.mtime||""), esc(b.size||""))).join("");
-  /* ⚠️ **U134**：`undoable` = 从栈顶往下还有几条真的能撤 ⇒ 后面的是「已过期」。 */
+  /* ⚠️ `undoable` = 从栈顶往下还有几条真的能撤 ⇒ 后面的是「已过期」。 */
   const nok = (typeof u.undoable==="number") ? u.undoable : (u.stack||[]).length;
   const st = (u.stack||[]).map((r,i)=>{
     const sum = r.summary||((r.entries||[]).join("、"));
@@ -4582,7 +4582,7 @@ function specTipHTML(t, extra){
 }
 
 /* ---------- 备选池：全量视图（按阵营 + 国籍分组，可折叠） ---------- */
-/* U49：**方向必须是「单位国籍的 parent == 特种兵国籍」** —— 单向，不可反。
+/* **方向必须是「单位国籍的 parent == 特种兵国籍」** —— 单向，不可反。
    罗马尼亚人能用德军装备；德军用不了罗马尼亚装备。
    ⚠ 之前写反了（拿「特种兵国籍」的 parent 去比）⇒ 德国单位能挂罗马尼亚装备。
    规则见规范 §7.3.2（`e162` 字节码），核心库 `Catalog.spec_can_attach` 同源。 */
@@ -4607,10 +4607,10 @@ function specCanAttach(specName, unitType){
 function fullPoolHTML(u, selected){
   const cat = CATALOG||{};
   const all = Object.keys(cat.spec_types||{});
-  /* U48：槽位上限（`min(3, max_spec)`）—— 满了才不让再挂 */
+  /* 槽位上限（`min(3, max_spec)`）—— 满了才不让再挂 */
   const cap = u.max_spec || ((cat.unit_types||{})[u.type]||{}).max_spec || 3;
   const used = selected.length;
-  /* ⚠️ **U145**：分组与排序**走共享的那套**（商店/兵库的「显示全部」也用它）
+  /* ⚠️ 分组与排序**走共享的那套**（商店/兵库的「显示全部」也用它）
      ⇒ 同一条规则只留一处（U136 的教训）。 */
   const myFac = (cat.unit_types||{})[u.type] ? ((cat.unit_types[u.type]||{}).faction||"") : "";
   const groups = specNatGroups(all.map(t=>({id:t})),
@@ -4626,7 +4626,7 @@ function fullPoolHTML(u, selected){
         const t = it.id;
         const chk = specAttachCheck(t,u.type);
         const can = chk.ok;
-        /* U48：同一种可以挂多个 ⇒ 已挂的不灰掉，角标显示「已挂 N 个」 */
+        /* 同一种可以挂多个 ⇒ 已挂的不灰掉，角标显示「已挂 N 个」 */
         const cnt = selected.filter(s=>s.type===t).length;
         const full = used >= cap;
         const why = !can ? chk.why
@@ -4639,7 +4639,7 @@ function fullPoolHTML(u, selected){
           ${imgTag(specTex(t), specCn(t), "spico")}${cnt?`<span class="dup">${cnt}</span>`:""}</div>`;
       }).join("");
       const canN = n.items.filter(it=>specCanAttach(it.id, u.type)).length;
-      /* U49：全量视图的各国分组**默认折叠** —— 375 种全铺开没法看 */
+      /* 全量视图的各国分组**默认折叠** —— 375 种全铺开没法看 */
       const open = poolGroupOpen(n);
       out += L2(`<div class="grphead{0}"
         onclick="togglePoolGroup('{1}')">
@@ -4651,12 +4651,12 @@ function fullPoolHTML(u, selected){
   });
   return out;
 }
-/* U49：分组默认**折叠** —— 只有用户点开的才展开（`SEL.poolOpen` 里记着） */
+/* 分组默认**折叠** —— 只有用户点开的才展开（`SEL.poolOpen` 里记着） */
 function poolGroupOpen(nat){ return !!(SEL.poolOpen && SEL.poolOpen[nat]); }
 function togglePoolGroup(nat){
   SEL.poolOpen = SEL.poolOpen||{};
   SEL.poolOpen[nat] = !poolGroupOpen(nat);
-  /* U103：只影响详情里的候选池 ⇒ 局部刷新（不重绘列表）。 */
+  /* 只影响详情里的候选池 ⇒ 局部刷新（不重绘列表）。 */
   refreshUnitLocal(SEL.units);
 }
 function toggleFullPool(){ SEL.fullPool = !SEL.fullPool; refreshUnitLocal(SEL.units); }
@@ -4684,7 +4684,7 @@ async function doApply(){
     openConfirm("error", {errors:d.errors||[], changes:d.changes||[]});
     return;
   }
-  /* ⚠️ **U147**：软警告**在确认页里一页列全** ⇒ 一次确认就够，
+  /* ⚠️ 软警告**在确认页里一页列全** ⇒ 一次确认就够，
      不再"点一次弹一条、逐个同意"（U118 那套太吵）。 */
   openConfirm("ok", {changes:d.changes||[], warnings:d.warnings||[],
     backup:d.backup, save_name:d.save_name});
@@ -4713,9 +4713,9 @@ async function reallyApply(){
     PENDING = [];
     paintPending();
     await openSave(VIEW._save_id);
-    /* U135：写完盘 ⇒ 撤销栈多了一条、备份多了一份 ⇒ 重新拉。 */
+    /* 写完盘 ⇒ 撤销栈多了一条、备份多了一份 ⇒ 重新拉。 */
     await refreshUndoStack();
-    /* U55：底栏没了 ⇒ 写入结果改成**弹窗**提示（含软警告）。 */
+    /* 底栏没了 ⇒ 写入结果改成**弹窗**提示（含软警告）。 */
     const warns = (d.warnings||[]);
     const warnHTML = warns.map(function(w){
       return '<div>⚠ ' + esc(w) + '</div>';
@@ -4742,12 +4742,12 @@ async function reallyApply(){
 async function doUndo(){
   const r = await post("/api/undo", {save_id: VIEW._save_id});
   const d = r.data;
-  /* U135：撤销之后撤销栈变了 ⇒ 重新拉
+  /* 撤销之后撤销栈变了 ⇒ 重新拉
      （**失败**也要拉 —— 撤不了的记录会被丢掉，列表得跟着变）。 */
   await refreshUndoStack();
   if(d.ok){ await openSave(VIEW._save_id); }
   else {
-    /* U55：底栏删了 ⇒ 撤销失败改成**弹窗**。 */
+    /* 底栏删了 ⇒ 撤销失败改成**弹窗**。 */
     const uerr = (d.errors||[]).map(function(e){
       return '<div class="erow">✕ ' + esc(e) + '</div>';
     }).join("");
@@ -4977,7 +4977,7 @@ async function fbGo(dir){
   FS.roots = d.roots||[]; FS.dirs = d.dirs||[]; FS.files = d.files||[];
   FS.picked = -1;
   if(roots) roots.innerHTML = FS.roots.map((r,i)=>
-    /* ⚠️ **U150**：这些名字是**服务端**给的（`_fs_roots`）⇒
+    /* ⚠️ 这些名字是**服务端**给的（`_fs_roots`）⇒
        英文界面下要翻（词条在 `i18n.json` 的 `ui` 段）。 */
     `<span class="chip" onclick="fbRoot(${i})">${esc(L(r.label))}</span>`).join("");
   if(dbox) dbox.innerHTML = (FS.parent ?
@@ -5088,20 +5088,20 @@ async function reload(){
   paint();
 }
 function paint(){
-  /* U81：语言按钮上的字跟着切（按钮在**启动页**） */
+  /* 语言按钮上的字跟着切（按钮在**启动页**） */
   const _lb = document.getElementById("btnLang");
   if(_lb) _lb.textContent = (LANG === "en") ? "EN" : L("中文");
   const q = (document.getElementById("q").value||"").trim().toLowerCase();
   const all = SAVES.filter(s => !q ||
     (s.name+" "+s.display+" "+s.campaign).toLowerCase().includes(q));
-  /* U72：不在 campaigns / games 下的（= 玩家自建的归档区）单独一段。
+  /* 不在 campaigns / games 下的（= 玩家自建的归档区）单独一段。
      ⚠️ **不按目录名挑** —— 玩家把归档区叫什么都行（游戏只认 campaigns / games 两个目录）。 */
   const isOld = s => !!s.archived;
   const list = all.filter(s=>!isOld(s));
   const olds = all.filter(isOld);
   document.getElementById("cnt").textContent = list.length + L(" 个存档") +
     (olds.length?(" · " + olds.length + L(" 个归档存档")):"");
-  /* U68：区分两种「空」——
+  /* 区分两种「空」——
      ① 一个存档都没有（`SAVES` 空）⇒ 给「打开其他位置 / 拖进来」的出口；
      ② 有存档但搜索没匹配上 ⇒ 仍是原来的「没有匹配的存档」。 */
   const none = !SAVES.length;
@@ -5133,7 +5133,7 @@ bindDropZone();          /* U68：拖 .usg 进这一页 ⇒ 导入成副本 */
 function esc(s){ return String(s??"").replace(/[&<>"]/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
-/* ⚠️ **U125**：把值塞进 **JS 单引号字符串**（`onclick="f('…')"`）的安全写法。
+/* ⚠️ 把值塞进 **JS 单引号字符串**（`onclick="f('…')"`）的安全写法。
    `esc()` 只管 HTML（`& < > "`），**不管 `'` 和 `\`** ⇒ 值里有个 `'`
    就能**提前闭合**字符串、把后面的内容当代码执行。
    ⇒ 先按 JS 规则转义（`\` `'` `"`），再按 HTML 规则转义（`& < > "`）
@@ -5208,7 +5208,7 @@ document.querySelectorAll(".rail .nav").forEach(n =>
    ⇒ 总部清单整页重绘后跳回顶部）。
    整页重绘会把它们重建 ⇒ scrollTop 归零 ⇒ **列表跳回顶部**。
    ⇒ 重绘前记住、画完放回去；**只对同一页生效**（换页仍然从顶部开始）。 */
-/* U106：详情区的内容**是不是还是那一份**？
+/* 详情区的内容**是不是还是那一份**？
    · 同一个总部的同一个标签页 ⇒ 内容没换 ⇒ 滚动位置保住（改完详情不跳）；
    · 换了总部 / 换了标签页 ⇒ 内容变了 ⇒ 旧位置没意义 ⇒ 从顶部开始。 */
 function scrollCtx(){
@@ -5233,7 +5233,7 @@ function restoreScroll(w, st){
   w.scrollTop = st.work;
   const rows = w.querySelector(".rows");
   if(rows) rows.scrollTop = st.rows;
-  /* U106：总部清单的滚动位置也要保住 */
+  /* 总部清单的滚动位置也要保住 */
   const hql = w.querySelector(".hqlist");
   if(hql) hql.scrollTop = st.hqlist;
   const det = w.querySelector(".detail");
@@ -5259,7 +5259,7 @@ function renderPage(p){
   /* 导航高亮跟随当前页（`?page=` 深链进来时原来还亮在「概览」） */
   document.querySelectorAll(".rail .nav").forEach(x=>
     x.classList.toggle("on", x.dataset.p===p));
-  /* U47：目录还没到位 ⇒ 先给「加载中」，别渲染半成品 */
+  /* 目录还没到位 ⇒ 先给「加载中」，别渲染半成品 */
   if(NEEDS_CATALOG[p] && !CATALOG){
     w.innerHTML = L2(`<div class="panel"><h3>{0}</h3><div class="placeholder">
       <div class="big">正在加载游戏目录…</div>
@@ -5280,7 +5280,7 @@ function renderPage(p){
         <div class="h">${L(FEATURE_CN[f.name])||f.name} ${f.ok?'✓':'✗'}</div>
         ${f.ok?"":`<div class="r">${esc(f.reason)}</div>`}
       </div>`).join("");
-    /* U56：两栏面板 —— 左「能力位体检 + 战役进度」，右「备份与撤销栈 + 说明」。
+    /* 两栏面板 —— 左「能力位体检 + 战役进度」，右「备份与撤销栈 + 说明」。
        宽度有上限、位置固定 ⇒ 放大窗口时不再「卡片乱飞」。 */
     w.innerHTML = L2(`<div class="ovwrap">
       <div class="ovcol">
@@ -5316,7 +5316,7 @@ function renderPage(p){
           </div></div></div>
       </div>
     </div>`, caps, levelPickerHTML(), backupStackHTML());
-    /* U75：版本号 + 日志路径 —— 外部测试者要能说清自己用的哪版，
+    /* 版本号 + 日志路径 —— 外部测试者要能说清自己用的哪版，
        出问题时把日志贴给开发者（浏览器窗口一关，console 就没了 ⇒ 日志落文件）。 */
     w.innerHTML += L2(`<div class="fine" style="padding:8px 12px 0">{0} · {1} · <code>{2}</code></div>`,
       L("版本") + " v" + ((SETTINGS && SETTINGS.version) || "?"),

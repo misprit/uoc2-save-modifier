@@ -114,7 +114,7 @@ class TestFreeStateOnItsOwnLine(CardsFreeUiTestBase):
 
     def test_freeline_is_not_truncated(self):
         """状态行**不许**被 ellipsis 截掉（卡名长的时候也要看得见）。"""
-        css = self.slice(".hcard .freeline{", "/* U47")
+        css = self.slice(".hcard .freeline{", "/* 手牌的两个操作")
         self.assertIn("text-overflow:clip", css)
         self.assertNotIn("text-overflow:ellipsis", css)
 

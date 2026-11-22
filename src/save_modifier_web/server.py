@@ -41,9 +41,9 @@ REPO_SRC = Path(__file__).resolve().parents[1]
 if str(REPO_SRC) not in sys.path:
     sys.path.insert(0, str(REPO_SRC))
 
-#: U141：存档打不开（文件损坏）时用这个异常 ⇒ 界面显示一句人话
+    #: 存档打不开（文件损坏）时用这个异常 ⇒ 界面显示一句人话
 from save_modifier_core import SaveUnreadable  # noqa: E402
-#: U143：战区资产的组 = **阵营**（不是"阶段"）⇒ 按 side 定位
+#: 战区资产的组 = **阵营**（不是"阶段"）⇒ 按 side 定位
 from save_modifier_core.container import (  # noqa: E402
     theater_group_index, theater_sides)
 
@@ -324,7 +324,7 @@ def api_saves() -> dict:
             "kind": ("战役" if info.kind == "campaign" else "独立场景")
                      if ui_language() == "chi" else
                      ("Campaign" if info.kind == "campaign" else "Standalone scenario"),
-            # U72：在**玩家自建的归档目录**里？（游戏只认 campaigns / games）
+            # 在**玩家自建的归档目录**里？（游戏只认 campaigns / games）
             "archived": bool(info.archived),
             "mtime": _mtime(info.mtime),
             "size": _size(info.size),
@@ -404,14 +404,14 @@ def api_view(save_id: str) -> dict:
             })
         data["_features"] = features
         data["_save_id"] = save_id
-        # U53：单位页过滤器 #2「当前场景激活的单位」的数据源
+        # 单位页过滤器 #2「当前场景激活的单位」的数据源
         # （`games/<场景>/units.yml` 的扁平 id 名单；**只在战斗中才有**）。
         data["battle_unit_ids"] = list(view.battle_unit_ids)
         data["in_battle"] = bool(caps.in_battle)
         # ⚠️ `SaveInfo.name` / `display_name` 是**属性**，不是 dataclass 字段
         # ⇒ `_jsonable` 不会输出它们 ⇒ 前端拿不到存档名（U42 实测 Header 显示「—」）。
         try:
-            # U74：`display_name` 是核心库的**中文属性** ⇒ 英文界面下走 `_save_display()`
+            # `display_name` 是核心库的**中文属性** ⇒ 英文界面下走 `_save_display()`
             data["save"]["display_name"] = _save_display(view.save)
             data["save"]["file_name"] = view.save.name
         except Exception:
@@ -429,7 +429,7 @@ def api_view(save_id: str) -> dict:
         try:
             pos = save.campaign_position()
             data["campaign_position"] = _jsonable(pos)
-            # U74：战役位置里的**名字**跟着界面语言
+            # 战役位置里的**名字**跟着界面语言
             try:
                 _cp = data.get("campaign_position")
                 if isinstance(_cp, dict):
@@ -447,7 +447,7 @@ def api_view(save_id: str) -> dict:
         _tr = None
         try:
             _tr = _tr_store(data_language())
-            #: U83：名字回退链 = **当前语言 → 英文 → 内部 id**
+            #: 名字回退链 = **当前语言 → 英文 → 内部 id**
             _pick = _name_lookup(data_language())
             for _u in (data.get("units") or []):
                 _u["name_cn"] = _pick(_u.get("name_brief") or "", _u.get("name_brief") or "")
@@ -484,7 +484,7 @@ def api_view(save_id: str) -> dict:
                     }
         data["skills"] = skills
         data["generals"] = generals
-        # U89：作战标记（HQ 技能的三种命令）—— 显示名跟着界面语言
+        # 作战标记（HQ 技能的三种命令）—— 显示名跟着界面语言
         try:
             from save_modifier_core.container import ORDER_LISTS, ORDER_LOCALE_KEYS
             data["orders_meta"] = {
@@ -602,7 +602,7 @@ def _catalog_payload() -> dict:
             "attack": t.attack,
             "defense": t.defense,
             "armor": t.armor,
-            # U92：防御装甲 + 「装甲机动单位」判定（「反击」的硬约束）
+            # 防御装甲 + 「装甲机动单位」判定（「反击」的硬约束）
             "armor_def": t.armor_def,
             "armor_mobile": t.armor_mobile,
             "max_st": t.max_st,
@@ -734,7 +734,7 @@ def api_pickers(save_id: str, unit_type: str = "",
             names, scope = catalog.specialist_candidates(
                 unit_type, campaign_id=campaign_id)
         pool = sorted(catalog.campaign_specialist_pool(campaign_id))
-        # U104：批量 —— 一次算齐所有单位类型的候选池
+        # 批量 —— 一次算齐所有单位类型的候选池
         by_unit: dict[str, dict] = {}
         for t in [x for x in (unit_types or "").split(",") if x]:
             if t in by_unit:
@@ -754,7 +754,7 @@ def api_pickers(save_id: str, unit_type: str = "",
 
         universe = catalog.store_item_universe(campaign_id, conference)
         wl = catalog.card_whitelist(save)
-        # U107：玩家「挂得上的」特种兵 —— 与**单位页挂载特种兵**同一个函数
+        # 玩家「挂得上的」特种兵 —— 与**单位页挂载特种兵**同一个函数
         # （`specialist_candidates`）：玩家**自己阵营**的每个单位类型的候选池取并集。
         # ⚠️ 存档里**也有 AI 的单位**（west 存档 45 个单位里有德国 / 意大利的）
         # ⇒ 必须按 `player_faction` 过滤，否则会把敌方的也带进来。
@@ -781,11 +781,11 @@ def api_pickers(save_id: str, unit_type: str = "",
             player_specs.update(names)
         return {
             "unit_type": unit_type,
-            # U107：玩家阵营 + 「挂得上的」特种兵（商店上架 / 兵库加条目用）
+            # 玩家阵营 + 「挂得上的」特种兵（商店上架 / 兵库加条目用）
             "player_faction": player_faction,
             "player_specs": sorted(player_specs),
             "specialists_for_unit": {"candidates": list(names), "scope": scope},
-            # U104：批量拿到的「每种单位类型的候选池」
+            # 批量拿到的「每种单位类型的候选池」
             "specialists_by_unit": by_unit,
             "campaign_pool": pool,
             # ⚠️ `store_item_universe()` 的键是**单数**（equipment / nationality / spec）
@@ -819,7 +819,7 @@ def _theater_assets_of(save, side: str = "player") -> list:
     theater = data.get("theater_assets")
     if not isinstance(theater, list) or not theater:
         return []
-    # ⚠️ **U143**：组 = **阵营**（不是"阶段"）⇒ 按 side 定位
+    # ⚠️ 组 = **阵营**（不是"阶段"）⇒ 按 side 定位
     idx = theater_group_index(data, side)
     items = theater[idx]
     if not isinstance(items, list):
@@ -874,7 +874,7 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
                           if isinstance(grp, list) else [])
     idx = (phase if isinstance(phase, int) and not isinstance(phase, bool)
            and 0 <= phase < len(groups) else 0)
-    # ⚠️ **U143**：组 = **阵营**（不是"阶段"）⇒
+    # ⚠️ 组 = **阵营**（不是"阶段"）⇒
     #   `current` = **玩家那一方**（`factions` 里 `player: local` 的下标），
     #   `other`   = **对手那一方**。
     #   以前按 `phase`（当前行动方）⇒ 轮到 AI 时会把**敌方那组当成自己的**。
@@ -925,7 +925,7 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
         universe.append({
             "asset": name,
             "has_texture": bool(it.get("has_texture")),
-            # U143：**玩家那一方 / 对手那一方**（旧的 in_current / in_other
+            # **玩家那一方 / 对手那一方**（旧的 in_current / in_other
             #        保留为别名，语义同步改成"两方"）
             "in_player": cur is not None,
             "in_opponent": name in other,
@@ -935,7 +935,7 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
             "scenario": defn is not None,
             "scenario_uses_total": (defn or {}).get("uses_total"),
             "scenario_uses_turn": (defn or {}).get("uses_turn"),
-            # U143：**对手那一方**的设计（各自的参照值，别混）
+            # **对手那一方**的设计（各自的参照值，别混）
             "opponent_scenario": (scenario_opp.get(name) is not None),
             "opponent_scenario_uses_total":
                 (scenario_opp.get(name) or {}).get("uses_total"),
@@ -949,7 +949,7 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
         "reason": reason,
         "phase": idx,
         "phase_count": len(groups),
-        # ⚠️ **U143**：两组分别属于哪一方（`player: local` / `player: ai`）
+        # ⚠️ 两组分别属于哪一方（`player: local` / `player: ai`）
         "sides": theater_sides(data),
         "player_index": player_idx,
         "opponent_index": opponent_idx,
@@ -1155,21 +1155,21 @@ def api_settings() -> dict:
         "game_dir": str(paths.game_dir) if paths.game_dir else "",
         "found": bool(paths.game_dir),
         "packages": [str(p) for p in paths.packages()],
-        # U70：被游戏**整包禁用**的 mod（not_moddable 规则命中）⇒ 修改器也不读
+        # 被游戏**整包禁用**的 mod（not_moddable 规则命中）⇒ 修改器也不读
         "disabled_packages": [{"path": k, "rule": v} for k, v in disabled.items()],
-        # U74：界面语言（用户选的 / 跟随游戏）与数据名字的语言
+        # 界面语言（用户选的 / 跟随游戏）与数据名字的语言
         "ui_language": ui_language(),
         "game_language": _game_language(),
         "data_language": data_language(),
         "available_languages": list(UI_LANGUAGES),
-        # U71：Steam 创意工坊里的 mod 包（zip 里还没解压的也算 ⇒ 已并入参考数据）
+        # Steam 创意工坊里的 mod 包（zip 里还没解压的也算 ⇒ 已并入参考数据）
         "workshop_packages": [
             {"kind": w["kind"], "pkg": w["pkg"], "item": w["item"],
              "path": str(w["path"])}
             for w in core_paths.workshop_package_sources()],
         "candidates": core_paths.game_dir_candidates(),
         "config_path": str(core_paths.config_path()),
-        # U75：版本号（测试者要能说清自己用的哪版）+ 日志文件（出问题贴给开发者）
+        # 版本号（测试者要能说清自己用的哪版）+ 日志文件（出问题贴给开发者）
         "version": _version(),
         "log_file": str(_log_path() or ""),
     }
@@ -1683,7 +1683,7 @@ def api_campaign_detail(save_id: str) -> dict:
         confs = data.index.conferences(cid, chosen_route)
         cur_idx = next((i for i, c in enumerate(confs) if c.id == cur), -1)
 
-        # U74：场景名跟着界面语言（内置索引里是**写死的中文**）
+        # 场景名跟着界面语言（内置索引里是**写死的中文**）
         _tr2 = None
         try:
             _tr2 = _tr_store(data_language())
@@ -1713,7 +1713,7 @@ def api_campaign_detail(save_id: str) -> dict:
                 roster = _jsonable(r)
                 # 名册单位的 name_brief 是**本地化键** ⇒ 翻成中文（§5.7）
                 try:
-                    #: U83：名字回退链 = **当前语言 → 英文 → 内部 id**
+                    #: 名字回退链 = **当前语言 → 英文 → 内部 id**
                     _pick2 = _name_lookup(data_language())
                     for _u in (roster.get("units") or []):
                         _u["name_cn"] = _pick2(str(_u.get("name_brief") or ""),
@@ -1762,7 +1762,7 @@ def api_undo_stack(save_id: str) -> dict:
         records, _ = load_stack(path)
         stack = [{"id": r.id, "time": r.time, "summary": r.summary,
                   "entries": [e.entry for e in r.entries]} for r in reversed(records)]
-        # ⚠️ **U134**（外部审阅 P2-1）：栈顶可能**撤不了**（存档后来又被改过）
+        # ⚠️ 栈顶可能**撤不了**（存档后来又被改过）
         # ⇒ 如实告诉界面「从栈顶往下还有几条真的能撤」，
         #   界面据此禁用撤销按钮、标出「已过期」的记录
         #   （玩家就不会反复点一个注定失败的按钮）。
@@ -1902,7 +1902,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _json(self, obj, code=200):
         # ⚠️ **显示层翻译**（U74）：界面是英文时，把报错/警告/摘要翻成英文
-        # ⚠️ **U81**：语言**只问一次**（整包一个）—— 别每个节点问一遍。
+        # ⚠️ 语言**只问一次**（整包一个）—— 别每个节点问一遍。
         obj = _tr_payload(obj, lang=ui_language())
         self._send(code, json.dumps(obj, ensure_ascii=False).encode("utf-8"),
                    "application/json; charset=utf-8")
@@ -1937,7 +1937,7 @@ class _Handler(BaseHTTPRequestHandler):
                     q = parse_qs(urlparse(self.path).query)
                     sid = (q.get("save_id") or [""])[0]
                     ut = (q.get("unit_type") or [""])[0]
-                    # U104：批量（一次算齐所有单位类型的候选池）
+                    # 批量（一次算齐所有单位类型的候选池）
                     uts = (q.get("unit_types") or [""])[0]
                     self._json(api_pickers(sid, ut, uts))
                 elif path == "/api/campaign-detail":
@@ -1958,7 +1958,7 @@ class _Handler(BaseHTTPRequestHandler):
                 else:
                     self._json({"error": "未知接口"}, 404)
             except SaveUnreadable as exc:
-                # ⚠️ **U141**：存档**打不开**（文件坏了）⇒ 这是用户的文件坏了，
+                # ⚠️ 存档**打不开**（文件坏了）⇒ 这是用户的文件坏了，
                 # 不是服务器出错 ⇒ 400 + 一句人话（别甩 BadZipFile 给他看）。
                 self._json({"error": str(exc)}, 400)
             except Exception as exc:                     # 绝不让一条坏请求炸掉服务
@@ -2034,7 +2034,7 @@ class _Handler(BaseHTTPRequestHandler):
             else:
                 self._json({"ok": False, "errors": ["未知接口"]}, 404)
         except SaveUnreadable as exc:
-            # ⚠️ **U141**：存档**打不开**（文件坏了）⇒ 400 + 一句人话
+            # ⚠️ 存档**打不开**（文件坏了）⇒ 400 + 一句人话
             self._json({"ok": False, "errors": [str(exc)]}, 400)
         except ValueError as exc:
             # 请求体不合法（非法 kind / params 不是字典 …）⇒ 400，不是 500
@@ -2080,7 +2080,7 @@ def run(serve_only: bool = False, no_window: bool = False,
 
     if serve_only:
         if no_browser:
-            # U80：启动器 exe 会自己开浏览器（能管 Edge --app / 默认浏览器，
+            # 启动器 exe 会自己开浏览器（能管 Edge --app / 默认浏览器，
             # 也能实现「关窗即退」与单实例）⇒ 服务端**不要**碰浏览器。
             print("（--no-browser：只起服务，浏览器交给启动器）")
         else:

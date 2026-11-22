@@ -159,7 +159,7 @@ def theater_group_index(battle_data: Any, side: str = "player") -> int:
 
 #: 作战标记（HQ 技能的三种「命令」）⇒ 战斗层 `main.yml` 里的列表名。
 #:
-#: U89（2026-11-20）：用户批准把**战斗层**列为可写（第二个 L3 例外，
+    #: 用户批准把**战斗层**列为可写（第二个 L3 例外，
 #: 第一个是战区资产）。标记的官方名称来自游戏 locale：
 #: `id_no_retreat`（不能撤退）/ `id_rearguard`（后卫部队）/ `id_elastic_defense`（反击）。
 ORDER_LISTS = {
@@ -218,20 +218,20 @@ class UnitView:
     max_st: int | None = None
     #: 类型的特种兵上限（`min(3, max_spec)`）
     max_spec: int | None = None
-    #: U89：**作战标记**（HQ 技能的命令）—— `no_retreat` / `rearguard` /
+    #: **作战标记**（HQ 技能的命令）—— `no_retreat` / `rearguard` /
     #: `elastic_defense`；只对当前战斗有效。
     #:
-    #: ⚠️ **U102：这三个标记互斥 —— 一个单位同时只能有一个。**
+    #: ⚠️ 这三个标记互斥 —— 一个单位同时只能有一个。
     #: 游戏里下达命令是「先把该单位从三个列表全清掉、再加进其中一个」
     #: （`state/scenario/commands_unit.pyc::UnitSetFlags._set_flags:359-368`），
     #: 且三个 `can_make_*` 都要求「该单位没有其它标记」
     #: （`Gamelike.has_any_defense_flag`）⇒ 这里**只给生效的那一个**
     #:（按游戏优先级 no_retreat → rearguard → elastic_defense）。
     orders: tuple[str, ...] = ()
-    #: U102：存档里这个单位**本来就**同时在多个列表里（游戏自己造不出这种状态，
+    #: 存档里这个单位**本来就**同时在多个列表里（游戏自己造不出这种状态，
     #: 可能是别的工具写的）⇒ 界面提示一句。只读，不改存档。
     orders_conflict: bool = False
-    #: U92：是不是**装甲机动单位**（类型判定）——
+    #: 是不是**装甲机动单位**（类型判定）——
     #: 游戏里「反击」只允许这种单位挂（`can_make_elastic_defense`）。
     armor_mobile: bool = False
 
@@ -413,7 +413,7 @@ class Save:
             try:
                 self._zf = zipfile.ZipFile(self.info.path, "r")
             except (zipfile.BadZipFile, OSError) as exc:
-                # ⚠️ **U141**：别把 `BadZipFile` 原样抛穿（玩家看不懂，
+                # ⚠️ 别把 `BadZipFile` 原样抛穿（玩家看不懂，
                 # 也不知道下一步该干什么）⇒ 换成一句人话。
                 raise SaveUnreadable(
                     "这个存档打不开（文件损坏，或它不是 .usg 存档）—— "
@@ -734,7 +734,7 @@ class Save:
         main = self.root_main()
         roster = self.roster_ids() if caps.has_root_units else set()
 
-        # U89：作战标记（当前战斗层的一次读取）
+        # 作战标记（当前战斗层的一次读取）
         orders_map = self.combat_orders() if caps.in_battle else {}
 
         units = []
@@ -759,11 +759,11 @@ class Save:
                 mp=u.get("mp"),
                 losses=u.get("losses"),
                 retreated=u.get("retreated"),
-                # U102：三个标记互斥 ⇒ 只暴露**生效的那一个**（游戏优先级）
+                # 三个标记互斥 ⇒ 只暴露**生效的那一个**（游戏优先级）
                 orders=_effective_orders(orders_map.get(u["id"], ())),
-                # U102：存档里本来就有冲突（同一单位在多个列表里）⇒ 标记出来
+                # 存档里本来就有冲突（同一单位在多个列表里）⇒ 标记出来
                 orders_conflict=len(orders_map.get(u["id"], ())) > 1,
-                # U92：类型级判定（有没有游戏包都安全 —— 没有就是 False）
+                # 类型级判定（有没有游戏包都安全 —— 没有就是 False）
                 armor_mobile=bool(catalog.armor_mobile(t)) if (catalog and t) else False,
                 in_roster=u["id"] in roster if roster else True,
                 max_st=catalog.max_st(t) if (catalog and t) else None,

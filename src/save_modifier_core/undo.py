@@ -330,7 +330,7 @@ def undo_save(save_path: Path) -> UndoResult:
     record = records[-1]
 
     # 基准校验 —— 不过就拒绝，绝不硬改
-    # ⚠️ **U134**（外部审阅 P2-1）：这条记录**撤不了**了（存档后来又被改过），
+    # ⚠️ 这条记录**撤不了**了（存档后来又被改过），
     # 但**不弹栈** —— 玩家把存档从备份还原回来之后，它又能撤了
     # （仓库护栏：`tests/test_undo.py::test_stack_survives_rejected_undo`）。
     # ⇒ 改成让**界面知道**：服务端算「还有几条能撤」（`undoable`），
@@ -342,7 +342,7 @@ def undo_save(save_path: Path) -> UndoResult:
             "（可能是在游戏里手动改的）")
         res.errors.extend(bad)
         res.warnings.append(
-            # ⚠️ U116：U109 起备份改放 `<修改器目录>/bak/` ⇒ 提示也要跟着改
+            # ⚠️ U109 起备份改放 `<修改器目录>/bak/` ⇒ 提示也要跟着改
             "提示：可以把 bak 文件夹里的 `_BACKUP.usg` 复制回去作为回退")
         return res
 

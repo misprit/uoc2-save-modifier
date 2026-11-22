@@ -206,13 +206,13 @@ class TestSpecPickerUi(unittest.TestCase):
     def test_shared_item_builder_exists(self):
         """两个选择器走**同一套**逻辑。"""
         self.assertIn("function specPickItems(", self.html)
-        body = self._body(self.html, "function specPickItems(", "/* U107：切换「显示全部」 */")
+        body = self._body(self.html, "function specPickItems(", "/* 切换「显示全部」 */")
         self.assertIn("playerSpecs()", body)
         self.assertIn("MODAL.all", body)
 
     def test_default_list_is_the_player_ones(self):
         """默认列表 = **玩家挂得上的那批**（直接取 `playerSpecs()`）。"""
-        body = self._body(self.html, "function specPickItems(", "/* U107：切换「显示全部」 */")
+        body = self._body(self.html, "function specPickItems(", "/* 切换「显示全部」 */")
         self.assertIn("ok ? ok.slice()", body,
                       "默认必须只列玩家挂得上的")
 
@@ -224,7 +224,7 @@ class TestSpecPickerUi(unittest.TestCase):
         ⇒ 用户以为「很多种挂不上 / 买不了」。
         """
         body = self._body(self.html, "function specPickItems(",
-                          "/* U107：切换「显示全部」 */")
+                          "/* 切换「显示全部」 */")
         self.assertIn("all ? allSpecTypes()", body)
         self.assertIn("function allSpecTypes()", self.html)
         self.assertIn("Object.keys(cat)", self.html)
@@ -234,7 +234,7 @@ class TestSpecPickerUi(unittest.TestCase):
         （U107 改的）⇒ 游戏本来就接受 ⇒ 灰掉反而是多余的拦截。
         挂不上的只在**悬停**里写明原因。"""
         body = self._body(self.html, "function specPickItems(",
-                          "/* U107：切换「显示全部」 */")
+                          "/* 切换「显示全部」 */")
         self.assertIn("blocked: false", body)
         self.assertNotIn("forStore && !usable", body)
 

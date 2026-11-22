@@ -48,7 +48,7 @@ LOCALE_SUBDIR = "localization"
 
 #: 每个 locale 目录里的**主**文件（保留旧名；U74 起不再用白名单）
 #:
-#: ⚠️ **U74：改成「扫该目录下所有 `.yml`」** ——
+#: ⚠️ 改成「扫该目录下所有 `.yml`」** ——
 #: ① `eng` 目录里**没有** `strings.yml`（英文被拆成 **40 个** 按功能分的 yml）
 #:    ⇒ 旧白名单会让英文**一个字符串都读不到**；
 #: ② mod 往 `localization/<lang>/` 里加的**新文件**（如所见即所得 mod 的
@@ -128,7 +128,7 @@ class TranslationStore:
         loc_dir = pkg / LOCALE_SUBDIR / self.locale
         if not loc_dir.is_dir():
             return
-        # U74：读该目录下**所有** `.yml`（不挑名字）—— 见 STRING_FILENAMES 的说明
+        # 读该目录下**所有** `.yml`（不挑名字）—— 见 STRING_FILENAMES 的说明
         try:
             files = sorted(f for f in loc_dir.glob("*.yml") if f.is_file())
         except OSError:

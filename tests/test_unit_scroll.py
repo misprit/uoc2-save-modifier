@@ -141,7 +141,7 @@ class UnitScrollTest(unittest.TestCase):
     def test_badges_html_is_shared(self):
         """列表行与局部刷新**共用**一份徽章 HTML（别写两遍）。"""
         self.assertIn("function unitBadgesHTML(u)", self.html)
-        row = _body(self.html, "function unitRowHTML(u)", "/* U103：列表行里的特种兵徽章")
+        row = _body(self.html, "function unitRowHTML(u)", "/* 列表行里的特种兵徽章")
         self.assertIn("unitBadgesHTML(u)", row)
 
     def test_spec_slots_are_clickable_after_local_refresh(self):

@@ -106,12 +106,12 @@ class Work:
         self._raws: dict[str, bytes] = {}
         self.touched: set[str] = set()
         self.outcomes: list[Outcome] = []
-        #: U97：**本批要执行的所有编辑** —— handler 可以据此判断
+        #: **本批要执行的所有编辑** —— handler 可以据此判断
         #: 「这一批改完之后」的值（而不是执行到一半的中间态）。
         #: 同一批编辑是**依次执行**的 ⇒ 中间态会误报
         #: （U96 的兵力上限、U97 的总部 CP 都是这么来的）。
         self.batch_edits: list = []
-        #: U123：**解析失败**的条目（`YAML 解析失败`）——
+        #: **解析失败**的条目（`YAML 解析失败`）——
         #: 这一批**不许写盘**（见 `table()`）。
         self.parse_errors: list[str] = []
 
@@ -128,7 +128,7 @@ class Work:
             try:
                 value = yamlio.load(raw)
             except Exception as exc:
-                # ⚠️ **U123**：原来这里直接 `value = default` ——
+                # ⚠️ 原来这里直接 `value = default` ——
                 # **静默**把一个解析失败的条目当成「空表」，
                 # 改完再写回去 = **残缺的存档**（外部审阅报告 P1-5）。
                 # ⇒ 记一条错误 ⇒ 这一批**整批不许写盘**。
@@ -224,7 +224,7 @@ def writable_entries(save) -> set:
 #: | `hq_force_pool_remove` | 某个总部的 `force_pool` |
 #: | `store_remove` | 某个 战线/子商店 的商品列表 |
 #:
-#: ⚠️ **U121**：以前只把 `hq_force_pool_remove` 当成「按下标删除」，
+    #: ⚠️ 以前只把 `hq_force_pool_remove` 当成「按下标删除」，
 #: **`store_remove` 漏了** ⇒ 一次改两个商店条目时**删错行**
 #: （外部审阅报告 P0-2）。
 #:
@@ -304,7 +304,7 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
         plan.errors.extend(oc.errors)
         plan.warnings.extend(oc.warnings)
 
-    # U123：有条目**解析失败** ⇒ 这一批**整批不许写盘**
+    # 有条目**解析失败** ⇒ 这一批**整批不许写盘**
     # （否则会把「空表」写回去 = 残缺存档）。
     plan.errors.extend(w.parse_errors)
 
@@ -330,7 +330,7 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
         plan._payload[entry] = after
         plan._before_raw[entry] = w._raws.get(entry, b"")
 
-    # U124：**写盘白名单** —— 只允许改根层那五张表 + 当前战斗层那张 main.yml
+    # **写盘白名单** —— 只允许改根层那五张表 + 当前战斗层那张 main.yml
     allowed = writable_entries(save)
     illegal = sorted({c.entry for c in plan.changes if c.entry not in allowed})
     if illegal:
