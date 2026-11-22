@@ -1576,7 +1576,16 @@ function bindSpin(el, opts){
 function bindNumIn(el, opts){
   const base = opts.base;      /* 存档原值 */
   let init = true;             /* 初始化时**不触发回调** */
+  /* ⚠️ **重入保护**（U162）：`opts.onChange` 往往会**重绘整页**
+     （`w.innerHTML = …`）⇒ 正在编辑的那个输入框被**移除**
+     ⇒ 浏览器补发一次 `change` ⇒ 又进来一次 `apply()`
+     ⇒ 第二次 innerHTML 撞上「第一次还没删完的节点」
+     ⇒ Chrome 抛 `NotFoundError: The node to be removed is no longer a child
+     of this node` ⇒ 玩家看到「界面出错了」横幅（**改动其实生效了**）。
+     ⇒ 重绘期间进来的那一次**直接忽略**（值没变，重来一遍也没意义）。 */
+  let busy = false;
   function apply(){
+    if(busy) return;
     /* ⚠️ `init` 必须**在这次调用开头**就消费掉 ——
        原来它是在「值合法」之后才置 false ⇒ **初始值非法**时
        （比如存档里 quantity=0 而下限是 1）初始化那次 `apply()` 提前 return
@@ -1600,7 +1609,8 @@ function bindNumIn(el, opts){
     /* ⚠️ 初始化**不**触发回调 —— 回调里往往会重绘页面，
        初始化就回调 ⇒ 重绘 → 重新 bind → 再回调 ⇒ **无限递归**（U38 实测）。 */
     if(isInit) return;
-    opts.onChange(v);
+    busy = true;
+    try{ opts.onChange(v); } finally { busy = false; }
   }
   el.addEventListener("input", apply);
   el.addEventListener("change", apply);
