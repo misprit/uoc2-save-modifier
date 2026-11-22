@@ -61,7 +61,7 @@ docs/                    规范文档 + 取证脚本
 ## 开发
 
 ```powershell
-# 跑全部测试（1082 项）
+# 跑全部测试（1176 项，2026-11-22 实测）
 .\python\python.exe -m unittest discover -s tests -t .
 
 # 发包前自检（工作区干净 / 成品 zip 完整且与代码逐字节一致 / 没漏打文件 /
