@@ -3385,6 +3385,30 @@ function theaterCn(a){ return (VIEW.theater_cn||{})[a] || a; }
    **带上阵营** ⇒ 两侧的改动互不串（同一资产可能两边都有）。
    当前编辑的是**哪一方** = `SEL.theaterSide`（页面上有切换）。 */
 function theaterSide(){ return (SEL && SEL.theaterSide) || "player"; }
+/** 取「某一侧」对应的字段（场景定义 / 有没有）。
+ *
+ * ⚠️ 战区资产的候选卡是**两方共用**的一张表，但「场景自带 / 新增」的判断
+ * 必须按**当前这一方**取 —— 否则切到对手方时，
+ * 会把「玩家场景里有」显示成「对手场景里有」（U154）。
+ * `side` 省略 = 当前这一方。
+ */
+function theaterSideField(u, key, side){
+  if(!u) return undefined;
+  const s = side||theaterSide();
+  const opp = (s==="opponent");
+  if(key==="scenario") return opp ? u.opponent_scenario : u.scenario;
+  if(key==="scenario_uses_total") return opp ? u.opponent_scenario_uses_total : u.scenario_uses_total;
+  if(key==="scenario_uses_turn") return opp ? u.opponent_scenario_uses_turn : u.scenario_uses_turn;
+  if(key==="in") return opp ? u.in_opponent : u.in_player;
+  if(key==="other_in") return opp ? u.in_player : u.in_opponent;
+  return u[key];
+}
+/** 另一方（不是当前这一方）的阵营名（取不到 ⇒ 空串）。 */
+function theaterOtherCn(){
+  const other = (theaterSide()==="opponent") ? "player" : "opponent";
+  const k = theaterSideKey(other);
+  return k ? facCn(k) : "";
+}
 /** 切换「你这一方 / 对手那一方」。 */
 function pickTheaterSide(sid){
   SEL.theaterSide = (sid==="opponent") ? "opponent" : "player";
@@ -3634,8 +3658,8 @@ function pageTheater(w){
     const inf = (tot===null||tot===undefined);
     let badge;
     if(theaterPend("theater_asset_remove", asset)) badge = L(`<span class="tbadge warn">待删除</span>`);
-    else if(on && !u.scenario) badge = L(`<span class="tbadge new">新增</span>`);
-    else if(u.scenario) badge = L(`<span class="tbadge">场景自带</span>`);
+    else if(on && !theaterSideField(u,"scenario")) badge = L(`<span class="tbadge new">新增</span>`);
+    else if(theaterSideField(u,"scenario")) badge = L(`<span class="tbadge">场景自带</span>`);
     else badge = L(`<span class="tbadge dim">场景没有</span>`);
     const head = `<div class="thead"><span class="tn">${esc(theaterCn(asset))}</span>${badge}</div>`;
     if(!on){
@@ -3649,8 +3673,10 @@ function pageTheater(w){
             <button class="btn pri" {4}
               onclick="openTheaterAddModal('{5}')">{6}</button>
           </div>
-        </div></div>`, imgTag(theaterTex(asset), theaterCn(asset)), head, u.scenario
-            ? L("（场景定义里有，多半是已经用完 / 被删了）") : L("（场景本来就没有）"), u.in_opponent ? L("<div class=\"talt\">对手那一方有这项（他们能用）。</div>") : "", editable?"":"disabled", jsq(asset), editable?L("添加这一项"):L("不在战斗中"));
+        </div></div>`, imgTag(theaterTex(asset), theaterCn(asset)), head, theaterSideField(u,"scenario")
+            ? L("（场景定义里有，多半是已经用完 / 被删了）") : L("（场景本来就没有）"), theaterSideField(u,"other_in") ? (theaterOtherCn()
+              ? L2("<div class=\"talt\">{0}有这项（他们能用）。</div>", esc(theaterOtherCn()))
+              : L("<div class=\"talt\">对手那一方有这项（他们能用）。</div>")) : "", editable?"":"disabled", jsq(asset), editable?L("添加这一项"):L("不在战斗中"));
     }
     return L2(`<div class="titem">
       {0}
@@ -3703,7 +3729,7 @@ function pageTheater(w){
     const asset = u.asset;
     if(!theaterInCurrent(asset)) return;
     const cur = theaterCur(asset);
-    const a = ((VIEW&&VIEW.theater_assets)||[]).find(x=>x.asset===asset) || {};
+    const a = theaterSideAssets().find(x=>x.asset===asset) || {};
     const tu = document.getElementById("th_tu_"+asset);
     if(tu) bindSpin(tu, {base:a.to_use, cur:cur.to_use, min:0, max:null,
       onChange(v){ theaterSet(asset, "to_use", v); }});
@@ -3774,7 +3800,7 @@ function renderTheaterAddModal(){
     </div>
     <div class="mf"><button class="btn" onclick="closeModal()">取消</button>
       <button class="btn pri" onclick="theaterAddConfirm()">添加</button></div>`, esc(theaterCn(M.asset)), inf?L(`<span class="num inf">无限</span>`)
-            : `<input class="numin" id="mp_tot" type="text" inputmode="numeric" autocomplete="off" value="${M.uses_total}" style="width:72px">`, inf?L("设成数字"):L("改成无限"), inf?L("无限 = 这场战斗随便用"):(L("整场战斗一共能用几次") + '<span id="mp_budget_tip">' + theaterModalBudgetTipHTML() + '</span>'), u.scenario
+            : `<input class="numin" id="mp_tot" type="text" inputmode="numeric" autocomplete="off" value="${M.uses_total}" style="width:72px">`, inf?L("设成数字"):L("改成无限"), inf?L("无限 = 这场战斗随便用"):(L("整场战斗一共能用几次") + '<span id="mp_budget_tip">' + theaterModalBudgetTipHTML() + '</span>'), theaterSideField(u,"scenario", M.side||theaterSide())
         ? L2(`{2}<b>本来就有</b>这项战区资产（场景定义：每回合恢复 {0}，
            本场景剩余 {1}），现在存档里没有 —— 多半是已经用完了。`, refTurn, refTotal===null||refTotal===undefined
              ? L("无限") : refTotal, esc(theaterSideCn(M.side)))
