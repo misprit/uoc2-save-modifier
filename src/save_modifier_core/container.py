@@ -622,7 +622,10 @@ class Save:
             flat = theater_assets_flat(groups)
             if not flat:
                 continue
-            if phase is not None and 0 <= phase < len(groups) and groups[phase]:
+            if phase is not None and 0 <= phase < len(groups):
+                # ⚠️ **空组就是空组** —— 不退回拍平
+                #    （拍平 = 后一组覆盖前一组 ⇒ 会把**另一方**的设计
+                #      当成这一方的参照值 ⇒ 玩家照着错的数去调）
                 return groups[phase]        # ← 当前阶段那一组
             return flat
         return {}

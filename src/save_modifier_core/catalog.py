@@ -1063,7 +1063,8 @@ class Catalog:
             groups = theater_assets_by_phase(ta)
             out = theater_assets_flat(groups)
             if out:
-                if phase is not None and 0 <= phase < len(groups) and groups[phase]:
+                if phase is not None and 0 <= phase < len(groups):
+                    # ⚠️ **空组就是空组**（不退回拍平 —— 那是另一方的设计）
                     return groups[phase]     # ← 当前阶段那一组
                 return out
         return {}
