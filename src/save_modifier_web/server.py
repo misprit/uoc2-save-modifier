@@ -805,10 +805,13 @@ def api_pickers(save_id: str, unit_type: str = "",
 
 
 def _theater_assets_of(save, side: str = "player") -> list:
-    """当前战斗的**战区资产**（按 `phase` 取当前那一组）。
+    """某一方的**战区资产**（按**阵营**取那一组）。
 
-    ⚠️ `theater_assets` 是按 phase 分组的（U20 实测）⇒ 只给当前 phase 那组，
-    别把别的阶段的混进来。
+    ⚠️ `theater_assets` 是**按阵营分组**的（组下标 = 阵营下标，U143 更正）
+    ⇒ 只给 `side` 指的那一组，别把另一方的混进来。
+
+    ⚠️ `side="opponent"` 在**双 `player: local`**（hotseat）时
+    取「玩家那一方之外的那一侧」⇒ 两组不重合（U153）。
     """
     try:
         data = save.battle_main()
