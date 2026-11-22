@@ -127,24 +127,53 @@ def theater_group_index(battle_data: Any, side: str = "player") -> int:
     """要改**哪一组**（组下标）。
 
     * `side="player"`（默认）⇒ **玩家那一方**（`player: local` 的下标）；
-    * `side="opponent"` ⇒ **对手那一方**；
+    * `side="opponent"` ⇒ **另一方**（不是玩家的那一组）；
     * `side="current"` ⇒ 当前行动方（`phase`）—— 旧语义，保留兼容；
+    * `side="0"` / `side="1"`（**数字**）⇒ **直接就是组下标**（界面按组寻址用）；
     * `factions` 缺失（旧存档 / 合成夹具）⇒ 退回 `phase`（**不猜**）。
+
+    ⚠️ **双 `player: local`（hotseat / 双人同机）**：两侧都是玩家 ⇒
+    「不是玩家的那一侧」**根本不存在** ⇒ 旧写法会退回第 0 组
+    ⇒ 两个页签都改第 0 组（**改错条目**），第二方那组永远改不到。
+    ⇒ 现在改成取「玩家那一方**之外**的那一侧」。
     """
     sides = theater_sides(battle_data)
     if sides:
-        want_opponent = (side == "opponent")
-        want_current = (side == "current")
+        # 数字 = **组下标**（界面按组寻址；越界 ⇒ 退回第 0 组，不猜）
+        n_groups = len(sides)
+        theater0 = (battle_data or {}).get("theater_assets")
+        if isinstance(theater0, list):
+            n_groups = len(theater0)
+        if isinstance(side, bool):
+            pass
+        elif isinstance(side, int):
+            return side if 0 <= side < n_groups else int(sides[0]["index"])
+        elif isinstance(side, str) and side.strip().isdigit():
+            n = int(side.strip())
+            return n if 0 <= n < n_groups else int(sides[0]["index"])
+        if side == "current":
+            for sd in sides:
+                if sd["is_current"]:
+                    return int(sd["index"])
+        # 玩家那一方 = 第一个 `player: local`（一个都没有 ⇒ 退第 0 组）
+        player_idx = None
         for sd in sides:
-            if want_current and sd["is_current"]:
-                return int(sd["index"])
-        for sd in sides:
-            if want_opponent and not sd["is_player"]:
-                return int(sd["index"])
-        for sd in sides:
-            if not want_opponent and sd["is_player"]:
-                return int(sd["index"])
-        return int(sides[0]["index"])
+            if sd["is_player"]:
+                player_idx = int(sd["index"])
+                break
+        if player_idx is None:
+            player_idx = int(sides[0]["index"])
+        if side == "opponent":
+            # 先找**不是玩家**的那一侧
+            for sd in sides:
+                if not sd["is_player"] and int(sd["index"]) != player_idx:
+                    return int(sd["index"])
+            # 两边都是玩家（hotseat）⇒ 玩家那一方**之外**的那一侧
+            for sd in sides:
+                if int(sd["index"]) != player_idx:
+                    return int(sd["index"])
+            return player_idx
+        return player_idx
     theater = (battle_data or {}).get("theater_assets")
     phase = (battle_data or {}).get("phase")
     if isinstance(theater, list) and theater:

@@ -3390,9 +3390,45 @@ function pickTheaterSide(sid){
   SEL.theaterSide = (sid==="opponent") ? "opponent" : "player";
   show("theater");
 }
-/** 当前那一方叫什么（"你这一方" / "对手那一方"）。 */
+/** 页面上的阵营列表（来自 `theater_meta.sides`）。 */
+function theaterSides(){
+  const meta = (VIEW&&VIEW.theater_meta)||{};
+  return (meta.sides&&meta.sides.length) ? meta.sides : [];
+}
+/** 某个阵营对应哪一侧（"player" / "opponent"）。
+ *
+ * ⚠️ **按组下标对齐，别用 `is_player` 布尔** ——
+ * hotseat（双 `player: local`）时**两边都是玩家** ⇒ 布尔会把两个页签
+ * 折叠成**同一个** ⇒ 第二个页签改的是第一方的组（U153）。
+ */
+function theaterSideId(sd){
+  const meta = (VIEW&&VIEW.theater_meta)||{};
+  if(typeof meta.player_index==="number" && sd.index===meta.player_index) return "player";
+  if(typeof meta.opponent_index==="number" && sd.index===meta.opponent_index) return "opponent";
+  return sd.is_player ? "player" : "opponent";
+}
+/** 这一侧是哪个阵营（`allies` / `axis` / `soviet` …）。 */
+function theaterSideKey(sid){
+  const s = sid||theaterSide();
+  for(const sd of theaterSides()){
+    if(theaterSideId(sd)===s) return sd.key||"";
+  }
+  return "";
+}
+/** 两边都是玩家（hotseat / 双人同机）⇒ 页签改用**阵营名**。 */
+function theaterDualLocal(){
+  let n = 0;
+  for(const sd of theaterSides()){ if(sd.is_player) n++; }
+  return n > 1;
+}
+/** 当前那一方叫什么（"你这一方" / "对手那一方"；hotseat 时是阵营名）。 */
 function theaterSideCn(sid){
-  return (sid||theaterSide())==="opponent" ? L("对手那一方") : L("你这一方");
+  const s = sid||theaterSide();
+  if(theaterDualLocal()){
+    const k = theaterSideKey(s);
+    if(k) return facCn(k);
+  }
+  return (s==="opponent") ? L("对手那一方") : L("你这一方");
 }
 function theaterKey(asset){ return `theater_asset:${theaterSide()}:${asset}`; }
 function theaterAddKey(asset){ return `theater_asset_add:${theaterSide()}:${asset}`; }
@@ -3583,7 +3619,7 @@ function pageTheater(w){
   const sides = (meta.sides && meta.sides.length) ? meta.sides : [];
   const curSide = theaterSide();
   const sideTabs = sides.length ? ('<div class="tabs">' + sides.map(sd=>{
-      const sid = sd.is_player ? "player" : "opponent";
+      const sid = theaterSideId(sd);
       const mark = sd.is_current ? L("（当前行动方）") : "";
       const tip = sd.key ? (L("阵营")+"：" + sd.key) : "";
       return '<div class="tb ' + (sid===curSide ? "on" : "") + '"'
