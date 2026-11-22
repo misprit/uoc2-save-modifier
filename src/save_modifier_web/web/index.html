@@ -3455,7 +3455,12 @@ function theaterSideCn(sid){
   return (s==="opponent") ? L("对手那一方") : L("你这一方");
 }
 function theaterKey(asset){ return `theater_asset:${theaterSide()}:${asset}`; }
-function theaterAddKey(asset){ return `theater_asset_add:${theaterSide()}:${asset}`; }
+/** 待应用条目的 key —— **带上阵营**。
+ *
+ * ⚠️ `side` 必须与 params 里的 `side` **同一个** ——
+ * 否则「待应用记在这一方、写盘写到另一方」（弹窗期间切了页签就会发生）。
+ */
+function theaterAddKey(asset, side){ return `theater_asset_add:${side||theaterSide()}:${asset}`; }
 function theaterDelKey(asset){ return `theater_asset_remove:${theaterSide()}:${asset}`; }
 /** 当前选中那一方的资产列表（"player" = 你，"opponent" = 对手）。 */
 function theaterSideAssets(){

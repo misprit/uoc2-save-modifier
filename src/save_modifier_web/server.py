@@ -847,13 +847,19 @@ def _theater_universe_of(save, catalog) -> tuple[list, dict]:
 
     * `universe` —— 游戏那 **7 种**候选，每项：
       `{asset, has_texture, in_current, in_other, other_count, scenario,
-        scenario_uses_total, scenario_uses_turn, added}`
-      * `in_current` —— **当前 phase** 那一组里有没有它；
-      * `in_other`  —— 别的 phase 组里有没有它（那些组不生效，只是留着）；
-      * `scenario` —— **这场战斗本来有没有**它（场景定义）；
+        scenario_uses_total, scenario_uses_turn, added,
+        opponent_scenario, opponent_scenario_uses_total,
+        opponent_scenario_uses_turn}`
+      * `in_current` —— **玩家那一方**那组里有没有它（历史别名，语义已是「两方」）；
+      * `in_other`  —— **另一方**那组里有没有它；
+      * `scenario` —— **玩家那一方**的场景定义里有没有它；
+      * `opponent_scenario*` —— **另一方**的场景定义（**各自一份**，别混）；
       * `added`     —— 场景本来没有、现在有了 ⇒ **「无中生有」的那一项**。
-    * `meta` —— `{editable, reason, phase, phase_count, groups, scenario_source,
-      scenario_found}`。
+    * `meta` —— `{editable, reason, phase, phase_count, groups, sides,
+      player_index, opponent_index, scenario_source, scenario_found}`。
+      * `sides` —— 两个阵营（`{key, index, is_player, is_current}`）；
+      * `player_index` / `opponent_index` —— 两方各对应**哪一组**
+        （前端按它对齐阵营页签 ⇒ 不用 `is_player` 布尔，U153）。
 
     ⚠️ `scenario_source` 的数据源优先级：
     **存档自带**的 `document/scenarios/<场景>/main.yml` → **游戏包**里的场景定义。

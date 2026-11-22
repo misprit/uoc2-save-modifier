@@ -161,7 +161,7 @@ class BrokenSaveTest(unittest.TestCase):
                 urllib.request.urlopen(req, timeout=30)
                 self.fail("坏存档居然返回了 200")
             except urllib.error.HTTPError as exc:
-                self.assertEqual(400, exc.code, "坏存档应�� 400，不是 500")
+                self.assertEqual(400, exc.code, "坏存档应该返回 400，不是 500")
                 body = exc.read().decode("utf-8")
                 self.assertIn("bak", body)
         finally:

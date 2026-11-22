@@ -41,8 +41,12 @@ from ._fixtures import make_save  # noqa: E402
 HOTSEAT = {"allies": {"deployed": True, "player": "local"},
            "soviet": {"deployed": True, "player": "local"}}
 
-#: hotseat 的另一种顺序（玩家那一方在**下标 1**）
-HOTSEAT_FLIPPED = {"allies": {"deployed": True, "player": "local"},
+#: hotseat 的另一种局面：**当前行动方在下标 1**（`phase = 1`）
+#: ⇒ 高亮要跟着走，但两组**仍然不能重合**。
+#: ⚠️ 双 local 时「玩家那一方」永远是**第一个 local**（下标 0），
+#:    所以「把玩家那一方放到下标 1」在双 local 下**不存在** ——
+#:    那种局面（local + ai，local 在下标 1）由 `test_theater_sides.py` 覆盖。
+HOTSEAT_PHASE1 = {"allies": {"deployed": True, "player": "local"},
                    "soviet": {"deployed": True, "player": "local"}}
 
 #: 正常存档：玩家 local / 对手 ai
@@ -74,9 +78,10 @@ class HotseatGroupIndexTest(unittest.TestCase):
         self.assertEqual(1, theater_group_index(d, "opponent"),
                          "双 local 时对手那一方仍是第 0 组 ⇒ 第二方改不到")
 
-    def test_the_player_side_is_still_the_first_local_one(self):
-        """玩家那一方 = 第一个 `player: local`（顺序颠倒时它在下标 1）。"""
-        d = battle(HOTSEAT_FLIPPED)
+    def test_the_current_side_may_be_the_second_one(self):
+        """当前行动方在下标 1 时，两组**仍然不重合**（高亮走的是 phase）。"""
+        d = battle(HOTSEAT_PHASE1, phase=1)
+        self.assertEqual(1, theater_group_index(d, "current"))
         self.assertEqual(0, theater_group_index(d, "player"))
         self.assertEqual(1, theater_group_index(d, "opponent"))
 
