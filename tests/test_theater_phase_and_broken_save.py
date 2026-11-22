@@ -27,6 +27,7 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from urllib.parse import quote
 import zipfile
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -118,7 +119,9 @@ class BrokenSaveTest(unittest.TestCase):
     """P2-2：坏存档 ⇒ 人话 + 400。"""
 
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="u141_broken_"))
+        # ⚠️ 目录名**故意带中文** —— 守住「路径里有非 ASCII 时也能跑」
+        #    （中文用户名 / 中文 TEMP 的机器上以前直接 UnicodeEncodeError）。
+        self.tmp = Path(tempfile.mkdtemp(prefix="u141_坏档_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.corrupt = self.tmp / "broken.usg"
         self.corrupt.write_bytes(b"this is definitely not a zip file")
@@ -147,8 +150,12 @@ class BrokenSaveTest(unittest.TestCase):
         th = threading.Thread(target=httpd.serve_forever, daemon=True)
         th.start()
         try:
+            # ⚠️ 路径里有中文 ⇒ 必须百分号编码
+            #    （http.client 只按 ASCII 编码 ⇒ 不编码直接 UnicodeEncodeError；
+            #     服务端 do_GET 里有 unquote(u.path) ⇒ 编码后照样还原）。
+            sid = quote(str(self.corrupt).replace("\\", "/"), safe="/")
             req = urllib.request.Request(
-                "http://127.0.0.1:%d/api/view/%s" % (port, self.corrupt),
+                "http://127.0.0.1:%d/api/view/%s" % (port, sid),
                 headers={"X-Token": "u141-token"})
             try:
                 urllib.request.urlopen(req, timeout=30)
