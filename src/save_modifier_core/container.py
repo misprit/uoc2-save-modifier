@@ -123,6 +123,26 @@ def theater_sides(battle_data: Any) -> list[dict]:
     return out
 
 
+#: 阵营 id → 中文名（游戏只有这三个；与前端 `facCn` 同一套叫法）。
+FACTION_CN = {"allies": "盟军", "axis": "轴心", "soviet": "苏联"}
+
+
+def theater_side_cn(battle_data: Any, idx: int) -> str:
+    """某一组对应的**阵营名**（给玩家看的）。
+
+    ⚠️ 组下标 = 阵营下标（U143）⇒ 取 `factions` 的第 `idx` 项。
+    找不到 ⇒ 退回「第 N 组」（**不猜**）。
+
+    ⚠️ **为什么要阵营名而不是「第 N 组」**（U161）：
+    两边都有同名资产时，光看「第 1 组」玩家**分不出是哪一方**
+    ⇒ 待应用明细里两条长得一模一样 ⇒ 可能撤错那条。
+    """
+    for sd in theater_sides(battle_data):
+        if int(sd["index"]) == int(idx):
+            return FACTION_CN.get(sd["key"], str(sd["key"]))
+    return "第 %d 组" % idx
+
+
 def theater_group_index(battle_data: Any, side: str = "player") -> int:
     """要改**哪一组**（组下标）。
 

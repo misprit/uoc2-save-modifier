@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .catalog import THEATER_ASSET_TYPES
-from .container import ORDER_LISTS, theater_group_index
+from .container import ORDER_LISTS, theater_group_index, theater_side_cn
 from .edits import UNSET, Edit
 
 __all__ = ["Outcome", "apply_edit"]
@@ -2182,11 +2182,12 @@ def _theater_asset(w, e: Edit) -> Outcome:
         target[f] = want[f]
         changed.append((f, old, want[f]))
     if not changed:
-        oc.summary = f"战区资产 {asset}：没有需要改的字段"
+        side_cn = theater_side_cn(_data, idx)
+        oc.summary = f"战区资产 {asset}（{side_cn}）：没有需要改的字段"
         return oc
     w.touch(entry)
-    oc.summary = "战区资产 %s：%s" % (
-        asset,
+    oc.summary = "战区资产 %s（%s）：%s" % (
+        asset, theater_side_cn(_data, idx),
         "、".join("%s %s → %s" % (THEATER_FIELD_CN[f], _theater_val(f, o),
                                 _theater_val(f, n))
                   for f, o, n in changed))
@@ -2234,6 +2235,7 @@ def _theater_asset_add(w, e: Edit) -> Outcome:
     if ctx is None:
         return oc
     entry, _data, idx, items = ctx
+    side_cn = theater_side_cn(_data, idx)
 
     if not isinstance(asset, str) or asset not in THEATER_ASSET_TYPES:
         oc.errors.append(
@@ -2243,7 +2245,7 @@ def _theater_asset_add(w, e: Edit) -> Outcome:
         return oc
     if any(isinstance(it, dict) and it.get("asset") == asset for it in items):
         oc.errors.append(
-            f"这一方（第 {idx} 组）已经有战区资产 {asset!r} —— "
+            f"这一方（{side_cn}）已经有战区资产 {asset!r} —— "
             "同一个组里不能有同名（游戏按名字取第一个匹配）")
         return oc
     if not _is_int(uses_turn) or uses_turn < THEATER_USES_TURN_MIN:
@@ -2272,8 +2274,8 @@ def _theater_asset_add(w, e: Edit) -> Outcome:
         "uses_turn": uses_turn,
     })
     w.touch(entry)
-    oc.summary = ("加战区资产 %s（这一方 第 %d 组；每回合恢复 %d，本场景剩余 %s）"
-                  % (asset, idx, uses_turn,
+    oc.summary = ("加战区资产 %s（%s；每回合恢复 %d，本场景剩余 %s）"
+                  % (asset, side_cn, uses_turn,
                      "无限" if uses_total is None else uses_total))
     oc.warnings.append(
         "新加的战区资产**只对这一方（阵营）生效** —— "
@@ -2300,18 +2302,19 @@ def _theater_asset_remove(w, e: Edit) -> Outcome:
     if ctx is None:
         return oc
     entry, _data, idx, items = ctx
+    side_cn = theater_side_cn(_data, idx)
     pos = next((i for i, it in enumerate(items)
                 if isinstance(it, dict) and it.get("asset") == asset), None)
     if pos is None:
         avail = ", ".join(str(it.get("asset")) for it in items if isinstance(it, dict))
         oc.errors.append(
-            f"这一方（第 {idx} 组）没有战区资产 {asset!r}；本组有："
+            f"这一方（{side_cn}）没有战区资产 {asset!r}；本组有："
             f"{avail or '（空）'}")
         return oc
     target = items[pos]
     items.pop(pos)
     w.touch(entry)
-    oc.summary = "删战区资产 %s（这一方 第 %d 组）" % (asset, idx)
+    oc.summary = "删战区资产 %s（%s）" % (asset, side_cn)
 
     total = target.get("uses_total")
     if isinstance(total, int) and not isinstance(total, bool) and total > 0:
@@ -2323,7 +2326,7 @@ def _theater_asset_remove(w, e: Edit) -> Outcome:
         oc.warnings.append(f"当前还有 {to_use} 次没用 —— 删掉等于放弃")
     if not items:
         oc.warnings.append(
-            f"这一方（第 {idx} 组）删完是空的 —— "
+            f"这一方（{side_cn}）删完是空的 —— "
             "游戏里这一方就没有战区资产了")
     return oc
 

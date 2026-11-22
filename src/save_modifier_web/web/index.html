@@ -3403,6 +3403,11 @@ function theaterSideField(u, key, side){
   if(key==="other_in") return opp ? u.in_player : u.in_opponent;
   return u[key];
 }
+/** 待应用明细里标出「是哪一方」—— 两边同名资产时字面完全一样 ⇒ 会撤错（U161）。 */
+function theaterSideLabel(sid){
+  const k = theaterSideKey(sid);
+  return k ? facCn(k) : theaterSideCn(sid);
+}
 /** 另一方（不是当前这一方）的阵营名（取不到 ⇒ 空串）。 */
 function theaterOtherCn(){
   const other = (theaterSide()==="opponent") ? "player" : "opponent";
@@ -3526,7 +3531,8 @@ function theaterSet(asset, field, value){
   }else{
     const fmt = (v)=> (v===null||v===undefined) ? L("无限") : v;
     setPending("theater_asset", theaterKey(asset), params,
-      L2("战区资产 {0} {1}", theaterCn(asset), theaterFieldCn(field))
+      L2("{0}：战区资产 {1} {2}", theaterSideLabel(), theaterCn(asset),
+         theaterFieldCn(field))
         + " " + fmt(a[field]) + " → " + fmt(value),
       value);
   }
@@ -3761,7 +3767,8 @@ function theaterRemove(asset){
   const tot = (cur.uses_total===null||cur.uses_total===undefined) ? L("无限") : cur.uses_total;
   setPending("theater_asset_remove", theaterDelKey(asset),
     {asset:asset, side:theaterSide()},
-    L2("删除战区资产 {0}（当前可用 {1}，本场景剩余 {2}）", theaterCn(asset), cur.to_use, tot));
+    L2("{0}：删除战区资产 {1}（当前可用 {2}，本场景剩余 {3}）", theaterSideLabel(),
+       theaterCn(asset), cur.to_use, tot));
   show("theater");
 }
 
@@ -3835,7 +3842,8 @@ function theaterAddConfirm(){
   } else tot = null;
   setPending("theater_asset_add", theaterAddKey(M.asset, M.side),
     {asset:M.asset, side:M.side||theaterSide(), uses_total:tot, uses_turn:ut},
-    L2("添加战区资产 {0}（每回合恢复 {1}，本场景剩余 {2}）", theaterCn(M.asset), ut, tot===null?L("无限"):tot));
+    L2("{0}：添加战区资产 {1}（每回合恢复 {2}，本场景剩余 {3}）",
+       theaterSideLabel(M.side), theaterCn(M.asset), ut, tot===null?L("无限"):tot));
   closeModal();
 }
 
