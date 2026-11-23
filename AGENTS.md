@@ -91,14 +91,20 @@ python tools\ui_audit.py http://127.0.0.1:<端口>/?t=<token> 9401 "campaigns%2F
 
 ## 7. 本机环境事实（已实测，别再踩）
 
-- **编码**：系统 **ACP=936(GBK)**。当前会话的 shell 是 **pwsh 7.7.0**（控制台 UTF-8），
-  但 **Windows PowerShell 5.1 仍在**
-  （`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`），
-  它的裸 `Get-Content` 读 UTF-8 中文会乱码
-  （实测「中文」→「涓<U+E15F>枃」，中间那个是私用区码位）。
-  ⇒ 读文件优先用 `read`/`grep` 工具（Node UTF-8），其次 `[System.IO.File]::ReadAllText($p)`；
-  用 cmdlet 必须显式 `-Encoding UTF8`；**禁裸 `Get-Content` / `Out-File` / `>`**。
-  读到「锟斤拷」「烫烫屯」就换 UTF-8 重读，别逐个编码试探。
+- **编码**：系统 **ACP=65001**（2026-11-23 开了「Beta: 使用 Unicode UTF-8 提供全球语言支持」
+  并重启；**此前是 936/GBK** ⇒ 下面几条结论在改之前是**反过来**的）。
+  当前会话的 shell 是 **pwsh 7.7.0**；**Windows PowerShell 5.1 仍在**
+  （`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`）。
+  实测（5.1）：裸 `Get-Content` 读 UTF-8 文件**已正常**（改 ACP 前乱码）；
+  但 **`>` 重定向仍写 UTF-16LE**（首字节 FF FE）⇒ 仍要禁；
+  `Set-Content`（默认）现在写 **UTF-8 无 BOM**（改 ACP 前是 GBK）。
+  ⇒ **GBK 旧文件现在会被当 UTF-8 读成乱码**（乱码方向反了）——
+  真 GBK 文件用 `[System.IO.File]::ReadAllText($p, [Text.Encoding]::GetEncoding(936))`。
+  ⇒ 读文件优先用 `read`/`grep` 工具（Node UTF-8）；**写仓库文件一律走 Python 脚本**（§2），
+  别依赖 cmdlet 的默认编码。
+  ⚠️ **Python 的 `locale.getpreferredencoding()` 现在是 `cp65001`**（改 ACP 前 `cp936`）
+  ⇒ `open()` 不带 `encoding=` 会按 UTF-8 走 ⇒ **所有文本读写必须显式写 `encoding="utf-8"`**
+  （仓库现状已合规：`src/` `tools/` `docs/证据脚本/` 每一处都显式写了）。
 - **代理**：全局 `git config --global http.proxy https.proxy http://127.0.0.1:7993`。
   ⚠️ **代理软件没开时，这个配置会让所有 git 远端操作失败**
   （实测报错 `Failed to connect to github.com:443 over proxy 127.0.0.1`）。
