@@ -89,6 +89,8 @@ INCLUDE_FILES = ("run.bat", "run_web.bat", "run_tests.bat", "使用说明.txt")
 #:    独立用户目录）—— 它是**缓存**，不进包。
 SKIP_DIRS = {"__pycache__", ".git", ".gitignore", "dist",
              ".pytest_cache", ".idea", ".vscode", "_edge_profile",
+             # U170：临时产物目录（会话与工具的中间文件）—— 绝不进成品
+             ".scratch",
              # U142：只读审阅通道的目录（.review/）与它的写权限探针（_probe*）
              # —— **绝不**进成品（`python/`、`src/`、`tests/`、`docs/` 都会被打包）。
              ".review"}

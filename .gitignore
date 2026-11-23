@@ -27,6 +27,13 @@ config.yml
 # ---- U26 Web GUI 的 Edge 运行时 profile（几百 MB 缓存）----
 _edge_profile/
 
+# ---- 临时产物目录（会话与工具的**中间文件**）----
+#   约定：**临时产物只放这里**（见 docs/开发上下文.md §7 工作方式），
+#   **会话结束清空**；**交付物一律进 git**，不要放这里。
+#   （`.scratch/.gitkeep` 保留 ⇒ 目录在别人机器上也存在。）
+.scratch/*
+!.scratch/.gitkeep
+
 # ---- Python 缓存 / 虚拟环境 ----
 # 注意：不要忽略 *.pyd —— python/Lib/site-packages/yaml/_yaml*.pyd 是必需的 C 扩展
 __pycache__/
