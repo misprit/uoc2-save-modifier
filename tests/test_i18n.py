@@ -265,7 +265,11 @@ class TrErrorTest(unittest.TestCase):
         for s in ("单位 U1 的 xp=900 越界（必须 0..400）",
                   "总部 hq1 的 cp：3 → 5",
                   "存档里没有 id 为 hq1 的总部",
-                  "目录不存在：D:\\nope"):
+                  "目录不存在：D:\\nope",
+                  # ⚠️ 战区资产的**字段名**是拼进**值**里的
+                  #    （U161 把 `{arg1}` 挪到了 `{arg2}`）⇒ values 段得按新的
+                  #    占位符名给映射，否则英文摘要里夹中文。
+                  "战区资产 air_attack（盟军）：当前可用 1 → 3"):
             out = server.tr_error(s)
             self.assertFalse(CJK.search(out), "还有中文：%r -> %r" % (s, out))
 

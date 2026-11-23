@@ -1077,6 +1077,11 @@
    "本场景剩余": "remaining in this scenario",
    "每回合恢复": "per-turn recovery"
   },
+  "arg2": {
+   "当前可用": "currently available",
+   "本场景剩余": "remaining in this scenario",
+   "每回合恢复": "per-turn recovery"
+  },
   "arg3": {
    "无限": "unlimited"
   },
