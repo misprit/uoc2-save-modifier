@@ -13,10 +13,26 @@ __all__ = ["save_root", "find_saves", "game_dir", "web_html"]
 
 
 def save_root() -> Path:
-    """游戏存档根目录 `%LOCALAPPDATA%\\.uoc2\\save`。"""
-    return Path(os.environ.get(
-        "UOC2_SAVE_ROOT",
-        Path.home() / "AppData" / "Local" / ".uoc2" / "save"))
+    """游戏存档根目录 `<游戏数据目录>\\save`（默认 `%LOCALAPPDATA%\\.uoc2\\save`）。
+
+    ⚠️ **必须和产品认的路径一致**（U166）：服务端按 **`UOC2_APPDATA`**
+    核对存档有没有越界（`save_modifier_core.paths.appdata_dir` ⇒ U126 的安全修复），
+    测试这边要是**认另一个根** ⇒ 干净环境自检
+    （`release_check --clean` 把 `UOC2_APPDATA` 指到空目录）
+    会找到**玩家真实存档**、而服务端又拒绝它 ⇒ 那个性能测试直接报错。
+
+    ⇒ 优先级：`UOC2_SAVE_ROOT` > `UOC2_APPDATA/save` > `%LOCALAPPDATA%/.uoc2/save`
+    （与核心库 `paths.appdata_dir()` 同口径）。
+    """
+    env = os.environ.get("UOC2_SAVE_ROOT")
+    if env:
+        return Path(env)
+    appdata = os.environ.get("UOC2_APPDATA")
+    if appdata:
+        return Path(appdata) / "save"
+    local = os.environ.get("LOCALAPPDATA")
+    base = Path(local) if local else Path.home() / "AppData" / "Local"
+    return base / ".uoc2" / "save"
 
 
 def game_dir() -> Path | None:
