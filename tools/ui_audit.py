@@ -13,7 +13,8 @@
 
 ```bat
 :: ① 起服务（隔离的 appdata，别碰玩家的真存档）
-set UOC2_APPDATA=D:\\MiniMax\\_analysis\\appdata_u89\\.uoc2
+::    （路径**相对仓库**⇒ 换台机器也能跑；中间文件都在 .scratch/ 里）
+set UOC2_APPDATA=%CD%\\.scratch\\appdata\\.uoc2
 python\\python.exe -u -m save_modifier_web.server --serve --no-window --no-browser
 
 :: ② 跑巡检（另开一个窗口）
@@ -21,6 +22,10 @@ python tools\\ui_audit.py http://127.0.0.1:<端口>/?t=<token> 9401
 ```
 
 **退出码**：0 = 没有异常；1 = 有异常（打印每一条）。
+
+**中间文件在哪**：浏览器的独立 profile 固定在 `<仓库>\\.scratch\\ui_audit_profile`
+（**复用**；要全新的先删掉它再跑）、隔离 appdata 在 `<仓库>\\.scratch\\appdata`。
+⇒ 两处都在 `.scratch/` 下，**会话结束清空**即可（见《开发上下文》§7 工作方式）。
 
 ⚠️ 它只走**界面能点到的主流程** —— 覆盖不到的路径要自己加步骤
 （脚本里的 `STEPS` 数组就是清单）。
@@ -34,6 +39,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 try:
     import websocket
@@ -44,7 +50,20 @@ except ImportError:      # pragma: no cover
     raise SystemExit(2)
 
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-PROFILE = r"D:\MiniMax\_analysis\_ui_audit_profile"
+
+#: 仓库根（`tools/` 的上一级）—— 用它推路径，**不写死某台机器的目录**。
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+#: Edge 的**独立 profile**（跟日常浏览隔开）。
+#:
+#: ⚠️ **固定一个目录反复用**（U172）—— 每次新建一个带随机名的目录，
+#:    跑几十次巡检就会堆出**几百 MB 到几 GB** 的垃圾
+#:    （实测：131 个 profile 目录 = **4.16 GB**）。
+#:    要「全新」状态：**先把这个目录删掉再跑**，**别新建另一个**。
+#:
+#: ⚠️ 放在仓库的 `.scratch/` 下（已 gitignore、不进包）——
+#:    这样换台机器也能跑，而且**回收站删得掉**（工作区外的路径删不掉）。
+PROFILE = str(REPO_ROOT / ".scratch" / "ui_audit_profile")
 
 _id = [0]
 EVENTS: list = []
@@ -174,6 +193,7 @@ def main() -> int:
     port = int(sys.argv[2])
     save_id = sys.argv[3] if len(sys.argv) > 3 else "campaigns%2Fwest.usg"
 
+    os.makedirs(PROFILE, exist_ok=True)
     proc = subprocess.Popen([
         EDGE, "--remote-debugging-port=%d" % port,
         "--user-data-dir=%s" % PROFILE,
