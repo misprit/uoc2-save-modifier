@@ -70,8 +70,12 @@ $env:UOC2_APPDATA = "$PWD\.scratch\appdata\.uoc2"
 #   ⇒ 打印 [OK ] GUI 服务已启动：http://127.0.0.1:<端口>/?t=<token>（token 每次随机，URL 必须带 ?t=）
 
 # 界面全盘巡检（要**系统 Python**，随包 python 没 pip、装不了 websocket-client）
-python tools\ui_audit.py http://127.0.0.1:<端口>/?t=<token> 9401
-#   退出码 0 = 没有异常；1 = 有异常（只有 favicon 404 是老熟人）
+#   第 3 个参数 = 要打开的存档 id（默认 "campaigns%2Fwest.usg"）
+#   ⇒ 用隔离 appdata 时**必须显式传**，否则会去开一个不存在的存档 ⇒ 误报「存档不存在」
+python tools\ui_audit.py http://127.0.0.1:<端口>/?t=<token> 9401 "campaigns%2F<存档名>.usg"
+#   退出码 0 = 没有异常；1 = 有异常。
+#   ⚠️ 工具**不过滤 favicon** ⇒ 界面干净时也会是「共 1 条异常(favicon.ico 404)」+ 退出码 1。
+#   判据：**除 favicon 外没有别的异常** 就算通过（要看清单，别只看退出码）。
 ```
 
 ## 6. 边界
