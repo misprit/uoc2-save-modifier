@@ -60,6 +60,9 @@ docs/                    规范文档 + 取证脚本
 
 ## 开发
 
+> 📁 **临时产物只放 `.scratch/`**（已 gitignore、不进包），**会话结束清空**；
+> 交付物一律进 git。详见《开发上下文》§7 工作方式。
+
 ```powershell
 # 跑全部测试（1185 项，2026-11-23 实测）
 .\python\python.exe -m unittest discover -s tests -t .
