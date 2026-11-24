@@ -2793,6 +2793,17 @@ mod 对 `entity_types/` 的影响有两种，都必须从**用户包**读：
 |---|---|
 | **新增**特种兵类型（用户包里多一个 `data/entity_types/specialists/xxx.yml`） | 扫用户包 → 发现新文件 → 加进候选列表 |
 | **覆盖**已有特种兵定义（用户包里同名文件，改了 `max_st` / `flags` / `name_brief`） | ⚠️ **必须取用户包那份**，不能取 base —— 否则显示的上限/标签是原版的，**与游戏实际不符** |
+| **新增**特种兵 **flag**（用户包 `flags:` 里出现没见过的名字） | **原样取、不做白名单**（`catalog.spec_type()` 只做 `tuple(str(f) for f in flags)`）⇒ **自动纳入**，不报错 |
+
+**flag 的中文名**走 locale 键 `id_sheet_spec_flag_<flag>`
+（`server._catalog_payload()`：`spec_flags.setdefault(_f, cn("id_sheet_spec_flag_" + _f, _f))`）——
+**查不到就退回 flag 原文**（中文名的来源规则见《GUI设计规范.md》§5.7，绝不自己翻译）
+⇒ mod 新增的 flag 自带 locale 键就有中文名，没有就显示原文，**两种都不报错**。
+
+⚠️ **flag 名还要过游戏侧那道门**：`state/entity_types/specialist_types.pyc` 的模块级
+`_specialists_flags`（`aa/at/engineers/no_retreat/recon/towed/arty/special/lci/ski`）
+是游戏校验 `flags` 字段的硬白名单 ⇒ **只改包不改游戏代码，新 flag 会被游戏拒掉**；
+**修改器这边照收不误**（它只认包里写了什么，§9.1.3「只做候选，绝不做白名单」）。
 
 **⚠️ 这是一个真实的实现陷阱**：直接去 `<game>/_packages/base/data/entity_types/` 读，
 在装了 mod 的机器上会拿到**错的值**。必须按「用户包 → 游戏包」顺序取，与游戏一致。

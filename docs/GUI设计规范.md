@@ -1274,6 +1274,10 @@ if len(self.specs) >= self._type.max_spec: return False
 `at` 反坦克炮 / `arty` 火炮 / `towed` 牵引式 / `engineers` 工程兵 / `recon` 侦察 /
 `ski` 雪橇 / `lci` 两栖 / `special` 特种。
 
+⚠️ **上面这 8 个不是全集**：flag **来自包**（`entity_types/specialists/*.yml` 的 `flags` 字段，
+**原样取、不做白名单**）⇒ **mod 可以新增 flag**，修改器**自动纳入**，不报错。
+新增 flag 的中文名同样走 locale 键 `id_sheet_spec_flag_<flag>`，**查不到就显示 flag 原文**（§5.7.1）。
+
 **挂满了怎么办**：不弹「选哪个卸掉」的二级选择器 —— 直接提示「特种兵已满」，
 玩家自己点已挂的槽位卸掉再挂（简单优先）。
 
