@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-__all__ = ["save_root", "find_saves", "game_dir", "web_html"]
+__all__ = ["save_root", "find_saves", "game_dir", "web_html", "pick_save"]
 
 
 def save_root() -> Path:
@@ -68,3 +68,49 @@ def find_saves(limit_per_dir: int = 2) -> list[Path]:
     if old.is_dir():
         out.extend(sorted(old.rglob("*.usg"))[:limit_per_dir])
     return out
+
+
+def pick_save(predicate, *, reason="本机没有合适的存档"):
+    """按**内容**挑一个存档 —— **不看 `list_saves()` 的顺序**。
+
+    ⚠️ **为什么不能拿「第一个」当选择规则**：`list_saves()` 是按 **mtime 倒序**排的
+    （`save_modifier_core/discovery.py`）⇒「第一个」= 玩家**最近动过**的那个存档
+    ⇒ 玩家一开新档、玩一次，测试挑到的对象就换人 ⇒ 结果会莫名其妙地变红 / 变跳过。
+    （实例：2026-11-24 玩家新开了 `fall_blau_2_fall_blau_2.usg`，
+    `test_theater_to_use_edit` 与 `test_campaign_detail_has_route_roster_store` 当场变红。）
+
+    ⇒ 这里先把全部存档按 **save_id 字典序**排好，再逐个交给 `predicate` 判，
+    **第一个满足条件的**就是答案 ⇒ 选择只跟存档**内容**有关，
+    与目录顺序、修改时间都无关 ⇒ 玩家玩不玩游戏都不影响测试结果。
+
+    `predicate` 收到 `SaveInfo`，返回 True 表示可用；
+    抛异常当作不可用（跳过该存档）⇒ 一个坏存档不会连累整轮。
+    一个都不满足 ⇒ 抛 `unittest.SkipTest`（跳过，不是失败）。
+    """
+    import unittest
+
+    for info in _all_saves():
+        try:
+            if predicate(info):
+                return info
+        except Exception:
+            continue
+    raise unittest.SkipTest(reason)
+
+
+#: `list_saves()` 的结果缓存（键 = 游戏数据目录）。
+#: ⚠️ `list_saves()` 要挨个打开存档读根 `main.yml`（本机 73 个存档 ≈ 2 秒），
+#: 而 `setUp` 每个用例都要调一次 ⇒ 不缓存的话同一个存档列表会被扫几十遍。
+#: 缓存键用**数据目录**，测试里切 `UOC2_APPDATA` 时自动换一份，不会串味。
+_SAVE_CACHE: dict = {}
+
+
+def _all_saves() -> list:
+    """全部存档（按 **save_id 字典序**排好），按数据目录缓存。"""
+    from save_modifier_core.paths import appdata_dir
+
+    key = str(appdata_dir())
+    if key not in _SAVE_CACHE:
+        from save_modifier_core import list_saves
+        _SAVE_CACHE[key] = sorted(list_saves(), key=lambda i: i.save_id)
+    return _SAVE_CACHE[key]

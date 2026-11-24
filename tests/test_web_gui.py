@@ -22,6 +22,29 @@ if REPO_SRC not in sys.path:
 
 from save_modifier_web import server  # noqa: E402
 
+from ._helpers import pick_save  # noqa: E402
+
+
+def _has_spendable_theater_asset(info):
+    """这个存档里，玩家那一方有没有「当前可用次数还没用满」的战区资产。
+
+    ⚠️ `to_use + 1 <= uses_total` 才是**合法**编辑（游戏每用一次资产就让
+    `uses_total` 减 1，减成负数 ⇒ 存档校验失败、打不开）⇒ 拿它当**选存档的判据**，
+    测试就不会挑到一个「加不了」的对象。
+    """
+    from save_modifier_core import open_save
+    try:
+        with open_save(info.save_id) as s:
+            for a in server._theater_assets_of(s, "player"):
+                tu = a.get("to_use")
+                tot = a.get("uses_total")
+                if (isinstance(tu, int) and isinstance(tot, int)
+                        and tu + 1 <= tot):
+                    return True
+    except Exception:
+        return False
+    return False
+
 
 class WebGuiTestBase(unittest.TestCase):
     @classmethod
@@ -123,18 +146,13 @@ class TestWriteApi(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves
 
         self.tmp = Path(tempfile.mkdtemp(prefix="webwrite_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            p = str(info.path)
-            if "BACKUP" not in p and p.endswith(".usg"):
-                src = p
-                break
-        if src is None:
-            self.skipTest("本机没有存档")
+        src = str(pick_save(
+            lambda i: i.is_primary and "BACKUP" not in str(i.path)
+            and str(i.path).endswith(".usg"),
+            reason="本机没有存档").path)
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
         # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
@@ -326,18 +344,13 @@ class TestPathEncoding(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves
 
         tmp = Path(tempfile.mkdtemp(prefix="web enc "))
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            p = str(info.path)
-            if "BACKUP" not in p and p.endswith(".usg"):
-                src = p
-                break
-        if src is None:
-            self.skipTest("本机没有存档")
+        src = str(pick_save(
+            lambda i: i.is_primary and "BACKUP" not in str(i.path)
+            and str(i.path).endswith(".usg"),
+            reason="本机没有存档").path)
         # ⚠️ **U126**：副本放在一个**临时游戏数据目录**里（服务端只认
         # 游戏数据目录之内的 save_id）—— 目录名带空格，保留本用例的用意。
         appdir = tmp / ".uoc2"
@@ -357,11 +370,8 @@ class TestPathEncoding(WebGuiTestBase):
 
         这是用户实际点的那一类（63 个归档存档）⇒ **只读** GET。
         """
-        from save_modifier_core import list_saves
-        olds = [i.save_id for i in list_saves() if "Old Saves" in i.save_id]
-        if not olds:
-            self.skipTest("本机没有归档存档")
-        sid = olds[0]
+        sid = pick_save(lambda i: "Old Saves" in i.save_id,
+                        reason="本机没有归档存档").save_id
         self.assertIn(" ", sid, "这个用例要的就是含空格的 save_id")
         data = self._get_view(sid)
         self.assertIn("units", data)
@@ -448,15 +458,9 @@ class TestCatalogApi(WebGuiTestBase):
     def test_pickers_returns_candidates(self):
         """选择器：按单位类型给特种兵候选 + 战役池 + 商店可上架范围。"""
         import urllib.parse
-        from save_modifier_core import list_saves
 
-        sid = None
-        for info in list_saves():
-            if info.is_primary and info.campaign_id:
-                sid = info.save_id
-                break
-        if sid is None:
-            self.skipTest("本机没有战役存档")
+        sid = pick_save(lambda i: i.is_primary and bool(i.campaign_id),
+                        reason="本机没有战役存档").save_id
         q = urllib.parse.quote(sid, safe="")
         pk = self.get_json("/api/pickers?save_id=" + q)
         self.assertIn("specialists_for_unit", pk)
@@ -470,15 +474,8 @@ class TestCatalogApi(WebGuiTestBase):
     def test_view_has_theater_assets_and_names(self):
         """视图要带战区资产、战役位置、中文名。"""
         import urllib.parse
-        from save_modifier_core import list_saves
 
-        sid = None
-        for info in list_saves():
-            if info.is_primary:
-                sid = info.save_id
-                break
-        if sid is None:
-            self.skipTest("本机没有存档")
+        sid = pick_save(lambda i: i.is_primary, reason="本机没有存档").save_id
         v = self.get_json("/api/view/" + urllib.parse.quote(sid, safe=""))
         self.assertIn("theater_assets", v)
         self.assertIn("campaign_position", v)
@@ -496,18 +493,13 @@ class TestUnitWriteApi(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves
 
         self.tmp = Path(tempfile.mkdtemp(prefix="webunit_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            p = str(info.path)
-            if "BACKUP" not in p and p.endswith(".usg"):
-                src = p
-                break
-        if src is None:
-            self.skipTest("本机没有存档")
+        src = str(pick_save(
+            lambda i: i.is_primary and "BACKUP" not in str(i.path)
+            and str(i.path).endswith(".usg"),
+            reason="本机没有存档").path)
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
         # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
@@ -636,18 +628,13 @@ class TestHqWriteApi(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves
 
         self.tmp = Path(tempfile.mkdtemp(prefix="webhq_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            p = str(info.path)
-            if "BACKUP" not in p and p.endswith(".usg"):
-                src = p
-                break
-        if src is None:
-            self.skipTest("本机没有存档")
+        src = str(pick_save(
+            lambda i: i.is_primary and "BACKUP" not in str(i.path)
+            and str(i.path).endswith(".usg"),
+            reason="本机没有存档").path)
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
         # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
@@ -809,6 +796,43 @@ def _save_has_hand_cards(path):
         return False
 
 
+_CARD_CATALOG = None
+
+
+def _card_catalog():
+    """（缓存）游戏目录 —— 看手牌要用它翻卡名。"""
+    global _CARD_CATALOG
+    if _CARD_CATALOG is None:
+        from save_modifier_core import Catalog, CorePaths
+        _CARD_CATALOG = Catalog(CorePaths.discover())
+    return _CARD_CATALOG
+
+
+def _has_free_hand_slot(info):
+    """这个存档**有手牌数据**，而且**手牌没占满**。
+
+    ⚠️ 手牌上限跟难度走（`card_deck_limit`：easy/normal 5、classic 4、hard 3）
+    ⇒ 手牌满了就**加不了卡**，`test_card_add_and_remove` 会跳过
+    ⇒ 把「有空位」也写进**选存档的判据**，那条用例才不会被「换一个存档」顶掉。
+    """
+    if not (info.is_primary and "BACKUP" not in str(info.path)):
+        return False
+    if not _save_has_hand_cards(str(info.path)):
+        return False
+    from save_modifier_core import open_save
+    from save_modifier_core.handlers import CARD_DECK_LIMIT
+    try:
+        with open_save(info.save_id) as s:
+            lv = str((s.root_main() or {}).get("level") or "")
+            limit = CARD_DECK_LIMIT.get(lv, 5)
+            hand = s.view(catalog=_card_catalog()).hand or []
+            # ⚠️ iew.hand 里的是 CardView 对象（不是 dict）→ 用属性取 position
+            used = {getattr(c, "position", None) for c in hand}
+            return any(p not in used for p in range(1, limit + 1))
+    except Exception:
+        return False
+
+
 def _use_tmp_appdata(tmp):
     """让服务端把 `tmp` 当作**游戏数据目录**（U126）。
 
@@ -848,22 +872,14 @@ class TestCardStoreWriteApi(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves
 
         self.tmp = Path(tempfile.mkdtemp(prefix="webcard_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            p = str(info.path)
-            if "BACKUP" in p or not p.endswith(".usg"):
-                continue
-            # ⚠️ **必须挑有手牌数据的存档**（新开的战役还没有 cards.yml）
-            if not _save_has_hand_cards(p):
-                continue
-            src = p
-            break
-        if src is None:
-            self.skipTest("本机没有带手牌数据的存档")
+        # ⚠️ **必须挑「有手牌数据、且手牌没占满」的存档** ——
+        #   新开的战役还没有 cards.yml；手牌满了就加不了卡
+        #   （那个用例会跳过 ⇒ 换一个存档就丢覆盖面）。
+        src = str(pick_save(_has_free_hand_slot,
+                            reason="本机没有可加卡的存档").path)
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
         # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
@@ -966,18 +982,13 @@ class TestStoreWriteApi(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves
 
         self.tmp = Path(tempfile.mkdtemp(prefix="webstore_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            p = str(info.path)
-            if "BACKUP" not in p and p.endswith(".usg"):
-                src = p
-                break
-        if src is None:
-            self.skipTest("本机没有存档")
+        src = str(pick_save(
+            lambda i: i.is_primary and "BACKUP" not in str(i.path)
+            and str(i.path).endswith(".usg"),
+            reason="本机没有存档").path)
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
         # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
@@ -1071,24 +1082,15 @@ class TestTheaterWriteApi(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves, open_save
+        from save_modifier_core import open_save
 
         self.tmp = Path(tempfile.mkdtemp(prefix="webtheater_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            if not info.is_primary:
-                continue
-            try:
-                with open_save(info.save_id) as s:
-                    bm = s.battle_main()
-                    if isinstance(bm, dict) and bm.get("theater_assets"):
-                        src = str(info.path)
-                        break
-            except Exception:
-                continue
-        if src is None:
-            self.skipTest("本机没有正在战斗的存档")
+        # ⚠️ **必须挑「战区资产的当前可用次数还没用满」的存档** ——
+        #   「当前可用 +1」要合法（`to_use` 不得超过 `uses_total`），
+        #   否则 `test_theater_to_use_edit` 会被校验**正确地**拦掉 ⇒ 假失败。
+        src = str(pick_save(_has_spendable_theater_asset,
+                            reason="本机没有可用的战区资产存档").path)
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
         # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
@@ -1123,8 +1125,16 @@ class TestTheaterWriteApi(WebGuiTestBase):
     def test_theater_to_use_edit(self):
         """改「当前可用」→ 提交 → 撤销 → 复原。"""
         v = self._view()
-        a = (v.get("theater_assets") or [])[0]
-        new = (a.get("to_use") or 0) + 1
+        # ⚠️ 必须挑「当前可用次数还没用满」的资产 —— 用满了再 +1 会被校验拦掉
+        #   （`to_use` 不得超过 `uses_total`）⇒ 那不是缺陷，是数据到顶了。
+        cand = [x for x in (v.get("theater_assets") or [])
+                if isinstance(x.get("to_use"), int)
+                and isinstance(x.get("uses_total"), int)
+                and x["to_use"] + 1 <= x["uses_total"]]
+        if not cand:
+            self.skipTest("这个存档的战区资产当前可用次数都用满了")
+        a = cand[0]
+        new = a["to_use"] + 1
         cm = self.post("/api/commit", {
             "save_id": self.copy,
             "edits": [{"kind": "theater_asset",
@@ -1250,18 +1260,13 @@ class TestWriteConfirmGate(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves
 
         self.tmp = Path(tempfile.mkdtemp(prefix="webplan_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            p = str(info.path)
-            if "BACKUP" not in p and p.endswith(".usg"):
-                src = p
-                break
-        if src is None:
-            self.skipTest("本机没有存档")
+        src = str(pick_save(
+            lambda i: i.is_primary and "BACKUP" not in str(i.path)
+            and str(i.path).endswith(".usg"),
+            reason="本机没有存档").path)
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
         # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id
@@ -1343,11 +1348,22 @@ class TestCampaignDetailApi(WebGuiTestBase):
     """U41：战役页的三块（路线图 / 场景名册 / 会议商店）。"""
 
     def _save_id(self):
-        from save_modifier_core import list_saves
-        for info in list_saves():
-            if info.is_primary and info.campaign_id:
-                return info.save_id
-        self.skipTest("本机没有战役存档")
+        """挑一个**战役索引认识、路线图非空**的战役存档。
+
+        ⚠️ 战役索引只认**官方战役**（`west` / `stalingrad` / …）⇒
+        mod 自己造的战役（`campaign_id` 不在索引里）**没有路线图**，
+        拿它测「路线图」必然失败 ⇒ 这里按**内容**挑，不按列表顺序。
+        """
+        from save_modifier_core.campaigns import default_campaign_index
+        idx = default_campaign_index()
+
+        def _has_route(info):
+            cid = info.campaign_id
+            if not (info.is_primary and cid):
+                return False
+            return any(idx.conferences(cid, r) for r in idx.routes(cid))
+
+        return pick_save(_has_route, reason="本机没有带路线图的战役存档").save_id
 
     def test_campaign_detail_has_route_roster_store(self):
         sid = self._save_id()
@@ -1373,14 +1389,7 @@ class TestCampaignDetailApi(WebGuiTestBase):
 
     def test_undo_stack_endpoint(self):
         """撤销栈 + 备份列表。"""
-        from save_modifier_core import list_saves
-        sid = None
-        for info in list_saves():
-            if info.is_primary:
-                sid = info.save_id
-                break
-        if sid is None:
-            self.skipTest("本机没有存档")
+        sid = pick_save(lambda i: i.is_primary, reason="本机没有存档").save_id
         d = self.get_json("/api/undo-stack?save_id=" + _quote(sid))
         self.assertIn("stack", d)
         self.assertIn("backups", d)
@@ -2330,18 +2339,13 @@ class _SaveCopyBase(WebGuiTestBase):
         import shutil
         import tempfile
         from pathlib import Path
-        from save_modifier_core import list_saves
 
         self.tmp = Path(tempfile.mkdtemp(prefix="webcopy_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        src = None
-        for info in list_saves():
-            p = str(info.path)
-            if "BACKUP" not in p and p.endswith(".usg"):
-                src = p
-                break
-        if src is None:
-            self.skipTest("本机没有存档")
+        src = str(pick_save(
+            lambda i: i.is_primary and "BACKUP" not in str(i.path)
+            and str(i.path).endswith(".usg"),
+            reason="本机没有存档").path)
         self.copy = str(self.tmp / "copy.usg")
         shutil.copyfile(src, self.copy)
         # ⚠️ **U126**：服务端只认**游戏数据目录**之内的 save_id

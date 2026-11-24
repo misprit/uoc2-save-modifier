@@ -28,6 +28,7 @@ import yaml
 from save_modifier_core import CorePaths, Edit, open_save
 
 from ._fixtures import make_save
+from ._helpers import pick_save
 
 
 class HqTestBase(unittest.TestCase):
@@ -587,19 +588,21 @@ class TestHqRename(unittest.TestCase):
     """
 
     def _first_hq(self):
-        from save_modifier_core import Catalog, CorePaths, list_saves, open_save
+        from save_modifier_core import Catalog, CorePaths, open_save
         cat = Catalog(CorePaths.discover())
-        for info in list_saves():
+
+        def _has_hq(info):
             if not info.is_primary:
-                continue
+                return False
             try:
                 with open_save(info.save_id) as s:
-                    hqs = s.view(catalog=cat).hqs
-                    if hqs:
-                        return cat, hqs[0]
+                    return bool(s.view(catalog=cat).hqs)
             except Exception:
-                continue
-        self.skipTest("本机没有带总部的存档")
+                return False
+
+        info = pick_save(_has_hq, reason="本机没有带总部的存档")
+        with open_save(info.save_id) as s:
+            return cat, s.view(catalog=cat).hqs[0]
 
     def test_rename_is_allowed(self):
         from save_modifier_core.edits import Edit
@@ -623,8 +626,4 @@ class TestHqRename(unittest.TestCase):
 
 
 def _first_save_path():
-    from save_modifier_core import list_saves
-    for info in list_saves():
-        if info.is_primary:
-            return str(info.path)
-    raise unittest.SkipTest("本机没有存档")
+    return str(pick_save(lambda i: i.is_primary, reason="本机没有存档").path)
