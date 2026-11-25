@@ -3946,7 +3946,7 @@ function ruinsBox(){
       + '</div>';
   }
 
-  return '<div class="storegrp" style="margin-top:12px">'
+  return '<div class="storegrp" id="ruinsbox" style="margin-top:12px">'
     + '<div class="storetitle">' + L("废墟（被摧毁的城市）") + ' \u00b7 ' + ruins.length + '</div>'
     + '<div style="padding:0 0 2px">'
     + card(latest) + more + '</div>'
@@ -3989,6 +3989,7 @@ function pageCampaign(w){
         <div class="storetitle">路线图 · {1}</div>
         {2}
       </div>
+      {12}
       <div class="cols-wide" style="display:grid;gap:14px;margin-top:12px">
         <div class="storegrp"><div class="storetitle">这场会议的可选场景 · {3} 个</div>
           <table class="rlist"><thead><tr><th>名称</th><th>场景 id</th><th>变体</th></tr></thead>
@@ -4007,7 +4008,6 @@ function pageCampaign(w){
           · {10}</div>
         {11}
       </div>
-      {12}
       <div class="note">这一页除了<b>废墟修复</b>之外都是<b>只读</b>的 —— 战役推进是游戏自己的逻辑，
         修改器只告诉你「现在在哪儿、能打哪几场」（§7.8）。<br>
         ⚠️ <b>名册与会议商店来自游戏包</b>（战役包默认配置）——

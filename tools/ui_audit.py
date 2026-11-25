@@ -213,6 +213,33 @@ WALK = r"""
       const c=(VIEW.theater_candidates||[])[0]; if(c) openTheaterAddModal(c.asset);
       await sleep(500); closeModal(); await sleep(200); });
     await step('战役页-渲染', async()=>{ PAGE='campaign'; show('campaign'); await sleep(1200); });
+    /* ⚠️ **U188 回归**：废墟块必须在**路线图下面**（用户 2026-11-25：
+       「目前修改废墟功能埋在战役最低下，太难发现了」⇒ 挪到战役第二行）。
+       静态断言只比对源码字面量、不验行为（U186 实锤：一条断言把 bug 锁了 46 个 commit）
+       ⇒ 这里**真看 DOM 顺序**：废墟块的**上一个兄弟**是路线图块、
+       **下一个兄弟**是两列格子（可选场景 / 总部）。
+       ⚠️ `ruinsBox()` 在**没有废墟时返回空串** ⇒ 存档没废墟就跳过；
+          但「有废墟却没渲染出来」是回归 ⇒ 要报错。 */
+    await step('战役页-废墟块在路线图下面', async()=>{
+      /* 战役明细是**异步**拉的（`loadCampaignDetail()`）⇒ 先等它到位再断言 */
+      for(let i=0;i<30 && !CDETAIL;i++) await sleep(200);
+      const ruins = (CDETAIL && CDETAIL.ruins) || [];
+      const box = document.querySelector('#ruinsbox');
+      if(!box){
+        if(ruins.length) throw new Error('存档里有 '+ruins.length+' 座废墟，但废墟块没渲染（U188 回归）');
+        return;                       /* 这个存档本来就没有废墟 ⇒ 无从验证 */
+      }
+      const prev = box.previousElementSibling;
+      const next = box.nextElementSibling;
+      if(!prev || !/路线图|Roadmap/.test(prev.textContent||''))
+        throw new Error('废墟块上面不是路线图块（U188 回归）');
+      if(!next || String(next.className).indexOf('cols-wide')<0)
+        throw new Error('废墟块不在「可选场景/总部」两列格子上面（U188 回归）');
+      const r = box.getBoundingClientRect();
+      if(r.height<=0) throw new Error('废墟块高度为 0（不可见）');
+      const pr = prev.getBoundingClientRect();
+      if(pr.top > r.top) throw new Error('废墟块在路线图块上面（U188 回归）');
+    });
     await step('回概览', async()=>{ PAGE='overview'; show('overview'); await sleep(900); });
     return log;
   })()
