@@ -1919,7 +1919,11 @@ class TestU49LayoutAndLegality(unittest.TestCase):
         self.assertIn("function poolGroupOpen(", self.html)
         self.assertIn("SEL.poolOpen", self.html)
         self.assertNotIn("SEL.poolClosed", self.html)
-        self.assertIn("const open = poolGroupOpen(n);", self.html)
+        # U186：折叠状态的**读**侧必须用国籍 id 当键 ——
+        # 写侧是 `togglePoolGroup('{1}')`（传 `n.nat`），读侧也得是 `n.nat`。
+        # 以前读侧传整个分组对象 ⇒ `SEL.poolOpen['[object Object]']` ⇒ 分组点不开。
+        self.assertIn("const open = poolGroupOpen(n.nat);", self.html)
+        self.assertNotIn("const open = poolGroupOpen(n);", self.html)
 
     def test_attach_check_uses_unit_parent_nationality(self):
         """挂载判定方向：**单位国籍的 parent == 特种兵国籍**（单向）。"""

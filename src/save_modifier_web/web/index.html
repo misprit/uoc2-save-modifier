@@ -4823,7 +4823,12 @@ function fullPoolHTML(u, selected){
       }).join("");
       const canN = n.items.filter(it=>specCanAttach(it.id, u.type)).length;
       /* 全量视图的各国分组**默认折叠** —— 375 种全铺开没法看 */
-      const open = poolGroupOpen(n);
+      /* ⚠️ **U186**：折叠状态**读写必须用同一个键** ——
+         写：`togglePoolGroup('german')` ⇒ `SEL.poolOpen['german']`；
+         读：这里传**国籍 id**（`n.nat`）⇒ `SEL.poolOpen['german']`。
+         以前读的时候传了整个分组对象 ⇒ 查的是 `SEL.poolOpen['[object Object]']`
+         ⇒ 永远 undefined ⇒ **31 个国籍分组一个都点不开**（U145 遗留）。 */
+      const open = poolGroupOpen(n.nat);
       out += L2(`<div class="grphead{0}"
         onclick="togglePoolGroup('{1}')">
         <span class="caret">▼</span>{2}

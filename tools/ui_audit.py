@@ -118,6 +118,26 @@ WALK = r"""
     await step('单位页-移动力', async()=>{ if(u){ const el=document.getElementById('in_mp_'+u.id);
       if(el){ el.value='5'; el.dispatchEvent(new Event('input',{bubbles:true})); } } await sleep(300); });
     await step('单位页-显示所有特种兵', async()=>{ toggleFullPool(); await sleep(500); });
+    /* ⚠️ **U186 回归**：国籍分组的折叠状态**读写用的键必须一致**。
+       以前写用字符串键、读用整个对象 ⇒ 查 `SEL.poolOpen['[object Object]']`
+       ⇒ 永远折叠 ⇒ **一个都点不开**，而这一步以前只调 `toggleFullPool()`、
+       根本不验证 ⇒ 这个 bug 一直没被抓到。 */
+    await step('单位页-展开国籍分组', async()=>{
+      const heads = document.querySelectorAll('#udetail .grphead');
+      if(!heads.length) throw new Error('没有国籍分组（显示所有特种兵 没开？）');
+      const before = heads[0].className.indexOf('closed')>=0;
+      heads[0].click();
+      await sleep(500);
+      const after = document.querySelector('#udetail .grphead');
+      if(!after) throw new Error('点完国籍分组，详情区没了');
+      const opened = after.className.indexOf('closed')<0;
+      const body = after.nextElementSibling;
+      const vis = body && body.style.display!=='none';
+      if(before && !opened) throw new Error('点了国籍分组还是折叠的（折叠状态读写键不一致）');
+      if(!vis) throw new Error('国籍分组展开标记对了，但内容仍然隐藏');
+      if(after) after.click();          /* 点回去，别把状态留给后面的步骤 */
+      await sleep(400);
+    });
     await step('单位页-隐藏所有特种兵', async()=>{ toggleFullPool(); await sleep(400); });
     await step('单位页-加特种兵', async()=>{
       const pool = unitPoolFor(u); if(!pool || !pool.candidates.length) return;

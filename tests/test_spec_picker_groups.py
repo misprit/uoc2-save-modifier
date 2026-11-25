@@ -162,6 +162,24 @@ class SpecPickerGroupsTest(unittest.TestCase):
                           "/* 国籍组的折叠状态")
         self.assertIn("const open = q ? true : spickGroupOpen(n.nat);", body)
 
+    def test_unit_page_group_state_uses_the_nationality_key(self):
+        """⚠️ **U186**：单位明细页的国籍分组，折叠状态的**读写必须用同一个键**。
+
+        写：`togglePoolGroup('german')` ⇒ `SEL.poolOpen['german']`；
+        读：`poolGroupOpen(n.nat)` ⇒ `SEL.poolOpen['german']`。
+        以前读的时候传的是**整个分组对象** ⇒ 查 `SEL.poolOpen['[object Object]']`
+        ⇒ 永远 undefined ⇒ 永远渲染成折叠 ⇒ **31 个国籍分组一个都点不开**
+        （U145 改数据结构时只改了一侧；2026-11-25 用户发现）。
+
+        ⚠️ 商店/兵库那侧（`spickGroupOpen(n.nat)`）一直是对的 ⇒ 只错了一侧。
+        """
+        units = self._body(self.html, "function fullPoolHTML(",
+                           "function poolGroupOpen(")
+        self.assertIn("const open = poolGroupOpen(n.nat);", units)
+        # 写的那一侧传的也必须是**国籍 id**
+        self.assertIn("onclick=\"togglePoolGroup('{1}')\"", units)
+        self.assertIn("esc(n.nat)", units)
+
     def test_both_modals_start_with_a_fresh_state(self):
         # 兵库：MODAL = {…, all:false, poolOpen:{},   /* 注释 */}
         self.assertIn("all:false, poolOpen:{},", self.html)

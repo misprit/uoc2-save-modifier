@@ -5931,7 +5931,29 @@ U150 就是靠真浏览器那一遍才发现文件浏览器的四个目录名没
 
 ⚠️ **同一条规则只留一处**：分组与排序抽成共享的 `specNatGroups()`，
 单位明细页的「显示所有特种兵」也改用它 ⇒ 两边不会漂移（U136 的教训）。
-`tests/test_spec_picker_groups.py`（11 项）守着这条。
+`tests/test_spec_picker_groups.py`（12 项）守着这条。
+
+#### 10.10.77 ★ 单位明细页的国籍分组**一个都点不开**（U186）
+
+> **【2026-11-25 · 用户反馈】**
+> 单位详情页的特种兵选择，勾上「显示所有特种兵」以后，**每个国家的下拉菜单都点不开**。
+
+| 东西 | 症状 | 根因 | 改法 |
+|---|---|---|---|
+| 单位明细页「显示所有特种兵」里的国籍分组 | 31 个国籍组头**全点不动**（点了还是折叠的） | 折叠状态的**读写用了不同的键**：写 `togglePoolGroup('german')` ⇒ `SEL.poolOpen['german']`；读却传了整个分组对象 `poolGroupOpen(n)` ⇒ 查 `SEL.poolOpen['[object Object]']` ⇒ 永远 undefined | 读改成 `poolGroupOpen(n.nat)` |
+
+⚠️ **规范 §7.3.4 早就写的是 `poolGroupOpen(nat)`** ⇒ 是**实现跑偏**，不是规范错。
+
+⚠️ **商店/兵库那侧一直是对的**（`spickGroupOpen(n.nat)`）⇒ 只错了一侧；
+但这也说明「同一条规则两处实现 ⇒ 迟早漂移」（U136 的教训）在**同一个文件里**同样成立。
+
+⇒ 两条护栏：
+  · `tests/test_spec_picker_groups.py` 新增
+    `test_unit_page_group_state_uses_the_nationality_key`
+    —— 以前只断言了商店那侧用 `.nat`。
+  · `tools/ui_audit.py` 新增步骤「单位页-展开国籍分组」——
+    **真点**一个组头并断言它展开了（以前的步骤只调 `toggleFullPool()`、
+    **根本不验证** ⇒ 这个 bug 一直没被抓到）。
 
 > **【2026-11-21 · 外部审阅 P2-1 / P2-2】**
 
