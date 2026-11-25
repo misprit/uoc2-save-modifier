@@ -37,9 +37,9 @@ from .campaigns import (CampaignData, CampaignIndex, CampaignPosition,
                         Conference, Scenario, ScenarioRoster, StoreListing)
 from .catalog import CardWhitelist, Catalog, UnitType
 from .commit import CommitResult, commit, make_backup
-from .container import (CardView, HqView, Save, SaveUnreadable,
-                        StoreEntryView, UnitView,
-                        View)
+from .container import (CardView, HqView, RuinedCity, Save,
+                        SaveUnreadable, StoreEntryView,
+                        UnitView, View)
 from .discovery import (SaveInfo, is_archived_path, list_saves,
                         resolve_save_id)
 from .edits import UNSET, Edit
@@ -63,6 +63,7 @@ __all__ = [
     "FileChange",
     "HqView",
     "Plan",
+    "RuinedCity",
     "Save",
     "SaveInfo",
     "SaveUnreadable",

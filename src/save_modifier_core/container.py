@@ -36,7 +36,7 @@ if TYPE_CHECKING:                      # pragma: no cover
     from .undo import UndoResult
 
 __all__ = ["Save", "SaveUnreadable", "View", "UnitView", "HqView", "CardView",
-           "StoreEntryView"]
+           "StoreEntryView", "RuinedCity"]
 
 _TURN_RE = re.compile(r"^turn_(\d+)")
 
@@ -393,6 +393,57 @@ class StoreEntryView:
         return self.sub == "elite_store"
 
 
+def _xy(value: Any) -> tuple[int, int] | None:
+    """两元素的整数序列 → 地图坐标 `(x, y)`；形状不对就返回 None。
+
+    ⚠️ **坐标在 YAML 里是 list，在游戏里是 tuple** ——
+    voluptuous 的 `uv_schema` 会把它转成 tuple，
+    否则游戏自己的 `dict(data['map'])` 会因 list 不可哈希而炸（`e167` 字节码）。
+    这里只做**只读**解析 ⇒ 保持 list 语义即可。
+    """
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return None
+    x, y = value[0], value[1]
+    if isinstance(x, bool) or isinstance(y, bool):
+        return None
+    if not isinstance(x, int) or not isinstance(y, int):
+        return None
+    return (x, y)
+
+
+def _map_uv(item: Any) -> tuple[int, int] | None:
+    """`cities.yml` / `forts.yml` 的 `map` 的一项（`[坐标, 附加数据]`）→ 坐标。
+
+    ⚠️ **与战役清单的形状不同** —— 清单 `destroyed_cities` 的项**直接就是** `[x, y]`，
+    没有「附加数据」那一层（`e167` 字节码 + 68 个存档实测）。
+    """
+    if not isinstance(item, (list, tuple)) or len(item) != 2:
+        return None
+    return _xy(item[0])
+
+
+@dataclass(frozen=True)
+class RuinedCity:
+    """一座被摧毁的城市（废墟）—— **只读描述**。
+
+    ⚠️ 改它要走 `Edit.city_restore`（规范 §6.5），不要直接改存档。
+
+    | 字段 | 含义 |
+    |---|---|
+    | `uv` | 地图坐标 `(x, y)` |
+    | `scenarios` | **哪些场景的快照里有它**（`games/<场景>/cities.yml`）|
+    | `index` | 在**去重后**的战役清单里的下标（0 = 最早被摧毁）|
+    | `latest` | 是不是最后一项（= **最新变成废墟的那座**）|
+    | `occurrences` | 原始清单里这个坐标出现了几次（> 1 ⇒ 有重复）|
+    """
+
+    uv: tuple[int, int]
+    scenarios: tuple[str, ...] = ()
+    index: int = 0
+    latest: bool = False
+    occurrences: int = 1
+
+
 @dataclass
 class View:
     """给 GUI 用的只读投影（规范 §0.2 的 `save.view()`）。
@@ -697,6 +748,67 @@ class Save:
                 if isinstance(u, dict) and isinstance(u.get("id"), int):
                     out.add(u["id"])
         return out
+
+    # ---- 废墟（被摧毁的城市） ----
+
+    def ruined_cities(self) -> list[RuinedCity]:
+        """战役里被摧毁的城市（废墟）—— **只读**（规范 §6.5）。
+
+        * **权威清单** = 根 `main.yml` 的 `destroyed_cities`
+          （`[[x, y], …]`，**顺序 = 摧毁时间序** ⇒ 最后一项 = 最新变成废墟的那座）；
+        * **场景快照** = `games/<场景>/cities.yml` ⇒ 用来算「影响哪些场景」。
+
+        ⚠️ 「影响场景」**只按快照的实际内容算** —— 不要用 `playable.npz`
+        也不要用 `playable_area` 多边形反查（多边形是凹的，实测误判 43 处）。
+        """
+        raw = self.root_main().get("destroyed_cities")
+        order: list[tuple[int, int]] = []
+        counts: dict[tuple[int, int], int] = {}
+        if isinstance(raw, list):
+            for item in raw:
+                uv = _xy(item)
+                if uv is None:
+                    continue
+                order.append(uv)
+                counts[uv] = counts.get(uv, 0) + 1
+        if not order:
+            return []
+        scen = self._ruined_city_scenarios()
+        uniq: list[tuple[int, int]] = []
+        for uv in order:
+            if uv not in uniq:
+                uniq.append(uv)
+        return [
+            RuinedCity(
+                uv=uv,
+                scenarios=scen.get(uv, ()),
+                index=i,
+                latest=(i == len(uniq) - 1),
+                occurrences=counts.get(uv, 1),
+            )
+            for i, uv in enumerate(uniq)
+        ]
+
+    def _ruined_city_scenarios(self) -> dict[tuple[int, int], tuple[str, ...]]:
+        """哪座废墟出现在**哪些场景**的快照里（`games/<场景>/cities.yml`）。"""
+        out: dict[tuple[int, int], set[str]] = {}
+        for entry in self.list_names():
+            if not entry.startswith("games/") or not entry.endswith("/cities.yml"):
+                continue
+            parts = entry.split("/")
+            if len(parts) != 3:
+                continue
+            data = self.read_yaml(entry, None)
+            if not isinstance(data, dict):
+                continue
+            items = data.get("map")
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                uv = _map_uv(item)
+                if uv is not None:
+                    out.setdefault(uv, set()).add(parts[1])
+        return {k: tuple(sorted(v)) for k, v in out.items()}
 
     # ---- 能力位与阶段 ----
 

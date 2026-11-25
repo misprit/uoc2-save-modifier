@@ -126,6 +126,7 @@ class TestPackageSurface(unittest.TestCase):
     # ⚠️ 2026-11-18 U18：新增战役只读层的公开 API（`campaigns` 模块）。
     EXPECTED = {
         "Capabilities", "CampaignData", "CampaignIndex", "CampaignPosition",
+        "RuinedCity",
         "CardView", "CardWhitelist", "Catalog", "CommitResult", "Conference",
         "CorePaths", "Edit", "FileChange", "HqView", "Plan", "Save",
         "SaveInfo", "SaveUnreadable", "Scenario", "ScenarioRoster",

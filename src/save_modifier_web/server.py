@@ -1749,6 +1749,9 @@ def api_campaign_detail(save_id: str) -> dict:
         active_fronts = [str(f) for f in (getattr(pos, "fronts", None) or [])]
         active_front_names = [front_names.get(f, f) for f in active_fronts]
 
+        # 废墟（被摧毁的城市）—— 只读清单（规范 §6.5）
+        ruins = save.ruined_cities()
+
         return {
             "campaign_id": cid,
             "route_name": chosen_route,
@@ -1758,6 +1761,7 @@ def api_campaign_detail(save_id: str) -> dict:
             "position": _jsonable(pos),
             "front_names": front_names,
             "active_front_names": active_front_names,
+            "ruins": _jsonable(ruins),
         }
 
 

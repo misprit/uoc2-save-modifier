@@ -1387,6 +1387,19 @@ class TestCampaignDetailApi(WebGuiTestBase):
             self.skipTest("这个存档的会议不在索引里")
         self.assertTrue(now[0]["scenes"] or now[0]["id"])
 
+    def test_campaign_detail_carries_ruins(self):
+        """U183：战役页要显示废墟 ⇒ 接口必须带出 `ruins`。"""
+        sid = self._save_id()
+        d = self.get_json("/api/campaign-detail?save_id=" + _quote(sid))
+        self.assertNotIn("error", d, d.get("error"))
+        self.assertIn("ruins", d)
+        self.assertIsInstance(d["ruins"], list)
+        for r in d["ruins"]:
+            self.assertIn("uv", r)
+            self.assertIn("scenarios", r)
+            self.assertIn("index", r)
+            self.assertIn("latest", r)
+
     def test_undo_stack_endpoint(self):
         """撤销栈 + 备份列表。"""
         sid = pick_save(lambda i: i.is_primary, reason="本机没有存档").save_id

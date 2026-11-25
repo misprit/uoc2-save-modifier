@@ -110,6 +110,10 @@ save.view() -> View
 #     给 GUI 用的只读投影：能力位、当前阶段（§3.4.6）、
 #     单位列表（含 max_st/max_spec）、总部列表、卡牌、商店、
 #     历史战斗单位（只读）。
+#
+# save.ruined_cities() -> list[RuinedCity]   （§6.5 · U183）
+#     战役里被摧毁的城市（废墟）清单 —— 坐标 / 影响哪些场景 /
+#     是不是「最新变成废墟的那座」。**只读**：改它走 `city_restore`。
 
 # ── 4) 规划编辑 ─────────────────────────────────────────
 save.plan_edit(edits: list[Edit]) -> Plan
@@ -2330,7 +2334,8 @@ store:
 ### 6.5 废墟修复（city_restore）⭐
 
 > 🚧 **状态**：设计已拍板（用户 2026-11-24），按 U183（只读 API）→ U184（写入）→ U185（界面）落地。
-> **U184 之前本节是「设计」，不是「已实现」** —— 那时 `EDIT_KINDS` 里还没有 `city_restore`。
+> **U183 已完成**：`Save.ruined_cities()` + `/api/campaign-detail` 的 `ruins` 字段可用。
+> **U184 之前本节仍有一半是「设计」** —— 那时 `EDIT_KINDS` 里还没有 `city_restore`。
 
 #### 6.5.1 为什么需要它
 
@@ -2447,6 +2452,7 @@ store:
 ```
 
 * 「影响场景」**用存档里 `games/*/cities.yml` 的实际内容算**（不是可玩区反查）。
+* 「在不在当前场景」由界面判定：当前战斗场景（`in_state.scenario`）或当前会议的**可选场景**里有没有它 —— 核心库只给事实，不给结论。
 * 「其它废墟」默认折叠，点开可点选任意一座修复（一次一座）。
 * **不显示城市名**（游戏没给，见 §6.5.2）。
 * 最新那座不在当前场景时：**仍然给按钮**，但标黄提示「对当前战斗无影响」（用户 2026-11-24 拍板）。
@@ -2455,7 +2461,7 @@ store:
 
 | 东西 | 位置 | 说明 |
 |---|---|---|
-| 只读清单 | `Save.ruined_cities()` → `list[RuinedCity]` | 每项含 `uv` / `scenarios` / `in_current_scenario` / `index` / `latest` |
+| 只读清单 | `Save.ruined_cities()` → `list[RuinedCity]` | 每项含 `uv`（坐标）/ `scenarios`（影响哪些场景）/ `index`（第几座被摧毁）/`latest`（是不是最新那座）/ `occurrences`（清单里重复了几次）|
 | 编辑 | `Edit.city_restore(uv, restore_forts=True)` | `kind = "city_restore"` |
 | 写盘白名单 | 放开 `games/*/cities.yml` 与 `games/*/forts.yml` | §7.2 W9 的新例外（U184 同步） |
 
