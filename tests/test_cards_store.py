@@ -232,35 +232,47 @@ class TestCards(CardStoreTestBase):
         self.assertFalse(plan.ok)
         self.assertIn("不存在", plan.errors[0])
 
-    def test_card_with_unit_takes_reserved_unit_id(self):
-        """⚠️ `unit_id` 的真实语义 = 本战役为这张卡登记的**预留 id**。
+    def test_summon_card_cannot_be_added_to_the_hand(self):
+        """⛔ **U187**：空降 / 登陆卡**一律不许直接加到手牌**。
 
-        夹具里 `document/main.yml.card_type_units` 登记了
-        `tactical_para_german → 718` ⇒ 不传 unit_id 也能加（自动补上）。
+        召唤卡用的时候要召唤单位，而本战役登记的那个单位 id
+        **可能已经被召唤过**（`used_card_types_with_unit`）
+        ⇒ 游戏读到就会崩（U187 实测：给「霸王行动」加 82 空降师 ⇒ 崩）。
+
+        ⇒ 手牌这一侧一刀切禁掉，**不判断「用没用过」**（用户 2026-11-25 拍板）。
         """
         if not self.catalog.has_card_type("tactical_para_german"):
             self.skipTest("本机没有这个卡牌类型")
-        plan, res = self.commit([Edit.card_add("tactical_para_german")])
-        self.assertTrue(plan.ok, plan.errors)
-        self.assertTrue(res.ok, res.errors)
-        cards = self.read("cards.yml")
-        self.assertEqual(cards[1]["unit_id"], 718)
+        plan, _ = self.commit([Edit.card_add("tactical_para_german")])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("空降/登陆卡" in e for e in plan.errors), plan.errors)
 
-    def test_card_with_unit_rejects_wrong_unit_id(self):
-        """填错 ⇒ 召唤出**错误的单位** —— 必须拦。"""
+    def test_summon_card_with_the_right_unit_id_is_still_banned(self):
+        """`unit_id` 填对了也一样禁 —— 禁的是**卡种**，不是参数。
+
+        夹具里 `document/main.yml.card_type_units` 登记了
+        `tactical_para_german → 718` ⇒ U187 之前这条是能加进去的。
+        """
+        if not self.catalog.has_card_type("tactical_para_german"):
+            self.skipTest("本机没有这个卡牌类型")
+        plan, _ = self.commit([Edit.card_add("tactical_para_german", unit_id=718)])
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("空降/登陆卡" in e for e in plan.errors), plan.errors)
+
+    def test_summon_card_with_a_wrong_unit_id_is_banned_by_the_same_rule(self):
         if not self.catalog.has_card_type("tactical_para_german"):
             self.skipTest("本机没有这个卡牌类型")
         plan, _ = self.commit([Edit.card_add("tactical_para_german", unit_id=1)])
         self.assertFalse(plan.ok)
-        self.assertTrue(any("预留的单位是 718" in e for e in plan.errors), plan.errors)
+        self.assertTrue(any("空降/登陆卡" in e for e in plan.errors), plan.errors)
 
-    def test_card_with_unit_not_registered_in_campaign_is_blocked(self):
-        """本战役没为它登记单位 ⇒ 硬写进去用卡时游戏会崩。"""
+    def test_summon_card_not_registered_in_campaign_is_banned_the_same_way(self):
+        """本战役没登记单位的召唤卡也是同一条报错（口径统一）。"""
         if not self.catalog.has_card_type("tactical_naval_assault_us"):
             self.skipTest("本机没有这个卡牌类型")
         plan, _ = self.commit([Edit.card_add("tactical_naval_assault_us")])
         self.assertFalse(plan.ok)
-        self.assertTrue(any("登记" in e for e in plan.errors), plan.errors)
+        self.assertTrue(any("空降/登陆卡" in e for e in plan.errors), plan.errors)
 
     def test_card_without_unit_rejects_unit_id(self):
         plan, _ = self.commit([Edit.card_add("air_attack_allies", unit_id=1)])

@@ -918,9 +918,14 @@ class TestCardStoreWriteApi(WebGuiTestBase):
         cat = self.get_json("/api/catalog")
         wl = self.get_json("/api/pickers?save_id=" + _quote(self.copy))
         allowed = wl.get("cards", {}).get("allowed") or []
-        if not allowed:
-            self.skipTest("这个存档没有可上架的卡")
-        ct = allowed[0]
+        # ⚠️ **U187**：白名单 `allowed` 里**本来就有召唤卡**（空降 / 登陆），
+        # 而召唤卡**不许进手牌** ⇒ 这里必须挑一张**不召唤单位**的卡。
+        ctypes = cat.get("card_types") or {}
+        plain = [t for t in allowed
+                 if not (ctypes.get(t) or {}).get("has_unit")]
+        if not plain:
+            self.skipTest("这个存档没有不召唤单位的可上架卡")
+        ct = plain[0]
         v0 = self._view()
         hand = v0.get("hand") or []
         used = {c.get("position") for c in hand}
@@ -948,14 +953,20 @@ class TestCardStoreWriteApi(WebGuiTestBase):
     def test_card_add_out_of_range_position_is_rejected(self):
         """槽位超上限 ⇒ 必须拦（写了游戏也读不到，U25）。"""
         v = self._view()
+        cat = self.get_json("/api/catalog")
         wl = self.get_json("/api/pickers?save_id=" + _quote(self.copy))
         allowed = wl.get("cards", {}).get("allowed") or []
-        if not allowed:
-            self.skipTest("这个存档没有可上架的卡")
+        ctypes = cat.get("card_types") or {}
+        # ⚠️ **U187**：挑一张**不召唤单位**的卡 —— 否则撞上的是召唤卡的硬拦，
+        # 测的就不是「槽位超限」这条规则了。
+        plain = [t for t in allowed
+                 if not (ctypes.get(t) or {}).get("has_unit")]
+        if not plain:
+            self.skipTest("这个存档没有不召唤单位的可上架卡")
         cm = self.post("/api/commit", {
             "save_id": self.copy,
             "edits": [{"kind": "card_add",
-                       "params": {"card_type": allowed[0], "position": 99}}]})
+                       "params": {"card_type": plain[0], "position": 99}}]})
         self.assertFalse(cm["ok"])
         self.assertTrue(cm["errors"])
 

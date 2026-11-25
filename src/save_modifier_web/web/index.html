@@ -4383,15 +4383,19 @@ function renderCardPickerModal(){
   const M = MODAL; if(!M) return;
   const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
   const types = Object.keys(CATALOG&&CATALOG.card_types ? CATALOG.card_types : {}).sort();
+  const isHand = M.mode==="hand";
   const items = types.map(t=>{
     const info = cardInfo(t);
-    const blocked = wl.blocked && wl.blocked[t];
+    let blocked = wl.blocked && wl.blocked[t];
+    /* ⚠️ **U187**：空降/登陆卡（会召唤单位）**不许直接加到手牌** ——
+       它召唤的单位可能已经被召唤过，游戏读到会崩（U187 实测）。
+       ⇒ 手牌这一侧一律灰掉；卡牌商店那一侧不受影响（货架走白名单）。 */
+    if(!blocked && isHand && info.has_unit) blocked = L("空降/登陆卡不能直接加到手牌");
     return {id:t, name:cardCn(t), tex:cardImg(t), blocked:!!blocked,
       dup:"", title:(info.subtitle||"")+(blocked?("："+blocked):""),
       cost:info.cost, sub:info.subtitle};
   });
   const sel = items.find(i=>i.id===M.sel);
-  const isHand = M.mode==="hand";
   /* 标题与按钮按「上架 / 换牌」分别说清楚 */
   const isAdd = (M.act==="add");
   const mhTitle = isHand ? L("加一张到手牌")

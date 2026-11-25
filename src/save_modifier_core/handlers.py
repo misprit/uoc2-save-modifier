@@ -1476,6 +1476,27 @@ def _card_add(w, e: Edit) -> Outcome:
             f"{len(w.catalog.card_type_names())} 个）")
         return oc
 
+    # ⛔ **U187**：**空降 / 登陆卡（`has_unit`）一律不许直接加到手牌**。
+    # 这类卡用的时候要召唤单位，而它指向的那个单位 id
+    # （`document/main.yml.card_type_units` 里的**预留** id）**可能已经被召唤过**
+    # （`used_card_types_with_unit`）⇒ 有**重复召唤同一个单位**的风险
+    # ⇒ 游戏读到就会崩（U187 实测：给「霸王行动」加 82 空降师 ⇒ 崩）。
+    #
+    # ⇒ 手牌这一侧**一刀切禁掉**，不判断「用没用过」（用户 2026-11-25 拍板：最保险）：
+    #   · **存档里原本就有的不检测** —— 读路径一行不改，照常显示；
+    #   · **卡牌商店（货架）那侧不受影响** —— 它走 `card_whitelist`，
+    #     那里本来就把「已召唤过 / 已在手牌 / 预留单位阵亡」排除了。
+    #
+    # ⚠️ **别把这条当成「已定位到根因」**（`e169` 实测）：游戏自己的存档里**也有**
+    #    同样形态的召唤卡（`used=false` + `unit_id` 已被消耗 + 单位已登场）
+    #    ⇒ 离线**无法**据此定位崩溃点 ⇒ 这是一条**保守兜底**（整类掐掉）。
+    if (w.catalog.card_type(card_type) or {}).get("has_unit"):
+        oc.errors.append(
+            f"卡牌 {card_type} 是空降/登陆卡（会召唤单位）—— "
+            "不能直接加到手牌（§6.3）：它召唤的单位可能已经被召唤过，"
+            "游戏读到会崩。要这类卡请上架到卡牌商店。")
+        return oc
+
     cards = w.table("cards.yml", [])
     if not isinstance(cards, list):
         oc.errors.append("根 cards.yml 结构异常")
@@ -1505,24 +1526,8 @@ def _card_add(w, e: Edit) -> Outcome:
         oc.errors.append(f"槽位 {position} 已经被占了")
         return oc
 
-    info = w.catalog.card_type(card_type) or {}
-    if info.get("has_unit"):
-        # ⚠️ unit_id 的真实语义 = 本战役为这张卡登记的**预留 id**（§8.1）
-        reserved = _reserved_unit_id(w, card_type)
-        if reserved is None:
-            oc.errors.append(
-                f"卡牌 {card_type} 会召唤单位，但本战役没有为它登记可召唤的单位"
-                "（document/main.yml.card_type_units）—— 硬写进去用卡时游戏会崩"
-                "（§7.5.1）")
-            return oc
-        if unit_id is None:
-            unit_id = reserved
-        elif unit_id != reserved:
-            oc.errors.append(
-                f"卡牌 {card_type} 预留的单位是 {reserved}，不能填 {unit_id}"
-                "（填错会召唤出**错误的单位**）")
-            return oc
-    elif unit_id is not None:
+    # 召唤卡在上面已经一刀切禁掉了 ⇒ 走到这里的卡**都不召唤单位**
+    if unit_id is not None:
         oc.errors.append(f"卡牌 {card_type} 不召唤单位，unit_id 必须是 None")
         return oc
 

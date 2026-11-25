@@ -779,7 +779,8 @@
   "游戏存档目录": "Save folder",
   "桌面": "Desktop",
   "文档": "Documents",
-  "下载": "Downloads"
+  "下载": "Downloads",
+  "空降/登陆卡不能直接加到手牌": "airborne / landing cards cannot be added straight to your hand"
  },
  "errors": {
   "修复废墟城市 {arg0}：战役清单删 {arg1} 处；场景快照 {arg2} 处；同格要塞 {arg3} 处": "Restored ruined city {arg0}: {arg1} removed from the campaign list, {arg2} scenario snapshots, {arg3} same-tile forts",
@@ -877,8 +878,6 @@
   "卡牌 {card_type} 不召唤单位，unit_id 必须是 None": "card {card_type} does not summon a unit, unit_id must be None",
   "卡牌 {card_type} 不能上架：{reason}": "card {card_type} cannot be listed: {reason}",
   "卡牌 {card_type} 会召唤单位，但本战役没有为它登记可召唤的单位": "card {card_type} summons a unit, but this campaign has no unit registered for it",
-  "卡牌 {card_type} 会召唤单位，但本战役没有为它登记可召唤的单位（document/main.yml.card_type_units）—— 硬写进去用卡时游戏会崩（§7.5.1）": "card {card_type} summons a unit, but this campaign has no unit registered for it (document/main.yml.card_type_units) — writing it in anyway crashes the game when the card is played (§7.5.1)",
-  "卡牌 {card_type} 预留的单位是 {reserved}，不能填 {unit_id}（填错会召唤出**错误的单位**）": "the unit reserved for card {card_type} is {reserved}; {unit_id} cannot be used (a wrong unit would be summoned)",
   "卡牌类型 {card_type} 不存在（游戏包里共 {len_w_catalog_card_type_names} 个）": "card type {card_type} does not exist (the game package has {len_w_catalog_card_type_names} in total)",
   "卡车数必须在 {TRUCK_MIN}–{TRUCK_MAX} 之间，收到 {trucks}（0 不行 —— 总部至少要有一辆补给卡车）": "the truck count must be between {TRUCK_MIN}–{TRUCK_MAX}, got {trucks} (0 is not allowed — an HQ needs at least one supply truck)",
   "卡车数必须是整数，收到 {trucks}": "the truck count must be an integer, got {trucks}",
@@ -1087,7 +1086,8 @@
   "苏联": "Soviet",
   "这些条目不允许写入：{arg0}（只允许改根层的 {arg1}、战役名册的 {arg2} 与当前战斗层的那张 main.yml）": "These entries are not writable: {arg0} (only the root tables {arg1}, the campaign roster tables {arg2} and the current battle's main.yml may be changed)",
   "⚠️ 游戏**开着**时改盘 ⇒ 退出游戏时它会把内存里的存档写回去 ⇒ 你的改动会被覆盖 ⇒ **改之前先退出游戏**": "⚠️ If the game is **running** while you edit the save, it writes its in-memory copy back when it exits ⇒ your change is overwritten ⇒ **quit the game before editing**",
-  "{entry}：内容与我改完时对不上（现在 {h}…，记录 {sha}…）": "{entry}: the contents no longer match what was written (now {h}…, recorded {sha}…)"
+  "{entry}：内容与我改完时对不上（现在 {h}…，记录 {sha}…）": "{entry}: the contents no longer match what was written (now {h}…, recorded {sha}…)",
+  "卡牌 {card_type} 是空降/登陆卡（会召唤单位）—— 不能直接加到手牌（§6.3）：它召唤的单位可能已经被召唤过，游戏读到会崩。要这类卡请上架到卡牌商店。": "card {card_type} is an airborne/landing card (it summons a unit) — it cannot be added straight to your hand (§6.3): the unit it summons may have been summoned already, and the game crashes when it reads that. To get one, list it on the card shop shelf."
  },
  "values": {
   "arg1": {

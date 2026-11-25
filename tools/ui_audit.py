@@ -161,6 +161,20 @@ WALK = r"""
     await step('卡牌页-换牌', async()=>{
       const c=(VIEW.hand||[])[0]; if(c) openCardPickerModal('hand', c.position); await sleep(500);
       closeModal(); await sleep(200); });
+    /* ⚠️ **U187 回归**：空降 / 登陆卡（会召唤单位）**不许直接加到手牌**。
+       以前没这一步 ⇒ 核心库那边漏了「单位已被召唤过」的检查也没人发现。
+       这里**真看 DOM**：手牌选择器里**不能有**还能点的召唤卡（blocked 的 onclick 是 void 0）。 */
+    await step('卡牌页-手牌选择器禁掉空降卡', async()=>{
+      const c=(VIEW.hand||[])[0]; if(!c) return;
+      openCardPickerModal('hand', c.position); await sleep(700);
+      const cells = Array.from(document.querySelectorAll('#spick_grid .pcell'));
+      if(!cells.length) throw new Error('手牌选择器里一张卡都没有');
+      const clickable = cells.filter(el => /para|naval_assault/.test(el.getAttribute('onclick')||''));
+      if(clickable.length) throw new Error(clickable.length + ' 张空降/登陆卡还能点（U187 回归）');
+      const greyed = cells.filter(el => /blocked/.test(el.className||''));
+      if(!greyed.length) throw new Error('一张卡都没被灰掉（U187 回归）');
+      closeModal(); await sleep(200);
+    });
     await step('商店页-渲染', async()=>{ PAGE='store'; show('store'); await sleep(1200); });
     await step('商店页-上架新商品', async()=>{ openStoreAddModal(); await sleep(500);
                                               closeModal(); await sleep(200); });
