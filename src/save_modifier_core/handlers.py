@@ -2338,6 +2338,135 @@ def _theater_val(field: str, value) -> str:
     return str(value)
 
 
+# ---------------------------------------------------------------- 废墟修复
+
+
+def _uv_param(value) -> tuple[int, int] | None:
+    """把参数里的坐标解析成 `(x, y)`；形状不对返回 `None`。
+
+    游戏的 `uv_schema` 要求**两个非负整数** ⇒ 负数 / 浮点 / 字符串一律不收。
+    """
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return None
+    x, y = value[0], value[1]
+    if isinstance(x, bool) or isinstance(y, bool):
+        return None
+    if not isinstance(x, int) or not isinstance(y, int):
+        return None
+    if x < 0 or y < 0:
+        return None
+    return (x, y)
+
+
+def _map_uv_is(item, uv: tuple[int, int]) -> bool:
+    """`cities.yml` / `forts.yml` 的 `map` 的一项是不是这个坐标。
+
+    ⚠️ **形状与战役清单不同** —— `map` 的项是 `[[x, y], 附加数据]`，
+    而清单 `destroyed_cities` 的项**直接就是** `[x, y]`（§6.5.4）。
+    """
+    if not isinstance(item, (list, tuple)) or len(item) != 2:
+        return False
+    return _uv_param(item[0]) == uv
+
+
+def _city_restore(w, e: Edit) -> Outcome:
+    """修复一座被摧毁的城市（废墟）—— 规范 §6.5。
+
+    **三处必须一起改**（漏一处就是**永久残留**，§6.5.6 R1）：
+
+    | # | 条目 | 改什么 | 漏了会怎样 |
+    |---|---|---|---|
+    | ① | 根 `main.yml` → `destroyed_cities` | 删掉该坐标的**所有**出现 | 下一场**新开**的战斗又注入它 |
+    | ② | `games/<场景>/cities.yml` → `map` | 删掉含该坐标的条目 | 该场景仍是废墟；而且清单已无 ⇒ 以后再也注入不回来 ⇒ **永久残留** |
+    | ③ | `games/<场景>/forts.yml` → `map` | 同格要塞 `functional` 改回 `true` | 同格要塞一直不可用 |
+
+    ⚠️ **战斗中不许修**（能力位 `in_battle`）——
+    `Campaign.save` 每次存档都**删掉并重写** `games/<当前场景>/`，
+    根 `main.yml` 也从内存重写 ⇒ 磁盘上的修改会被游戏覆盖回去（§6.5.5-1）。
+    """
+    oc = Outcome()
+    uv = _uv_param(e.params.get("uv"))
+    if uv is None:
+        oc.errors.append("坐标必须是两个非负整数（地图坐标 [x, y]）")
+        return oc
+    if not w.require(not w.caps.in_battle, "ruins", "main.yml"):
+        return oc
+
+    # ---- ① 战役清单（权威） ----
+    main = w.table("main.yml", {})
+    if not isinstance(main, dict):
+        oc.errors.append("根 main.yml 结构异常")
+        return oc
+    destroyed = main.get("destroyed_cities")
+    if not isinstance(destroyed, list):
+        oc.errors.append("根 main.yml 里没有 destroyed_cities —— 这个存档没有废墟清单")
+        return oc
+    kept = [x for x in destroyed if _uv_param(x) != uv]
+    removed = len(destroyed) - len(kept)
+    if removed == 0:
+        oc.errors.append("坐标 %s 不在废墟清单里" % (uv,))
+        return oc
+    main["destroyed_cities"] = kept
+    w.touch("main.yml")
+
+    # ---- ② 场景废墟快照 ----
+    names = list(w.save.list_names())
+    hit: list[str] = []
+    for entry in names:
+        if not (entry.startswith("games/") and entry.endswith("/cities.yml")):
+            continue
+        data = w.table(entry, None)
+        if not isinstance(data, dict):
+            continue
+        items = data.get("map")
+        if not isinstance(items, list):
+            continue
+        rest = [it for it in items if not _map_uv_is(it, uv)]
+        if len(rest) == len(items):
+            continue
+        data["map"] = rest
+        w.touch(entry)
+        hit.append(entry.split("/")[1])
+
+    # ---- ③ 同格要塞 ----
+    forts_done: list[str] = []
+    if e.params.get("restore_forts", True):
+        for sc in hit:
+            entry = "games/%s/forts.yml" % sc
+            if entry not in names:
+                continue
+            data = w.table(entry, None)
+            if not isinstance(data, dict):
+                continue
+            items = data.get("map")
+            if not isinstance(items, list):
+                continue
+            changed = False
+            for it in items:
+                if not _map_uv_is(it, uv):
+                    continue
+                props = it[1] if isinstance(it, (list, tuple)) and len(it) > 1 else None
+                if not isinstance(props, dict):
+                    continue
+                if props.get("functional") is not True:
+                    props["functional"] = True
+                    changed = True
+            if changed:
+                w.touch(entry)
+                forts_done.append(sc)
+
+    oc.summary = "修复废墟城市 %s：战役清单删 %d 处；场景快照 %d 处；同格要塞 %d 处" % (
+        uv, removed, len(hit), len(forts_done))
+    if not hit:
+        oc.warnings.append(
+            "这座城市在存档里**找不到对应的场景快照** —— 以后新开的战斗不会再有它，"
+            "但已经打完的那些场景的存档里仍留着当时的记录（那是历史，不影响新战斗）")
+    oc.warnings.append(
+        "游戏里的『重置会议 / 重打上一场』会用检查点覆盖战役清单 ⇒ "
+        "可能把这处修改回退；要撤销请用本工具的『撤销』")
+    return oc
+
+
 # ---------------------------------------------------------------- 分发表
 
 _HANDLERS = {
@@ -2369,6 +2498,7 @@ _HANDLERS = {
     "theater_asset": _theater_asset,
     "theater_asset_add": _theater_asset_add,
     "theater_asset_remove": _theater_asset_remove,
+    "city_restore": _city_restore,
 }
 
 

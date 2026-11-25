@@ -181,6 +181,7 @@ class TestEditKinds(unittest.TestCase):
         "store_set", "store_remove", "store_add", "card_store_set",
         "card_store_remove", "card_store_add", "hand_restore", "theater_asset",
         "theater_asset_add", "theater_asset_remove",
+        "city_restore",
     }
 
     def test_kinds_are_frozen(self):
@@ -201,7 +202,8 @@ class TestEditKinds(unittest.TestCase):
                      "card_set", "store_set", "store_remove", "store_add",
                      "card_store_set", "card_store_remove", "card_store_add",
                      "hand_restore", "theater_asset",
-                     "theater_asset_add", "theater_asset_remove"):
+                     "theater_asset_add", "theater_asset_remove",
+                     "city_restore"):
             self.assertTrue(callable(getattr(Edit, name)), name)
 
     def test_store_edits_take_sub_store(self):

@@ -39,6 +39,7 @@ NOT_KINDS = {
     "no_retreat_units",    # 作战标记的三个 id 列表
     "rearguard_units",
     "elastic_defense_units",
+    "destroyed_cities",     # 根 main.yml 的键名（不是编辑 kind）
 }
 
 

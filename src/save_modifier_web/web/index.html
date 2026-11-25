@@ -611,6 +611,18 @@ table.spec-tbl .spin{font-size:16px;padding:4px 9px;min-width:40px}
 .rlist td{padding:5px 8px;border-bottom:1px solid #f0f3f6}
 .rlist td.n{text-align:right;font-family:var(--mono)}
 
+/* ---------------- 废墟修复（U185） ---------------- */
+.ruincard{border:1px solid var(--border);border-radius:7px;padding:9px 11px;
+  margin:0 12px 10px;background:var(--surface)}
+.ruincard .rhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:13.5px}
+.ruincard .rhead b{color:var(--accent-dark)}
+.ruincard .rc{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.ruincard .rdim{font-size:12.5px;color:var(--muted);margin-top:3px}
+.ruincard .ract{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ruinmore{margin:0 12px 10px}
+.ruinmore .rmore-head{cursor:pointer;user-select:none;font-size:12.5px;
+  color:var(--accent-dark);padding:4px 0}
+
 
 /* ---------------- 战役页三块 + 概览页备份栈（U41） ---------------- */
 .route{display:flex;gap:0;align-items:stretch;overflow-x:auto;padding:6px 2px 10px}
@@ -3858,7 +3870,92 @@ function theaterAddConfirm(){
 }
 
 /* ===================================================================
-   战役页（U39 · 只读）
+   废墟修复（U185 · 规范 §6.5）
+   =================================================================== */
+/* 「在不在当前场景」是**界面口径**（§6.5.8）——
+   当前战斗场景（campaign_position.scenario_id）或这场会议的可选场景。
+   核心库只给事实（废墟出现在哪些场景的快照里），判断由界面做。 */
+function ruinSceneIds(){
+  const cp = (VIEW && VIEW.campaign_position) || {};
+  const ids = new Set();
+  if(cp.scenario_id) ids.add(String(cp.scenario_id));
+  (cp.available_scenes||[]).forEach(function(s){ if(s && s.id) ids.add(String(s.id)); });
+  return ids;
+}
+function ruinIsCurrent(r, ids){
+  return (r.scenarios||[]).some(function(s){ return ids.has(String(s)); });
+}
+/* 把一座废墟挂进「待应用」—— 真正写盘要按底栏的「应用更改」。 */
+function stageCityRestore(uv){
+  const x = uv[0], y = uv[1];
+  setPending("city_restore", "city_restore:" + x + "," + y,
+    {uv:[x, y], restore_forts:true},
+    L2("修复废墟城市 ({0}, {1})", x, y));
+  show("campaign");
+}
+function toggleRuinList(){
+  SEL.ruinOpen = !SEL.ruinOpen;
+  show("campaign");
+}
+function ruinsBox(){
+  const d = CDETAIL||{};
+  const ruins = d.ruins||[];
+  if(!ruins.length) return "";
+  const ids = ruinSceneIds();
+  const latest = ruins.find(function(r){ return r.latest; }) || ruins[ruins.length-1];
+  const others = ruins.filter(function(r){ return r !== latest; });
+  const open = !!SEL.ruinOpen;
+
+  const card = function(r){
+    const uv = r.uv||[];
+    const scen = r.scenarios||[];
+    const cur = ruinIsCurrent(r, ids);
+    const scenTxt = scen.length ? scen.join(" / ") : L("（存档里找不到它的场景快照）");
+    const warn = cur ? "" :
+      '<div class="warnbar" style="margin-top:8px">\u26a0 '
+      + L("这座城市不在当前场景 —— 修了也不会影响当前这场战斗。") + '</div>';
+    return '<div class="ruincard">'
+      + '<div class="rhead"><b>' + L("最新变成废墟的城市") + '</b>'
+      + '<span class="rc">(' + esc(uv[0]) + ', ' + esc(uv[1]) + ')</span></div>'
+      + '<div class="rdim">' + L("影响场景") + '：' + esc(scenTxt) + '</div>'
+      + warn
+      + '<div class="ract"><button class="btn pri" onclick="stageCityRestore(['
+      + uv[0] + ', ' + uv[1] + '])">' + L("修复这一座") + '</button></div>'
+      + '</div>';
+  };
+
+  let more = "";
+  if(others.length){
+    const rows = others.map(function(r){
+      const uv = r.uv||[];
+      const scen = r.scenarios||[];
+      const cur = ruinIsCurrent(r, ids);
+      const scenTxt = scen.length ? scen.join(" / ") : "—";
+      const badge = cur ? "" : ' <span class="tbadge dim">' + L("不在当前场景") + '</span>';
+      return '<tr><td class="n">(' + esc(uv[0]) + ', ' + esc(uv[1]) + ')</td>'
+        + '<td>' + esc(scenTxt) + badge + '</td>'
+        + '<td style="text-align:right"><button class="btn" onclick="stageCityRestore(['
+        + uv[0] + ', ' + uv[1] + '])">' + L("修复") + '</button></td></tr>';
+    }).join("");
+    more = '<div class="ruinmore">'
+      + '<div class="rmore-head" onclick="toggleRuinList()">'
+      + (open ? "\u25be " : "\u25b8 ") + L2("其它废墟（{0} 座）", others.length) + '</div>'
+      + (open ? '<table class="rlist"><thead><tr><th>' + L("坐标")
+        + '</th><th>' + L("影响场景") + '</th><th></th></tr></thead><tbody>'
+        + rows + '</tbody></table>' : "")
+      + '</div>';
+  }
+
+  return '<div class="storegrp" style="margin-top:12px">'
+    + '<div class="storetitle">' + L("废墟（被摧毁的城市）") + ' \u00b7 ' + ruins.length + '</div>'
+    + '<div style="padding:0 0 2px">'
+    + card(latest) + more + '</div>'
+    + '</div>';
+}
+
+
+/* ===================================================================
+   战役页（U39）
    =================================================================== */
 function pageCampaign(w){
   const cp = VIEW.campaign_position || {};
@@ -3910,11 +4007,12 @@ function pageCampaign(w){
           · {10}</div>
         {11}
       </div>
-      <div class="note">这一页是<b>只读</b>的 —— 战役推进是游戏自己的逻辑，
+      {12}
+      <div class="note">这一页除了<b>废墟修复</b>之外都是<b>只读</b>的 —— 战役推进是游戏自己的逻辑，
         修改器只告诉你「现在在哪儿、能打哪几场」（§7.8）。<br>
         ⚠️ <b>名册与会议商店来自游戏包</b>（战役包默认配置）——
         <b>不是玩家存档</b>：单位不一定存活 / 一定继承 / 一定登场。</div>
-  </div></div>`, pos, esc(cp.campaign_name||cp.campaign_id||""), routeBox(), scenes.length, sceneRows || L(`<tr><td colspan="3" class="dim">（没有索引到可选场景）</td></tr>`), (VIEW.hqs||[]).length, hqs, esc(cp.scenario_name||cp.scenario_id||"—"), rosterHTML(), esc(cp.front_name||cp.front||"—"), esc(cp.conference_text||cp.conference_id||"—"), storeBox());
+  </div></div>`, pos, esc(cp.campaign_name||cp.campaign_id||""), routeBox(), scenes.length, sceneRows || L(`<tr><td colspan="3" class="dim">（没有索引到可选场景）</td></tr>`), (VIEW.hqs||[]).length, hqs, esc(cp.scenario_name||cp.scenario_id||"—"), rosterHTML(), esc(cp.front_name||cp.front||"—"), esc(cp.conference_text||cp.conference_id||"—"), storeBox(), ruinsBox());
   markScrollable(w);   /* U99：给真的溢出的块加「↕」提示 */
 }
 

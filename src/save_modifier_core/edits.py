@@ -48,6 +48,7 @@ EDIT_KINDS = (
     "theater_asset",       # 战区资产（唯一的 L3 例外）
     "theater_asset_add",   # 往当前 phase 组**加**一项战区资产（U45）
     "theater_asset_remove",  # 从当前 phase 组**删**一项战区资产（U45）
+    "city_restore",       # 修复一座被摧毁的城市（废墟）—— 规范 §6.5
 )
 
 #: 商店的两个子商店（`store.yml` = `{战线: {store: [...], elite_store: [...]}}`）
@@ -402,6 +403,24 @@ class Edit:
             params["side"] = side
         return Edit("theater_asset_remove", params)
 
+    @staticmethod
+    def city_restore(uv, restore_forts: bool = True) -> "Edit":
+        """修复一座被摧毁的城市（废墟）—— 规范 §6.5。
+
+        `uv` = 地图坐标 `(x, y)`。
+
+        **一次只修一座** —— 修复要同时改三处（战役清单 + 每个场景的废墟快照
+        + 同格要塞），批量改会让「到底改了哪些」看不清（§6.5.2）。
+
+        `restore_forts` = 要不要把**同格要塞**的 `functional` 一起改回 `true`
+        （默认要 —— `set_destroyed_cities` 摧毁城市时会把同格要塞置 `false`）。
+
+        ⚠️ **战斗中不许用** —— 游戏会在存档时从内存重写当前战斗目录与根 `main.yml`，
+        改了会被覆盖回去（§6.5.5-1，handler 会硬拦）。
+        """
+        return Edit("city_restore",
+                    {"uv": uv, "restore_forts": bool(restore_forts)})
+
     # ---------------------------------------------------------------- 描述
 
     def describe(self) -> str:
@@ -487,4 +506,7 @@ class Edit:
                     f"（每回合恢复 {p.get('uses_turn')}，本场景剩余 {v}）")
         if k == "theater_asset_remove":
             return f"删战区资产 {p.get('asset')}"
+        if k == "city_restore":
+            uv = p.get("uv")
+            return "修复废墟城市 %s" % (tuple(uv) if isinstance(uv, (list, tuple)) else uv,)
         return k

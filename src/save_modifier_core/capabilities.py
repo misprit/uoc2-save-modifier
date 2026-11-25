@@ -110,5 +110,8 @@ class Capabilities:
             "shelf": "当前不在会议界面，没有卡牌商店货架",
             "restore_hand": "该存档没有会议检查点，无法恢复牌局",
             "theater_assets": "当前不在战斗中，战区资产由场景在开打时计算",
+            "ruins": "当前存档正在战斗中 —— 游戏会在存档时从内存重写"
+                     "当前战斗目录与根 main.yml，改了会被覆盖回去；"
+                     "请先打完这场战斗再修复废墟",
         }
         return reasons.get(feature, "该存档不支持此功能")

@@ -177,6 +177,14 @@ ROSTER_WRITABLE = ("document/units.yml", "document/hqs.yml")
 #: **独立场景是 `game/main.yml`（单数目录！）**。
 _BATTLE_MAIN_RE = re.compile(r"^(?:games/[^/]+|game)/main\.yml$")
 
+#: **废墟快照**那两张表（**U184**）—— 修复城市必须同时改它们（规范 §6.5.3）：
+#: `games/<场景>/cities.yml`（该场景的废墟快照）与
+#: `games/<场景>/forts.yml`（同格要塞的 `functional`）。
+#:
+#: ⚠️ **只放行这两张、且只放行存档里真实存在的那几份** ——
+#: `games/**` 的其它条目（`units.yml` / `ar_list.yml` / `archive` …）仍然一律只读。
+RUIN_SNAPSHOT_RE = re.compile(r"^games/[^/]+/(?:cities|forts)\.yml$")
+
 
 def _layer_of(entry: str) -> str:
     """条目属于哪一层。
@@ -188,7 +196,7 @@ def _layer_of(entry: str) -> str:
     ⚠️ **U124**：原来只认 `games/*/main.yml` ⇒ **独立场景**的战斗层被标成 L1
     （外部审阅报告 P1-7）。
     """
-    if _BATTLE_MAIN_RE.match(entry):
+    if _BATTLE_MAIN_RE.match(entry) or RUIN_SNAPSHOT_RE.match(entry):
         return "L3"
     return "L1"
 
@@ -199,7 +207,10 @@ def writable_entries(save) -> set:
     * 根层那五张表（`ROOT_WRITABLE`）；
     * **战役名册**那两张表（`ROSTER_WRITABLE`）—— 改名要两份都改（U148）；
     * **当前战斗**的那张 `main.yml`（战役 `games/<场景>/main.yml`，
-      独立场景 `game/main.yml`）。
+      独立场景 `game/main.yml`）；
+    * **废墟快照**那两张表（`RUIN_SNAPSHOT_RE`，**U184**）——
+      `games/<场景>/cities.yml` 与 `games/<场景>/forts.yml`，
+      **只放行存档里真实存在的那几份**（§6.5.3 的 ②③）。
 
     ⚠️ **U124**：以前**没有白名单** ⇒ 理论上能往存档里写**任意条目**
     （`document/`、`last_conference/`、`last_game/` …）——
@@ -214,6 +225,13 @@ def writable_entries(save) -> set:
         battle_dir = None
     if battle_dir:
         out.add("%s/main.yml" % battle_dir)
+    # 废墟快照（U184）：只放行存档里**真实存在**的那几份
+    try:
+        for name in save.list_names():
+            if RUIN_SNAPSHOT_RE.match(name):
+                out.add(name)
+    except Exception:
+        pass
     return out
 
 
@@ -335,8 +353,9 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
     illegal = sorted({c.entry for c in plan.changes if c.entry not in allowed})
     if illegal:
         plan.errors.append(
-            "这些条目不允许写入：%s（只允许改根层的 %s、战役名册的 %s "
-            "与当前战斗层的那张 main.yml）"
+            "这些条目不允许写入：%s（只允许改根层的 %s、战役名册的 %s、"
+            "当前战斗层的那张 main.yml，以及废墟快照那两张 "
+            "games/<场景>/cities.yml 与 forts.yml）"
             % ("、".join(illegal), "、".join(ROOT_WRITABLE),
                "、".join(ROSTER_WRITABLE)))
 

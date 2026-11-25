@@ -158,9 +158,9 @@ catalog.spec_types() / catalog.fronts() / catalog.store_defaults()
 > 但它会**整体回滚**玩家的整个存档状态 —— 用户只想撤销**刚才改的那一个数值**时，它帮不上忙。
 > 因此修改器需要自己的**单步/多步撤销栈**（§6.4）。
 
-### 0.3 本次范围（28 种编辑）
+### 0.3 本次范围（29 种编辑）
 
-核心库一共支持 **28 种编辑**（`src/save_modifier_core/edits.py::EDIT_KINDS`），
+核心库一共支持 **29 种编辑**（`src/save_modifier_core/edits.py::EDIT_KINDS`），
 **按写入目标**分组如下（`kind` 写错会直接报错，不会静默忽略）：
 
 | 组 | 写入目标 | 编辑 kind（`EDIT_KINDS`） |
@@ -174,10 +174,14 @@ catalog.spec_types() / catalog.fronts() / catalog.store_defaults()
 | 会议牌局 | 根 `main.yml` 的 `card_store` | `hand_restore`（读 L2 的检查点 → 写 L1） |
 | 商店 | 根 `store.yml` | `store_set`、`store_remove`、`store_add` —— `store` 与 `elite_store` **两个子商店都支持**（§6.3） |
 | 战区资产 ⭐ | **战斗层** `games/<场景>/main.yml`（独立场景 `game/main.yml`） | `theater_asset`、`theater_asset_add`、`theater_asset_remove` —— **L3 例外 ①**（§6.2b） |
+| 废墟修复 ⭐ | 根 `main.yml` + **战斗层** `games/<场景>/cities.yml` 与 `forts.yml` | `city_restore` —— **L3 例外 ②**（§6.5） |
 
-⚠️ **两个 L3 例外写的是同一张文件**（当前战斗层那张 `main.yml`）：
+⚠️ **三个 L3 例外**：
+① **战区资产**与②**作战标记**写的是**同一张文件**（当前战斗层那张 `main.yml`）：
 战区资产改 `theater_assets`，作战标记改 `no_retreat_units` / `rearguard_units` / `elastic_defense_units`
 三个 id 列表；该文件其余键原样搬运（§7.2 W8）。
+③ **废墟修复**写的是**另外两张**：`games/<场景>/cities.yml` 与 `games/<场景>/forts.yml`
+（场景级的废墟快照与同格要塞），并且**根 `main.yml` 的 `destroyed_cities` 也要一起改**（§6.5.3）。
 
 🚫 **不做里程碑（milestones）相关的任何功能** —— 多数玩家不关心，而且它会削弱成就感；
 技术上它还分成"存档内"和"Steam 全局统计"两套，改存档只能管着其中一半（§6.1b、§7.5）。
@@ -2333,9 +2337,11 @@ store:
 
 ### 6.5 废墟修复（city_restore）⭐
 
-> 🚧 **状态**：设计已拍板（用户 2026-11-24），按 U183（只读 API）→ U184（写入）→ U185（界面）落地。
-> **U183 已完成**：`Save.ruined_cities()` + `/api/campaign-detail` 的 `ruins` 字段可用。
-> **U184 之前本节仍有一半是「设计」** —— 那时 `EDIT_KINDS` 里还没有 `city_restore`。
+> ✅ **状态**：设计已拍板（用户 2026-11-24），U183（只读 API）→ U184（写入）→ U185（界面）**全部落地**。
+> * **U183**：`Save.ruined_cities()` + `/api/campaign-detail` 的 `ruins` 字段。
+> * **U184**：`city_restore` 写入路径 + 写盘白名单已放开（§7.2 W9）。
+> * **U185**：战役页的「废墟」块（§6.5.8）。
+> * ⛔ **只剩实机验证**：改一座城市后让游戏读一遍（§11.8 最后一条）。
 
 #### 6.5.1 为什么需要它
 
@@ -2447,7 +2453,7 @@ store:
 │   影响场景：edelweiss、fall_blau_2                  │
 │   ⚠ 这座废墟不在当前场景里（对当前战斗无影响）        │
 │   [ 修复这一座 ]                                   │
-│ ▸ 其它废墟（3）                                    │
+│ ▸ 其它废墟（3 座）                                    │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -2462,7 +2468,7 @@ store:
 | 东西 | 位置 | 说明 |
 |---|---|---|
 | 只读清单 | `Save.ruined_cities()` → `list[RuinedCity]` | 每项含 `uv`（坐标）/ `scenarios`（影响哪些场景）/ `index`（第几座被摧毁）/`latest`（是不是最新那座）/ `occurrences`（清单里重复了几次）|
-| 编辑 | `Edit.city_restore(uv, restore_forts=True)` | `kind = "city_restore"` |
+| 编辑 | `Edit.city_restore(uv, restore_forts=True)` | `kind = "city_restore"`；`uv` = 地图坐标 `(x, y)`；一次只修一座 |
 | 写盘白名单 | 放开 `games/*/cities.yml` 与 `games/*/forts.yml` | §7.2 W9 的新例外（U184 同步） |
 
 ---
@@ -2472,21 +2478,25 @@ store:
 > **本节是整个修改器的写入总纲，也是唯一的写入授权清单。**
 >
 > **一句话：修改器只写存档根目录下的 5 个 YAML 文件
-> + 当前战斗层的那一张 `main.yml`；
+> + 当前战斗层的那一张 `main.yml`
+> + 废墟快照那两张（`games/<场景>/cities.yml` 与 `games/<场景>/forts.yml`）；
 > 其他一切（检查点、战斗实时层里的其它条目、回合历史、战役文档、游戏包）一律只读、绝不触碰。**
 >
-> ⚠️ **两个 L3 例外，写的是同一张文件**：**当前进行中战斗**的 `theater_assets`（战区资产）
-> 与同一张文件里的**作战标记**三个 id 列表（`unit_orders`）——
-> 它们读档即生效、且不是战报（§6.2b、§6.2c、§7.2 W8）。
+> ⚠️ **三个 L3 例外**：
+> ① **战区资产**（`theater_assets`）与②**作战标记**（三个 id 列表，`unit_orders`）
+> 写的是**同一张文件** —— **当前进行中战斗**的 `main.yml`；它们读档即生效、且不是战报
+> （§6.2b、§6.2c、§7.2 W8）。
+> ③ **废墟修复**（`city_restore`）写的是**另外两张** —— `games/<场景>/cities.yml`
+> 与 `games/<场景>/forts.yml`（§6.5.3、§7.2 W9）。
 > **除此之外，L3 里没有任何东西可写。**
 
-### 7.1 存档有 5 个层，修改器只碰第 1 层（+ 两个 L3 例外，同一张文件）
+### 7.1 存档有 5 个层，修改器只碰第 1 层（+ 三个 L3 例外）
 
 | 层 | 位置 | 内容 | 游戏什么时候读 | 游戏内回退会撤销吗 | **修改器能不能写** |
 |---|---|---|---|---|---|
 | **L1 根状态** | `main.yml` `units.yml` `hqs.yml` `cards.yml` `store.yml`<br>（**最多 5 个**，实测 63 个存档全有，缺的按下表禁用） | 战役当前状态 | 每次读档 | ✅ **会**（被检查点整体替换） | ✅ **可写**（唯一的常规写入面） |
 | **L2 检查点** | `last_conference/{cards,hqs,main,store,units}.yml`<br>`last_game/{cards,hqs,main,store,units}.yml` | 玩家可回退的基线 | 点「重置会议」/「重打上一场」 | ❌ 它自己就是回退源 | ❌ **只读** |
-| **L3 战斗实时层** | `games/<场景>/{main.yml, ar_list.yml, units.yml(清单), enroute_units.yml, hqs.yml, …}`（独立场景是 `game/`） | 战斗当前状态 | 读档继续战斗 | ⚠️ 部分（回退到部署阶段会重写） | ❌ **只读**（⛔ **两个例外**，同一张文件：当前战斗 `main.yml` 的 `theater_assets` 与三个作战标记 id 列表，见 §7.2 W8） |
+| **L3 战斗实时层** | `games/<场景>/{main.yml, ar_list.yml, units.yml(清单), enroute_units.yml, hqs.yml, …}`（独立场景是 `game/`） | 战斗当前状态 | 读档继续战斗 | ⚠️ 部分（回退到部署阶段会重写） | ❌ **只读**（⛔ **三个例外**：① 当前战斗 `main.yml` 的 `theater_assets` 与三个作战标记 id 列表（§7.2 W8）；② `games/<场景>/cities.yml` 与 `forts.yml`（废墟快照，§7.2 W9 / §6.5.3）） |
 | **L4 回合边界历史** | `games/<场景>/archive/<快照>/*` | 每个 phase 边界的历史快照 | 回放 / 回退到部署阶段 | ❌ 不会 | ❌ **只读** |
 | **L5 战役文档** | `document/`（= 对应战役包的副本） | 名册 `units.yml`、场景预设、战役常量 | **每次读档都会加载**（`Campaign.load`） | ❌ 不会 | ❌ **只读** |
 
@@ -2518,7 +2528,7 @@ L3 里剩下的都是"回合流程状态"，改它们只会让存档内部不自
 | **W6** | **只读 L0**（游戏包） | 共享文件，会影响该战役的所有存档 |
 | **W7** | **重打包时 L2/L3/L4/L5 必须字节级原样保留** | 唯一合法的例外是"重新打包"，不是"改内容"。内层 `archive` ZIP 要**整条目原样复制**（§11.4） |
 | **W8** | ⛔ **两个 L3 例外（同一张文件）：当前进行中战斗的 `theater_assets`（战区资产）与作战标记三个 id 列表可写** | 只写 `games/<当前场景>/main.yml`（**独立场景是 `game/main.yml`**）的**这几个键**，其余键原样搬运。生效条件：当前战斗目录存在（`save.battle_dir()`；独立场景的 `in_state.scenario` 恒为 null，见 §3.4.5.1）。**历史战斗的快照一律不许写**（§6.2b、§6.2c） |
-| **W9** | ⛔ **写盘白名单：只允许改根层那五张表 + 当前战斗层那张 `main.yml`** | 根层 = `main.yml` / `units.yml` / `hqs.yml` / `cards.yml` / `store.yml`；战斗层 = 当前战斗的 `main.yml`（战役 `games/<场景>/main.yml`、独立场景 `game/main.yml`）。`document/`、`last_conference/`、`last_game/`、历史战斗目录等**只读条目一律不许写** —— 白名单外的条目会让整批计划失败（`plan.py::ROOT_WRITABLE` / `writable_entries`） |
+| **W9** | ⛔ **写盘白名单：只允许改根层那五张表 + 当前战斗层那张 `main.yml` + 废墟快照那两张** | 根层 = `main.yml` / `units.yml` / `hqs.yml` / `cards.yml` / `store.yml`；战斗层 = 当前战斗的 `main.yml`（战役 `games/<场景>/main.yml`、独立场景 `game/main.yml`）；废墟快照 = 存档里**真实存在**的 `games/<场景>/cities.yml` 与 `games/<场景>/forts.yml`（**U184 新增**，§6.5.3 —— 修复城市必须同时改这两张，否则留下**永久残留**）。`document/`、`last_conference/`、`last_game/`、`games/**` 的其它条目、历史战斗目录等**只读条目一律不许写** —— 白名单外的条目会让整批计划失败（`plan.py::ROOT_WRITABLE` / `RUIN_SNAPSHOT_RE` / `writable_entries`） |
 | **W10** | ⛔ **`save_id` 边界：服务端只接受游戏数据目录之内的路径** | 边界 = **游戏数据目录**（`<本地应用数据>/.uoc2`）：`save/` 与 `modifier_imports/` 之内；出去的一律拒绝 —— 否则 HTTP 请求里塞个绝对路径就能读/复制任意文件（`web/server.py::_save_id_checked`） |
 | **W11** | ⛔ **YAML 解析失败 ⇒ 整批不许写盘** | 任一条目解析失败就记一条错误、**这一批一个字节都不写** —— 绝不把坏文件当成"空表"写回去（那会造出残缺存档）（`plan.py::Work.table` 的 `parse_errors`） |
 | **W12** | ⛔ **写盘互斥 + 唯一临时文件名** | 同一个存档不许两个写盘同时进行：锁文件 `<存档名>.usg.lock`（不是 `*.usg`，游戏不会当存档）；临时文件 `<存档名>.usg.<pid>.<随机>.new`（`writer.py::_SaveLock` / `_temp_path_for`） |
@@ -2602,6 +2612,9 @@ with read_serialization(self.location) as main_ser:
   - 因为只写 L1，所以**只要存在回退点，那句话就成立**；不存在时必须说清楚。
   - ⚠️ **如果本次改动里包含战区资产**，上面那句话**不成立**（游戏内回退撤不掉它）——
     必须额外补一句：「战区资产无法通过游戏内回退撤销，可在此界面用『撤销』还原。」
+  - ⚠️ **如果本次改动里包含废墟修复**，也要补一句 —— 游戏里的「重置会议 / 重打上一场」
+    会用检查点覆盖战役清单 ⇒ 可能把这处修改回退：
+    「要撤销这处修改，请用本工具的『撤销』。」
 - **不提供**"同时写入回滚检查点"的开关 —— 旧版本有过这个建议，已作废（§7.4 R1–R6）。
 - **备份与撤销**必须无条件生效，不做成可选项（§6.4）。
 
@@ -3352,11 +3365,31 @@ mod 新增的类型还没被扫到时，玩家仍然可以手输 id 完成修改
       但修改器的「撤销」能撤掉 → 验证 §10 第 57 条
 - [ ] `force_pool` 条目里同时写 `spec` 与 `equipment` → **必须被拦截**（§10 第 60 条）
 
+### 11.8 废墟修复专项（§6.5）
+
+- [x] 修复一座城市后：根 `main.yml` 的 `destroyed_cities` 里**没有**这个坐标
+- [x] 同一次修复后，**所有** `games/<场景>/cities.yml`（原先含这个坐标的那些）里也**没有**它了
+      —— 漏一个就是**永久残留**（清单已无 ⇒ 以后不再注入 ⇒ 那份快照再也清不掉，§6.5.6 R1）
+- [x] 同格要塞的 `functional` 改回 `true`；**异格**要塞（城市没被摧毁、但要塞被单独打掉）**不动**
+      （实测同格 28/28 全是 `false`，异格 271 条 `false` / 152 条 `true`，e168）
+- [x] `restore_forts` 关掉时，要塞**一个字节都不动**
+- [x] 清单里同一个坐标**出现两次**时，两次**都**被删掉
+- [x] 删空之后 `cities.yml` 的内容是 `map: []`（与「文件不存在」等价，e167 字节码）
+- [x] **战斗中**的存档：废墟修复**被拦截**，并说明「游戏会从内存重写、改了会被覆盖回去」
+- [x] 坐标不在清单里 / 坐标形状不合法（负数、字符串、只有一个数）⇒ **必须被拦截**
+- [x] 修复后，**除了** `main.yml` 与那几张 `cities.yml` / `forts.yml`，
+      **其它条目逐字节不变**（含 `document/**`、`last_game/**`、`last_conference/**`、战斗层 `main.yml`）
+- [x] 战役页显示**最新变成废墟的那一座**（坐标 + 影响场景）+「修复这一座」按钮
+- [x] 其它废墟**默认折叠**，展开后每行一个「修复」按钮（一次一座）
+- [x] 不在当前场景时**仍然给按钮**，并加黄色提示「对当前战斗无影响」
+- [x] 界面改动的连带影响：前端 L2 模板变了 ⇒ **i18n `ui` 词表同步**（`test_ui_table_covers_every_l_call` 守着）
+- [ ] 修复后**读档继续战斗**、**新开一场战斗** ⇒ 那座城市**显示为完好城市**（⛔ 这一条**只能实机验证**）
+
 ---
 
 ## 12. 证据与复现
 
-本机实测脚本**随仓库分发**：`docs\证据脚本\`（162 个取证脚本 + 两个终检脚本 + README + 1 份取证报告）。
+本机实测脚本**随仓库分发**：`docs\证据脚本\`（181 个取证 / 校验脚本 + 4 个共用辅助模块 + README）。
 原件仍在 `D:\MiniMax\_analysis\`；仓库里那份是**逐字节拷贝**，路径仍是本机绝对路径
 （它们是"取证现场"，故意没改）。
 
