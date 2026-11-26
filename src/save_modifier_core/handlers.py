@@ -1843,6 +1843,41 @@ def _shelf_of(w):
     return shelf if isinstance(shelf, list) else None
 
 
+def _shelf_positions_pending_removal(w) -> set:
+    """本批里**即将被下架**的货架槽位（`card_store_remove` 按 `position` 删）。
+
+    ⚠️ 「先下架一张、再上一张同类型的」= **替换**，不是重复 ⇒ 判重时
+    要把**本批要删掉**的那些排除掉（同 `store_add` 的口径）。
+    """
+    out = set()
+    for ed in (getattr(w, "batch_edits", None) or []):
+        if getattr(ed, "kind", None) != "card_store_remove":
+            continue
+        pos = (getattr(ed, "params", None) or {}).get("position")
+        if isinstance(pos, int) and not isinstance(pos, bool):
+            out.add(pos)
+    return out
+
+
+def _shelf_has_card_type(w, shelf, card_type, ignore_position=None) -> bool:
+    """货架上**已经有**同类型的卡了吗？
+
+    ⚠️ **同一张卡不许在货架上出现两次** —— 召唤卡（伞兵 / 登陆）重复上架
+    ⇒ 同一个 `unit_id` 被召唤两次 ⇒ 地图上出现**两个同款兵模**、先那个不能点选。
+    """
+    dropping = _shelf_positions_pending_removal(w)
+    for c in shelf:
+        if not isinstance(c, dict) or c.get("card_type") != card_type:
+            continue
+        pos = c.get("position")
+        if ignore_position is not None and pos == ignore_position:
+            continue
+        if pos in dropping:
+            continue
+        return True
+    return False
+
+
 def _card_store_set(w, e: Edit) -> Outcome:
     """改卡牌商店货架上的某一张（换牌 / 改成免费 / 改成收费）。"""
     oc = Outcome()
@@ -1881,6 +1916,12 @@ def _card_store_set(w, e: Edit) -> Outcome:
         if not wl.is_allowed(card_type):
             reason = wl.reason(card_type) or "不在本战役商店的可上架清单里"
             oc.errors.append(f"卡牌 {card_type} 不能上架：{reason}")
+            return oc
+        # ★ 换成**货架上已有**的类型也不行（否则等于凭空多出一张同款卡）。
+        if _shelf_has_card_type(w, shelf, card_type, ignore_position=position):
+            oc.errors.append(
+                f"货架上已经有同类型的卡（{card_type}）了 —— "
+                "同一张卡不能重复上架")
             return oc
         info = w.catalog.card_type(card_type) or {}
         if info.get("has_unit"):
@@ -1978,6 +2019,13 @@ def _card_store_add(w, e: Edit) -> Outcome:
     if not wl.is_allowed(card_type):
         reason = wl.reason(card_type) or "不在本战役商店的可上架清单里"
         oc.errors.append(f"卡牌 {card_type} 不能上架：{reason}")
+        return oc
+
+    # ★ 同一张卡**不许在货架上出现两次**（召唤卡重复上架 ⇒ 同一个单位
+    #   被召唤两次 ⇒ 地图上两个同款兵模、先那个不能点选）。
+    if _shelf_has_card_type(w, shelf, card_type):
+        oc.errors.append(
+            f"货架上已经有同类型的卡（{card_type}）了 —— 同一张卡不能重复上架")
         return oc
 
     unit_id = None
