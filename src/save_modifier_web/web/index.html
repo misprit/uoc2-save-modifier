@@ -5198,6 +5198,7 @@ function doReloadCurrent(){
 }
 async function doReloadCurrentForce(){
   const sid = VIEW && VIEW._save_id;
+  PENDING = []; paintPending();
   closeModal();
   if(sid) await openSave(sid);
 }
