@@ -92,11 +92,10 @@ internal static class Launcher
                                                        out existingBrowser,
                                                        out existingReason))
             {
+                // The running server owns its rendezvous file.
                 existingBrowser.WaitForExit();
-                TryDelete(urlFile);
                 return 0;
             }
-            TryDelete(urlFile);
             Fail(existingEdge == null
                 ? "找不到 Microsoft Edge，无法打开修改器。"
                 : "Microsoft Edge 启动失败：\r\n" + existingReason);
