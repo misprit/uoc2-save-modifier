@@ -197,7 +197,7 @@ catalog.spec_types() / catalog.fronts() / catalog.store_defaults()
 | **只写 L1** | 存档有 5 层，**可写的是根目录那 5 个 YAML**（实测它们**不一定都存在**，缺哪个就禁掉对应功能，**不要新建**）**+ 当前战斗层的那张 `main.yml`**（两个 L3 例外，见下一行）；检查点 / 战斗实时层的其它条目 / 回合历史 / 战役文档**全部只读** |
 | **两个 L3 例外** | **当前进行中战斗**那张 `main.yml` 里的两处：**战区资产**（`theater_assets`）与**作战标记**（三个 id 列表）—— 读档即生效、且不是战报（§6.2b、§6.2c、§7.2 W8）。**历史战斗的快照一律不许写** |
 | **四条硬拦** | ① 特种兵挂载：阵营相同 + 国籍相同或**单位国籍的父国籍**匹配（单向）；② **手牌槽位上限**（按难度 easy/normal 5、classic 4、hard 3）；③ **判重**：同一个商店 `(战线, 子商店)` 不许有重复条目、同一个总部的兵库不许有"同身份 + 同延迟"两条（§6.2、§6.2b、§6.3）；④ **空降 / 登陆卡不许直接加到手牌**（会召唤单位的那种 ⇒ 游戏读到会崩，§6.3、§4.5） |
-| **写盘白名单** | 只允许改根层那五张表 + **当前战斗层**那张 `main.yml`；`document/`、`last_conference/`、`last_game/` 等只读条目**一律不许写**（§7.2 W9） |
+| **写盘白名单** | 只允许改根层那五张表 + **当前战斗层**那张 `main.yml`；`document/`、`last_conference/`、`last_game/` 等只读条目**一律不许写**（§7.2 W9）—— 唯一的例外是**改名**要同步的那几张名册（`document/units.yml`、`document/hqs.yml`、各场景名册与战斗层的 `hqs.yml`，B-8） |
 | **`save_id` 边界** | 服务端只接受**游戏数据目录**（`<本地应用数据>/.uoc2`）之内的路径（`save/` 与 `modifier_imports/`），出去的一律拒绝（§7.2 W10） |
 | **解析失败 ⇒ 整批不写盘** | 任一条目 YAML 解析失败 ⇒ 这一批**一个字节都不写**（不许把坏文件当"空表"写回去）（§7.2 W11） |
 | **写盘互斥** | 同一个存档不许两个写盘同时进行（锁文件 `<存档名>.usg.lock`），临时文件名唯一（§7.2 W12） |
@@ -2550,7 +2550,7 @@ L3 里剩下的都是"回合流程状态"，改它们只会让存档内部不自
 | **W6** | **只读 L0**（游戏包） | 共享文件，会影响该战役的所有存档 |
 | **W7** | **重打包时 L2/L3/L4/L5 必须字节级原样保留** | 唯一合法的例外是"重新打包"，不是"改内容"。内层 `archive` ZIP 要**整条目原样复制**（§11.4） |
 | **W8** | ⛔ **两个 L3 例外（同一张文件）：当前进行中战斗的 `theater_assets`（战区资产）与作战标记三个 id 列表可写** | 只写 `games/<当前场景>/main.yml`（**独立场景是 `game/main.yml`**）的**这几个键**，其余键原样搬运。生效条件：当前战斗目录存在（`save.battle_dir()`；独立场景的 `in_state.scenario` 恒为 null，见 §3.4.5.1）。**历史战斗的快照一律不许写**（§6.2b、§6.2c） |
-| **W9** | ⛔ **写盘白名单：只允许改根层那五张表 + 当前战斗层那张 `main.yml` + 废墟快照那两张** | 根层 = `main.yml` / `units.yml` / `hqs.yml` / `cards.yml` / `store.yml`；战斗层 = 当前战斗的 `main.yml`（战役 `games/<场景>/main.yml`、独立场景 `game/main.yml`）；废墟快照 = 存档里**真实存在**的 `games/<场景>/cities.yml` 与 `games/<场景>/forts.yml`（**U184 新增**，§6.5.3 —— 修复城市必须同时改这两张，否则留下**永久残留**）。`document/`、`last_conference/`、`last_game/`、`games/**` 的其它条目、历史战斗目录等**只读条目一律不许写** —— 白名单外的条目会让整批计划失败（`plan.py::ROOT_WRITABLE` / `RUIN_SNAPSHOT_RE` / `writable_entries`） |
+| **W9** | ⛔ **写盘白名单：只允许改根层那五张表 + 当前战斗层那张 `main.yml` + 废墟快照那两张**（**改名**另加几张名册：`document/units.yml`、`document/hqs.yml`、各场景名册与战斗层的 `hqs.yml`，B-8） | 根层 = `main.yml` / `units.yml` / `hqs.yml` / `cards.yml` / `store.yml`；战斗层 = 当前战斗的 `main.yml`（战役 `games/<场景>/main.yml`、独立场景 `game/main.yml`）；废墟快照 = 存档里**真实存在**的 `games/<场景>/cities.yml` 与 `games/<场景>/forts.yml`（**U184 新增**，§6.5.3 —— 修复城市必须同时改这两张，否则留下**永久残留**）。`document/`、`last_conference/`、`last_game/`、`games/**` 的其它条目、历史战斗目录等**只读条目一律不许写** —— 白名单外的条目会让整批计划失败（`plan.py::ROOT_WRITABLE` / `RUIN_SNAPSHOT_RE` / `writable_entries`） |
 | **W10** | ⛔ **`save_id` 边界：服务端只接受游戏数据目录之内的路径** | 边界 = **游戏数据目录**（`<本地应用数据>/.uoc2`）：`save/` 与 `modifier_imports/` 之内；出去的一律拒绝 —— 否则 HTTP 请求里塞个绝对路径就能读/复制任意文件（`web/server.py::_save_id_checked`） |
 | **W11** | ⛔ **YAML 解析失败 ⇒ 整批不许写盘** | 任一条目解析失败就记一条错误、**这一批一个字节都不写** —— 绝不把坏文件当成"空表"写回去（那会造出残缺存档）（`plan.py::Work.table` 的 `parse_errors`） |
 | **W12** | ⛔ **写盘互斥 + 唯一临时文件名** | 同一个存档不许两个写盘同时进行：锁文件 `<存档名>.usg.lock`（不是 `*.usg`，游戏不会当存档）；临时文件 `<存档名>.usg.<pid>.<随机>.new`（`writer.py::_SaveLock` / `_temp_path_for`） |
@@ -2658,7 +2658,7 @@ with read_serialization(self.location) as main_ser:
 
 | 护栏 | 规则 | 为什么（代码依据） |
 |---|---|---|
-| **写盘白名单** | 只有根层那五张表 + 当前战斗层那张 `main.yml` 能被改写；白名单外的条目会让**整批计划失败** | 以前理论上能往存档里写**任意条目**（`document/`、`last_conference/`、`last_game/` …）—— 那些是**只读**层（`plan.py::ROOT_WRITABLE` / `writable_entries`） |
+| **写盘白名单** | 只有根层那五张表 + 当前战斗层那张 `main.yml` 能被改写（**改名**另加几张名册：`document/units.yml`、`document/hqs.yml`、各场景名册与战斗层的 `hqs.yml`，B-8）；白名单外的条目会让**整批计划失败** | 以前理论上能往存档里写**任意条目**（`document/`、`last_conference/`、`last_game/` …）—— 那些是**只读**层（`plan.py::ROOT_WRITABLE` / `writable_entries`） |
 | **`save_id` 边界** | 服务端只接受**游戏数据目录**（`<本地应用数据>/.uoc2`）之内的路径（`save/` 与 `modifier_imports/`），出去的**一律拒绝** | `save_id` 来自 HTTP 请求 ⇒ 传绝对路径就能把任意文件当存档打开/复制（`web/server.py::_save_id_checked`） |
 | **YAML 解析失败 ⇒ 整批不写** | 任一条目解析失败就记一条错误，**这一批一个字节都不写** | 原来把解析失败的条目当成"空表"再写回去 = 造出**残缺存档**（`plan.py::Work.table` 的 `parse_errors`） |
 | **写盘互斥 + 唯一临时名** | 同一个存档不许两个写盘同时进行；临时文件名带进程号与随机串 | 服务端是多线程 ⇒ 连点两次"应用更改"就会撞车（`writer.py::_SaveLock` / `_temp_path_for`；锁文件 `<存档名>.usg.lock`） |
