@@ -3922,7 +3922,11 @@ function theaterAddConfirm(){
     if(isNaN(tot)){ alertModal(L("「本场景剩余」要填整数，或点「改成无限」")); return; }
     if(tot < 1){ alertModal(L("「本场景剩余」不能是 0 —— 0 会让这个资产永远用不了")); return; }
   } else tot = null;
-  stageTheaterAssetAdd(M.asset, M.side||theaterSide(), tot, ut);
+  /* ⚠️ 标签用**弹窗里记的那一方**（`M.side`）——
+     弹窗期间切了阵营页签也不能串。 */
+  const label = L2("{0}：添加战区资产 {1}（每回合恢复 {2}，本场景剩余 {3}）",
+    theaterSideLabel(M.side), theaterCn(M.asset), ut, tot===null?L("无限"):tot);
+  stageTheaterAssetAdd(M.asset, M.side||theaterSide(), tot, ut, label);
   closeModal();
 }
 /* 挂一条「添加战区资产」的待应用。
@@ -3931,14 +3935,14 @@ function theaterAddConfirm(){
  * 存档里本来没有这一项时，之前那条 remove 就是多余的（净效果是要有这一项）⇒ 撤掉它。
  * ⚠️ 存档里**本来就有**这一项时，**必须保留** remove 且它排在 add 前面 ——
  *    核心库 `_theater_asset_add` 拒绝「同一组里已有同名」。 */
-function stageTheaterAssetAdd(asset, side, tot, ut){
+function stageTheaterAssetAdd(asset, side, tot, ut, label){
   dropPendingKind("theater_asset_add", theaterAddKey(asset, side));
   if(!theaterSideAssetsOf(side).some(x=>x.asset===asset)){
     dropPendingKind("theater_asset_remove", theaterDelKey(asset));
   }
   setPending("theater_asset_add", theaterAddKey(asset, side),
     {asset:asset, side:side, uses_total:tot, uses_turn:ut},
-    L2("{0}：添加战区资产 {1}（每回合恢复 {2}，本场景剩余 {3}）",
+    label || L2("{0}：添加战区资产 {1}（每回合恢复 {2}，本场景剩余 {3}）",
        theaterSideLabel(side), theaterCn(asset), ut, tot===null?L("无限"):tot));
 }
 
