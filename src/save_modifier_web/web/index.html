@@ -2910,7 +2910,12 @@ function hqBranchState(id, br){
   const node = (((h&&h.branch_levels)||{})[br])||{};
   const oldLevel = node.level||0;
   const oldSuppressed = node.suppressed||0;
-  const real = oldLevel + oldSuppressed;      /* 真实等级（= 解锁到几级） */
+  /* 真实等级（= 解锁到几级）—— ⚠️ 必须**随待应用的等级变更一起更新**。
+     核心库的口径是「执行压制时的**当前** level + 当前 suppressed」
+     （`handlers._hq_branch_suppressed`）⇒ 这里若固定用存档原值，
+     「先升等级、再压制」会把等级变更丢掉 ⇒ 界面显示的生效等级比实际低
+     （B-3：社区反馈「显示升级了，再调节压制却还是原本的等级」）。 */
+  let real = oldLevel + oldSuppressed;
   let level = oldLevel, suppressed = oldSuppressed;
   /* 按**待应用的先后顺序**重放（核心库也是这个顺序应用） */
   PENDING.forEach(p=>{
@@ -2919,6 +2924,7 @@ function hqBranchState(id, br){
       level = real - suppressed;               /* 核心库的重算口径 */
     }else if(p.kind==="hq_branch_level" && p.key===hqBrKey(id,br)){
       level = p.params.level;
+      real = level + suppressed;               /* 等级变了 ⇒ 真实等级跟着变 */
     }
   });
   return {level:level, suppressed:suppressed, real:real,
