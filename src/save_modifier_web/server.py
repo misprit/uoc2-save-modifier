@@ -513,15 +513,27 @@ def api_view(save_id: str) -> dict:
             for e in ("infantry", "armor")
         }
 
+        # 商店的**结构**（战线 → 子商店）—— ⚠️ 要**独立于条目**取（B-11）：
+        #   下架全部 / 买空之后 store.yml **仍然存在**，只是列表空了
+        #   ⇒ 前端要能区分「文件不存在」与「文件存在但为空」
+        #   ⇒ 只靠条目推战线的话，一清空就误判成「没有商店数据」。
+        try:
+            _rs = save.root_store()
+            data["store_structure"] = {
+                str(_f): [str(_s) for _s in (_v or {})]
+                for _f, _v in _rs.items() if isinstance(_v, dict)
+            }
+        except Exception:
+            data["store_structure"] = {}
+
         # 战线中文名（§5.7）—— 商店页的 tab 原来直接显示 id（caucasus / south）
+        # ⚠️ 同样**从结构取**：商店清空后战线名不能跟着丢。
         try:
             _cd = _campaign_data()
             _cid = save.info.campaign_id
             _fs: dict[str, str] = {}
-            for _e in (data.get("store") or []):
-                _f = str(_e.get("front") or "")
-                if _f and _f not in _fs:
-                    _fs[_f] = _cd.front_name(_f, _cid) or _f
+            for _f in (data.get("store_structure") or {}):
+                _fs[str(_f)] = _cd.front_name(str(_f), _cid) or str(_f)
             data["front_names"] = _fs
         except Exception:
             data["front_names"] = {}

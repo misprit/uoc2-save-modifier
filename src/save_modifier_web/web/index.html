@@ -2325,8 +2325,13 @@ function pageUnits(w){
     if(hqf!=="" && String(u.hq_id??"")!==hqf) return false;
     if(UONLY && inBattle && !battleIds.has(u.id)) return false;
     if(!q) return true;
+    /* ⚠️ haystack 必须含单位**自己的中文名**（B-13）——
+       存档里 `name_brief` 存的是**本地化键**（如 `id_us_inf_42_brief`），
+       界面上显示的中文名是服务端现算的 `name_cn` / `full_cn`
+       ⇒ 不把它们放进 haystack 的话，**列表里看到的中文名拿去搜命中不了**。 */
     const hay = (unitCn(u.type)+" "+(u.type||"")+" "+(u.name_brief||"")+" "+
-                 (u.name_full||"")+" "+(u.id)).toLowerCase();
+                 (u.name_full||"")+" "+(u.name_cn||"")+" "+(u.full_cn||"")+" "+
+                 (u.id)).toLowerCase();
     return hay.includes(q);
   });
   const hqs = VIEW.hqs||[];
@@ -3255,12 +3260,30 @@ function projectedStore(){
 
 function pageStore(w){
   const rows = projectedStore();
+  /* 战线列表优先用**存档里的结构**（`store_structure`）——
+     ⚠️ B-11：下架全部 / 买空之后 store.yml **仍然存在**，只是列表空了
+     ⇒ 只从条目推战线的话，一清空就误判成「这个存档没有商店数据」，
+     而且没法再上架。 */
+  const struct = (VIEW && VIEW.store_structure) || null;
   const fronts = [];
+  const pushFront = (front, sub)=>{
+    let f = fronts.find(x=>x.front===front);
+    if(!f){ f = {front:front, subs:[]}; fronts.push(f); }
+    if(sub && !f.subs.some(s=>s.sub===sub)) f.subs.push({sub:sub});
+  };
+  if(struct){
+    Object.keys(struct).forEach(fr=>{
+      const subs = struct[fr] || [];
+      if(subs.length) subs.forEach(s=>pushFront(fr,s));
+      else pushFront(fr, null);
+    });
+  }
   rows.forEach(r=>{
-    if(!fronts.some(f=>f.front===r.e.front)) fronts.push({front:r.e.front, subs:[]});
-  });
-  fronts.forEach(f=>{
-    rows.forEach(r=>{ if(r.e.front===f.front && !f.subs.some(s=>s.sub===r.e.sub)) f.subs.push({sub:r.e.sub}); });
+    if(!fronts.some(f=>f.front===r.e.front)) pushFront(r.e.front, r.e.sub);
+    else {
+      const f = fronts.find(x=>x.front===r.e.front);
+      if(r.e.sub && !f.subs.some(s=>s.sub===r.e.sub)) f.subs.push({sub:r.e.sub});
+    }
   });
   if(!fronts.length){
     w.innerHTML = L(`<div class="panel"><h3>商店</h3><div class="placeholder">
@@ -3270,7 +3293,10 @@ function pageStore(w){
   }
   if(!SEL.storeFront || !fronts.some(f=>f.front===SEL.storeFront)) SEL.storeFront = fronts[0].front;
   const cur = fronts.find(f=>f.front===SEL.storeFront);
-  if(!SEL.storeSub || !cur.subs.some(s=>s.sub===SEL.storeSub)) SEL.storeSub = cur.subs[0].sub;
+  /* ⚠️ 战线下面**一个子商店都没有**（被下架/买空）⇒ 用默认的普通商店，
+     否则 `cur.subs[0]` 会抛 TypeError，整页白屏（B-11）。 */
+  if(!SEL.storeSub || !cur.subs.some(s=>s.sub===SEL.storeSub))
+    SEL.storeSub = (cur.subs[0] && cur.subs[0].sub) || "store";
 
   const fcn = (VIEW.front_names)||{};
   const tabs = fronts.map(f=>`<div class="tb ${f.front===SEL.storeFront?'on':''}"
