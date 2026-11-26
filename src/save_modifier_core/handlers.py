@@ -1362,11 +1362,15 @@ def _hq_force_pool_add(w, e: Edit) -> Outcome:
         else:
             new.setdefault("nationality", "")
     # ★ 同身份 + **同延迟**不许并存。
+    # ⚠️ B-1 同理：本批**要删掉**的那几条**不参与**判重（删除排最后 ⇒ 新增先跑）。
+    _dropping = _pending_removed_indexes(w, "hq_force_pool_remove", {"hq_id": hq_id})
     ident = _entry_identity(new)
     delay = new.get("delay", 0)
     others = []
     for i, e in enumerate(pool):
         if not isinstance(e, dict):
+            continue
+        if i in _dropping:
             continue
         if _entry_identity(e) != ident:
             continue
@@ -1664,6 +1668,33 @@ def _validate_store_entry(entry) -> list[str]:
     if not isinstance(nat, str) or not nat:
         errs.append("nationality 必须是国籍 id（uk / us / german …），不是阵营")
     return errs
+
+
+def _pending_removed_indexes(w, kind: str, group: dict) -> set:
+    """本批里**即将被删掉**的条目下标（按 `kind` + `group` 筛）。
+
+    ⚠️ **为什么需要它**（B-1）：
+    `plan.order_edits()` 把**按下标删除**的编辑排到最后
+    （U35/U91/U121 的教训：删除会让后面条目的下标前移 ⇒ 必须最后删、同组降序）
+    ⇒ **新增**类的编辑**先执行** ⇒ 判重时旧条目还在列表里
+    ⇒ 「删一条再添同一条」会被当成重复而拦下（社区反馈的老问题）。
+
+    ⇒ 判重必须看「**这一批改完之后**」的列表：本批要删掉的那些**不该参与**重复判定
+    ⇒ 「删一条再添同一条」= **替换**，不是重复。
+
+    `group` 是用来限定「哪份列表」的键（如商店 = {"front":…, "sub":…}）。
+    """
+    out = set()
+    for ed in (getattr(w, "batch_edits", None) or []):
+        if getattr(ed, "kind", None) != kind:
+            continue
+        params = getattr(ed, "params", None) or {}
+        if any(params.get(k) != v for k, v in group.items()):
+            continue
+        idx = params.get("index")
+        if isinstance(idx, int) and not isinstance(idx, bool):
+            out.add(idx)
+    return out
 
 
 def _entry_identity(entry) -> tuple:
@@ -2023,9 +2054,16 @@ def _store_add(w, e: Edit) -> Outcome:
         new.pop("equipment")
 
     # ★ 同一个 (战线, 子商店) 里**不允许重复条目**。
+    # ⚠️ B-1：本批**要删掉**的那几条**不参与**判重 ——
+    #    「删一条再添同一条」= **替换**，不是重复。
+    #    （`order_edits` 把删除排最后 ⇒ 新增先跑 ⇒ 不排除就会误报）
+    _dropping = _pending_removed_indexes(w, "store_remove",
+                                         {"front": front, "sub": sub})
     ident = _entry_identity(new)
     for i, e in enumerate(entries):
         if not isinstance(e, dict):
+            continue
+        if i in _dropping:
             continue
         if _entry_identity(e) != ident:
             continue
