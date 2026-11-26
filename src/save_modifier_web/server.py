@@ -638,6 +638,8 @@ def _catalog_payload() -> dict:
             "image": d.get("image"),
             "meta_type": d.get("meta_type"),
             "theater_asset": d.get("theater_asset"),
+            # N-5：前端要判断「这张卡是不是持续卡」，才敢给「已使用 / 未使用」开关
+            "persistent": bool(d.get("persistent")),
             "image_resolved": _resolve_card_image(name, d),
         }
 

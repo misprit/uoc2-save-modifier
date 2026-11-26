@@ -758,6 +758,12 @@ tr.oldrow{opacity:.6}
   text-overflow:clip;font-weight:600}
 .hcard .freeline.free{color:var(--ok)}
 .hcard .freeline.paid{color:var(--muted);font-weight:400}
+/* N-5：**持续卡**才有「已使用 / 未使用」这一行（点一下切换） */
+.hcard .usedline{font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:visible;
+  text-overflow:clip;font-weight:600;cursor:pointer}
+.hcard .usedline.used{color:var(--muted);font-weight:400}
+.hcard .usedline.unused{color:var(--ok)}
+.hcard .usedline:hover{text-decoration:underline}
 /* 手牌的两个操作**并成一行**（原来一卡两行，卡片区被撑得很高） */
 .hcard .acts{text-align:center;white-space:nowrap}
 .hcard .rm{display:inline-block;width:auto;margin:5px 2px 0;font-size:11px;padding:2px 6px}
@@ -3057,6 +3063,11 @@ function projectedCards(list, kind){
       const i = out.findIndex(c=>c.position===p.params.position);
       if(i>=0) out[i].is_free = !!p.params.value;
     }
+    /* N-5：「已使用 / 未使用」的挂起改动同样要立即可见 */
+    if(p.kind==="card_set" && kind==="hand" && p.params.field==="used"){
+      const i = out.findIndex(c=>c.position===p.params.position);
+      if(i>=0) out[i].used = !!p.params.value;
+    }
     if(p.kind==="card_store_set" && kind==="shelf"){
       const i = out.findIndex(c=>c.position===p.params.position);
       if(i>=0){
@@ -3079,6 +3090,15 @@ function cardTileHTML(c, kind){
   const freeTip = free ? L("改成收费") : L("改成免费");
   /* 货架上有牌时也能**换牌** —— 点卡面（跟空槽位「点此上架」对称）。
      ⚠️ 按钮行放不下第三个按钮（卡宽 104px，中文三个按钮就超宽了）⇒ 用卡面。 */
+  /* N-5：**持续卡**才有「已使用 / 未使用」这一行 ——
+     非持续卡用完就从战役里移除，`used` 不参与玩法 ⇒ 不给开关。 */
+  const persist = (kind==="hand") && !!cardInfo(c.card_type).persistent;
+  const used = !!c.used;
+  const usedLine = persist
+    ? L2(`<div class="cp usedline {0}" onclick="cardSetUsed({1},{2})" title="{3}">{4}</div>`,
+         used?"used":"unused", c.position, used?"false":"true",
+         L("持续卡：用过之后仍留在牌堆"), used?L("已使用"):L("未使用"))
+    : "";
   const img = imgTag(cardImg(c.card_type), cardCn(c.card_type));
   const ci = (kind==="shelf")
     ? `<div class="ci" style="cursor:pointer" title="${esc(L("点击换成别的牌"))}"
@@ -3089,6 +3109,7 @@ function cardTileHTML(c, kind){
     <div class="cp"><b>{1}</b></div>
     <div class="cp" style="margin-top:1px">{2}</div>
     <div class="cp freeline {3}">{4}</div>
+    {10}
     <div class="acts">
       <button class="btn rm" onclick="{5}">
         {6}</button>
@@ -3101,7 +3122,8 @@ function cardTileHTML(c, kind){
      kind==="hand"
         ? ("cardRemove("+c.position+")") : ("cardStoreRemove("+c.position+")"), kind==="hand"?L("移除"):L("下架"), kind==="hand"
         ? ("cardSetFree("+c.position+","+(free?"false":"true")+")")
-        : ("cardStoreSetFree("+c.position+","+(free?"false":"true")+")"), freeBtn, freeTip);
+        : ("cardStoreSetFree("+c.position+","+(free?"false":"true")+")"), freeBtn, freeTip,
+     usedLine);
 }
 
 /* 卡牌选择器现在走**模态框**（U40b）
@@ -4939,6 +4961,19 @@ function cardSetFree(position, free){
   queueEdit("card_set", key,
     {position:position, field:"is_free", value:!!free}, c?(c.is_free?true:false):false, !!free,
     L2("手牌槽位 {0} 改成{1}", position, free?L("免费"):L("收费")));
+  show("cards");
+}
+/* ---------- N-5：持续卡的「已使用 / 未使用」 ---------- */
+function cardSetUsed(position, used){
+  const c = projectedCards(VIEW.hand,"hand").find(x=>x.position===position);
+  /* 待加的卡**还没写盘** ⇒ 存档里没有这一张 ⇒ 不给挂 used 改动
+     （核心库会报「手牌里没有槽位号为 N 的卡」⇒ 整批被拦）。 */
+  if(pendingAddOf("card_add", position)){ show("cards"); return; }
+  /* ⚠️ key 要与 is_free 的分开（`card_set:{position}`）——
+     两处改的是同一个槽位的**不同字段**，同时挂起时要各留一条。 */
+  queueEdit("card_set", `card_set_used:${position}`,
+    {position:position, field:"used", value:!!used}, c?!!c.used:false, !!used,
+    L2("手牌槽位 {0} 标为{1}", position, used?L("已使用"):L("未使用")));
   show("cards");
 }
 function cardStoreSetFree(position, free){

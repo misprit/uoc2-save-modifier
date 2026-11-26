@@ -83,8 +83,10 @@ PLAY_LEVELS = ("easy", "normal", "classic", "hard")
 #: 货架格数（`card_store_limit`，四个难度恒为 5；`e158` 实证）
 CARD_STORE_LIMIT = {"easy": 5, "normal": 5, "classic": 5, "hard": 5}
 
-#: 手牌里**允许改**的字段（§7.5.2）
+#: 手牌里无需卡型元数据即可改的字段（§7.5.2）。
 CARD_FIELD_ALLOWED = {"is_free"}
+#: `used` 只有游戏类型定义明确声明为持久卡时才可改。
+CARD_FIELD_PERSISTENT = "used"
 
 #: 总部**允许改**的字段（§7.4）
 #:
@@ -1621,16 +1623,16 @@ def _card_add(w, e: Edit) -> Outcome:
 
 
 def _card_set(w, e: Edit) -> Outcome:
-    """改手牌某一张的某个字段（目前只有 `is_free`）。"""
+    """改手牌某一张的 `is_free`，或持久卡型的 `used`。"""
     oc = Outcome()
     position = e.params.get("position")
     field = e.params.get("field")
     value = e.params.get("value")
     if not w.require(w.caps.can_edit_hand, "hand", "cards.yml"):
         return oc
-    if field not in CARD_FIELD_ALLOWED:
+    if field != CARD_FIELD_PERSISTENT and field not in CARD_FIELD_ALLOWED:
         oc.errors.append(
-            f"不允许改手牌字段 {field!r}；可改：{', '.join(sorted(CARD_FIELD_ALLOWED))}")
+            f"不允许改手牌字段 {field!r}；可改：{', '.join(sorted(CARD_FIELD_ALLOWED | {CARD_FIELD_PERSISTENT}))}")
         return oc
     if not isinstance(value, bool):
         oc.errors.append(f"{field} 必须是 True / False，收到 {value!r}")
@@ -1645,6 +1647,20 @@ def _card_set(w, e: Edit) -> Outcome:
     if target is None:
         oc.errors.append(f"手牌里没有槽位号为 {position} 的卡")
         return oc
+
+    if field == CARD_FIELD_PERSISTENT:
+        if w.catalog is None:
+            oc.errors.append("没有游戏包目录，无法校验卡牌类型是否允许改 used")
+            return oc
+        card_type = target.get("card_type")
+        definition = w.catalog.card_type(card_type) if card_type else None
+        if not isinstance(definition, dict):
+            oc.errors.append(f"卡牌类型 {card_type!r} 没有游戏定义，禁止改 used")
+            return oc
+        if definition.get("persistent") is not True:
+            oc.errors.append(
+                f"卡牌类型 {card_type!r} 不是 persistent 卡型，禁止改 used")
+            return oc
 
     old = target.get(field)
     target[field] = value
