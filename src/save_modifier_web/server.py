@@ -1777,6 +1777,17 @@ def api_campaign_detail(save_id: str) -> dict:
         }
 
 
+from save_modifier_web.backup_cleanup import BackupCleanup
+
+_backup_cleanup = BackupCleanup()
+
+
+def api_backup_preview(save_id: str) -> dict:
+    from save_modifier_core import open_save
+    with open_save(_save_id_checked(save_id)) as save:
+        return {"backups": _backup_cleanup.preview(save.path)}
+
+
 def api_undo_stack(save_id: str) -> dict:
     """撤销栈 + 备份文件列表（概览页的「备份与撤销栈」面板）。"""
     from save_modifier_core import open_save
@@ -1969,6 +1980,12 @@ class _Handler(BaseHTTPRequestHandler):
                     q = parse_qs(urlparse(self.path).query)
                     sid = (q.get("save_id") or [""])[0]
                     self._json(api_campaign_detail(sid))
+                elif path == "/api/backups/preview":
+                    sid = (parse_qs(u.query).get("save_id") or [""])[0]
+                    try:
+                        self._json(api_backup_preview(sid))
+                    except (ValueError, OSError) as exc:
+                        self._json({"error": str(exc)}, 400)
                 elif path == "/api/undo-stack":
                     q = parse_qs(urlparse(self.path).query)
                     sid = (q.get("save_id") or [""])[0]
