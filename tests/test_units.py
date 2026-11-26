@@ -55,8 +55,8 @@ class TestUnitFields(UnitEditingTestBase):
         self.assertEqual(units[0]["xp"], 399)
 
     def test_xp_over_399_is_blocked(self):
-        """⚠️ 上限是 **399**（游戏的 `add_xp` 封顶），不是 schema 的 400 ——
-        写 400 会被结算立刻拉回 399 ⇒ 等于白写。"""
+        """⚠️ 上限是 **399**（游戏的 `add_xp` / `_repair_data` 都封顶），
+        不是 schema 的 400 ⇒ 写 400 一读档就被修回 399，等于白写。"""
         plan, res = self.commit([Edit.unit_field(1, "xp", 400)])
         self.assertFalse(plan.ok)
         self.assertIsNone(res)
