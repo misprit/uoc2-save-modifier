@@ -1214,13 +1214,30 @@ async function post(path, body){
 /* ===================================================================
    Header / Rail（U42）—— 照设计稿：品牌 · 存档 · 提示 · 计数徽章 · 禁用原因 · 撤销栈
    =================================================================== */
+function isImportedCopy(view){
+  const v = view||{}, save = v.save||{};
+  /* 三代服务端响应兼容：明确布尔优先；旧版只给路径时按组件边界识别，
+     禁止用 contains，避免普通存档名恰好包含 imports。 */
+  for(const obj of [v, save]){
+    for(const key of ["is_imported_copy","imported_copy","is_imported","imported"]){
+      if(typeof obj[key] === "boolean") return obj[key];
+    }
+  }
+  const paths = [v._save_id, v.save_id, save.save_id, save.path, save.file_path]
+    .filter(x=>typeof x === "string");
+  return paths.some(path=>{
+    const parts = path.replace(/\\/g,"/").split("/").filter(Boolean);
+    return parts.some((part,i)=>part === "modifier_imports" ||
+      (part === "imports" && i > 0 && parts[i-1] === "data"));
+  });
+}
 function paintHeader(){
   const el = document.getElementById("hSave");
   if(!el || !VIEW) return;
   const save = VIEW.save||{};
   const inBattle = theaterEditable();
   /* 当前存档是个**按钮** —— 点开是菜单（切换存档 / 另存为 / 放弃改动）。 */
-  const imported = String(VIEW._save_id||"").indexOf("modifier_imports") >= 0;
+  const imported = isImportedCopy(VIEW);
   el.innerHTML = L2(`<span class="nm">{0}</span>
     {1}
     {2}
@@ -4801,6 +4818,86 @@ function conferenceStoreHTML(){
 }
 
 /* ---------- 概览页：备份与撤销栈 ---------- */
+let BACKUP_MGMT = {token:0, sid:null, items:[], selected:new Set(), busy:false};
+function backupSize(n){
+  const v = Number(n)||0;
+  return v.toLocaleString();
+}
+function backupSummary(items){
+  return {count:items.length, size:items.reduce((n,b)=>n+(Number(b.size)||0),0)};
+}
+function backupManagerHTML(){
+  const M = BACKUP_MGMT;
+  const rows = (M.items||[]).map((b,i)=>L2(`<label class="bkmanage-row">
+    <input type="checkbox" data-backup-id="{0}" onchange="backupToggle(this)" {1}>
+    <span><b>{2}</b><br><span class="fine">{3} · {4} · {5}</span></span></label>`,
+    esc(b.id), M.selected.has(String(b.id))?'checked':'', esc(b.name),
+    esc(b.source==="primary"?"bak/":(b.source||L("未知来源"))), esc(b.size===undefined?"—":backupSize(b.size)),
+    esc(b.mtime===undefined?"—":new Date(Number(b.mtime)*1000).toLocaleString()))).join("");
+  const s = backupSummary([...M.items].filter(b=>M.selected.has(String(b.id))));
+  return L2(`<div class="mh">{0}</div><div class="mb">
+    <div class="fine">{1}</div><div class="bkmanage-list">{2}</div>
+    <div class="fine">{3}：{4} · {5}：{6}</div>
+    <div class="fine">{7}</div></div>
+    <div class="mf"><button class="btn" onclick="closeModal()">{8}</button>
+    <button class="btn pri" onclick="backupNext()" {9}>{10}</button></div>`,
+    L("管理备份"), L("默认不选；可单选或多选"), rows||L("没有可回收的备份"),
+    L("已选份数"), s.count, L("总大小"), backupSize(s.size),
+    L("回收后文件会进入系统回收站"), L("取消"), M.selected.size?'':'disabled', L("下一步"));
+}
+function backupToggle(el){
+  if(!el || BACKUP_MGMT.busy) return;
+  const id = String(el.dataset.backupId||"");
+  if(el.checked) BACKUP_MGMT.selected.add(id); else BACKUP_MGMT.selected.delete(id);
+  openModal(backupManagerHTML());
+}
+function openBackupManager(){
+  if(!VIEW || !VIEW._save_id) return;
+  const sid = VIEW._save_id, token = ++BACKUP_MGMT.token;
+  BACKUP_MGMT = {token:token, sid:sid, items:[], selected:new Set(), busy:false};
+  openModal(L2(`<div class="mh">{0}</div><div class="mb">{1}</div>`, L("管理备份"), L("正在读取备份列表…")));
+  api("/api/backups/preview?save_id="+encOnce(sid)).then(d=>{
+    if(token!==BACKUP_MGMT.token || !VIEW || VIEW._save_id!==sid) return;
+    BACKUP_MGMT.items = Array.isArray(d.backups) ? d.backups.map(b=>({id:String(b.id),name:b.name,size:b.size,mtime:b.mtime,source:b.source})) : [];
+    openModal(backupManagerHTML());
+  }).catch(e=>{
+    if(token!==BACKUP_MGMT.token || !VIEW || VIEW._save_id!==sid) return;
+    openModal(L2(`<div class="mh">✕ {0}</div><div class="mb"><div class="erow">{1}</div></div><div class="mf"><button class="btn" onclick="closeModal()">{2}</button></div>`, L("读取备份失败"), esc(e.message||e), L("关闭")), {cls:"err"});
+  });
+}
+function backupNext(){
+  const M=BACKUP_MGMT; if(M.busy || !M.selected.size) return;
+  const chosen=M.items.filter(b=>M.selected.has(String(b.id))), s=backupSummary(chosen);
+  openModal(L2(`<div class="mh">{0}</div><div class="mb"><div>{1}</div><div class="elist">{2}</div><div class="fine">{3}：{4} · {5}：{6}</div><div class="fine">{7}</div></div><div class="mf"><button class="btn" onclick="openModal(backupManagerHTML())">{8}</button><button class="btn pri" onclick="backupRecycle()">{9}</button></div>`,
+    L("确认回收备份"), L("将回收以下文件"), chosen.map(b=>`<div>${esc(b.name)} · bak/ · ${esc(backupSize(b.size))} · ${esc(new Date(Number(b.mtime)*1000).toLocaleString())}</div>`).join(""), L("总份数"), s.count, L("总大小"), backupSize(s.size), L("文件会进入系统回收站；此操作不可在修改器内撤销"), L("返回"), L("确认回收")));
+}
+async function backupRecycle(){
+  const M=BACKUP_MGMT; if(M.busy || !M.selected.size || !VIEW || VIEW._save_id!==M.sid) return;
+  M.busy=true;
+  const ids=[...M.selected], sid=M.sid;
+  const btn=document.querySelector('#modal .mf .pri'); if(btn) btn.disabled=true;
+  let d;
+  try { const r=await post("/api/backups/recycle", {save_id:sid, ids:ids}); d=r.data||{}; if(!r.status || r.status<200 || r.status>=300) throw new Error((d.errors||[]).join("；")||("HTTP "+r.status)); }
+  catch(e){
+    if(M!==BACKUP_MGMT || sid!==BACKUP_MGMT.sid || !VIEW || VIEW._save_id!==sid) return;
+    M.busy=false;
+    openModal(L2(`<div class="mh">✕ {0}</div><div class="mb"><div class="erow">{1}</div><div class="fine">{2}</div></div><div class="mf"><button class="btn" onclick="closeModal()">{3}</button></div>`, L("回收失败"), esc(e.message||e), L("未确认成功")+"；"+L("没有自动重试"), L("关闭")), {cls:"err"});
+    return;
+  }
+  if(M!==BACKUP_MGMT || sid!==BACKUP_MGMT.sid || !VIEW || VIEW._save_id!==sid) return;
+  const byId=new Map(M.items.map(b=>[String(b.id),b.name]));
+  const done=new Set((d.completed||[]).map(String)), failed=d.failed==null?null:String(d.failed), remaining=new Set((d.remaining||[]).map(String));
+  const failedText=failed&&byId.has(failed)?byId.get(failed):failed;
+  const remainingText=[...remaining].map(id=>byId.get(id)||id);
+  M.busy=false; M.items=M.items.filter(b=>!done.has(String(b.id))); M.selected=new Set();
+  await loadUndoStack();
+  if(M!==BACKUP_MGMT || !VIEW || VIEW._save_id!==sid) return;
+  openModal(L2(`<div class="mh">{0}</div><div class="mb"><div>{1}：{2}</div>{3}{4}{5}</div><div class="mf"><button class="btn" onclick="closeModal()">{6}</button></div>`,
+    L("回收结果"), L("已成功回收"), [done.size, ...[...done].map(id=>esc(byId.get(id)||id))].join(" · "),
+    failedText?`<div class="erow">${esc(L("未确认成功"))}：${esc(failedText)}</div>`:'',
+    remainingText.length?`<div class="fine">${esc(L("未尝试"))}：${remainingText.map(esc).join("、")}</div>`:'',
+    (d.errors||[]).map(x=>`<div class="erow">${esc(x)}</div>`).join(""), L("关闭")));
+}
 function backupStackHTML(){
   const u = USTACK||{};
   /* 三栏 —— 标签 | 主内容 | 右侧小字（名字过长省略号截断，hover 有全文） */
@@ -4821,8 +4918,9 @@ function backupStackHTML(){
       esc((r.time||"").replace("T"," ")),
       stale ? L(" · 已过期，撤不了") : "");
   }).join("");
-  if(!bks && !st) return L(`<div class="bkempty">还没有备份，也没有撤销记录</div>`);
-  return bks + st;
+  const manage = '<button class="btn" onclick="openBackupManager()">'+esc(L("管理备份"))+'</button>';
+  if(!bks && !st) return manage + L(`<div class="bkempty">还没有备份，也没有撤销记录</div>`);
+  return manage + bks + st;
 }
 
 /* ---------- 卡牌：改成免费 / 改成收费 ---------- */
@@ -5161,6 +5259,8 @@ function openSaveMenu(){
     <div class="mf"><button class="btn" onclick="closeModal()">关闭</button></div>`, esc(cur.display_name||cur.file_name||"—"), esc(cur.path||(VIEW&&VIEW._save_id)||""), n, n?L2(`<div class="fine">⚠ 当前有 <b>{0}</b> 条<b>未应用</b>的改动 ——
         切换存档 / 重新读取会丢弃它们；「另存为」则会把它们一起写进新文件。</div>`, n):""),
     {cls:"menu"});
+  const box = document.querySelector("#modal .mb");
+  if(box) box.insertAdjacentHTML("beforeend", '<div class="fine">'+esc(L("便携目录：备份在 bak/；设置与导入副本在 data/；data/cache/ 可再生"))+"<br>"+esc(L("分享原始压缩包，不要分享带存档的目录；升级会保留 bak/ 与 data/"))+"</div>");
 }
 
 /* ---------- 切换存档（不用退出） ---------- */

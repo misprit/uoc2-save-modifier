@@ -8,12 +8,13 @@ import os
 import re
 import secrets
 import stat
+import threading
 import time
 import uuid
 from pathlib import Path
 
-from save_modifier_core.paths import (appdata_dir, backup_dir, fallback_backup_dir,
-                                      legacy_imports_dir, modifier_imports_dir)
+from save_modifier_core import paths as core_paths
+
 
 
 class BackupCleanupError(ValueError):
@@ -32,8 +33,8 @@ def _clean(path):
 
 
 def _enumerate(save):
-    base = appdata_dir().absolute()
-    sources = (base / "save", modifier_imports_dir().absolute(), legacy_imports_dir().absolute())
+    base = core_paths.appdata_dir().absolute()
+    sources = (base / "save", *(p.absolute() for p in core_paths.import_roots()))
     if not any(save.is_relative_to(root) for root in sources) or not _clean(save) or not save.is_file() or save.suffix.lower() != ".usg":
         raise BackupCleanupError("存档不允许操作")
     # writer 只记文件名，不记来源目录。同名活跃存档或导入副本无法区分。
@@ -49,24 +50,24 @@ def _enumerate(save):
             if any(n.casefold() == save.name.casefold() and Path(folder) / n != save for n in names):
                 raise BackupCleanupError("存在同名存档，无法确定备份归属")
     exact = re.compile(re.escape(save.stem) + r"_BACKUP(?:_(?:[2-9]|[1-9][0-9]+))?" + re.escape(save.suffix))
-    for i, root in enumerate(dict.fromkeys((backup_dir(), fallback_backup_dir()))):
-        root = root.absolute()
-        if any(root.is_relative_to(folder) for folder in sources):
-            continue
-        try:
-            if not _clean(root) or not root.is_dir():
+    # 只有程序自身 bak 可回收；旧 appdata fallback bak 仅作为只读遗留目录。
+    root = core_paths.backup_dir().absolute()
+    if root.is_relative_to(core_paths.fallback_backup_dir().absolute()) or any(root.is_relative_to(folder) for folder in sources):
+        return
+    try:
+        if not _clean(root) or not root.is_dir():
+            return
+        for p in root.iterdir():
+            if not exact.fullmatch(p.name):
                 continue
-            for p in root.iterdir():
-                if not exact.fullmatch(p.name):
-                    continue
-                try:
-                    st = p.lstat()
-                    if stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and _clean(p):
-                        yield i, p, st
-                except FileNotFoundError:
-                    continue
-        except FileNotFoundError:
-            continue
+            try:
+                st = p.lstat()
+                if stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and _clean(p):
+                    yield p, st
+            except FileNotFoundError:
+                continue
+    except FileNotFoundError:
+        return
 
 
 def _check_recycle_result(hr, recycled):
@@ -123,6 +124,7 @@ class BackupCleanup:
         self._key = secrets.token_bytes(32)
         self._backend = backend or _recycle_windows
         self._ttl = ttl
+        self._recycle_lock = threading.RLock()
 
     def _id(self, save, p, st, expires):
         def version(s):
@@ -142,21 +144,22 @@ class BackupCleanup:
         save = Path(save_path)
         expires = int(time.monotonic()) + self._ttl
         return [{"id": self._id(save, p, st, expires), "name": p.name, "size": st.st_size,
-                 "mtime": st.st_mtime, "source": ("primary", "fallback")[i]}
-                for i, p, st in _enumerate(save)]
+                 "mtime": st.st_mtime, "source": "primary"}
+                for p, st in _enumerate(save)]
 
     def recycle_one(self, save_path, item_id):
         if not isinstance(item_id, str) or not re.fullmatch(r"[0-9]{1,16}[.][0-9a-f]{64}", item_id):
             raise BackupCleanupError("备份标识无效")
-        expires = int(item_id.partition(".")[0])
-        save = Path(save_path)
-        if time.monotonic() >= expires:
-            raise BackupCleanupError("预览过期，请刷新")
-        for _, p, st in _enumerate(save):
-            if hmac.compare_digest(self._id(save, p, st, expires), item_id) and time.monotonic() < expires:
-                self._backend(p)
-                return
-        raise BackupCleanupError("备份已变化或预览过期，请刷新")
+        with self._recycle_lock:
+            expires = int(item_id.partition(".")[0])
+            save = Path(save_path)
+            if time.monotonic() >= expires:
+                raise BackupCleanupError("预览过期，请刷新")
+            for p, st in _enumerate(save):
+                if hmac.compare_digest(self._id(save, p, st, expires), item_id) and time.monotonic() < expires:
+                    self._backend(p)
+                    return
+            raise BackupCleanupError("备份已变化或预览过期，请刷新")
 
     def recycle_many(self, save_path, item_ids):
         for item_id in item_ids:

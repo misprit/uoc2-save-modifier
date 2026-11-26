@@ -331,31 +331,13 @@ def api_saves() -> dict:
 
 
 def _save_id_checked(save_id: str) -> str:
-    """把 `save_id` 还原成**游戏数据目录之内**的路径（U126）。
-
-    ⚠️ `save_id` 来自 HTTP 请求（query / body）⇒ **不能直接信**。
-    核心库的 `resolve_save_id` 允许**绝对路径** ⇒ 传
-    `C:\\Windows\\win.ini` 就会把**任意文件**当成存档打开
-    （`api_save_as` 还会把它**复制**出去 ⇒ 任意文件读取 + 外传）。
-
-    ⇒ 边界 = **游戏数据目录**（`<本地应用数据>/.uoc2`）：
-
-    * `save/` —— 战役 / 独立场景 / 玩家自建的归档目录；
-    * `modifier/modifier_imports/` —— 新导入 .usg 时生成的副本；
-      旧 `<appdata>/modifier_imports/` 仍允许读取。
-
-    出了这个目录 ⇒ 一律拒绝（抛错 ⇒ HTTP 层变成 500 + 说明文字）。
-
-    返回：存档根之内的给**相对 posix 路径**（`campaigns/west.usg`，
-    与 `list_saves()` 的口径一致）；`modifier_imports/` 里的给**绝对路径**
-    （导入接口本来也是这么回的）。
-    """
-    from save_modifier_core.paths import appdata_dir
+    """游戏数据目录保持原边界；程序目录只允许导入根内的 .usg 副本。"""
+    from save_modifier_core import paths as core_paths
 
     raw = (save_id or "").strip()
     if not raw:
         raise ValueError("没有指定存档")
-    appdata = Path(appdata_dir()).resolve()
+    appdata = Path(core_paths.appdata_dir()).resolve()
     root = (appdata / "save").resolve()
     try:
         # 相对路径按存档根拼；绝对路径直接用（下面统一再核对边界）
@@ -364,13 +346,12 @@ def _save_id_checked(save_id: str) -> str:
     except OSError as exc:
         raise ValueError("存档路径打不开：%s" % exc)
     try:
-        real.relative_to(appdata)
-    except ValueError:
-        raise ValueError("存档不在游戏数据目录里（拒绝越界访问）：%s" % raw)
-    try:
         rel = real.relative_to(root)
     except ValueError:
-        return str(real)          # 例如 modifier_imports/ 里的导入副本
+        if real.is_relative_to(appdata) or (real.suffix.lower() == ".usg" and
+                any(real.is_relative_to(p.absolute()) for p in core_paths.import_roots())):
+            return str(real)
+        raise ValueError("存档不在允许的数据目录里（拒绝越界访问）：%s" % raw)
     if str(rel) == ".":
         raise ValueError("这不是一个存档文件：%s" % raw)
     return rel.as_posix()
@@ -1788,6 +1769,39 @@ def api_backup_preview(save_id: str) -> dict:
         return {"backups": _backup_cleanup.preview(save.path)}
 
 
+def api_backup_recycle(payload) -> dict:
+    """严格校验后按预览顺序逐件回收备份；失败项及其后续项不冒充成功。"""
+    from save_modifier_core import open_save
+    if not isinstance(payload, dict) or set(payload) != {"save_id", "ids"}:
+        raise ValueError("请求体必须严格包含 save_id 和 ids")
+    save_id = payload["save_id"]
+    ids = payload["ids"]
+    if not isinstance(save_id, str) or not save_id.strip():
+        raise ValueError("save_id 必须是非空字符串")
+    if not isinstance(ids, list) or not ids:
+        raise ValueError("ids 必须是非空列表")
+    if any(not isinstance(item, str) for item in ids):
+        raise ValueError("ids 只能包含字符串")
+    if len(set(ids)) != len(ids):
+        raise ValueError("ids 不能重复")
+    if any(not re.fullmatch(r"[0-9]{1,16}[.][0-9a-f]{64}", item)
+           for item in ids):
+        raise ValueError("备份标识无效")
+
+    # 先验证存档边界和存在性，再允许任何回收动作。
+    with open_save(_save_id_checked(save_id)) as save:
+        completed = []
+        for index, item_id in enumerate(ids):
+            try:
+                _backup_cleanup.recycle_one(save.path, item_id)
+            except Exception as exc:
+                return {"ok": False, "completed": completed, "failed": item_id,
+                        "remaining": ids[index + 1:], "errors": [str(exc)]}
+            completed.append(item_id)
+    return {"ok": True, "completed": completed, "failed": None,
+            "remaining": [], "errors": []}
+
+
 def api_undo_stack(save_id: str) -> dict:
     """撤销栈 + 备份文件列表（概览页的「备份与撤销栈」面板）。"""
     from save_modifier_core import open_save
@@ -1815,12 +1829,12 @@ def api_undo_stack(save_id: str) -> dict:
         # **老位置**（存档旁边）留下的备份也一并列出来（升级前生成的）。
         backups = []
         try:
-            from save_modifier_core.paths import backup_dir
-            bak = backup_dir()
+            from save_modifier_core.paths import backup_dir, fallback_backup_dir
+            folders = (backup_dir(), fallback_backup_dir(), path.parent)
         except Exception:
-            bak = None
+            folders = (path.parent,)
         seen = set()
-        for folder in ([bak] if bak is not None else []) + [path.parent]:
+        for folder in dict.fromkeys(folders):
             try:
                 for p in sorted(folder.glob(path.stem + "_BACKUP*.usg")):
                     key = str(p)
@@ -2065,6 +2079,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(_jsonable(api_commit(payload)))
             elif path == "/api/undo":
                 self._json(_jsonable(api_undo(payload)))
+            elif path == "/api/backups/recycle":
+                self._json(_jsonable(api_backup_recycle(payload)))
             elif path == "/api/save-as":
                 self._json(_jsonable(api_save_as(payload)))
             elif path == "/api/import-save":
@@ -2080,7 +2096,11 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"ok": False, "errors": [str(exc)]}, 400)
         except ValueError as exc:
             # 请求体不合法（非法 kind / params 不是字典 …）⇒ 400，不是 500
-            self._json({"ok": False, "errors": [str(exc)]}, 400)
+            if path == "/api/backups/recycle":
+                self._json({"ok": False, "completed": [], "failed": None,
+                            "remaining": [], "errors": [str(exc)]}, 400)
+            else:
+                self._json({"ok": False, "errors": [str(exc)]}, 400)
         except Exception as exc:
             import traceback
             _log("[500] %s: %s" % (type(exc).__name__, exc))
@@ -2147,7 +2167,13 @@ def run(serve_only: bool = False, no_window: bool = False,
 
     from save_modifier_core.paths import modifier_profile_dir
     profile_dir = modifier_profile_dir()
-    profile_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        profile_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print("[NG ] 无法创建 Edge profile：%s（%s）。请将程序放在可写目录。" % (profile_dir, exc))
+        httpd.shutdown()
+        httpd.server_close()
+        return 1
     proc = subprocess.Popen(
         [edge, "--app=" + url, "--user-data-dir=" + str(profile_dir),
          "--no-first-run", "--no-default-browser-check",

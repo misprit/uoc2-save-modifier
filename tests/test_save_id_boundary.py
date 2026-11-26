@@ -23,6 +23,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO_SRC = os.path.join(REPO, "src")
@@ -36,7 +37,9 @@ from ._fixtures import make_save  # noqa: E402
 
 class SaveIdBoundaryTest(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="u126_sid_"))
+        scratch = Path(REPO) / ".scratch"
+        scratch.mkdir(exist_ok=True)
+        self.tmp = Path(tempfile.mkdtemp(prefix="u126_sid_", dir=scratch))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.appdata = self.tmp / ".uoc2"
         self.save_dir = self.appdata / "save" / "campaigns"
@@ -94,6 +97,29 @@ class SaveIdBoundaryTest(unittest.TestCase):
         copy.write_bytes(b"PK")
         got = server._save_id_checked(str(copy))
         self.assertTrue(got.endswith("imported.usg"), got)
+
+    def test_only_portable_imported_saves_are_allowed_outside_appdata(self):
+        home = self.tmp / "portable"
+        with patch("save_modifier_core.paths.modifier_home", return_value=home):
+            imported = home / "data" / "imports" / "copy.usg"
+            self.assertEqual(str(imported), server._save_id_checked(str(imported)))
+            for other in (home / "data" / "copy.usg", home / "bak" / "copy.usg",
+                          imported.with_suffix(".ini")):
+                with self.assertRaises(ValueError):
+                    server._save_id_checked(str(other))
+
+    def test_profile_creation_failure_closes_service_without_launching_edge(self):
+        from unittest.mock import MagicMock
+        httpd = MagicMock(server_address=("127.0.0.1", 23))
+        with (patch.object(server, "ThreadingHTTPServer", return_value=httpd),
+              patch.object(server, "_log_startup"), patch.object(server, "find_edge", return_value="edge"),
+              patch("save_modifier_core.paths.modifier_profile_dir", return_value=self.outside / "profile"),
+              patch.object(server.subprocess, "Popen") as launch, patch("builtins.print") as output):
+            self.assertEqual(1, server.run())
+        self.assertIn(str(self.outside / "profile"), output.call_args.args[0])
+        httpd.shutdown.assert_called_once()
+        httpd.server_close.assert_called_once()
+        launch.assert_not_called()
 
     def test_the_game_data_dir_is_the_sandbox(self):
         """边界 = **游戏数据目录**（`<本地应用数据>/.uoc2`）——

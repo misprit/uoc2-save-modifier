@@ -21,6 +21,7 @@ class BackupCleanupTest(unittest.TestCase):
         self.primary.mkdir(parents=True)
         self.fallback.mkdir(parents=True)
         self.enterContext(patch.dict(os.environ, UOC2_APPDATA=str(self.base), UOC2_BAK_DIR=str(self.primary)))
+        self.enterContext(patch.object(mod.core_paths, "modifier_home", return_value=self.primary.parent))
         self.backend = Mock()
         self.service = mod.BackupCleanup(backend=self.backend)
 
@@ -40,15 +41,15 @@ class BackupCleanupTest(unittest.TestCase):
         with patch.dict(os.environ, UOC2_BAK_DIR=str(self.save.parent)):
             self.assertEqual([], self.service.preview(self.save))
 
-    def test_two_roots_same_name_single_and_batch(self):
-        first, second = self.add(), self.add(folder=self.fallback)
-        a, b = self.service.preview(self.save)
-        self.assertNotEqual(a["id"], b["id"])
-        self.service.recycle_one(self.save, a["id"])
-        self.service.recycle_many(self.save, [b["id"]])
-        self.assertEqual([first, second], [call.args[0] for call in self.backend.call_args_list])
-        for path in (first, second):
-            self.assertEqual(b"backup", path.read_bytes())
+    def test_only_primary_can_be_recycled_even_if_override_names_fallback(self):
+        primary, fallback = self.add(), self.add(folder=self.fallback)
+        row, = self.service.preview(self.save)
+        self.assertEqual("primary", row["source"])
+        self.service.recycle_one(self.save, row["id"])
+        self.backend.assert_called_once_with(primary)
+        with patch.dict(os.environ, UOC2_BAK_DIR=str(self.fallback)):
+            self.assertEqual([], self.service.preview(self.save))
+        self.assertEqual(b"backup", fallback.read_bytes())
 
     def test_stale_forged_expired_or_path_rejected(self):
         p = self.add()
@@ -85,8 +86,7 @@ class BackupCleanupTest(unittest.TestCase):
         self.backend.assert_not_called()
 
     def test_new_import_and_name_collision_with_legacy_import(self):
-        new_root = self.base / "modifier" / "modifier_imports"
-        old_root = self.base / "modifier_imports"
+        new_root = mod.core_paths.import_roots()[0]
         new_root.mkdir(parents=True)
         imported = self.add("east.usg", new_root)
         backup = self.add("east_BACKUP.usg")
@@ -94,13 +94,16 @@ class BackupCleanupTest(unittest.TestCase):
         self.service.recycle_one(imported, token)
         self.backend.assert_called_once_with(backup)
         self.backend.reset_mock()
-        old_root.mkdir()
-        legacy = self.add(imported.name, old_root)
-        with self.assertRaisesRegex(mod.BackupCleanupError, "同名"):
-            self.service.recycle_one(imported, token)
-        with self.assertRaisesRegex(mod.BackupCleanupError, "同名"):
-            self.service.preview(legacy)
-        self.backend.assert_not_called()
+        for old_root in mod.core_paths.import_roots()[1:]:
+            with self.subTest(root=old_root):
+                old_root.mkdir(parents=True, exist_ok=True)
+                legacy = self.add(imported.name, old_root)
+                with self.assertRaisesRegex(mod.BackupCleanupError, "同名"):
+                    self.service.recycle_one(imported, token)
+                with self.assertRaisesRegex(mod.BackupCleanupError, "同名"):
+                    self.service.preview(legacy)
+                self.backend.assert_not_called()
+                legacy.rename(old_root / "other.usg")
 
     def test_recycle_result_requires_s_ok_and_destination(self):
         dest = object()
