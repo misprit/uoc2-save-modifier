@@ -21,10 +21,16 @@ __all__ = [
     "appdata_dir","CorePaths", "APP_DIR_NAME", "config_path", "read_config",
            "write_config", "detect_game_dir", "game_dir_candidates",
            "looks_like_game_dir", "set_game_dir", "steam_libraries",
-           "modifier_home", "backup_dir"]
+           "modifier_home", "backup_dir", "modifier_data_dir",
+           "legacy_config_path", "modifier_imports_dir", "legacy_imports_dir",
+           "modifier_log_path", "legacy_log_path", "modifier_profile_dir",
+           "legacy_profile_dir", "modifier_fallback_backup_dir"]
 
 APP_DIR_NAME = ".uoc2"
-
+#: 修改器专属数据目录；新写入不得污染游戏数据根目录。
+MODIFIER_DIR_NAME = "modifier"
+#: 旧导入目录名（只读兼容；新导入目录位于 modifier/ 下）。
+LEGACY_IMPORTS_DIR_NAME = "modifier_imports"
 #: **备份存档**目录名（放在**修改器所在目录**下 —— U109）
 BACKUP_DIR_NAME = "bak"
 
@@ -50,8 +56,24 @@ def modifier_home() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def modifier_data_dir() -> Path:
+    """修改器的新数据根目录：`<游戏数据目录>/modifier/`。
+
+    纯路径 helper，不创建目录；调用方决定何时实际写入。
+    """
+    return appdata_dir() / MODIFIER_DIR_NAME
+
+
+def modifier_fallback_backup_dir() -> Path:
+    """新布局的备用备份目录：`<appdata>/modifier/bak/`。
+
+    仅提供未来写回管线接线点；当前 writer 仍使用兼容的旧 helper。
+    """
+    return modifier_data_dir() / BACKUP_DIR_NAME
+
+
 def fallback_backup_dir() -> Path:
-    """**备用**备份目录：`<游戏数据目录>/bak/`（U132）。
+    """**旧**备用备份目录：`<游戏数据目录>/bak/`（U132）。
 
     ⚠️ **为什么不用「存档旁边」**：游戏只扫存档目录里的 `*.usg`
     ⇒ 备份放那儿会被**游戏当成存档**列出来（U109 的教训）。
@@ -221,26 +243,69 @@ _looks_like_game_dir = looks_like_game_dir
 
 
 def config_path() -> Path:
-    """修改器自己的设置文件路径（`<游戏数据目录>/modifier_config.json`）。"""
-    return _default_appdata() / CONFIG_FILENAME
+    """新设置路径：`<游戏数据目录>/modifier/modifier_config.json`。"""
+    return modifier_data_dir() / CONFIG_FILENAME
+
+
+def legacy_config_path() -> Path:
+    """旧设置路径；仅用于读取，不作为新写入目标。"""
+    return appdata_dir() / CONFIG_FILENAME
+
+
+def _read_config_file(path: Path) -> dict | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def read_config() -> dict:
-    """读设置（文件不存在 / 坏了都当空设置）。"""
-    try:
-        data = json.loads(config_path().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    """新设置优先；新文件不存在时读取旧设置，失败时返回空字典。"""
+    data = _read_config_file(config_path())
+    if data is not None:
+        return data
+    data = _read_config_file(legacy_config_path())
+    return data if data is not None else {}
 
 
 def write_config(data: dict) -> Path:
-    """写设置（只写我们自己那几个键；**绝不碰存档**）。"""
+    """只写新设置路径；不会迁移、删除或覆盖旧设置文件。"""
     p = config_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, ensure_ascii=False, indent=1),
                  encoding="utf-8")
     return p
+
+
+def modifier_imports_dir() -> Path:
+    """新导入副本目录：`<appdata>/modifier/modifier_imports/`；不创建目录。"""
+    return modifier_data_dir() / LEGACY_IMPORTS_DIR_NAME
+
+
+def legacy_imports_dir() -> Path:
+    """旧导入副本目录；仅供兼容读取。"""
+    return appdata_dir() / LEGACY_IMPORTS_DIR_NAME
+
+
+def modifier_log_path() -> Path:
+    """新日志路径：`<appdata>/modifier/modifier.log`。"""
+    return modifier_data_dir() / "modifier.log"
+
+
+def legacy_log_path() -> Path:
+    """旧日志路径；仅供兼容读取。"""
+    return appdata_dir() / "modifier.log"
+
+
+def modifier_profile_dir() -> Path:
+    """新 Edge profile 目录：`<appdata>/modifier/edge_profile/`。"""
+    return modifier_data_dir() / "edge_profile"
+
+
+def legacy_profile_dir() -> Path:
+    """旧 Edge profile 目录；仅供兼容读取。"""
+    return appdata_dir() / "edge_profile"
 
 
 def set_game_dir(path) -> Path:

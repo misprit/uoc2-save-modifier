@@ -67,10 +67,7 @@ EDGE_CANDIDATES = (
     r"C:\Program Files (x86)\Microsoft\Edge Beta\Application\msedge.exe",
 )
 
-#: Edge 自己的独立 profile（跟用户日常浏览隔开）。
-#: ⚠️ 放在 **LOCALAPPDATA** 下，**不进源码树** —— 它是几百 MB 的浏览器缓存。
-PROFILE_DIR = Path(os.environ.get("LOCALAPPDATA") or str(Path.home())) \
-    / ".uoc2" / "edge_profile"
+#: Edge profile 由 paths.py 统一定位；启动时动态取值以尊重环境变量覆盖。
 
 
 # ---------------------------------------------------------------- 日志
@@ -86,8 +83,8 @@ _TOKEN_RE = re.compile(r"([?&]t=)[^&\s\"]+")
 def _log_path():
     """日志文件路径（取不到就返回 None ⇒ 不写日志）。"""
     try:
-        from save_modifier_core.paths import CorePaths
-        return CorePaths.discover().uoc2_appdata / "modifier.log"
+        from save_modifier_core.paths import modifier_log_path
+        return modifier_log_path()
     except Exception:
         return None
 
@@ -98,6 +95,7 @@ def _log(text):
     if p is None:
         return
     try:
+        p.parent.mkdir(parents=True, exist_ok=True)
         if p.exists() and p.stat().st_size > _LOG_MAX:
             data = p.read_bytes()[-(_LOG_MAX // 3):]
             p.write_bytes(b"...[truncated]...\n" + data)
@@ -343,7 +341,8 @@ def _save_id_checked(save_id: str) -> str:
     ⇒ 边界 = **游戏数据目录**（`<本地应用数据>/.uoc2`）：
 
     * `save/` —— 战役 / 独立场景 / 玩家自建的归档目录；
-    * `modifier_imports/` —— 导入 .usg 时生成的副本。
+    * `modifier/modifier_imports/` —— 新导入 .usg 时生成的副本；
+      旧 `<appdata>/modifier_imports/` 仍允许读取。
 
     出了这个目录 ⇒ 一律拒绝（抛错 ⇒ HTTP 层变成 500 + 说明文字）。
 
@@ -1147,7 +1146,8 @@ def api_import_save(payload) -> dict:
         return {"ok": False, "errors": ["文件是空的"]}
     if not data.startswith(b"PK"):
         return {"ok": False, "errors": ["这不像存档文件（.usg 应该是 zip 包）"]}
-    imp = paths.uoc2_appdata / "modifier_imports"
+    from save_modifier_core.paths import modifier_imports_dir
+    imp = modifier_imports_dir()
     try:
         imp.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -2128,9 +2128,11 @@ def run(serve_only: bool = False, no_window: bool = False,
         httpd.shutdown()
         return 1
 
-    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    from save_modifier_core.paths import modifier_profile_dir
+    profile_dir = modifier_profile_dir()
+    profile_dir.mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen(
-        [edge, "--app=" + url, "--user-data-dir=" + str(PROFILE_DIR),
+        [edge, "--app=" + url, "--user-data-dir=" + str(profile_dir),
          "--no-first-run", "--no-default-browser-check",
          # ⚠️ **强制缩放系数 = 1**（U34 实测踩坑）：
          #   Windows 有 150% 缩放时，Edge 的 CSS 视口 ≈ 物理像素 / 1.5
