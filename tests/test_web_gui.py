@@ -530,7 +530,7 @@ class TestUnitWriteApi(WebGuiTestBase):
             self.skipTest("这个存档没有单位")
         u = units[0]
         old = u.get("xp") or 0
-        new = min(400, old + 11)
+        new = min(399, old + 11)
 
         cm = self.post("/api/commit", {
             "save_id": self.copy,
@@ -566,7 +566,7 @@ class TestUnitWriteApi(WebGuiTestBase):
         self.assertEqual(u1.get("name_brief"), "测试改名")
 
     def test_out_of_range_xp_is_rejected(self):
-        """经验超范围（游戏 schema 是 0–400）⇒ 必须硬拦，不写盘。"""
+        """经验超范围（游戏**逻辑**上限是 0–399）⇒ 必须硬拦，不写盘。"""
         v0 = self._view()
         units = v0.get("units") or []
         if not units:

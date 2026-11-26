@@ -375,8 +375,9 @@ def _check_unit(unit: dict) -> list[str]:
     errs: list[str] = []
     uid = unit.get("id")
     xp = unit.get("xp")
-    # ⚠️ 上限 **399**（不是 400）：游戏的 `add_xp` 是 `min(self.xp + xp, 399)`
-    #    （`lib/uoc2/state/entities/unit.pyc` 字节码实证）
+    # ⚠️ 上限 **399**（不是 400）：游戏的 `add_xp` 是 `min(self.xp + xp, 399)`，
+    #    `_repair_data` 也是 `max(0, min(v, 399))`
+    #    （游戏安装目录 `lib\uoc2\state\entities\unit.pyc` 字节码实证）
     if isinstance(xp, int) and not (0 <= xp <= 399):
         errs.append(f"单位 {uid} 的 xp={xp} 越界（必须 0..399）")
     for f, hi in (("entr", 2), ("supply", 3), ("ap", 3)):

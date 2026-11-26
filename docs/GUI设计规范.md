@@ -620,7 +620,7 @@ U17 已做过一次**全量交叉验证**：375 特种兵 × （名字/攻防装
 
 * 到达上限再往上滚：**数字闪一次 `warn` 色**，值不变（不静默、不循环、不跳变）；
 * 往回滚回到原值：**该条待应用记录自动消失**（避免"改了又改回来"却还留在清单里）；
-* 数值超出核心库允许范围（硬拦类，如 `xp > 400`）：**允许你先滚过去**，但在应用时会被 `plan.errors` 拦下并在清单上标红说明 —— 不在滚动时打断你。
+* 数值超出核心库允许范围（硬拦类，如 `xp > 399`）：**允许你先滚过去**，但在应用时会被 `plan.errors` 拦下并在清单上标红说明 —— 不在滚动时打断你。
 
 **【决策】** 滚轮**绝不直接写盘**。所有改动先进"待应用"清单，一键提交。
 理由：写盘要备份 + 校验 + 原子替换，滚轮一格就写一次会把磁盘写爆，也没法"撤销一批"。
@@ -2963,7 +2963,7 @@ PNG 文件
 
 | 层 | 入口 | 字段 | 合法范围 | 游戏 schema 依据 |
 |---|---|---|---|---|
-| 单位 | `unit_field` | `xp` | **0 – 400** | `All(int, Range(min=0, max=400))` |
+| 单位 | `unit_field` | `xp` | **0 – 399** | `All(int, Range(min=0, max=400))`（schema 校验到 400，但游戏逻辑上限是 399） |
 | 单位 | `unit_field` | `entr` / `supply` / `ap` | 0 – 2 / 0 – 3 / 0 – 3 | `Range(max=unit_max_entr_level)` 等 |
 | 单位 | `unit_field` | `act_st` / `sup_st` | ≥ 0（**上限在类型表**，不在存档） | `nonnegative_int_schema` |
 | 单位 | `unit_field` | `name_brief` / `name_full` | 字符串或 `null` | `Or(str, bool)` |
@@ -3449,7 +3449,7 @@ return self.represent_scalar('tag:yaml.org,2002:float', str(float(data)))
 | `max_supply_hubs = 5` | 同上 |
 | `max_branch_level = 3` | 同上（**逻辑**上限，schema 本身不封顶） |
 | `card_deck_limit` / `card_store_limit` | 同上 |
-| `xp ≤ 400` | `uoc2.state.entities.data_validation.unit._scenario_base_unit_schema` 的 `Range(min=0, max=400)` |
+| `xp ≤ 399` | `uoc2.state.entities.data_validation.unit._scenario_base_unit_schema` 的 `Range(min=0, max=400)`（schema 校验）＋ `UnitState.add_xp` 的 `min(..., 399)`（逻辑上限） |
 
 ⚠️ **只有「超了游戏读档就失败」的才算 FAIL** —— 游戏逻辑层面的（分支等级 ≤3、
 兵库/商店重复）只记**警告**：游戏自己写出来的存档里就有重复
@@ -4622,7 +4622,7 @@ zip 里的特种兵能读到 / zip 里的国籍能读到 / 已解压目录能认
 | 步 | 做法 | 例子 |
 |---|---|---|
 | ① 整条精确匹配 | 词表里直接命中 | `没有要写入的内容` → `there is nothing to write` |
-| ② **模板**匹配 | 词表里的 `{name}` 编译成正则再匹配（报错常带真值，整条匹配不上） | `单位 U1 的 xp=900 越界（必须 0..400）` → `unit U1: xp=900 is out of range (must be 0..400)` |
+| ② **模板**匹配 | 词表里的 `{name}` 编译成正则再匹配（报错常带真值，整条匹配不上） | `单位 U1 的 xp=900 越界（必须 0..399）` → `unit U1: xp=900 is out of range (must be 0..399)` |
 | ③ 片段兜底 | 核心库把几条错误用 `；` 拼成一串时，逐段替换 | `❌ …；…` |
 
 ⚠️ **捕获到的值本身也要再翻一层**（深度上限 3）—— 核心库的摘要是**拼出来的**

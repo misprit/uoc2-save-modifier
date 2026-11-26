@@ -219,8 +219,8 @@ def main():
                           if x.id == unit_id), None) == "验收改名", "验收改名"),
          ["units.yml"])
 
-    step("A 单位", "经验 0→400（上限）",
-         [Edit("unit_field", {"unit_id": unit_id, "field": "xp", "value": 400})],
+    step("A 单位", "经验 0→399（上限）",
+         [Edit("unit_field", {"unit_id": unit_id, "field": "xp", "value": 399})],
          lambda s: (next((x.xp for x in s.view(catalog=catalog).units
                           if x.id == unit_id), None) == 400, 400),
          ["units.yml"])

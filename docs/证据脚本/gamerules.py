@@ -49,7 +49,14 @@ TRUCK_MIN, TRUCK_MAX = 1, 5
 #: `uoc2.state.constants` → max_branch_level（**逻辑**上限，不是 schema 上限）
 BRANCH_MAX = 3
 #: `uoc2.state.entities.data_validation.unit._scenario_base_unit_schema` → xp
-UNIT_XP_MAX = 400
+#: ⚠️ **这是 schema 的校验上限**（写这个值读档不报错）
+#:    但**游戏的逻辑上限**是 399（`UnitState.add_xp` = `min(self.xp + xp, 399)`，
+#:    `_repair_data` 也会把超的截回 399）⇒ **产品允许范围按 399 判**。
+UNIT_XP_SCHEMA_MAX = 400
+#: 游戏**逻辑**上限（`UnitState.add_xp` / `_repair_data` 都用它）
+UNIT_XP_LOGIC_MAX = 399
+#: 产品（修改器）允许的范围 = 逻辑上限
+UNIT_XP_MAX = 399
 #: 特种兵槽位（idx 0..2）
 SPEC_SLOTS_MAX = 3
 #: 战区资产「每回合恢复」≥ 1（游戏的 positive_int_schema）
@@ -86,13 +93,14 @@ def verify_against_game() -> list:
             out.append((name, got, ours, got == ours))
     except Exception as exc:
         out.append(("constants 模块加载失败", str(exc), None, False))
-    # xp 的 400 直接从游戏的 schema 对象里读
+    # xp 的 schema 上限直接从游戏的 schema 对象里读
     try:
         um = importlib.import_module("uoc2.state.entities.data_validation.unit")
         sch = getattr(um, "_scenario_base_unit_schema", {})
         xp = sch.get("xp") if isinstance(sch, dict) else None
         ok = "max=400" in repr(xp)
-        out.append(("unit.xp Range(max=400)", repr(xp)[:90], UNIT_XP_MAX, ok))
+        out.append(("unit.xp schema Range(max=400)", repr(xp)[:90],
+                    UNIT_XP_SCHEMA_MAX, ok))
     except Exception as exc:
         out.append(("unit schema 读取失败", str(exc), None, False))
     return out

@@ -174,6 +174,17 @@ class TestCombatFieldsUi(unittest.TestCase):
         # ⚠️ 经验卡的文案是「范围 0 – 399（游戏上限）」（B-4：游戏逻辑上限是 399）
         self.assertLess(tpl.index("范围 0 – 399"), tpl.index("{18}"))
 
+    def test_xp_input_max_is_399(self):
+        """经验输入框的 `max` 必须是 **399**。
+
+        ⚠️ 前端能让用户填到 400 ⇒ 提交时才被核心库拒
+        （「能填但不让存」）；核心库拦得住，但界面不该给出这个口子。
+        """
+        i = self.html.index("bindNumIn(xpEl, {")
+        chunk = self.html[i:i + 300]
+        self.assertIn("max:399", chunk,
+                      "经验输入框的上限应是 399（游戏的逻辑上限）")
+
     def test_entrenchment_has_three_buttons(self):
         for lv in ("0", "1", "2"):
             self.assertIn("setUnitEntr(${u.id},%s)" % lv, self.html)
@@ -189,11 +200,12 @@ class TestCombatFieldsUi(unittest.TestCase):
 
     def test_english_words_exist(self):
         ui = self.table["ui"]
-        for zh in ("工事等级", "移动力", "行动力", "没有行动力（不能攻击）",
-                   "受限：只能攻击", "不受限：可攻击 + 可转额外移动"):
+        # ⚠️ 行动力四档的文案在 B-15 改过（说人话）⇒ 这里跟新文案
+        for zh in ("工事等级", "移动力", "行动力", "无行动力（不能攻击）",
+                   "受限（只能攻击）", "不受限（可攻击 + 可转移动力）"):
             self.assertIn(zh, ui, "词表里缺 %r" % zh)
-        self.assertEqual(ui["不受限：可攻击 + 可转额外移动"],
-                         "unlimited: can attack and convert to extra movement")
+        self.assertEqual(ui["不受限（可攻击 + 可转移动力）"],
+                         "unrestricted (attack + convert to movement)")
 
     def test_summaries_are_translated(self):
         errs = self.table["errors"]
