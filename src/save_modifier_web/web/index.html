@@ -3525,11 +3525,14 @@ function theaterKey(asset){ return `theater_asset:${theaterSide()}:${asset}`; }
  */
 function theaterAddKey(asset, side){ return `theater_asset_add:${side||theaterSide()}:${asset}`; }
 function theaterDelKey(asset){ return `theater_asset_remove:${theaterSide()}:${asset}`; }
+/** **指定那一方**的资产列表（存档里的原值）。 */
+function theaterSideAssetsOf(side){
+  return (side==="opponent" ? ((VIEW&&VIEW.theater_assets_opponent)||[])
+                             : ((VIEW&&VIEW.theater_assets)||[]));
+}
 /** 当前选中那一方的资产列表（"player" = 你，"opponent" = 对手）。 */
 function theaterSideAssets(){
-  const s = theaterSide();
-  return (s==="opponent" ? ((VIEW&&VIEW.theater_assets_opponent)||[])
-                          : ((VIEW&&VIEW.theater_assets)||[]));
+  return theaterSideAssetsOf(theaterSide());
 }
 /** 现在**在不在战斗中**（能不能改）—— 不是「当前 phase 有没有资产」。 */
 function theaterEditable(){
@@ -3541,12 +3544,22 @@ function theaterPend(kind, asset){
   const key = (kind==="theater_asset_add") ? theaterAddKey(asset) : theaterDelKey(asset);
   return PENDING.find(x=>x.kind===kind && x.key===key) || null;
 }
-/** 这一项现在在不在当前 phase 里（**含待应用的增删**）。 */
+/** 这一项现在在不在当前 phase 里（**含待应用的增删**）。
+ *
+ * ⚠️ B-6：必须按 `PENDING` 的**原序**套用增删 ⇒ 判定 = **写盘后的最终状态**
+ * （与核心库 `plan.order_edits` 的执行顺序一致）。
+ * 原来「先判 remove 再判 add」⇒ 删掉又加回来仍显示「没有这一项」，
+ * 而数值那栏又取 add 的值 ⇒ **界面自相矛盾**。 */
 function theaterInCurrent(asset){
   /* 判的是**当前选中那一方**（不再是"当前 phase 那一组"） */
-  if(theaterPend("theater_asset_remove", asset)) return false;
-  if(theaterPend("theater_asset_add", asset)) return true;
-  return theaterSideAssets().some(x=>x.asset===asset);
+  let has = theaterSideAssets().some(x=>x.asset===asset);
+  const addKey = theaterAddKey(asset);
+  const delKey = theaterDelKey(asset);
+  PENDING.forEach(p=>{
+    if(p.kind==="theater_asset_remove" && p.key===delKey) has = false;
+    else if(p.kind==="theater_asset_add" && p.key===addKey) has = true;
+  });
+  return has;
 }
 /** 当前显示的三个数（含待应用的改动）。 */
 function theaterCur(asset){
@@ -3823,6 +3836,18 @@ function theaterToggleTotal(asset){
 function theaterRemove(asset){
   const cur = theaterCur(asset);
   const tot = (cur.uses_total===null||cur.uses_total===undefined) ? L("无限") : cur.uses_total;
+  /* ⚠️ B-6：「删掉」= 最终**不要**这一项 ⇒ 之前挂着的「添加 / 改数量」都撤掉
+     （留着的话写盘顺序会变成 add→remove，界面说「有」、写出来却没有）。 */
+  dropPendingKind("theater_asset_add", theaterAddKey(asset));
+  dropPendingKind("theater_asset", theaterKey(asset));
+  /* ⚠️ 存档里**本来就没有**这一项（只是刚才加进来的）⇒ 净效果是**什么都没有**
+     ⇒ 也不能留一条 remove（核心库会报「这一方没有战区资产」）。 */
+  const inSave = theaterSideAssets().some(x=>x.asset===asset);
+  if(!inSave){
+    dropPendingKind("theater_asset_remove", theaterDelKey(asset));
+    show("theater");
+    return;
+  }
   setPending("theater_asset_remove", theaterDelKey(asset),
     {asset:asset, side:theaterSide()},
     L2("{0}：删除战区资产 {1}（当前可用 {2}，本场景剩余 {3}）", theaterSideLabel(),
@@ -3898,11 +3923,24 @@ function theaterAddConfirm(){
     if(isNaN(tot)){ alertModal(L("「本场景剩余」要填整数，或点「改成无限」")); return; }
     if(tot < 1){ alertModal(L("「本场景剩余」不能是 0 —— 0 会让这个资产永远用不了")); return; }
   } else tot = null;
-  setPending("theater_asset_add", theaterAddKey(M.asset, M.side),
-    {asset:M.asset, side:M.side||theaterSide(), uses_total:tot, uses_turn:ut},
-    L2("{0}：添加战区资产 {1}（每回合恢复 {2}，本场景剩余 {3}）",
-       theaterSideLabel(M.side), theaterCn(M.asset), ut, tot===null?L("无限"):tot));
+  stageTheaterAssetAdd(M.asset, M.side||theaterSide(), tot, ut);
   closeModal();
+}
+/* 挂一条「添加战区资产」的待应用。
+ *
+ * ⚠️ B-6：同一个 key 的 add 是**替换** ⇒ 先撤掉旧的（位置不动）。
+ * 存档里本来没有这一项时，之前那条 remove 就是多余的（净效果是要有这一项）⇒ 撤掉它。
+ * ⚠️ 存档里**本来就有**这一项时，**必须保留** remove 且它排在 add 前面 ——
+ *    核心库 `_theater_asset_add` 拒绝「同一组里已有同名」。 */
+function stageTheaterAssetAdd(asset, side, tot, ut){
+  dropPendingKind("theater_asset_add", theaterAddKey(asset, side));
+  if(!theaterSideAssetsOf(side).some(x=>x.asset===asset)){
+    dropPendingKind("theater_asset_remove", theaterDelKey(asset));
+  }
+  setPending("theater_asset_add", theaterAddKey(asset, side),
+    {asset:asset, side:side, uses_total:tot, uses_turn:ut},
+    L2("{0}：添加战区资产 {1}（每回合恢复 {2}，本场景剩余 {3}）",
+       theaterSideLabel(side), theaterCn(asset), ut, tot===null?L("无限"):tot));
 }
 
 /* ===================================================================
