@@ -2281,7 +2281,7 @@ function unitDetailHTML(u){
         <div class="lb"><span>经验</span><span class="hintw">可直接输入</span></div>
         <div class="v"><input class="numin" id="in_xp_{10}" type="text" inputmode="numeric"
           autocomplete="off" value="{11}"></div>
-        <div class="hintline">范围 0 – 400（schema 硬范围）</div>
+        <div class="hintline">范围 0 – 399（游戏上限）</div>
       </div>
       {18}
     </div>
@@ -2465,7 +2465,7 @@ function bindUnitControls(u){
     }, {passive:false});
   }
   bindUnitCombatFields(u);          /* U85：移动力输入框 */
-  if(xpEl) bindNumIn(xpEl, {base:u.xp||0, cur:xp, min:0, max:400,
+  if(xpEl) bindNumIn(xpEl, {base:u.xp||0, cur:xp, min:0, max:399,
     kind:"unit_field", key:uKey(u.id,"xp"),
     params:{unit_id:u.id, field:"xp", value:xp},
     onChange(v){

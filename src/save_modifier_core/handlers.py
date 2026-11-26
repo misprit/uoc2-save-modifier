@@ -59,8 +59,12 @@ UNIT_FIELD_CN = {
 UNIT_FIELD_RISKY = {"uv", "entr", "supply", "ap", "mp"}
 
 #: 单位数值字段的取值范围（§5.2）
+#: ⚠️ `xp` 的上限是 **399**，不是 schema 里的 400 ——
+#:   游戏的 `add_xp` 是 `self.xp = min(self.xp + xp, 399)`
+#:   （`lib/uoc2/state/entities/unit.pyc` 字节码实证）
+#:   ⇒ 写 400 读档不报错（schema 只校验 <=400），但**下一次经验结算就拉回 399**。
 UNIT_FIELD_RANGE = {
-    "xp": (0, 400),
+    "xp": (0, 399),
     "entr": (0, 2),          # 游戏的 `unit_max_entr_level = 2`（U85 字节码实证）
     "supply": (0, 3),
     "ap": (0, 3),            # 游戏的 `ap_max_value = 3`（ap_none/conv/lock/full）

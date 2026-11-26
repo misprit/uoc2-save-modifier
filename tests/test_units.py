@@ -2,7 +2,7 @@
 
 **验收口径**（规范 §6.2、§5.2、§5.5、§5.4）：
 
-* `xp` 超过 400 **必须被拦**；
+* `xp` 超过 399 **必须被拦**（游戏逻辑上限，字节码实证）；
 * `type`（编制）**必须被拒**，并给出可读的理由；
 * 改名**直接写明文**，改完游戏直接显示，**不产生任何 temp mod**；
 * 战力上限按类型的 `max_st` **软提示**（不硬拦）；
@@ -46,19 +46,21 @@ class UnitEditingTestBase(unittest.TestCase):
 
 class TestUnitFields(UnitEditingTestBase):
     def test_set_xp(self):
-        plan, res = self.commit([Edit.unit_field(1, "xp", 400)])
+        plan, res = self.commit([Edit.unit_field(1, "xp", 399)])
         self.assertTrue(plan.ok, plan.errors)
         self.assertTrue(res.ok, res.errors)
         with zipfile.ZipFile(self.save_path) as zf:
             import yaml
             units = yaml.safe_load(zf.read("units.yml"))
-        self.assertEqual(units[0]["xp"], 400)
+        self.assertEqual(units[0]["xp"], 399)
 
-    def test_xp_over_400_is_blocked(self):
-        plan, res = self.commit([Edit.unit_field(1, "xp", 401)])
+    def test_xp_over_399_is_blocked(self):
+        """⚠️ 上限是 **399**（游戏的 `add_xp` 封顶），不是 schema 的 400 ——
+        写 400 会被结算立刻拉回 399 ⇒ 等于白写。"""
+        plan, res = self.commit([Edit.unit_field(1, "xp", 400)])
         self.assertFalse(plan.ok)
         self.assertIsNone(res)
-        self.assertIn("400", plan.errors[0])
+        self.assertIn("399", plan.errors[0])
 
     def test_negative_xp_is_blocked(self):
         plan, _ = self.commit([Edit.unit_field(1, "xp", -1)])

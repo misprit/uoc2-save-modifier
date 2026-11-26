@@ -48,7 +48,7 @@ store                        列出商店
 types [unit|spec|card|hq]    列出类型目录（候选值）
 
 --- 编辑（先 plan，确认后再 commit）---
-xp <单位id> <值>             经验值 0..400
+xp <单位id> <值>             经验值 0..399
 st <单位id> <活跃> [压制]    战力 act_st / sup_st
 name <单位id> <明文>         改显示名（**直接写明文**）
 spec <单位id> <特种类型>      加特种

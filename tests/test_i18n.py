@@ -242,12 +242,12 @@ class TrErrorTest(unittest.TestCase):
 
     def test_template_match(self):
         self.assertEqual(
-            "unit U1: xp=900 is out of range (must be 0..400)",
-            server.tr_error("单位 U1 的 xp=900 越界（必须 0..400）"))
+            "unit U1: xp=900 is out of range (must be 0..399)",
+            server.tr_error("单位 U1 的 xp=900 越界（必须 0..399）"))
 
     def test_fragment_match(self):
         # 核心库把几条错误用 `；` 拼成一串 ⇒ 整条匹配不上，得靠片段替换
-        out = server.tr_error("❌ 单位 U1 的 xp=900 越界（必须 0..400）；"
+        out = server.tr_error("❌ 单位 U1 的 xp=900 越界（必须 0..399）；"
                               "总部 hq1 的 cp：3 → 5")
         self.assertIn("unit U1: xp=900 is out of range", out)
         self.assertIn("HQ hq1: cp: 3 → 5", out)
@@ -262,7 +262,7 @@ class TrErrorTest(unittest.TestCase):
             server.tr_error("手牌已满（本难度「普通」的上限是 5 张）—— 先删一张再添加"))
 
     def test_no_chinese_left(self):
-        for s in ("单位 U1 的 xp=900 越界（必须 0..400）",
+        for s in ("单位 U1 的 xp=900 越界（必须 0..399）",
                   "总部 hq1 的 cp：3 → 5",
                   "存档里没有 id 为 hq1 的总部",
                   "目录不存在：D:\\nope",
@@ -295,7 +295,7 @@ class TrPayloadTest(unittest.TestCase):
     def test_only_user_facing_keys_are_translated(self):
         payload = {
             "ok": False,
-            "errors": ["单位 U1 的 xp=900 越界（必须 0..400）"],
+            "errors": ["单位 U1 的 xp=900 越界（必须 0..399）"],
             "warnings": ["没有要写入的内容"],
             "save_name": "我的存档.usg",          # 存档名**不翻**（是数据）
             "changes": [{"entry": "units.yml",
