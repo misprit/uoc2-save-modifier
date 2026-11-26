@@ -18,7 +18,7 @@ from typing import Any, Iterable
 
 from . import yamlio
 from .edits import Edit
-from .handlers import Outcome, apply_edit
+from .handlers import HQ_ROSTER_COPY_RE, Outcome, apply_edit
 from .paths import CorePaths
 
 __all__ = ["Plan", "FileChange", "ValidationResult", "plan_edit", "validate"]
@@ -185,6 +185,9 @@ _BATTLE_MAIN_RE = re.compile(r"^(?:games/[^/]+|game)/main\.yml$")
 #: `games/**` 的其它条目（`units.yml` / `ar_list.yml` / `archive` …）仍然一律只读。
 RUIN_SNAPSHOT_RE = re.compile(r"^games/[^/]+/(?:cities|forts)\.yml$")
 
+#: **战斗层**那份 `hqs.yml`（`games/<场景>/hqs.yml`）—— 属于 L3。
+BATTLE_HQ_ROSTER_RE = re.compile(r"^games/[^/]+/hqs\.yml$")
+
 
 def _layer_of(entry: str) -> str:
     """条目属于哪一层。
@@ -196,7 +199,8 @@ def _layer_of(entry: str) -> str:
     ⚠️ **U124**：原来只认 `games/*/main.yml` ⇒ **独立场景**的战斗层被标成 L1
     （外部审阅报告 P1-7）。
     """
-    if _BATTLE_MAIN_RE.match(entry) or RUIN_SNAPSHOT_RE.match(entry):
+    if (_BATTLE_MAIN_RE.match(entry) or RUIN_SNAPSHOT_RE.match(entry)
+            or BATTLE_HQ_ROSTER_RE.match(entry)):
         return "L3"
     return "L1"
 
@@ -210,7 +214,10 @@ def writable_entries(save) -> set:
       独立场景 `game/main.yml`）；
     * **废墟快照**那两张表（`RUIN_SNAPSHOT_RE`，**U184**）——
       `games/<场景>/cities.yml` 与 `games/<场景>/forts.yml`，
-      **只放行存档里真实存在的那几份**（§6.5.3 的 ②③）。
+      **只放行存档里真实存在的那几份**（§6.5.3 的 ②③）；
+    * **场景名册与战斗层那两份 `hqs.yml`**（`HQ_ROSTER_COPY_RE`）——
+      改名要**四份都改**：战役界面「点选场景」显示的
+      **出场指挥部**读的就是场景名册 ⇒ 只改根表 + 战役名册，那个界面还是旧名。
 
     ⚠️ **U124**：以前**没有白名单** ⇒ 理论上能往存档里写**任意条目**
     （`document/`、`last_conference/`、`last_game/` …）——
@@ -229,6 +236,9 @@ def writable_entries(save) -> set:
     try:
         for name in save.list_names():
             if RUIN_SNAPSHOT_RE.match(name):
+                out.add(name)
+            # 场景名册 / 战斗层那两份 `hqs.yml`（B-8）：也只放行**真实存在**的
+            if HQ_ROSTER_COPY_RE.match(name):
                 out.add(name)
     except Exception:
         pass
@@ -354,8 +364,9 @@ def plan_edit(save, edits: Iterable[Edit], catalog=None) -> Plan:
     if illegal:
         plan.errors.append(
             "这些条目不允许写入：%s（只允许改根层的 %s、战役名册的 %s、"
-            "当前战斗层的那张 main.yml，以及废墟快照那两张 "
-            "games/<场景>/cities.yml 与 forts.yml）"
+            "当前战斗层的那张 main.yml、废墟快照那两张 "
+            "games/<场景>/cities.yml 与 forts.yml，以及各场景名册与战斗层里的 "
+            "hqs.yml）"
             % ("、".join(illegal), "、".join(ROOT_WRITABLE),
                "、".join(ROSTER_WRITABLE)))
 

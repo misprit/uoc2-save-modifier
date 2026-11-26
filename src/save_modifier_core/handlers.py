@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -359,6 +360,16 @@ def _level(w, e: Edit) -> Outcome:
 ROSTER_ENTRY = {"units.yml": "document/units.yml",
                 "hqs.yml": "document/hqs.yml"}
 
+#: **改名要同步到的另外两份名册** —— HQ 名字在存档里有 **4 份**：
+#: 根 `hqs.yml` / `document/hqs.yml`（战役名册）/ **场景名册** / **战斗层**那份。
+#:
+#: ⚠️ 战役界面「点选场景」显示的**出场指挥部**读的是**场景名册**
+#: （`document/scenarios/<场景>/hqs.yml`）⇒ 只改前两份 ⇒ 那个界面还是旧名。
+#:
+#: ⚠️ **只放行这两类 `hqs.yml`** —— `document/` 下**其余**条目仍然只读（U124）。
+HQ_ROSTER_COPY_RE = re.compile(
+    r"^(?:document/scenarios/[^/]+|games/[^/]+)/hqs\.yml$")
+
 
 #: ⚠️ **游戏开着**时改盘 ⇒ 退出游戏时它会把**内存里的存档**写回去 ⇒ 你的改动被覆盖。
 #:
@@ -396,6 +407,26 @@ def _rename_fields(obj: dict, field: str, value) -> dict:
     return out
 
 
+def _apply_rename(obj: dict, field: str, value) -> bool:
+    """把改名**落到某个对象**上（按它**自己有哪些名字字段**）。返回是否真的改了。
+
+    ⚠️ 每份名册的**字段形态不同**（实测）：
+    * `document/hqs.yml` 与 `games/<场景>/hqs.yml` —— `name_brief` /
+      `name_full` / `name_super_brief` 三种都有；
+    * `document/scenarios/<场景>/hqs.yml` —— **只有 `name_brief`**
+      （实测 5 份存档共 249 份场景名册、1032 条 HQ 条目，**全都只有 `name_brief`**）。
+
+    ⇒ **哪个对象有哪个字段就改哪个**，别凭空造一个
+    （`_rename_fields` 已经按对象本身判断过了）。
+    """
+    changed = False
+    for k, v in _rename_fields(obj, field, value).items():
+        if k in obj and obj.get(k) != v:
+            obj[k] = v
+            changed = True
+    return changed
+
+
 def _sync_rename_to_roster(w, entry: str, obj_id, field: str, value) -> bool:
     """把改名**同步**到战役名册（`document/` 那份）。返回是否真的改了。
 
@@ -412,14 +443,44 @@ def _sync_rename_to_roster(w, entry: str, obj_id, field: str, value) -> bool:
     item = _find_by_id(roster, obj_id)
     if item is None:
         return False
-    changed = False
-    for k, v in _rename_fields(item, field, value).items():
-        if k in item and item.get(k) != v:
-            item[k] = v
-            changed = True
+    changed = _apply_rename(item, field, value)
     if changed:
         w.touch(doc_entry)
     return changed
+
+
+def _hq_roster_copy_entries(w) -> list[str]:
+    """存档里**要跟着改名**的那两份名册（按存档**实际有的**算）。"""
+    try:
+        names = list(w.save.list_names())
+    except Exception:
+        return []
+    return [n for n in names if HQ_ROSTER_COPY_RE.match(n)]
+
+
+def _sync_rename_to_roster_copies(w, obj_id, field: str, value) -> list[str]:
+    """把改名同步到**场景名册**与**战斗层**那两份名册。返回改了哪些条目。
+
+    ⚠️ 这两份**不一定存在**：
+    * 场景名册 = `document/scenarios/<场景>/hqs.yml`（一个场景一份）；
+    * 战斗层那份 = `games/<场景>/hqs.yml` —— **当前活动场景**那份是
+      `list[int]`（只有 id、没有名字）⇒ 里面根本没有名字字段，改不到；
+      **已结束的战斗**那份才是完整对象（有名字）。
+
+    ⇒ 找不到 / 没有这个 id ⇒ **静默跳过**（不是错误）。
+    """
+    out = []
+    for entry in _hq_roster_copy_entries(w):
+        rows = w.table(entry, [])
+        if not isinstance(rows, list):
+            continue
+        item = _find_by_id(rows, obj_id)
+        if item is None:
+            continue
+        if _apply_rename(item, field, value):
+            w.touch(entry)
+            out.append(entry)
+    return out
 
 
 def _unit_field(w, e: Edit) -> Outcome:
@@ -466,9 +527,7 @@ def _unit_field(w, e: Edit) -> Outcome:
     # ⚠️ 改名要**两份都改** —— 战役地图显示的是**名册**那份
     # （`document/units.yml`），只改根表 ⇒ 玩家在战役地图上看不到变化。
     if field in ("name_brief", "name_full"):
-        for k, v in _rename_fields(unit, field, value).items():
-            if k in unit and unit.get(k) != v:
-                unit[k] = v
+        _apply_rename(unit, field, value)
         _sync_rename_to_roster(w, "units.yml", unit_id, field, value)
         # ⚠️ 游戏开着 ⇒ 退出时它把内存里的存档写回去 ⇒ 改名被覆盖。
         oc.warnings.append(GAME_RUNNING_WARNING)
@@ -980,10 +1039,11 @@ def _hq_field(w, e: Edit) -> Outcome:
     oc.summary = f"总部 {hq_id} 的 {field}：{old} → {value}"
     # ⚠️ 同单位 —— 战役地图显示的是**名册**那份（`document/hqs.yml`）。
     if field in ("name_brief", "name_full"):
-        for k, v in _rename_fields(hq, field, value).items():
-            if k in hq and hq.get(k) != v:
-                hq[k] = v
+        _apply_rename(hq, field, value)
         _sync_rename_to_roster(w, "hqs.yml", hq_id, field, value)
+        # ⚠️ 场景名册 + 战斗层那两份也要改 —— 战役界面「点选场景」
+        #    显示的**出场指挥部**读的就是场景名册（不改 ⇒ 那里还是旧名）。
+        _sync_rename_to_roster_copies(w, hq_id, field, value)
         # ⚠️ 同上（游戏开着 ⇒ 退出时覆盖）。
         oc.warnings.append(GAME_RUNNING_WARNING)
 
@@ -1673,11 +1733,11 @@ def _validate_store_entry(entry) -> list[str]:
 def _pending_removed_indexes(w, kind: str, group: dict) -> set:
     """本批里**即将被删掉**的条目下标（按 `kind` + `group` 筛）。
 
-    ⚠️ **为什么需要它**（B-1）：
+    ⚠️ **为什么需要它**：
     `plan.order_edits()` 把**按下标删除**的编辑排到最后
-    （U35/U91/U121 的教训：删除会让后面条目的下标前移 ⇒ 必须最后删、同组降序）
+    （删除会让后面条目的下标前移 ⇒ 必须最后删、同组降序）
     ⇒ **新增**类的编辑**先执行** ⇒ 判重时旧条目还在列表里
-    ⇒ 「删一条再添同一条」会被当成重复而拦下（社区反馈的老问题）。
+    ⇒ 「删一条再添同一条」会被当成重复而拦下。
 
     ⇒ 判重必须看「**这一批改完之后**」的列表：本批要删掉的那些**不该参与**重复判定
     ⇒ 「删一条再添同一条」= **替换**，不是重复。
