@@ -3995,7 +3995,9 @@ function ruinsBox(){
    =================================================================== */
 function pageCampaign(w){
   const cp = VIEW.campaign_position || {};
-  if(!CDETAIL) loadCampaignDetail().then(()=>{ if(PAGE==="campaign") show("campaign"); });
+  /* ⚠️ `!CDETAIL_LOADING` —— 正在取的时候**别再取一次**（否则来回重取）。 */
+  if(!CDETAIL && !CDETAIL_LOADING)
+    loadCampaignDetail().then(()=>{ if(PAGE==="campaign") show("campaign"); });
   const scenes = cp.available_scenes || [];
   const pos = L2(`<div class="cpos">
     <b>{0}</b>
@@ -4618,11 +4620,36 @@ function alertModal(msg){
 let CDETAIL = null;      /* /api/campaign-detail */
 let USTACK = null;       /* /api/undo-stack */
 let SETTINGS = null;     /* /api/settings —— 游戏本体目录等（U69） */
+/* ⚠️ 战役详情的**在途守卫**（B-7）：
+   切换存档时旧的请求**可能还在路上** ⇒ 它回来时会把**新**存档的详情覆盖成旧的。
+   ⇒ 每次作废都 ++ 一个 token；响应回来时 token 对不上就丢弃。 */
+let CDETAIL_TOKEN = 0;
+let CDETAIL_LOADING = false;
+
+/* 战役详情作废 —— 切换存档 / 写盘 / 撤销之后必须调用。
+   ⚠️ **不重取**（重取交给调用方，因为它要知道当前是哪个存档）。 */
+function invalidateCampaignDetail(){
+  CDETAIL = null;
+  CDETAIL_TOKEN++;
+  CDETAIL_LOADING = false;
+}
 
 async function loadCampaignDetail(){
   if(!VIEW) return;
-  try { CDETAIL = await api("/api/campaign-detail?save_id=" + encOnce(VIEW._save_id)); }
-  catch(e){ CDETAIL = {error:String(e.message||e)}; }
+  const token = CDETAIL_TOKEN;
+  const sid = VIEW._save_id;
+  CDETAIL_LOADING = true;
+  try {
+    const d = await api("/api/campaign-detail?save_id=" + encOnce(sid));
+    /* ⚠️ 回来的路上可能已经换存档了 ⇒ 这份是**旧存档**的详情 ⇒ 丢弃。 */
+    if(token !== CDETAIL_TOKEN) return;
+    CDETAIL = d;
+  } catch(e){
+    if(token !== CDETAIL_TOKEN) return;
+    CDETAIL = {error:String(e.message||e)};
+  } finally {
+    if(token === CDETAIL_TOKEN) CDETAIL_LOADING = false;
+  }
 }
 async function loadUndoStack(){
   if(!VIEW) return;
@@ -5096,6 +5123,7 @@ function doSwitchSaveForce(){
   PENDING = []; paintPending();
   closeModal();
   VIEW = null; USTACK = null; PICKCACHE = {};
+  invalidateCampaignDetail();   /* B-7：换存档 ⇒ 战役详情作废 */
   document.getElementById("app").style.display = "none";
   document.getElementById("splash").style.display = "block";
   reload().catch(()=>{});
@@ -5400,6 +5428,9 @@ window.addEventListener("unhandledrejection", function(ev){
 });
 
 async function openSave(sid){
+  /* ⚠️ B-7：换存档 ⇒ 战役详情（路线图 / 名册 / 废墟）**必须作废** ——
+     否则它们还是**上一个存档**的（名册整张表串了、废墟判错场景）。 */
+  invalidateCampaignDetail();
   try {
     VIEW = await api("/api/view/" + encOnce(sid));
   } catch(e) {
@@ -5425,6 +5456,10 @@ async function openSave(sid){
     L2(" · 声望 <b class=\"ok\">{0}</b> · 分数 <b>{1}</b>", VIEW.prestige??"—", VIEW.score??"—") +
     L2(" · 单位 <b>{0}</b> · 总部 <b>{1}</b>", (VIEW.units||[]).length, (VIEW.hqs||[]).length) +
     L2("<span style=\"margin-left:auto\" id=\"hDirty\">{0}</span>", PENDING.length?L("有未应用的改动"):L("就绪 · 未改动磁盘"));
+  /* ⚠️ B-7：战役详情要**按新存档重取**（写盘 / 撤销 / 重新读取也都走这条路径）——
+     废墟清单尤其依赖它：修完废墟后清单要立刻跟着变。 */
+  loadCampaignDetail().then(()=>{ if(VIEW && PAGE==="campaign") show("campaign"); })
+    .catch(e=>showJsError(e, "读取战役详情"));
   show(PAGE);
 }
 
