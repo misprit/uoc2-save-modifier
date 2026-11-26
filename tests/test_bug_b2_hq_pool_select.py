@@ -97,6 +97,53 @@ class TestHqPoolSelectPassesRealValues(unittest.TestCase):
         self.assertRegex(nat_arg.strip(), r"^this\.value$",
                          "国籍下拉第二个实参应是 this.value（新选的国籍），实得 %r" % nat_arg)
 
+    # ---------- ② 实参 ↔ 占位符的**绑定**（独立审阅发现的盲区）----------
+    def _l2_arguments(self):
+        """取出兵库模态那个 `L2(...)` 的实参列表（前 4 个是模板占位符的实参）。"""
+        marker = '<div class="mrow"><span class="lb">兵种</span>'
+        i = self.html.find(marker)
+        self.assertGreater(i, 0, "没找到兵库模态的模板")
+        j = self.html.rfind("L2(", 0, i)
+        seg = self.html[j:j + 1400]
+        return re.findall(r"jsq\([^)]*\)", seg)
+
+    def test_l2_arguments_bind_nationality_and_equipment_correctly(self):
+        """L2 的**第 1 个实参**必须是国籍、第 **2 个 jsq** 必须是兵种。
+
+        ⚠️ **为什么必须单独断言**（独立审阅实测出的盲区）：
+        只断言模板里的**占位符位置**不够 —— 实参错位一样会让
+        「国籍被写成兵种、兵种被写成国籍」，也就是社区反馈的原始症状，
+        而原来的 6 条护栏**全绿**。
+        """
+        jsq = self._l2_arguments()
+        self.assertGreaterEqual(len(jsq), 2, "没找到 L2 的实参，实得 %r" % jsq)
+        self.assertRegex(jsq[0], r"M\.equipNat",
+                         "L2 第 1 实参应是**国籍**（M.equipNat），实得 %r" % jsq[0])
+        self.assertRegex(jsq[1], r"M\.equipType",
+                         "L2 第 3 实参应是**兵种**（M.equipType），实得 %r" % jsq[1])
+
+    def test_the_english_template_binds_the_same_way(self):
+        """英文词表里那份模板的**参数方向**也要对。
+
+        ⚠️ 英文界面渲染的是**词表那份** ⇒ 只挡「带引号」那一种退化不够，
+        **参数方向写反**同样会让国籍变成兵种（独立审阅实测：那样 6 条护栏全绿）。
+        """
+        keys = [k for k in self.i18n.get("ui", {}) if "hqPoolEquip" in k]
+        self.assertEqual(1, len(keys), "词表里应恰好有一条兵库模态模板，实得 %d" % len(keys))
+        val = self.i18n["ui"][keys[0]]
+        calls = _CALL_RE.findall(val)
+        self.assertEqual(2, len(calls), "英文模板里应恰好有两条 hqPoolEquip 调用")
+        eq_arg, nat_arg = calls[0]
+        self.assertRegex(eq_arg.strip(), r"^this\.value$",
+                         "英文模板：兵种下拉第一个实参应是 this.value，实得 %r" % eq_arg)
+        self.assertIn("{0}", nat_arg,
+                      "英文模板：兵种下拉的第二个实参应是当前国籍占位符 {0}，实得 %r" % nat_arg)
+        eq_arg2, nat_arg2 = calls[1]
+        self.assertIn("{2}", eq_arg2,
+                      "英文模板：国籍下拉的第一个实参应是当前兵种占位符 {2}，实得 %r" % eq_arg2)
+        self.assertRegex(nat_arg2.strip(), r"^this\.value$",
+                         "英文模板：国籍下拉第二个实参应是 this.value，实得 %r" % nat_arg2)
+
     # ---------- ③ 候选源不能是「本次会议在售」 ----------
     def test_nationality_candidates_come_from_the_game_catalog(self):
         """国籍候选要取**游戏定义过的全部**（CATALOG.nationalities），
