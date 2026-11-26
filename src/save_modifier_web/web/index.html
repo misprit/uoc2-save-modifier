@@ -2000,17 +2000,17 @@ function unitCombatFieldsHTML(u){
       <div class="lb"><span>${L("移动力")}</span><span class="hintw">${baseMove!=null?L("基础 ")+baseMove:L("可直接输入")}</span></div>
       <div class="v"><input class="numin" id="in_mp_${u.id}" type="text" inputmode="numeric"
         autocomplete="off" value="${mp}" title="${L("移动力是剩余的移动点；单位进入敌方控制区会被游戏清零（这就是被定住的原因），所以被定住的单位这里通常是 0。战斗中改立即生效（战斗里的单位数据就在这个存档里）；战斗外改，进战斗后的回合开始会按补给重算。")}"></div>
-      <div class="hintline">${L("战斗里会按类型的移动力重算")}</div>
+      <div class="hintline">${L("上限 = 该类型的基础移动力；战斗里会按类型重算")}</div>
     </div>
     <div class="stat" id="st_ap_${u.id}">
       <div class="lb"><span>${L("行动力")}</span><span class="hintw">${L("四档")}</span></div>
       <div class="v"><select class="sel" id="in_ap_${u.id}" onchange="setUnitAp(${u.id},this.value)">
-        <option value="0"${sel(ap===0)}>${L("没有行动力（不能攻击）")}</option>
-        <option value="1"${sel(ap===1)}>${L("只能转成额外移动")}</option>
-        <option value="2"${sel(ap===2)}>${L("受限：只能攻击")}</option>
-        <option value="3"${sel(ap===3)}>${L("不受限：可攻击 + 可转额外移动")}</option>
+        <option value="0"${sel(ap===0)}>${L("无行动力（不能攻击）")}</option>
+        <option value="1"${sel(ap===1)}>${L("可转为移动力")}</option>
+        <option value="2"${sel(ap===2)}>${L("受限（只能攻击）")}</option>
+        <option value="3"${sel(ap===3)}>${L("不受限（可攻击 + 可转移动力）")}</option>
       </select></div>
-      <div class="hintline">${L("0 无 · 1 转移动 · 2 只能打 · 3 不受限")}</div>
+      <div class="hintline">${L("0 无 · 1 可转移动力 · 2 只能攻击 · 3 不受限")}</div>
     </div>`;
 }
 /* 移动力输入框（重画后要重新绑） */
@@ -2018,8 +2018,12 @@ function bindUnitCombatFields(u){
   const mpEl = document.getElementById("in_mp_"+u.id);
   if(!mpEl) return;
   const base = (u.mp==null)?0:u.mp;
+  /* ⚠️ 上限 = 该单位**类型的基础移动力**（`unit_types/<类型>.yml` 的 `move`）
+     ⇒ 不给上限的话能写出游戏读不出的值（B-14）。 */
+  const mpMax = ((CATALOG&&CATALOG.unit_types&&CATALOG.unit_types[u.type])||{}).move;
   bindNumIn(mpEl, {base: base, cur: pendingVal("unit_field", uKey(u.id,"mp"), base),
-    min: 0, kind:"unit_field", key: uKey(u.id,"mp"),
+    min: 0, max: (typeof mpMax === "number" && mpMax >= 0) ? mpMax : undefined,
+    kind:"unit_field", key: uKey(u.id,"mp"),
     params: {unit_id:u.id, field:"mp", value: base},
     onChange: v => {
       queueEdit("unit_field", uKey(u.id,"mp"),
