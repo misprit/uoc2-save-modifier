@@ -3160,9 +3160,16 @@ function pageCards(w){
   const hand = projectedCards(VIEW.hand, "hand");
   const shelf = projectedCards(VIEW.shelf, "shelf");
   const wl = VIEW.card_whitelist || {allowed:[], blocked:{}};
-  const handHTML = hand.length
-    ? hand.map(c=>cardTileHTML(c,"hand")).join("")
-    : L(`<div class="placeholder"><div class="big">手里没有牌</div>
+  const handFeat = ((VIEW&&VIEW._features)||[]).find(f=>f.name==="hand");
+  const handOK = !handFeat || handFeat.ok;
+  const restoreFeat = (VIEW._features||[]).find(f=>f.name==="restore_hand");
+  const restoreOK = !restoreFeat || restoreFeat.ok;
+  const handHTML = !handOK
+    ? L2(`<div class="placeholder"><div class="big">{0}</div>
+        <div>{1}</div></div>`, L("这个存档没有手牌数据"), esc(handFeat.reason||""))
+    : hand.length
+      ? hand.map(c=>cardTileHTML(c,"hand")).join("")
+      : L(`<div class="placeholder"><div class="big">手里没有牌</div>
         手牌是<b>你手里已经拿到的牌</b>（会议阶段才发牌）——
         用下面的「加一张到手牌」可以直接放一张进来。</div>`);
   const shelfLimit = VIEW.shelf_limit || 5;
@@ -3194,9 +3201,9 @@ function pageCards(w){
           <span>被屏蔽：<b>{8}</b> 种</span>
           <span>当前会议：<b>{9}</b></span>
           <button class="btn" style="margin-left:auto;padding:3px 10px;font-size:12px"
-            onclick="openCardPicker('hand',0)">加一张到手牌</button>
+            {14}onclick="openCardPicker('hand',0)">加一张到手牌</button>
           <button class="btn" style="padding:3px 10px;font-size:12px"
-            onclick="restoreHand()">恢复上次会议牌局</button>
+            {15}onclick="restoreHand()">恢复上次会议牌局</button>
         </div>
         {10}
         <div class="note">手牌是<b>你手里已经拿到的牌</b>；货架是<b>这一场会议可以买的牌</b>。<br>
@@ -3212,7 +3219,7 @@ function pageCards(w){
         <div class="note">空格子「点此上架」= <b>上架一张新卡</b>；
           已有卡的格子：<b>点卡面 = 换成别的卡</b>，或先「下架」清空、再点空格位上架。</div>
       </div></div>
-  </div>`, hand.length, handHTML, esc(wl.conference||"—"), esc(VIEW.level||"—"), VIEW.prestige??"—", VIEW.hand_limit||5, esc(VIEW.level||"—"), (wl.allowed||[]).length, Object.keys(wl.blocked||{}).length, esc(wl.conference||"—"), SEL.cardErr?`<div class="err">${esc(SEL.cardErr)}</div>`:"", shelf.length, shelfLimit, shelfSlots);
+  </div>`, hand.length, handHTML, esc(wl.conference||"—"), esc(VIEW.level||"—"), VIEW.prestige??"—", VIEW.hand_limit||5, esc(VIEW.level||"—"), (wl.allowed||[]).length, Object.keys(wl.blocked||{}).length, esc(wl.conference||"—"), SEL.cardErr?`<div class="err">${esc(SEL.cardErr)}</div>`:"", shelf.length, shelfLimit, shelfSlots, handOK?"":"disabled ", restoreOK?"":"disabled ");
 }
 
 function restoreHand(){
