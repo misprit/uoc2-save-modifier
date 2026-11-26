@@ -40,18 +40,19 @@ internal static class Launcher
         get { return AppDomain.CurrentDomain.BaseDirectory; }
     }
 
-    /// <summary>游戏数据目录（配置 / 存档 / 日志都在这儿；**不在程序目录里**）。</summary>
-    private static string AppData
+    private static string RuntimeData
     {
-        get
-        {
-            string env = Environment.GetEnvironmentVariable("UOC2_APPDATA");
-            if (!string.IsNullOrEmpty(env))
-                return env;
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                ".uoc2");
-        }
+        get { return Path.Combine(Root, "data", "runtime"); }
+    }
+
+    private static string LogFile
+    {
+        get { return Path.Combine(Root, "data", "logs", "modifier.log"); }
+    }
+
+    private static string EdgeProfile
+    {
+        get { return Path.Combine(Root, "data", "cache", "edge"); }
     }
 
     [STAThread]
@@ -78,14 +79,28 @@ internal static class Launcher
             return 1;
         }
 
-        string urlFile = Path.Combine(AppData, "server.url");
+        string urlFile = Path.Combine(RuntimeData, "server.url");
 
         // ① 已经在跑？⇒ 只把窗口叫出来
         string old = ReadAll(urlFile);
         if (old != null && Alive(old))
         {
-            OpenDefault(old);
-            return 0;
+            string existingEdge = FindEdge();
+            Process existingBrowser;
+            string existingReason = null;
+            if (existingEdge != null && TryLaunchEdge(existingEdge, old,
+                                                       out existingBrowser,
+                                                       out existingReason))
+            {
+                existingBrowser.WaitForExit();
+                TryDelete(urlFile);
+                return 0;
+            }
+            TryDelete(urlFile);
+            Fail(existingEdge == null
+                ? "找不到 Microsoft Edge，无法打开修改器。"
+                : "Microsoft Edge 启动失败：\r\n" + existingReason);
+            return 1;
         }
 
         // ② 起服务（**不拉窗口** —— 浏览器归本启动器管）
@@ -120,31 +135,33 @@ internal static class Launcher
         if (url == null)
         {
             Kill(proc);
+            TryDelete(urlFile);
             Fail("服务没能启动（60 秒内没拿到地址）。\r\n\r\n日志在：\r\n"
-               + Path.Combine(AppData, "modifier.log"));
+               + LogFile);
             return 1;
         }
-        WriteAll(urlFile, url);
-
-        // ③ 开窗口
-        string edge = FindEdge();
-        if (edge != null)
+        if (!WriteAll(urlFile, url))
         {
-            Process browser = LaunchEdge(edge, url);
-            if (browser != null)
-            {
-                browser.WaitForExit();       // 关掉窗口 ⇒ 服务一起退
-                Kill(proc);
-                TryDelete(urlFile);
-                return 0;
-            }
+            Kill(proc);
+            TryDelete(urlFile);
+            Fail("无法写入启动器运行状态：\r\n" + urlFile);
+            return 1;
         }
 
-        // 没有 Edge ⇒ 退回默认浏览器；提示用完关掉
-        OpenDefault(url);
-        MessageBox.Show(
-            "界面已在默认浏览器中打开。\r\n\r\n用完请点「确定」，修改器会随之退出。",
-            TITLE, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        // ③ 只用独立 profile 启动 Edge；失败不得回退到默认浏览器
+        string edge = FindEdge();
+        Process browser;
+        string reason = null;
+        if (edge == null || !TryLaunchEdge(edge, url, out browser, out reason))
+        {
+            Kill(proc);
+            TryDelete(urlFile);
+            Fail(edge == null
+                ? "找不到 Microsoft Edge，无法打开修改器。"
+                : "Microsoft Edge 启动失败：\r\n" + reason);
+            return 1;
+        }
+        browser.WaitForExit();       // 关掉窗口 ⇒ 服务一起退
         Kill(proc);
         TryDelete(urlFile);
         return 0;
@@ -192,42 +209,35 @@ internal static class Launcher
         return null;
     }
 
-    private static Process LaunchEdge(string edge, string url)
+    private static bool TryLaunchEdge(string edge, string url,
+                                      out Process browser, out string reason)
     {
+        browser = null;
+        reason = null;
         try
         {
-            string profile = Path.Combine(AppData, "edge_profile");
-            Directory.CreateDirectory(profile);
+            Directory.CreateDirectory(EdgeProfile);
             ProcessStartInfo psi = new ProcessStartInfo(edge);
             psi.Arguments =
                 "--app=" + url +
-                " --user-data-dir=\"" + profile + "\"" +
+                " --user-data-dir=\"" + EdgeProfile + "\"" +
                 " --no-first-run --no-default-browser-check" +
                 " --force-device-scale-factor=1" +
                 " --window-size=1500,940" +
                 " --disable-features=Translate,msEdgeSidebarV2,msEdgeShoppingAssistant";
             psi.UseShellExecute = false;
-            return Process.Start(psi);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>默认浏览器（任何浏览器都能开这个界面 —— 它本来就是纯 HTML）。</summary>
-    private static void OpenDefault(string url)
-    {
-        try
-        {
-            ProcessStartInfo psi = new ProcessStartInfo(url);
-            psi.UseShellExecute = true;
-            Process.Start(psi);
+            browser = Process.Start(psi);
+            if (browser == null)
+            {
+                reason = "进程未能创建。";
+                return false;
+            }
+            return true;
         }
         catch (Exception ex)
         {
-            Fail("打不开浏览器：\r\n" + ex.Message + "\r\n\r\n"
-               + "可以手动在浏览器里打开：\r\n" + url);
+            reason = ex.Message;
+            return false;
         }
     }
 
@@ -271,7 +281,7 @@ internal static class Launcher
         }
     }
 
-    private static void WriteAll(string path, string text)
+    private static bool WriteAll(string path, string text)
     {
         try
         {
@@ -279,8 +289,12 @@ internal static class Launcher
             // ⚠️ **不要 BOM**（`Encoding.UTF8` 在 .NET Framework 上会写 BOM
             //    ⇒ 读回来是「﻿http://…」⇒ Uri 解析失败）
             File.WriteAllText(path, text, new UTF8Encoding(false));
+            return true;
         }
-        catch { }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void TryDelete(string path)
