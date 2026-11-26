@@ -874,6 +874,8 @@ tr.oldrow{opacity:.6}
   font-weight:400;padding:4px 9px;border-bottom:1px solid var(--border);text-align:left}
 .fptab .fdelay b{font-family:var(--mono);font-weight:700;font-size:13px}
 .fptab .rm{color:var(--danger);cursor:pointer;font-size:12.5px}
+/* 兵库的数量框（B1：改成可键入）—— 尺寸跟原来的 spin 控件对齐 */
+table.fptab .numin{width:72px;font-size:22px;padding:5px 9px}
 .hqpick{margin-top:10px}
 
 
@@ -1611,6 +1613,9 @@ function bindSpin(el, opts){
 function bindNumIn(el, opts){
   const base = opts.base;      /* 存档原值 */
   let init = true;             /* 初始化时**不触发回调** */
+  /* ⚠️ **挂起值要看得见**：存档原值 ≠ 玩家已经改过的值
+     ⇒ 初始化时先把挂起的值写进输入框（滚轮控件一直这么做，`bindSpin` 有 `cur`）。 */
+  if(opts.cur!==undefined && opts.cur!==null) el.value = opts.cur;
   /* ⚠️ **重入保护**（U162）：`opts.onChange` 往往会**重绘整页**
      （`w.innerHTML = …`）⇒ 正在编辑的那个输入框被**移除**
      ⇒ 浏览器补发一次 `change` ⇒ 又进来一次 `apply()`
@@ -1650,6 +1655,19 @@ function bindNumIn(el, opts){
   el.addEventListener("input", apply);
   el.addEventListener("change", apply);
   el.addEventListener("keydown", ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); apply(); el.blur(); } });
+  /* 滚轮 ±1 —— **默认不挂**（XP / 移动力 / 价格等既有输入框行为零变化）；
+     只有「数量」这类控件显式要 `wheel:true` 才挂。 */
+  if(opts.wheel){
+    el.title = opts.title || L("滚轮 ±1（也能直接键入）");
+    wheelBind(el, function(d){
+      const cur = parseInt(String(el.value??"").replace(/\D/g,""), 10);
+      let v = (isFinite(cur)?cur:(base||0)) + d;
+      if(opts.min!==undefined && opts.min!==null && v<opts.min) v=opts.min;
+      if(opts.max!==undefined && opts.max!==null && v>opts.max) v=opts.max;
+      el.value = v;
+      apply();
+    });
+  }
   apply();
 }
 
@@ -2758,10 +2776,11 @@ function hqPoolHTML(h){
         <td class="dim">{5} / {6} /
           {7}</td>
         <td class="tags">{8}</td>
-        <td><span class="spin" id="fp_q_{9}_{10}"></span></td>
+        <td><input class="numin" id="fp_q_{9}_{10}" type="text"
+          inputmode="numeric" autocomplete="off" value="{13}"></td>
         <td><span class="rm" onclick="hqPoolRemove({11},{12})">移除</span></td>
       </tr>`, tip, isSpec?imgTag(specTex(e.spec), nm, "spico")
-          :imgTag("steps/step.png", nm), esc(nm), isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:"", esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", tags, h.id, o, h.id, o);
+          :imgTag("steps/step.png", nm), esc(nm), isSpec?`<span class="ro">${esc(st.cn||"")}</span>`:"", esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", tags, h.id, o, h.id, o, q);
     });
   });
   return L2(`<div class="fpool">
@@ -2880,18 +2899,22 @@ function bindHqControls(h){
      经验目标由游戏按战役规模动态重算（`campaign._set_hqs_xp_target`），
      手改会被覆盖；升级请直接用下面的**分支等级 / 技能专精**。 */
 
-  /* 兵库数量（每条一个滚轮 ±1 控件） */
+  /* 兵库数量（每条一个**可键入**的框，滚轮 ±1 也留着 —— B1） */
   const pool = projectedPool(h);
   pool.forEach((e)=>{
     const o = e._o;                 /* ⚠️ 存档原始下标，不是界面行号（U91） */
     const el = document.getElementById("fp_q_"+h.id+"_"+o);
     if(!el) return;
-    bindSpin(el, {base:e.quantity||0, cur:pendingVal("hq_force_pool", hqPoolKey(h.id,o), e.quantity||0), min:0, max:null,
+    bindNumIn(el, {base:e.quantity||0, cur:pendingVal("hq_force_pool", hqPoolKey(h.id,o), e.quantity||0),
+      min:0, max:null, wheel:true, kind:"hq_force_pool", key:hqPoolKey(h.id,o),
+      params:{hq_id:h.id, index:o, quantity:e.quantity||0},
       onChange(v){
         queueEdit("hq_force_pool", hqPoolKey(h.id,o),
           {hq_id:h.id, index:o, quantity:v}, e.quantity||0, v,
           L2("总部 {0} 兵库 {1} 数量", h.id, e.spec?specCn(e.spec):hqEquipCn(e.equipment)));
-        SEL.hqs = h.id; refreshHqLocal(h.id, true);
+        SEL.hqs = h.id;
+        /* ⚠️ **不要**重绘详情区（`refreshHqLocal` 会把正在输入的框删掉
+           ⇒ 焦点丢失、第二个字打不进去）。待应用清单由 `queueEdit` 自己刷新。 */
       }});
   });
 }
@@ -3370,9 +3393,10 @@ function pageStore(w){
       <td class="tags">{8}</td>
       <td class="num"><input class="numin" id="st_p_{9}_{10}_{11}" type="text"
         inputmode="numeric" autocomplete="off" value="{12}"></td>
-      <td class="num"><span class="spin" id="st_q_{13}_{14}_{15}"></span></td>
+      <td class="num"><input class="numin" id="st_q_{13}_{14}_{15}" type="text"
+        inputmode="numeric" autocomplete="off" value="{19}"></td>
       <td><span class="rm" onclick="storeRemove('{16}','{17}',{18})">下架</span></td>
-    </tr>`, imgTag(tex, storeEntryCn(e), texCls), esc(nm), subLine, esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", isSpec?esc(st.artillery??"—"):"—", tags, esc(e.front), esc(e.sub), index, price, esc(e.front), esc(e.sub), index, jsq(e.front), jsq(e.sub), index);
+    </tr>`, imgTag(tex, storeEntryCn(e), texCls), esc(nm), subLine, esc(natCn(e.nationality)), isSpec?esc(st.attack??"—"):"—", isSpec?esc(st.defense??"—"):"—", isSpec?esc(st.armor??"—"):"—", isSpec?esc(st.artillery??"—"):"—", tags, esc(e.front), esc(e.sub), index, price, esc(e.front), esc(e.sub), index, jsq(e.front), jsq(e.sub), index, qty);
   }).join("");
 
   w.innerHTML = L2(`<div class="panel"><h3>商店</h3><div class="pbody">
@@ -3422,13 +3446,18 @@ function pageStore(w){
           {front:e.front, sub:e.sub, index, field:"price", value:v}, e.price||0, v,
           L2("商店 {0}/{1} 第 {2} 条价格", e.front, e.sub, index+1)); }});
     const qEl = document.getElementById("st_q_"+e.front+"_"+e.sub+"_"+index);
-    if(qEl) bindSpin(qEl, {base:e.quantity||0, cur:pendingVal("store_set", storeKey(e.front,e.sub,index,"quantity"), e.quantity||0),
-      min:1, max:null, onChange(v){
-        if(isNew){ setNewEntry("quantity", v); show("store"); return; }
+    /* 库存 = **可直接键入**（社区反馈：「改数量只能用滚轮而不能输入」）
+       ⇒ 与价格同一套控件（`bindNumIn`），滚轮也留着。 */
+    if(qEl) bindNumIn(qEl, {base:e.quantity||0, cur:pendingVal("store_set", storeKey(e.front,e.sub,index,"quantity"), e.quantity||0),
+      min:1, max:null, wheel:true, kind:"store_set", key:storeKey(e.front,e.sub,index,"quantity"),
+      params:{front:e.front, sub:e.sub, index, field:"quantity", value:qEl.value},
+      onChange(v){
+        /* ⚠️ **不要**整页重绘：重绘会把正在输入的框删掉 ⇒ 焦点丢失、
+           第二个字打不进去（价格那一侧早就是照这个做的）。 */
+        if(isNew){ setNewEntry("quantity", v); return; }
         queueEdit("store_set", storeKey(e.front,e.sub,index,"quantity"),
           {front:e.front, sub:e.sub, index, field:"quantity", value:v}, e.quantity||0, v,
           L2("商店 {0}/{1} 第 {2} 条库存", e.front, e.sub, index+1));
-        show("store");
       }});
   });
 }
