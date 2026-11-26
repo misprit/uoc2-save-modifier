@@ -4263,10 +4263,10 @@ function hqPoolItems(h){
 }
 function openHqPoolModal(hqId){
   const h = (VIEW.hqs||[]).find(x=>x.id===hqId); if(!h) return;
-  const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[]};
   MODAL = {kind:"hqpool", hqId:hqId, mode:"spec", sel:null, quantity:1, delay:0,
     all:false, poolOpen:{},   /* U145：国籍组的折叠状态 */
-    equipType:(uni.equipment||["infantry"])[0], equipNat:(uni.nationality||["german"])[0]};
+    equipType:Object.keys((VIEW&&VIEW.equipment_cn)||{}).sort()[0]||"infantry",
+    equipNat:Object.keys((CATALOG&&CATALOG.nationalities)||{}).sort()[0]||"german"};
   renderHqPoolModal();
 }
 function renderHqPoolModal(){
@@ -4280,10 +4280,13 @@ function renderHqPoolModal(){
   const usableCount = ok ? ok.length : allTotal;
   const facText = playerFaction() || L("未知");
   const sel = items.find(i=>i.id===M.sel);
-  /* 兵种模式：兵种只有 2 种，国籍从「游戏在该会议会卖的」里取 */
-  const uni = (PICK && PICK.store_universe) || {equipment:[], nationality:[]};
-  const equipTypes = uni.equipment || ["infantry", "armor"];
-  const equipNats = uni.nationality || [];
+  /* 兵种模式：兵种与国籍都取「**游戏定义过的全部**」——
+     ⚠️ 不能用「本次会议商店在售的」（store_universe）——
+     那是**商店**的校验口径（U107 的教训：过严 ⇒ 玩家部分选项用不了）；
+     兵库条目的 nationality 游戏允许**全部 40 个国籍**
+     （force_pool.pyc 的 nationality_types.id_validation_schema）。 */
+  const equipTypes = Object.keys((VIEW && VIEW.equipment_cn) || {}).sort();
+  const equipNats = Object.keys((CATALOG && CATALOG.nationalities) || {}).sort();
   openModal(L2(`<div class="mh">给「{0}」加一条
       <span class="ro">存进 hqs.yml</span></div>
     <div class="mb">
@@ -4320,16 +4323,16 @@ function renderHqPoolModal(){
         <div class="spfoot" id="spick_foot">{3}{4}</div>
       </div>`, esc(M.q||""), usableCount, cells, spickCardHTML(sel), natRowHTML(sel),
       (M.all?"checked":""), allTotal, facText) : L2(`<div class="mrow"><span class="lb">兵种</span>
-        <select class="sel" onchange="hqPoolEquip('{0}','this.value')">
+        <select class="sel" onchange="hqPoolEquip(this.value,'{0}')">
           {1}
         </select></div>
         <div class="mrow"><span class="lb">国籍</span>
-        <select class="sel" onchange="hqPoolEquip('{2}','this.value')">
+        <select class="sel" onchange="hqPoolEquip('{2}',this.value)">
           {3}
         </select>
-        <span class="hint">兵种的国籍要**手选**（特种兵是自动跟着类型走的）</span></div>`, jsq(M.equipType||"infantry"), (equipTypes||[]).map(eq=>`<option value="${esc(eq)}" ${
+        <span class="hint">兵种的国籍要**手选**（特种兵是自动跟着类型走的）</span></div>`, jsq(M.equipNat||equipNats[0]||""), (equipTypes||[]).map(eq=>`<option value="${esc(eq)}" ${
             eq===(M.equipType||"infantry")?'selected':''}>${esc(hqEquipCn(eq))}</option>`).join(""), jsq(M.equipType||"infantry"), (equipNats||[]).map(nt=>`<option value="${esc(nt)}" ${
-            nt===(M.equipNat||"german")?'selected':''}>${esc(natCn(nt))}</option>`).join(""))),
+            nt===(M.equipNat||equipNats[0])?'selected':''}>${esc(natCn(nt))}</option>`).join(""))),
     {onOpen:function(){
       bindModalSpin("mp_q", ()=>MODAL.quantity, v=>MODAL.quantity=v, 0, 99);
       bindModalSpin("mp_d", ()=>MODAL.delay, v=>MODAL.delay=v, 0, 99);
