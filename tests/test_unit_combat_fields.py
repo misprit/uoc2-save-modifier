@@ -171,7 +171,8 @@ class TestCombatFieldsUi(unittest.TestCase):
         tpl = self.html[i:j]
         self.assertIn("{18}", tpl, "dhead 模板里要有三张卡的占位")
         # 占位在经验卡之后、.stats 结束之前
-        self.assertLess(tpl.index("范围 0 – 400"), tpl.index("{18}"))
+        # ⚠️ 经验卡的文案是「范围 0 – 399（游戏上限）」（B-4：游戏逻辑上限是 399）
+        self.assertLess(tpl.index("范围 0 – 399"), tpl.index("{18}"))
 
     def test_entrenchment_has_three_buttons(self):
         for lv in ("0", "1", "2"):
