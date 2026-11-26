@@ -2709,8 +2709,6 @@ function hqMatrixHTML(h){
 
 function hqPoolHTML(h){
   const pool = projectedPool(h);
-  if(!pool.length) return L(`<div class="fpool"><div class="fptitle">兵库</div>
-    <div style="padding:10px 11px;color:var(--muted);font-size:12px">兵库是空的</div></div>`);
   /* 按延迟分组（游戏是分批上线的） */
   const groups = {};
   pool.forEach((e)=>{
