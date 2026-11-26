@@ -18,7 +18,9 @@ class ModifierDataPathsTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(prefix="r2_paths_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.old_appdata = os.environ.get("UOC2_APPDATA")
+        self.old_modifier_home = os.environ.get("UOC2_MODIFIER_HOME")
         os.environ["UOC2_APPDATA"] = str(self.tmp / "appdata")
+        os.environ["UOC2_MODIFIER_HOME"] = str(self.tmp / "modifier")
         self.addCleanup(self._restore_appdata)
 
     def _restore_appdata(self):
@@ -26,19 +28,25 @@ class ModifierDataPathsTest(unittest.TestCase):
             os.environ.pop("UOC2_APPDATA", None)
         else:
             os.environ["UOC2_APPDATA"] = self.old_appdata
+        if self.old_modifier_home is None:
+            os.environ.pop("UOC2_MODIFIER_HOME", None)
+        else:
+            os.environ["UOC2_MODIFIER_HOME"] = self.old_modifier_home
 
     def test_new_paths_are_under_modifier_and_are_pure(self):
         appdata = self.tmp / "appdata"
-        self.assertEqual(appdata / "modifier", paths.modifier_data_dir())
-        self.assertEqual(appdata / "modifier" / "modifier_imports", paths.modifier_imports_dir())
-        self.assertEqual(appdata / "modifier" / "modifier.log", paths.modifier_log_path())
-        self.assertEqual(appdata / "modifier" / "edge_profile", paths.modifier_profile_dir())
-        self.assertEqual(appdata / "modifier" / "bak", paths.modifier_fallback_backup_dir())
+        modifier = self.tmp / "modifier"
+        self.assertEqual(modifier / "data", paths.modifier_data_dir())
+        self.assertEqual(modifier / "data" / "imports", paths.modifier_imports_dir())
+        self.assertEqual(modifier / "data" / "logs" / "modifier.log", paths.modifier_log_path())
+        self.assertEqual(modifier / "data" / "cache" / "edge", paths.modifier_profile_dir())
+        self.assertEqual(modifier / "data" / "bak", paths.modifier_fallback_backup_dir())
         self.assertFalse(appdata.exists(), "路径 helper 不应创建真实目录")
+        self.assertFalse(modifier.exists(), "路径 helper 不应创建真实目录")
 
     def test_appdata_override_is_preserved(self):
         self.assertEqual(self.tmp / "appdata", paths.appdata_dir())
-        self.assertEqual(self.tmp / "appdata" / "modifier" / "modifier_config.json",
+        self.assertEqual(self.tmp / "modifier" / "data" / "config" / "modifier_config.json",
                          paths.config_path())
 
     def test_old_config_is_read_then_new_write_preserves_all_settings(self):
@@ -96,8 +104,12 @@ class ModifierDataPathsTest(unittest.TestCase):
     def test_legacy_read_helpers_are_separate_and_non_mutating(self):
         appdata = self.tmp / "appdata"
         self.assertEqual(appdata / "modifier_imports", paths.legacy_imports_dir())
+        self.assertEqual(appdata / "modifier" / "modifier_imports", paths.legacy_modifier_imports_dir())
         self.assertEqual(appdata / "modifier.log", paths.legacy_log_path())
+        self.assertEqual(appdata / "modifier" / "modifier.log", paths.legacy_modifier_log_path())
         self.assertEqual(appdata / "edge_profile", paths.legacy_profile_dir())
+        self.assertEqual(appdata / "modifier" / "edge_profile", paths.legacy_modifier_profile_dir())
+        self.assertEqual((paths.modifier_imports_dir(), paths.legacy_modifier_imports_dir(), paths.legacy_imports_dir()), paths.import_roots())
         self.assertFalse(appdata.exists())
 
 

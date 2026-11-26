@@ -3,18 +3,14 @@
 
 **漏洞**
 
-U109 把备份挪到了 `<修改器目录>/bak/`（游戏看不见），但**兜底**还是
-「退回存档旁边」⇒ 那个目录建不出来时（修改器装在 Program Files 下），
-备份又会落回**游戏会扫的目录** ⇒ 游戏把备份当存档列出来。
-
-⇒ 兜底改成 `<游戏数据目录>/bak/`（游戏不扫那儿）；
-两处都不行就**报错**（写盘因此停下 ⇒ 绝不出现「没备份就写存档」）。
+U109 把备份挪到了 `<修改器目录>/bak/`（游戏看不见）。
+备份目录建不出来或复制失败时必须**报错**（写盘因此停下 ⇒ 绝不出现「没备份就写存档」）。
 
 **这些测试守着**
 
-① `fallback_backup_dir()` = `<游戏数据目录>/bak`；
-② `make_backup` **不再**用「存档旁边」那个老位置；
-③ 兜底时存档目录里**一个备份都不留**（在 test_backup_location.py 里）。
+① `fallback_backup_dir()` 保留为旧只读路径 helper；
+② `make_backup` **不再**用外部或存档旁边的位置回退；
+③ 备份失败时存档目录里**一个备份都不留**（在 test_backup_location.py 里）。
 """
 
 import io
@@ -57,8 +53,8 @@ class MakeBackupSourceTest(unittest.TestCase):
         body = self.src[i:j]
         self.assertNotIn("legacy_backup_path_for", body,
                          "make_backup 又退回存档旁边了（游戏会把它当存档）")
-        self.assertIn("fallback_backup_dir", body,
-                      "兜底应该走 <游戏数据目录>/bak/")
+        self.assertNotIn("fallback_backup_dir", body,
+                         "备份失败不得回退到外部目录")
 
 
 if __name__ == "__main__":

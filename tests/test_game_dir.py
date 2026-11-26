@@ -38,6 +38,10 @@ class _TempAppdata(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="gamedir_"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        from unittest.mock import patch
+        env = patch.dict(os.environ, UOC2_MODIFIER_HOME=str(self.tmp / "program"))
+        env.start()
+        self.addCleanup(env.stop)
         old = os.environ.get("UOC2_APPDATA")
         os.environ["UOC2_APPDATA"] = str(self.tmp / "appdata")
 
@@ -58,11 +62,11 @@ class _TempAppdata(unittest.TestCase):
 class TestGameDirConfig(_TempAppdata):
     """核心库：设置文件 + 探测顺序。"""
 
-    def test_config_file_lives_in_the_appdata_dir(self):
-        """设置文件放在**游戏数据目录**下（不进存档目录）。"""
+    def test_config_file_lives_in_the_program_directory(self):
+        """设置文件随程序保存，不进游戏数据目录。"""
         p = core_paths.config_path()
         self.assertEqual(p.name, "modifier_config.json")
-        self.assertEqual(p.parent, self.tmp / "appdata")
+        self.assertEqual(p.parent, self.tmp / "program" / "data" / "config")
         self.assertNotIn("save", p.parts)
 
     def test_config_roundtrip(self):

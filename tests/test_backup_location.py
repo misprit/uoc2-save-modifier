@@ -18,8 +18,7 @@
 ① 备份落在 `bak/` 里，**存档目录一个备份都不留**（游戏看不到）；
 ② 序号照旧递增（`_BACKUP` / `_BACKUP_2` …，**绝不覆盖**）；
 ③ `bak/` 就在**修改器所在目录**下（玩家在 exe 旁边就找得到）；
-④ `bak/` 建不出来 / 不可写 ⇒ **退回存档旁边**，写盘照常成功
-   （绝不因为「没地方放备份」就拒绝写入）；
+④ `bak/` 建不出来 / 不可写 ⇒ **拒绝写盘**，且不回退到外部或存档旁边；
 ⑤ 撤销栈**不受影响**（它记的是内容本身，与备份文件无关）。
 """
 
@@ -112,49 +111,33 @@ class TestBackupLocation(BackupLocationTestBase):
         self.assertEqual(self.bak, want.parent)
         self.assertEqual("s_BACKUP.usg", want.name)
 
-    def test_falls_back_to_the_appdata_bak_when_bak_is_unusable(self):
-        """⚠️ `bak/` 建不出来（装在 Program Files 下）⇒ **退到
-        `<游戏数据目录>/bak/`**（U132）。
-
-        ⚠️ **不再退回存档旁边** —— 游戏只扫存档目录里的 `*.usg`
-        ⇒ 备份放那儿会被**游戏当成存档**（U109 的问题又回来了；
-        外部审阅报告 P2-13）。
-        """
+    def test_backup_failure_rejects_write_without_external_fallback(self):
+        """bak 不可用时拒绝写回，且不在外部或存档旁边生成备份。"""
         blocker = self.tmp / "not_a_dir"
         blocker.write_text("x", encoding="utf-8")
         os.environ["UOC2_BAK_DIR"] = str(blocker)
-        appdata = self.tmp / "appdata"
-        old_app = os.environ.get("UOC2_APPDATA")
-        os.environ["UOC2_APPDATA"] = str(appdata)
-        try:
-            res = self.commit([Edit.progress("prestige", 5)])
-        finally:
-            if old_app is None:
-                os.environ.pop("UOC2_APPDATA", None)
-            else:
-                os.environ["UOC2_APPDATA"] = old_app
-        self.assertIsNotNone(res.backup)
-        self.assertEqual(appdata / "bak", res.backup.parent,
-                         "bak/ 不可用时应退到 <游戏数据目录>/bak/")
-        self.assertTrue(res.backup.is_file())
+        before = self.save_path.read_bytes()
+        with open_save(str(self.save_path), self.paths) as save:
+            plan = save.plan_edit([Edit.progress("prestige", 5)], catalog=self.catalog)
+            self.assertTrue(plan.ok, plan.errors)
+            res = save.commit(plan)
+        self.assertFalse(res.ok)
+        self.assertTrue(any("备份失败" in error for error in res.errors), res.errors)
+        self.assertEqual(before, self.save_path.read_bytes())
+        self.assertEqual([], self.usgs_in_save_dir())
 
-    def test_the_save_folder_never_gets_a_backup(self):
-        """⭐ 存档目录里**一个备份都不许留**（游戏会把它当存档）。"""
+    def test_backup_failure_does_not_leave_save_sidecar(self):
         blocker = self.tmp / "not_a_dir"
         blocker.write_text("x", encoding="utf-8")
         os.environ["UOC2_BAK_DIR"] = str(blocker)
-        appdata = self.tmp / "appdata"
-        old_app = os.environ.get("UOC2_APPDATA")
-        os.environ["UOC2_APPDATA"] = str(appdata)
-        try:
-            self.commit([Edit.progress("prestige", 5)])
-        finally:
-            if old_app is None:
-                os.environ.pop("UOC2_APPDATA", None)
-            else:
-                os.environ["UOC2_APPDATA"] = old_app
-        self.assertEqual([], self.usgs_in_save_dir(),
-                         "兜底也不许把备份放进存档目录（游戏会把它当存档）")
+        before = self.save_path.read_bytes()
+        with open_save(str(self.save_path), self.paths) as save:
+            plan = save.plan_edit([Edit.progress("prestige", 5)], catalog=self.catalog)
+            self.assertTrue(plan.ok, plan.errors)
+            result = save.commit(plan)
+        self.assertFalse(result.ok)
+        self.assertEqual(before, self.save_path.read_bytes())
+        self.assertEqual([], self.usgs_in_save_dir())
 
 
 class TestUndoStillWorks(BackupLocationTestBase):
@@ -174,7 +157,8 @@ class TestUndoStillWorks(BackupLocationTestBase):
         """撤销栈（`<存档名>.undo.json`）**留在存档旁边** ——
         一个存档一个文件，游戏只扫 `*.usg` ⇒ 不会被当成存档。"""
         self.commit([Edit.progress("prestige", 999)])
-        stack = self.tmp / "s.undo.json"
+        from save_modifier_core.undo import stack_path_for
+        stack = stack_path_for(self.save_path)
         self.assertTrue(stack.is_file())
 
 

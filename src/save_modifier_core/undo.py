@@ -27,6 +27,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import uuid
@@ -35,6 +36,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from .paths import modifier_data_dir
 from .writer import WriteOutcome, read_entries, sha256_bytes, write_overlay
 
 __all__ = [
@@ -185,10 +187,27 @@ class UndoResult:
 # ---------------------------------------------------------------- 栈文件
 
 
-def stack_path_for(save_path: Path) -> Path:
-    """撤销栈文件的位置：存档旁边的 `<存档名>.undo.json`。"""
+def _normalized_save_identity(save_path: Path) -> str:
+    """返回用于撤销栈命名的规范化绝对存档路径。"""
+    p = Path(save_path).expanduser()
+    try:
+        p = p.resolve(strict=False)
+    except OSError:
+        p = Path(os.path.abspath(os.path.normpath(str(p))))
+    return os.path.normcase(os.path.normpath(str(p)))
+
+
+def _legacy_stack_path_for(save_path: Path) -> Path:
+    """旧布局：存档旁边的 `<存档名>.undo.json`；仅用于读取兼容。"""
     p = Path(save_path)
     return p.with_name(f"{p.stem}.undo.json")
+
+
+def stack_path_for(save_path: Path) -> Path:
+    """新撤销栈路径：`<appdata>/modifier/undo/` 下按存档路径身份命名。"""
+    identity = _normalized_save_identity(save_path).encode("utf-8")
+    digest = hashlib.sha256(identity).hexdigest()
+    return modifier_data_dir() / "undo" / f"{digest}.undo.json"
 
 
 def load_stack(save_path: Path) -> tuple[list[UndoRecord], list[str]]:
@@ -198,6 +217,9 @@ def load_stack(save_path: Path) -> tuple[list[UndoRecord], list[str]]:
     文件不存在 ⇒ 空列表、空错误；文件坏了 ⇒ 空列表 + 一条错误（**不静默吞掉**）。
     """
     p = stack_path_for(save_path)
+    # 新栈文件存在（包括撤空后的空栈）时，绝不回读旧栈，避免旧记录复活。
+    if not p.is_file():
+        p = _legacy_stack_path_for(save_path)
     if not p.is_file():
         return [], []
     try:
@@ -237,11 +259,16 @@ def _prune(records: list[UndoRecord]) -> list[UndoRecord]:
 
 
 def _write_stack(save_path: Path, records: list[UndoRecord]) -> list[str]:
-    """把栈原子写盘（先写 `.tmp` 再 `os.replace`）。返回警告。"""
+    """把栈原子写盘（先写 `.tmp` 再 `os.replace`）。返回警告。
+
+    新栈目录创建失败、临时写入失败或原子替换失败都会返回警告；
+    旧旁置栈不会被改动。
+    """
     p = stack_path_for(save_path)
     data = _dump_stack(records)
     tmp = p.with_name(p.name + ".tmp")
     try:
+        p.parent.mkdir(parents=True, exist_ok=True)
         tmp.write_bytes(data)
         os.replace(tmp, p)
     except OSError as exc:

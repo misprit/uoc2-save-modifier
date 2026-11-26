@@ -2,7 +2,7 @@
 
 **验收底线**（规范 §6.4.2、§10 第 58 条、§12 验收清单）：
 
-* 撤销栈**落盘**在存档旁边（`<存档名>.undo.json`）—— 关掉程序仍能撤；
+* 撤销栈**落盘**在修改器专属目录——关掉程序仍能撤，且不污染存档目录；
 * 撤销粒度是**一次 commit** —— 一次改了 3 个单位就一起撤销；
 * 撤销走的是**和 commit 完全相同的写回流程**（备份 → 校验 → 原子替换）；
 * **基准过期时拒绝撤销**并明确提示，不硬改；
@@ -20,8 +20,8 @@ from pathlib import Path
 
 from save_modifier_core import Catalog, CorePaths, Edit, open_save
 from save_modifier_core.packing import list_entries, repack_overlay
-from save_modifier_core.undo import (MAX_RECORDS, load_stack, peek,
-                                     stack_path_for)
+from save_modifier_core.undo import (MAX_RECORDS, load_stack, make_record, peek,
+                                     push, stack_path_for)
 
 from ._fixtures import make_save
 
@@ -37,7 +37,11 @@ class UndoTestBase(unittest.TestCase):
         # U109：备份改放 `<修改器目录>/bak/` ⇒ 这里用**本测试自己的**目录
         # （断言的是确切文件名，如 `s_BACKUP_2.usg`）。
         self._bak_old = os.environ.get("UOC2_BAK_DIR")
+        self._app_old = os.environ.get("UOC2_APPDATA")
+        self._modifier_old = os.environ.get("UOC2_MODIFIER_HOME")
         os.environ["UOC2_BAK_DIR"] = str(self.tmp)
+        os.environ["UOC2_APPDATA"] = str(self.tmp / "appdata")
+        os.environ["UOC2_MODIFIER_HOME"] = str(self.tmp / "modifier")
         self.addCleanup(self._restore_bak)
         self.save_path = make_save(self.tmp / "s.usg")
         self.paths = CorePaths.discover()
@@ -48,6 +52,14 @@ class UndoTestBase(unittest.TestCase):
             os.environ.pop("UOC2_BAK_DIR", None)
         else:
             os.environ["UOC2_BAK_DIR"] = self._bak_old
+        if self._app_old is None:
+            os.environ.pop("UOC2_APPDATA", None)
+        else:
+            os.environ["UOC2_APPDATA"] = self._app_old
+        if self._modifier_old is None:
+            os.environ.pop("UOC2_MODIFIER_HOME", None)
+        else:
+            os.environ["UOC2_MODIFIER_HOME"] = self._modifier_old
 
     def open(self):
         return open_save(str(self.save_path), self.paths)
@@ -66,13 +78,13 @@ class UndoTestBase(unittest.TestCase):
 
 
 class TestStackIsPersisted(UndoTestBase):
-    def test_commit_creates_undo_file_next_to_save(self):
+    def test_commit_creates_undo_file_in_modifier_data_dir(self):
         self.commit([Edit.progress("prestige", 999)])
         stack = stack_path_for(self.save_path)
-        self.assertTrue(stack.is_file(), "撤销栈必须落盘在存档旁边")
-        self.assertEqual(stack.name, "s.undo.json")
-        # 游戏只扫 *.usg —— .undo.json 不会被当成存档
-        self.assertFalse(stack.suffix == ".usg")
+        self.assertTrue(stack.is_file(), "撤销栈必须落盘")
+        self.assertEqual(stack.parent, self.tmp / "modifier" / "data" / "undo")
+        self.assertNotEqual(stack.parent, self.save_path.parent)
+        self.assertFalse((self.save_path.parent / "s.undo.json").exists())
 
     def test_stack_file_is_valid_json_with_one_record(self):
         self.commit([Edit.progress("prestige", 999)])
@@ -93,10 +105,55 @@ class TestStackIsPersisted(UndoTestBase):
 
     def test_broken_stack_file_is_reported_not_swallowed(self):
         stack = stack_path_for(self.save_path)
+        stack.parent.mkdir(parents=True, exist_ok=True)
         stack.write_text("{ 这不是 JSON", encoding="utf-8")
         records, errs = load_stack(self.save_path)
         self.assertEqual(records, [])
         self.assertTrue(errs, "坏掉的撤销栈必须报错，不能静默吞掉")
+
+
+class TestUndoStackStorageBoundaries(UndoTestBase):
+    def test_same_name_saves_have_distinct_stack_paths(self):
+        other = make_save(self.tmp / "other" / "s.usg")
+        self.assertNotEqual(stack_path_for(self.save_path), stack_path_for(other))
+
+    def test_legacy_adjacent_stack_is_read_without_moving_it(self):
+        record = make_record({"main.yml": (b"before", "after")}, "legacy")
+        legacy = self.save_path.with_name("s.undo.json")
+        legacy.write_bytes(__import__("save_modifier_core.undo", fromlist=["_dump_stack"])._dump_stack([record]))
+        records, errors = load_stack(self.save_path)
+        self.assertFalse(errors)
+        self.assertEqual(records[0].summary, "legacy")
+        self.assertTrue(legacy.is_file())
+
+    def test_empty_new_stack_does_not_revive_legacy_records(self):
+        record = make_record({"main.yml": (b"before", "after")}, "legacy")
+        legacy = self.save_path.with_name("s.undo.json")
+        legacy.write_bytes(__import__("save_modifier_core.undo", fromlist=["_dump_stack"])._dump_stack([record]))
+        stack = stack_path_for(self.save_path)
+        stack.parent.mkdir(parents=True, exist_ok=True)
+        stack.write_bytes(__import__("save_modifier_core.undo", fromlist=["_dump_stack"])._dump_stack([]))
+        records, errors = load_stack(self.save_path)
+        self.assertFalse(errors)
+        self.assertEqual(records, [])
+        self.assertTrue(legacy.is_file())
+
+    def test_atomic_stack_write_failure_leaves_no_temp_file(self):
+        import save_modifier_core.undo as undo_module
+        record = make_record({"main.yml": (b"before", "after")}, "write")
+        stack = stack_path_for(self.save_path)
+        original_replace = undo_module.os.replace
+        def fail_replace(_src, _dst):
+            raise OSError("synthetic replace failure")
+        undo_module.os.replace = fail_replace
+        try:
+            warnings = push(self.save_path, record)
+        finally:
+            undo_module.os.replace = original_replace
+        self.assertTrue(warnings)
+        self.assertFalse(stack.exists())
+        self.assertFalse(any(stack.parent.glob(stack.name + ".tmp")))
+
 
 
 class TestUndoRestores(UndoTestBase):

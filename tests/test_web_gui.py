@@ -2535,7 +2535,8 @@ class TestU68ImportWhenNoSave(_SaveCopyBase):
         p = r["path"]
         self.assertTrue(os.path.isfile(p))
         self.assertEqual(io.open(p, "rb").read(), raw)
-        self.assertIn("modifier_imports", p)
+        from save_modifier_core.paths import modifier_imports_dir
+        self.assertEqual(os.path.dirname(p), str(modifier_imports_dir()))
 
     def test_import_never_overwrites(self):
         import base64

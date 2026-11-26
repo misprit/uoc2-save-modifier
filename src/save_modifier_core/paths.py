@@ -22,9 +22,11 @@ __all__ = [
            "write_config", "detect_game_dir", "game_dir_candidates",
            "looks_like_game_dir", "set_game_dir", "steam_libraries",
            "modifier_home", "backup_dir", "modifier_data_dir",
-           "legacy_config_path", "modifier_imports_dir", "legacy_imports_dir",
-           "modifier_log_path", "legacy_log_path", "modifier_profile_dir",
-           "legacy_profile_dir", "modifier_fallback_backup_dir"]
+           "legacy_config_path", "legacy_config_paths", "modifier_imports_dir",
+           "legacy_imports_dir", "legacy_modifier_imports_dir", "import_roots",
+           "modifier_log_path", "legacy_log_path", "legacy_modifier_log_path",
+           "modifier_profile_dir", "legacy_profile_dir", "legacy_modifier_profile_dir",
+           "modifier_fallback_backup_dir"]
 
 APP_DIR_NAME = ".uoc2"
 #: 修改器专属数据目录；新写入不得污染游戏数据根目录。
@@ -53,21 +55,24 @@ def modifier_home() -> Path:
     发布包里 = 解压出来的那个目录（exe 就在那儿）⇒
     备份放 `<家目录>/bak/` ⇒ 玩家在**修改器旁边**就能找到（U109）。
     """
+    env = os.environ.get("UOC2_MODIFIER_HOME")
+    if env:
+        return Path(env).expanduser()
     return Path(__file__).resolve().parents[2]
 
 
 def modifier_data_dir() -> Path:
-    """修改器的新数据根目录：`<游戏数据目录>/modifier/`。
+    """修改器的新数据根目录：`<修改器目录>/data/`。
 
     纯路径 helper，不创建目录；调用方决定何时实际写入。
     """
-    return appdata_dir() / MODIFIER_DIR_NAME
+    return modifier_home() / "data"
 
 
 def modifier_fallback_backup_dir() -> Path:
-    """新布局的备用备份目录：`<appdata>/modifier/bak/`。
+    """新布局的备用备份目录：`<修改器目录>/data/bak/`。
 
-    仅提供未来写回管线接线点；当前 writer 仍使用兼容的旧 helper。
+    仅提供路径接线点；备份失败时 writer 不回退到此目录。
     """
     return modifier_data_dir() / BACKUP_DIR_NAME
 
@@ -243,13 +248,19 @@ _looks_like_game_dir = looks_like_game_dir
 
 
 def config_path() -> Path:
-    """新设置路径：`<游戏数据目录>/modifier/modifier_config.json`。"""
-    return modifier_data_dir() / CONFIG_FILENAME
+    """新设置路径：`<修改器目录>/data/config/modifier_config.json`。"""
+    return modifier_data_dir() / "config" / CONFIG_FILENAME
+
+
+def legacy_config_paths() -> tuple[Path, ...]:
+    """旧两代设置路径；按新旧顺序返回，只读兼容。"""
+    base = appdata_dir()
+    return (base / MODIFIER_DIR_NAME / CONFIG_FILENAME, base / CONFIG_FILENAME)
 
 
 def legacy_config_path() -> Path:
-    """旧设置路径；仅用于读取，不作为新写入目标。"""
-    return appdata_dir() / CONFIG_FILENAME
+    """最旧设置路径；仅用于兼容旧调用方读取。"""
+    return legacy_config_paths()[-1]
 
 
 def _read_config_file(path: Path) -> dict | None:
@@ -265,8 +276,11 @@ def read_config() -> dict:
     data = _read_config_file(config_path())
     if data is not None:
         return data
-    data = _read_config_file(legacy_config_path())
-    return data if data is not None else {}
+    for legacy in legacy_config_paths():
+        data = _read_config_file(legacy)
+        if data is not None:
+            return data
+    return {}
 
 
 def write_config(data: dict) -> Path:
@@ -279,32 +293,53 @@ def write_config(data: dict) -> Path:
 
 
 def modifier_imports_dir() -> Path:
-    """新导入副本目录：`<appdata>/modifier/modifier_imports/`；不创建目录。"""
-    return modifier_data_dir() / LEGACY_IMPORTS_DIR_NAME
+    """新导入副本目录：`<修改器目录>/data/imports/`；不创建目录。"""
+    return modifier_data_dir() / "imports"
+
+
+def legacy_modifier_imports_dir() -> Path:
+    """旧一代导入副本目录；仅供兼容读取。"""
+    return appdata_dir() / MODIFIER_DIR_NAME / LEGACY_IMPORTS_DIR_NAME
 
 
 def legacy_imports_dir() -> Path:
-    """旧导入副本目录；仅供兼容读取。"""
+    """最旧导入副本目录；仅供兼容读取。"""
     return appdata_dir() / LEGACY_IMPORTS_DIR_NAME
 
 
+def import_roots() -> tuple[Path, ...]:
+    """导入副本目录集合；新目录优先，旧目录只读回退。"""
+    roots = (modifier_imports_dir(), legacy_modifier_imports_dir(), legacy_imports_dir())
+    return tuple(dict.fromkeys(roots))
+
+
 def modifier_log_path() -> Path:
-    """新日志路径：`<appdata>/modifier/modifier.log`。"""
-    return modifier_data_dir() / "modifier.log"
+    """新日志路径：`<修改器目录>/data/logs/modifier.log`。"""
+    return modifier_data_dir() / "logs" / "modifier.log"
+
+
+def legacy_modifier_log_path() -> Path:
+    """旧一代日志路径；仅供兼容读取。"""
+    return appdata_dir() / MODIFIER_DIR_NAME / "modifier.log"
 
 
 def legacy_log_path() -> Path:
-    """旧日志路径；仅供兼容读取。"""
+    """最旧日志路径；仅供兼容读取。"""
     return appdata_dir() / "modifier.log"
 
 
 def modifier_profile_dir() -> Path:
-    """新 Edge profile 目录：`<appdata>/modifier/edge_profile/`。"""
-    return modifier_data_dir() / "edge_profile"
+    """新 Edge profile 目录：`<修改器目录>/data/cache/edge/`。"""
+    return modifier_data_dir() / "cache" / "edge"
+
+
+def legacy_modifier_profile_dir() -> Path:
+    """旧一代 Edge profile 目录；仅供兼容读取。"""
+    return appdata_dir() / MODIFIER_DIR_NAME / "edge_profile"
 
 
 def legacy_profile_dir() -> Path:
-    """旧 Edge profile 目录；仅供兼容读取。"""
+    """最旧 Edge profile 目录；仅供兼容读取。"""
     return appdata_dir() / "edge_profile"
 
 

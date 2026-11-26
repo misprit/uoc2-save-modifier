@@ -17,6 +17,13 @@ import os as _os
 import tempfile as _tempfile
 from pathlib import Path as _Path
 
+import atexit as _atexit
+
+if "UOC2_MODIFIER_HOME" not in _os.environ:
+    _runtime = _tempfile.TemporaryDirectory(prefix="uoc2_test_program_")
+    _os.environ["UOC2_MODIFIER_HOME"] = _runtime.name
+    _atexit.register(_runtime.cleanup)
+
 _os.environ.setdefault(
     "UOC2_BAK_DIR",
     str(_Path(_tempfile.gettempdir()) / "uoc2_save_modifier_test_bak"))
