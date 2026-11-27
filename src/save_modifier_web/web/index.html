@@ -1003,7 +1003,7 @@ table.fptab .numin{width:72px;font-size:22px;padding:5px 9px}
   </div>
   <div class="gamedir" id="gameDir"></div>
   <div class="warnbar" style="width:min(1180px,100%);margin-top:12px">
-    ⚠ <b>改存档前请先退出游戏</b> —— 文件被占用时写回会失败。
+    ⚠ <b>改存档前请先退出游戏</b> —— 游戏开着时，它退出时会用内存里的旧状态<b>覆盖</b>你的修改（写盘当时不会报错）。
   </div>
   <div class="note" style="width:min(1180px,100%);margin-top:12px">
     <b>界面层说明</b>：这一版是 <b>U26 技术路线</b>的落地 —— 界面 = HTML/CSS，
@@ -4306,7 +4306,7 @@ function openConfirm(mode, info){
       <div class="elist">{1}</div>
       <div class="fine">写回前会自动备份：<b>{2}</b>
         （同名已存在则递增为 <b>_BACKUP_2</b>）· 改动后仍可一键撤销。</div>`, esc(info.save_name||VIEW.save&&VIEW.save.name||""), files.map(f=>`<div><span class="f">${esc(f.entry)}</span>${
-        f.notes.length?`<span class="d">${esc(f.notes.join("；"))}</span>`:""}</div>`).join(""), esc(info.backup||L("（原文件保留为 _BACKUP）"))) + warnBox;
+        f.notes.length?`<span class="d">${esc(f.notes.join("；"))}</span>`:""}</div>`).join(""), esc(info.backup||L("（原文件保留为 _BACKUP）"))) + warnBox + gameOpenTip;
     foot = L(`<button class="btn" onclick="closeModal()">取消</button>
       <button class="btn pri" onclick="reallyApply()">应用更改</button>`);
   }
@@ -5244,6 +5244,13 @@ async function showWarningsOnly(){
     <div class="mb">${warnBoxHTML(list)}</div>
     <div class="mf"><button class="btn pri" onclick="closeModal()">知道了</button></div>`);
 }
+/* 写盘前的最后一道提醒 ——
+   ⚠️ **游戏开着的时候，它退出时会用内存里的旧状态覆盖你的修改**
+   （写盘当时**不会**报错、也不会失败 ⇒ 最容易误以为「修改器有 bug」）。
+   证据：`Campaign.save` 每次存档都删掉重写 `games/` 与 `document/`，
+   根 `main.yml` 也从内存重写（见 docs/战斗中修复废墟-可行性研究.md）。 */
+const gameOpenTip = L('<div class="fine">⚠ <b>游戏开着的话</b>：它退出时会用内存里的旧状态覆盖你这次的修改（写盘当时不会报错）——先退出游戏再改，才留得住。</div>');
+
 /* 确认框里点「应用更改」才真的写盘 */
 async function reallyApply(){
   const r = await post("/api/commit", {save_id: VIEW._save_id, edits: pendingEdits()});
