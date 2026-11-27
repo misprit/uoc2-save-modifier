@@ -2579,8 +2579,13 @@ def _city_restore(w, e: Edit) -> Outcome:
     if uv is None:
         oc.errors.append("坐标必须是两个非负整数（地图坐标 [x, y]）")
         return oc
-    if not w.require(not w.caps.in_battle, "ruins", "main.yml"):
-        return oc
+    # ⚠️ **战斗中也可以修**（玩家 2026-11-27 口径）：状态都记录在存档里 ——
+    #   存档准确记录了哪座城市被摧毁 ⇒ 没被记录的城市就是好的 ⇒ 改存档就是改状态，
+    #   与「是否在战斗中」无关。
+    #   写入路径本来就与战斗无关：① 根 `main.yml` 的 `destroyed_cities`
+    #   ② 所有 `games/*/cities.yml` ③ 同格 `games/*/forts.yml` 的 `functional`。
+    #   实测：**战斗中的存档也有这三样**（`in_state.scenario` 非空的存档里
+    #   `destroyed_cities` 有条目、场景快照 `cities.yml` 也在）。
 
     # ---- ① 战役清单（权威） ----
     main = w.table("main.yml", {})

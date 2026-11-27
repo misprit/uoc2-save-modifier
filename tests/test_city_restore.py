@@ -6,7 +6,8 @@
    每个场景的 `games/<场景>/cities.yml`、同格要塞的 `games/<场景>/forts.yml`；
 2. **重复坐标** ⇒ 清单里**所有**出现都被删；
 3. **删空** ⇒ `cities.yml` 写成 `map: []`（与「文件不存在」等价，e167 字节码）；
-4. **战斗中硬拦**（能力位 `in_battle`）—— 改了会被游戏从内存重写覆盖回去；
+4. **战斗中也能修**（玩家 2026-11-27 拍板解锁）—— 状态都在存档里 ⇒
+   改存档就是改状态，与是否在战斗中无关；
 5. **只改同格要塞** —— 异格的要塞（城市没被摧毁但要塞被单独打掉）不许动；
 6. `restore_forts=False` ⇒ 不动要塞；
 7. **端到端**：plan → commit → 回读 ZIP 验证三处都改了，**其它条目逐字节不变**；
@@ -108,14 +109,45 @@ class TestCityRestore(CityRestoreTestBase):
         self.assertIn("games/avalanche/cities.yml", plan.changed_entries)
         self.assertIn("games/avalanche/forts.yml", plan.changed_entries)
 
-    def test_in_battle_is_refused(self):
-        """战斗中改了会被游戏从内存重写覆盖回去 ⇒ 硬拦。"""
-        path = self._save(destroyed=[[380, 208]], in_battle=True)
+    def test_in_battle_is_allowed(self):
+        """⚠️ **战斗中也能修**（玩家 2026-11-27 拍板）：状态都记录在存档里 ⇒
+        改存档就是改状态，与是否在战斗中无关。
+
+        ⇒ 战斗中修废墟的**写入路径与战斗外完全一样**（三处一起改）。
+        """
+        path = self._save(destroyed=[[380, 208]],
+                          cities={"avalanche": cities_entry([(380, 208)])},
+                          forts={"avalanche": forts_entry([((380, 208), False)])},
+                          in_battle=True)
         with open_save(str(path)) as save:
             plan = save.plan_edit([Edit.city_restore((380, 208))])
-        self.assertFalse(plan.ok)
-        self.assertTrue(plan.errors)
-        self.assertIn("战斗中", " ".join(plan.errors))
+        self.assertTrue(plan.ok, plan.errors)
+        self.assertIn("main.yml", plan.changed_entries)
+        self.assertIn("games/avalanche/cities.yml", plan.changed_entries)
+        self.assertIn("games/avalanche/forts.yml", plan.changed_entries)
+
+    def test_in_battle_commit_writes_all_three(self):
+        """战斗中端到端：三处都真的改了（清单 / 场景快照 / 同格要塞）。"""
+        path = self._save(destroyed=[[380, 208]],
+                          cities={"avalanche": cities_entry([(380, 208)])},
+                          forts={"avalanche": forts_entry([((380, 208), False),
+                                                          ((500, 500), False)])},
+                          in_battle=True)
+        with open_save(str(path)) as save:
+            plan = save.plan_edit([Edit.city_restore((380, 208))])
+            self.assertTrue(plan.ok, plan.errors)
+            res = save.commit(plan)
+        self.assertTrue(res.ok, res.errors)
+        # ① 战役清单
+        self.assertEqual(self._read(path, "main.yml")["destroyed_cities"], [])
+        # ② 场景快照
+        cities = self._read(path, "games/avalanche/cities.yml")["map"]
+        self.assertEqual(cities, [])
+        # ③ 同格要塞恢复；异格不动
+        forts = self._read(path, "games/avalanche/forts.yml")["map"]
+        by_uv = {tuple(f[0]): f[1] for f in forts}
+        self.assertIs(by_uv[(380, 208)]["functional"], True)
+        self.assertIs(by_uv[(500, 500)]["functional"], False)
 
     def test_coordinate_not_in_list_is_refused(self):
         path = self._save(destroyed=[[1, 1]])
