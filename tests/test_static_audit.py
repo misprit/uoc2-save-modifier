@@ -116,7 +116,14 @@ class StaticAuditTest(unittest.TestCase):
         kinds = re.findall(r'^\s+"([a-z_]+)",\s*#', edits, flags=re.M)
         self.assertGreater(len(kinds), 20, "kind 列表没解析出来")
         front = set(re.findall(r'"([a-z_]+)"', self.code))
-        missing = [k for k in kinds if k not in front]
+        #: T12：界面改走 `hq_branch_level(level, suppressed)` **成对**写入
+        #: （顺序无关、不会写出负数）⇒ `hq_branch_suppressed` 不再有单独的前端入口。
+        #: 核心库那一侧的语义与 API **保留不动**
+        #: （`tests/test_hq_branch_semantics.py` 仍守着它）—— 只是界面不再单独用它。
+        #: ⚠️ 这条豁免是**显式**的：新增 kind 时不许顺手加进来（要先问「界面为什么不用它」）。
+        ALLOWED_WITHOUT_FRONTEND = {"hq_branch_suppressed"}
+        missing = [k for k in kinds
+                   if k not in front and k not in ALLOWED_WITHOUT_FRONTEND]
         self.assertEqual([], missing,
                          "这些 kind 前端**完全没提到**（改了可能不显示）：%r" % missing)
 

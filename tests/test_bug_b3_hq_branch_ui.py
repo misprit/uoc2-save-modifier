@@ -65,15 +65,17 @@ for (const sc of scenarios) {
   VIEW.hqs = [{id: HQ_ID, branch_levels: {[BR]: {level: sc.level, suppressed: sc.supp}}}];
   PENDING.length = 0;
   for (const p of sc.pending) {
+    /* T12：界面现在把「等级 + 压制」**成对**挂在**一条** `hq_branch_level` 上
+       （params 里同时带 level 与 suppressed）⇒ 顺序无关、不会写出负数。 */
     PENDING.push({
-      kind: p.kind,
-      key: p.kind === 'hq_branch_suppressed'
-        ? `hq_branch_level:${HQ_ID}:${BR}:sup` : `hq_branch_level:${HQ_ID}:${BR}`,
+      kind: 'hq_branch_level',
+      key: `hq_branch_level:${HQ_ID}:${BR}`,
       params: p.params,
     });
   }
   const st = hqBranchState(HQ_ID, BR);
-  console.log(JSON.stringify({name: sc.name, level: st.level, suppressed: st.suppressed}));
+  console.log(JSON.stringify({name: sc.name, level: st.level, suppressed: st.suppressed,
+                              real: st.real}));
 }
 """
 
@@ -103,13 +105,15 @@ def _run_frontend(scenarios):
 class TestHqBranchUiMatchesCore(unittest.TestCase):
     """界面显示的生效等级 / 被压制数，必须与**核心库算出来的**一致。"""
 
-    #: (名字, 存档 level, 存档 suppressed, [(kind, 值), ...])
+    #: (名字, 存档 level, 存档 suppressed, [(level, suppressed), ...])
+    #: ⚠️ T12 新口径：**解锁到几级** = level + suppressed（≤ 3）；
+    #: **压制不改变解锁到几级**（只降生效等级、只影响技能图标）。
     SCENARIOS = [
-        ("只升等级", 1, 0, [("hq_branch_level", 2)]),
-        ("只压制", 1, 0, [("hq_branch_suppressed", 1)]),
-        ("先升等级再压制", 1, 0, [("hq_branch_level", 2), ("hq_branch_suppressed", 1)]),
-        ("升两级再压制一级", 1, 0, [("hq_branch_level", 3), ("hq_branch_suppressed", 1)]),
-        ("先压制再升等级", 1, 0, [("hq_branch_suppressed", 1), ("hq_branch_level", 2)]),
+        ("只升等级", 2, 0, [(3, 0)]),
+        ("只压制", 2, 0, [(1, 1)]),
+        ("升一级再压一级", 2, 0, [(2, 1)]),
+        ("升两级再压一级", 2, 0, [(2, 1)]),
+        ("只压一级不动等级", 2, 0, [(2, 0)]),
     ]
 
     BRANCH = "operations"
@@ -133,11 +137,9 @@ class TestHqBranchUiMatchesCore(unittest.TestCase):
                     # `w.table()` 会从字节重新解析 ⇒ 必须在建夹具时就定好）
                     break
                 edits = []
-                for kind, val in pending:
-                    if kind == "hq_branch_level":
-                        edits.append(Edit.hq_branch_level(self.HQ_ID, self.BRANCH, val))
-                    else:
-                        edits.append(Edit.hq_branch_suppressed(self.HQ_ID, self.BRANCH, val))
+                for level, supp in pending:
+                    # T12：成对写（`hq_branch_level` 本来就支持同时带 `suppressed`）
+                    edits.append(Edit.hq_branch_level(self.HQ_ID, self.BRANCH, level, supp))
                 plan = save.plan_edit(edits, catalog=catalog)
                 self.assertTrue(plan.ok, "核心库拒绝了这个场景：%s" % plan.errors)
                 res = save.commit(plan)
@@ -162,32 +164,34 @@ class TestHqBranchUiMatchesCore(unittest.TestCase):
         # 夹具的 operations 初始是 level=2 / suppressed=0
         base_level, base_supp = 2, 0
         scen = [{"name": n, "level": base_level, "supp": base_supp,
-                 "pending": [{"kind": k,
-                              "params": {"level": v} if k == "hq_branch_level"
-                              else {"suppressed": v}} for k, v in p]}
+                 "pending": [{"params": {"level": lv, "suppressed": sp}} for lv, sp in p]}
                 for (n, _l, _s, p) in self.SCENARIOS]
         ui = _run_frontend(scen)
         self.assertEqual(len(self.SCENARIOS), len(ui))
         for (name, _l, _s, p), got in zip(self.SCENARIOS, ui):
             core_level, core_supp = self._core_result(base_level, base_supp, p)
+            # ⚠️ T12：界面显示的是「**解锁到几级**」（玩家口径）⇒
+            # 与核心库实际结果的 `level + suppressed` 比（**不变量没变**：
+            # 界面显示必须与写盘结果一致）。
             self.assertEqual(
-                (core_level, core_supp), (got["level"], got["suppressed"]),
-                "场景「%s」：界面显示 L%s/S%s，核心库实际 L%s/S%s ⇒ 不一致"
-                % (name, got["level"], got["suppressed"], core_level, core_supp))
+                (core_level + core_supp, core_supp), (got["real"], got["suppressed"]),
+                "场景「%s」：界面显示 解锁%s/S%s，核心库实际 L%s/S%s ⇒ 不一致"
+                % (name, got["real"], got["suppressed"], core_level, core_supp))
 
     @unittest.skipUnless(_node_available(), "本机没有 node")
     def test_raise_then_suppress_keeps_the_raised_level(self):
-        """**针对性**：先升等级再压制 ⇒ 界面显示的等级必须是**升过的那一级**。
+        """**针对性**：升到 3 再压 1 ⇒ 界面显示的「解锁到几级」仍是 **3**。
 
-        修之前：显示 L1（真实 L2）—— 社区反馈「显示升级了，再调节压制却还是原本的等级」。
+        ⚠️ T12 新口径：压制**不改变**解锁到几级（只降生效等级）——
+        玩家要求「压制变化不显示为等级的变化」。
         """
-        scen = [{"name": "先升等级再压制", "level": 2, "supp": 0,
-                 "pending": [{"kind": "hq_branch_level", "params": {"level": 3}},
-                             {"kind": "hq_branch_suppressed", "params": {"suppressed": 1}}]}]
+        scen = [{"name": "升到 3 再压 1", "level": 2, "supp": 0,
+                 "pending": [{"params": {"level": 2, "suppressed": 1}}]}]
         got = _run_frontend(scen)[0]
-        self.assertEqual(2, got["level"],
-                         "升到 3 再压制 1 ⇒ 生效等级应是 2（3−1），实得 %s" % got["level"])
+        self.assertEqual(3, got["real"],
+                         "升到 3 再压 1 ⇒ 解锁到几级仍是 3，实得 %s" % got["real"])
         self.assertEqual(1, got["suppressed"])
+        self.assertEqual(2, got["level"], "生效等级 = 3 − 1 = 2")
 
 
 if __name__ == "__main__":

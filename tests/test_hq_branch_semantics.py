@@ -114,14 +114,25 @@ class TestBranchUi(unittest.TestCase):
         cls.html = io.open(os.path.join(WEB, "index.html"),
                            encoding="utf-8", newline="").read()
 
-    def test_the_suppress_button_uses_the_dedicated_kind(self):
-        """压制按钮必须走 `hq_branch_suppressed`（它自动重算 level）。"""
-        i = self.html.index("function hqSuppress(")
-        j = self.html.index("function hqSpecialize(", i)
+    def test_branch_level_and_suppression_are_written_as_one_paired_edit(self):
+        """⚠️ T12（玩家 2026-11-27 实测后的口径）：等级与压制必须**成对**写成
+        **一条** `hq_branch_level`（带 `suppressed`）。
+
+        为什么不再单独走 `hq_branch_suppressed`：
+        两条 edit 的**先后顺序**会互相影响（先等级后压制 / 先压制后等级
+        算出的 level 不一样）⇒ 玩家实测到「两者同时互动能产生负数的分支等级」。
+        成对写 ⇒ 顺序无关 ⇒ `level = 解锁到几级 − 被压制数` 恒 ≥ 0。
+
+        核心库那一侧的 `hq_branch_suppressed` 语义**保留不动**
+        （`TestSuppressSemantics` 仍守着它）—— 只是界面不再单独用它。
+        """
+        i = self.html.index("function setHqBranchState(")
+        j = self.html.index("function hqBranchLevel(", i)
         body = self.html[i:j]
-        self.assertIn('queueEdit("hq_branch_suppressed"', body)
-        self.assertNotIn('queueEdit("hq_branch_level"', body,
-                         "压制按钮不该再走 hq_branch_level（那个不重算 level）")
+        self.assertIn('"hq_branch_level"', body)
+        self.assertIn("suppressed:suppressed", body)
+        self.assertIn("real - suppressed", body,
+                      "写盘时 level = 解锁到几级 − 被压制数（恒 ≥ 0）")
 
     def test_the_projection_exists_and_replays_pending_edits(self):
         self.assertIn("function hqBranchState(", self.html)
@@ -139,11 +150,14 @@ class TestBranchUi(unittest.TestCase):
         self.assertIn("hqBranchState(", body)
 
     def test_the_level_button_respects_the_limit(self):
+        """等级（= 解锁到几级）必须夹在 **0–3**（游戏的硬上限）。"""
         i = self.html.index("function hqBranchLevel(")
         j = self.html.index("function hqSuppress(", i)
         body = self.html[i:j]
-        self.assertIn("3 - st.suppressed", body,
-                      "等级按钮必须把「等级 + 被压制」压在 3 以内")
+        self.assertIn("if(real>3) real=3", body)
+        self.assertIn("if(real<0) real=0", body)
+        self.assertIn("if(sup>real) sup = real", body,
+                      "压制不能超过等级")
 
 
 if __name__ == "__main__":
