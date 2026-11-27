@@ -139,6 +139,8 @@ button,input,select{font:inherit}
 /* 启动页署名（作者名**不翻译** —— 词表里没有它，中英文都显示「烟柳边城 misprit」） */
 #splash .by{color:var(--muted);font-size:12.5px;margin:-2px 0 8px;letter-spacing:.2px}
 #splash .by::before{content:"by ";font-size:11px;opacity:.7}
+/* 特别鸣谢（作者名下面一行） */
+#splash .thanks{color:var(--muted);font-size:11.5px;margin:-4px 0 10px;opacity:.85}
 #splash .sub{color:var(--muted);margin-bottom:22px}
 .picker{width:min(1180px,100%);background:var(--surface);border:1px solid var(--border);
   border-radius:10px;overflow:hidden}
@@ -973,6 +975,7 @@ table.fptab .numin{width:72px;font-size:22px;padding:5px 9px}
 <div id="splash">
   <h1>统一指挥 2 存档修改器</h1>
   <div class="by">烟柳边城 misprit</div>
+  <div class="thanks">特别鸣谢 IQ180 的学生会会计的详细测试</div>
   <div class="sub">选一个存档开始</div>
   <div class="picker">
     <div class="bar">
@@ -1192,6 +1195,63 @@ function encOnce(s){
   // 已经编码过的（含 %XX 且能解码回来）=> **原样返回**，不要再编码一次
   try { if(decodeURIComponent(raw) !== raw) return raw; } catch(e){}
   return encodeURIComponent(raw).replace(/'/g, "%27");
+}
+
+/* ---------- v1.4.2：客户端「在场」信号 ----------
+   ⚠️ **为什么需要它**：启动器以前靠「Edge 进程退出」判断用户关了窗口 ⇒
+   但 Edge 启动 `--app` 时**首个进程会自己退出**（relaunch，窗口照常开着）
+   ⇒ 启动器误判 ⇒ **把服务杀了** ⇒ 页面报 "Failed to fetch"、
+   首次打开直接「无法访问此网站」。
+   ⇒ 改成「**客户端还在不在**」这条**可靠**的信号：
+   ① `pagehide` 时 beacon 通知离开 ⇒ **即时**关窗退出；
+   ② 每 15 秒 ping 一次（**与有没有操作无关** —— 只是证明客户端还在）；
+   ③ 服务端 180 秒没等到心跳 ⇒ 兜底退出。
+   ⚠️ **relaunch 不触发 `pagehide`**（页面没被关，只是浏览器进程重启）⇒ 不误杀。 */
+function clientHeartbeat(){
+  try{
+    fetch("/api/ping?t=" + encodeURIComponent(TOKEN), {cache:"no-store"})
+      .catch(function(){});           /* 服务没了就别刷屏 —— 服务自己会退出 */
+  }catch(e){}
+}
+function clientBeaconGone(){
+  /* 关窗/关标签 ⇒ 立刻告诉服务「我走了」⇒ 服务马上退（不用等心跳超时）。
+     ⚠️ `sendBeacon` 是 POST、不等响应 —— 服务端按「客户端离开」处理。 */
+  try{
+    if(navigator.sendBeacon){
+      navigator.sendBeacon("/api/client-gone?t=" + encodeURIComponent(TOKEN));
+    }else{
+      fetch("/api/client-gone?t=" + encodeURIComponent(TOKEN),
+            {method:"POST", keepalive:true}).catch(function(){});
+    }
+  }catch(e){}
+}
+function startClientHeartbeat(){
+  clientHeartbeat();
+  setInterval(clientHeartbeat, 15000);
+  /* ⚠️ 用 `pagehide` 而不是 `beforeunload` —— 后者只在「有用户交互」时可靠；
+     `pagehide` 在关窗/切走/刷新时都会触发。
+     ⚠️ **刷新也会触发** ⇒ 服务会退出 ⇒ 刷新后页面连不上。
+     ⇒ 刷新时用 `event.persisted` 区分不了（reload 也会 persisted=false），
+     所以**刷新**要单独排除：只在 `pagehide` 且**不是 reload** 时才通知。
+     浏览器给 `pagehide` 事件的 `persisted` 属性在 reload 时是 false，
+     但关窗时也是 false ⇒ 分不开。
+     ⇒ 改用 **`beforeunload` 判 reload**：reload 时 `beforeunload` 也会触发……
+     ⇒ **最稳的办法**：**不靠 unload 通知**，改靠**服务端数心跳**：
+     刷新 ⇒ 旧页面没了、新页面几秒内就上来 ⇒ 心跳很快恢复 ⇒ 服务不退出。
+     ⇒ 所以这里**只留心跳**，`pagehide` 的 beacon 改成**延迟 2 秒**再发：
+        刷新时新页面会在 2 秒内接管（并**取消**这个延迟通知）⇒ 不会误杀；
+        真关窗时没有新页面 ⇒ 2 秒后通知 ⇒ 服务退出（仍算即时）。 */
+  let goneTimer = null;
+  window.addEventListener("pagehide", function(){
+    goneTimer = setTimeout(clientBeaconGone, 2000);
+  });
+  /* 新页面接管 ⇒ 取消那个「我走了」通知（刷新场景） */
+  window.addEventListener("pageshow", function(){
+    if(goneTimer){ clearTimeout(goneTimer); goneTimer = null; }
+  });
+  window.addEventListener("beforeunload", function(){
+    /* 刷新也会触发 ⇒ 这里**什么都不做**（交给心跳判活） */
+  });
 }
 
 async function api(path){
@@ -5970,6 +6030,10 @@ function renderPage(p){
 
 /* ⚠️ **词表必须先到位**（U74）：`loadSettings()` 里有 `L2(...)`，
    词表没加载时查不到 ⇒ 那一块会永远停在中文 ⇒ 挪到 `loadI18n()` 之后。 */
+/* ⚠️ **心跳要在词表加载之后才开始** —— `TOKEN` 在脚本加载时就有，
+   但 `startClientHeartbeat()` 里有 `L()` 调用的话必须等词表；
+   这里没有 ⇒ 直接开。放在最前面 ⇒ 哪怕词表加载失败，服务也知道客户端在。 */
+startClientHeartbeat();
 loadI18n().then(()=>{ startTr(); loadSettings(); return reload(); }).catch(e => {
   const r = document.getElementById("rows");
   if(r) r.innerHTML =

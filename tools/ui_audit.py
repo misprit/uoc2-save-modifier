@@ -111,6 +111,17 @@ WALK = r"""
     const h = (VIEW.hqs||[])[0];
 
     await step('概览页', async()=>{ PAGE='overview'; show('overview'); await sleep(900); });
+    await step('启动页-特别鸣谢', async()=>{
+      const t = document.querySelector('#splash .thanks');
+      if(!t) throw new Error('启动页没有鸣谢那一行');
+      const txt = (t.textContent||'').trim();
+      if(!txt.includes('IQ180')) throw new Error('鸣谢行内容不对：' + txt);
+      const by = document.querySelector('#splash .by');
+      if(!by) throw new Error('启动页没有作者署名');
+      /* 位置：作者**下面** */
+      if(!(by.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING))
+        throw new Error('鸣谢行不在作者署名的下面');
+    });
     await step('单位页-渲染', async()=>{ PAGE='units'; show('units'); await sleep(1200); });
     await step('单位页-选单位', async()=>{ if(u) pickUnit(u.id); await sleep(400); });
     await step('单位页-工事等级', async()=>{ if(u) setUnitEntr(u.id, 1); await sleep(300); });

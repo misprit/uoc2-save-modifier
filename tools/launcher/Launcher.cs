@@ -12,6 +12,17 @@
 // ⚠️ 只用 .NET Framework 4.x 自带的东西（System.Windows.Forms 只是为了弹错误框），
 //    **零第三方依赖** ⇒ 编译用系统自带的 csc.exe 即可（见 tools/build_launcher.py）。
 //
+// ⚠️⚠️ **v1.4.2：退出判定改了** ——
+// 以前是「**被拉起的那个 Edge 进程**退出 ⇒ 用户关了窗口 ⇒ 杀服务」。
+// 但 Edge 启动 `--app` 时**首个进程会自己退出**（relaunch —— 浏览器进程重启，
+// 而**窗口照常开着**、服务照常收到请求；实测 0.5 秒就退出、rc=0）
+// ⇒ 启动器**误判**成「用户关了窗口」⇒ **把服务杀了**
+// ⇒ 首次打开直接「无法访问此网站」、写回时报 "Failed to fetch"。
+//
+// ⇒ 改成：**不再看 Edge 的进程**，改为**等 python 服务进程自己退出**。
+//    服务端按**客户端心跳**判活（前端定时器发的，与操作无关）：
+//    客户端关窗 ⇒ beacon 通知 ⇒ 服务立刻退；浏览器崩了 ⇒ 心跳超时 ⇒ 也退。
+//
 // 作者：烟柳边城 misprit
 
 using System;
@@ -28,8 +39,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("UOC2 Save Modifier")]
 [assembly: AssemblyCompany("烟柳边城 misprit")]
 [assembly: AssemblyCopyright("Copyright © 烟柳边城 misprit")]
-[assembly: AssemblyVersion("1.1.3.0")]
-[assembly: AssemblyFileVersion("1.1.3.0")]
+[assembly: AssemblyVersion("1.4.2.0")]
+[assembly: AssemblyFileVersion("1.4.2.0")]
 
 internal static class Launcher
 {
@@ -93,7 +104,11 @@ internal static class Launcher
                                                        out existingReason))
             {
                 // The running server owns its rendezvous file.
-                existingBrowser.WaitForExit();
+                // ⚠️ **v1.4.2：不要等这个 Edge 进程退出** ——
+                // Edge 的首个进程会自己退出（relaunch，窗口照常开着）
+                // ⇒ 等它返回 = 这个启动器白退（而且没有任何好处：
+                // 服务是**另一个**启动器起的，它自己会管服务的生死）。
+                Log("[launcher] 已有服务在跑 ⇒ 只把窗口叫出来（不重复起服务）");
                 return 0;
             }
             Fail(existingEdge == null
@@ -133,6 +148,7 @@ internal static class Launcher
 
         if (url == null)
         {
+            Log("[launcher] 60 秒内没拿到服务地址 ⇒ 放弃");
             Kill(proc);
             TryDelete(urlFile);
             Fail("服务没能启动（60 秒内没拿到地址）。\r\n\r\n日志在：\r\n"
@@ -141,11 +157,13 @@ internal static class Launcher
         }
         if (!WriteAll(urlFile, url))
         {
+            Log("[launcher] 写不了 server.url ⇒ 放弃");
             Kill(proc);
             TryDelete(urlFile);
             Fail("无法写入启动器运行状态：\r\n" + urlFile);
             return 1;
         }
+        Log("[launcher] 服务已启动：" + url);
 
         // ③ 只用独立 profile 启动 Edge；失败不得回退到默认浏览器
         string edge = FindEdge();
@@ -153,6 +171,7 @@ internal static class Launcher
         string reason = null;
         if (edge == null || !TryLaunchEdge(edge, url, out browser, out reason))
         {
+            Log("[launcher] Edge 启动失败 ⇒ 杀服务");
             Kill(proc);
             TryDelete(urlFile);
             Fail(edge == null
@@ -160,13 +179,45 @@ internal static class Launcher
                 : "Microsoft Edge 启动失败：\r\n" + reason);
             return 1;
         }
-        browser.WaitForExit();       // 关掉窗口 ⇒ 服务一起退
-        Kill(proc);
-        TryDelete(urlFile);
+        Log("[launcher] Edge 已拉起（pid=" + browser.Id + "）");
+
+        // ④ ⚠️ **v1.4.2：不再 `browser.WaitForExit()`** ——
+        //    Edge 的首个进程会自己退出（relaunch，窗口照常开着）⇒
+        //    等它返回就等于「服务立刻自杀」（v1.4.1 的实测故障）。
+        //    ⇒ 改为**等 python 服务进程自己退出**：服务端按**客户端心跳**判活
+        //    （关窗 ⇒ beacon ⇒ 立刻退；浏览器崩了 ⇒ 心跳超时 ⇒ 也退）。
+        try
+        {
+            proc.WaitForExit();
+            Log("[launcher] 服务进程已退出（码=" + proc.ExitCode + "）");
+        }
+        catch (Exception ex)
+        {
+            Log("[launcher] 等服务退出时出错：" + ex.Message);
+        }
+        finally
+        {
+            Kill(proc);
+            TryDelete(urlFile);
+        }
         return 0;
     }
 
     // ---------------------------------------------------------------- 小工具
+
+    /// <summary>写一行到日志（**每次杀服务都记** ⇒ 下次出问题能直接看出是谁杀的）。</summary>
+    private static void Log(string msg)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(LogFile));
+            File.AppendAllText(LogFile,
+                "[launcher] " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                + "  " + msg + Environment.NewLine,
+                new UTF8Encoding(false));
+        }
+        catch { }
+    }
 
     /// <summary>从服务的 stdout 里读出「http://…」（那行前面有中文提示，无所谓）。</summary>
     private static string WaitUrl(Process proc)

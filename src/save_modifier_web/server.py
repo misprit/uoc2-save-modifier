@@ -144,6 +144,80 @@ def _version() -> str:
             return "?"
 
 
+# ---------------------------------------------------------------- 客户端在场
+#
+# ⚠️ **v1.4.2**：以前「服务什么时候退」是由**浏览器进程**决定的 ⇒
+# Edge 的 relaunch（首个进程自己退出）会被误判成「用户关了窗口」⇒ 服务被杀。
+# ⇒ 改成由**客户端自己**报告：
+#   · `GET  /api/ping`         —— 每 15 秒一次（前端定时器，与操作无关）
+#   · `POST /api/client-gone`  —— `pagehide` 时 beacon（即时关窗）
+#   · 兜底：HEARTBEAT_TIMEOUT 秒没心跳 ⇒ 退出（浏览器崩了/被强杀）
+
+#: 心跳超时（秒）—— **不是「多久没操作」**。
+#: ⚠️ 选 180 而不是 90：Edge 会节流不可见窗口的定时器
+#:    （Chromium 的 intensive throttling ⇒ 最慢 1 分钟一次），
+#:    90 秒在节流下只剩 1.5 次机会 ⇒ 可能误杀。
+HEARTBEAT_TIMEOUT = 180
+
+#: 最后一次收到心跳的时间（0 = 还没收到过）
+_LAST_BEAT = [0.0]
+
+#: 客户端说「我走了」的**时刻**（0 = 没说）
+#:
+#: ⚠️ 用**时刻**而不是布尔 —— `pagehide` 在**刷新**时也会触发 ⇒
+#: 收到 beacon 后要**再等一会儿**，看有没有新页面接管并发心跳
+#: （刷新 ⇒ 撤销「走了」；真关窗 ⇒ 才算真走）。
+_CLIENT_GONE_AT = [0.0]
+
+#: 收到「我走了」后再容忍多久（秒）—— **给刷新留时间**
+GONE_GRACE = 10
+
+#: 服务启动时刻（用来算宽限期）
+_STARTED_AT = [time.time()]
+
+#: 启动宽限期（秒）—— **页面还没加载完**的容忍时间。
+#: ⚠️ Edge 首启要初始化 profile（可能好几秒）⇒ 起服务后这一段时间内
+#:    **不该**因为「还没心跳」就退出。
+GRACE = 60
+
+
+def _beat():
+    """收到心跳 ⇒ 刷新时间戳 + 撤销「已离开」标记。
+
+    ⚠️ 心跳就是「**我还在**」的证明 ⇒ 若之前收到过「我走了」beacon
+    （多半是**页面刷新**触发的）⇒ 这里撤销它。
+    """
+    _LAST_BEAT[0] = time.time()
+    _CLIENT_GONE_AT[0] = 0.0
+
+
+def _beat_age() -> float:
+    """距上次心跳过了多久（秒）；从没收到过 ⇒ 很大。"""
+    if not _LAST_BEAT[0]:
+        return 1e9
+    return time.time() - _LAST_BEAT[0]
+
+
+def _client_present() -> bool:
+    """客户端还在不在？
+
+    ⚠️ **「从没收到过心跳」≠「客户端不在」** ——
+    刚起服务时页面可能还没加载完（Edge 首启要初始化 profile）⇒
+    宽限期内算「在场」；宽限期过了还没心跳 ⇒ 才算不在。
+
+    ⚠️ **「心跳超时」也不是「多久没操作」** —— 心跳是前端**定时器**发的，
+    界面开着什么都不干也照样在发 ⇒ 不会因为「用户没动」而被踢。
+    """
+    if _CLIENT_GONE_AT[0]:
+        # ⚠️ 刚收到「我走了」⇒ 再等一会儿（**刷新**时新页面会接管并发心跳）
+        if (time.time() - _CLIENT_GONE_AT[0]) > GONE_GRACE:
+            return False
+        return True
+    if not _LAST_BEAT[0]:
+        return (time.time() - _STARTED_AT[0]) <= GRACE
+    return _beat_age() <= HEARTBEAT_TIMEOUT
+
+
 # ---------------------------------------------------------------- 小工具
 
 
@@ -1975,8 +2049,13 @@ class _Handler(BaseHTTPRequestHandler):
         path = unquote(u.path)
 
         if path.startswith("/api/"):
-            if not self._check_token():
-                return
+            # ⚠️ **v1.4.2：只有这两个「在场信号」接口不需要 token** ——
+            # 它们只回 `{"ok":true}`、**不泄露任何数据**；
+            # 而 `sendBeacon` **不能带自定义头** ⇒ 只能走查询参数。
+            # ⚠️ **放行范围不能扩大** —— 其余 `/api/*` 仍要 token。
+            if path not in ("/api/ping", "/api/client-gone"):
+                if not self._check_token():
+                    return
             try:
                 if path == "/api/saves":
                     self._json(api_saves())
@@ -2013,6 +2092,16 @@ class _Handler(BaseHTTPRequestHandler):
                     self._json(api_settings())
                 elif path == "/api/i18n":
                     self._json(api_i18n())
+                elif path == "/api/client-gone":
+                    # v1.4.2：也接受 GET（有些浏览器/代理会改写方法）
+                    _CLIENT_GONE_AT[0] = time.time()
+                    self._json({"ok": True})
+                elif path == "/api/ping":
+                    # v1.4.2：客户端心跳（**不需要 token** —— 它只证明
+                    # 「页面还活着」，不泄露任何数据；而且 beacon 的
+                    # `sendBeacon` 不方便带自定义头 ⇒ 允许 ?t= 查询参数）。
+                    _beat()
+                    self._json({"ok": True})
                 else:
                     self._json({"error": "未知接口"}, 404)
             except SaveUnreadable as exc:
@@ -2065,8 +2154,11 @@ class _Handler(BaseHTTPRequestHandler):
         if not path.startswith("/api/"):
             self._send(404, b"not found", "text/plain; charset=utf-8")
             return
-        if not self._check_token():
-            return
+        # ⚠️ **v1.4.2**：`/api/client-gone`（关窗 beacon）不需要 token
+        #    （`sendBeacon` 带不了自定义头 ⇒ 只能走查询参数）。
+        if path != "/api/client-gone":
+            if not self._check_token():
+                return
         try:
             n = int(self.headers.get("Content-Length") or 0)
             raw = self.rfile.read(n) if n else b"{}"
@@ -2075,7 +2167,11 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"ok": False, "errors": ["请求体不是合法 JSON：%s" % exc]}, 400)
             return
         try:
-            if path == "/api/plan":
+            if path == "/api/client-gone":
+                # v1.4.2：客户端说「我走了」（关窗 beacon）⇒ 立刻退出服务。
+                _CLIENT_GONE_AT[0] = time.time()
+                self._json({"ok": True})
+            elif path == "/api/plan":
                 self._json(_jsonable(api_plan(payload)))
             elif path == "/api/commit":
                 self._json(_jsonable(api_commit(payload)))
@@ -2117,15 +2213,47 @@ def _serve_forever(httpd):
     httpd.serve_forever(poll_interval=0.3)
 
 
+def _watch_client(httpd):
+    """**客户端不在了就退服务**（v1.4.2）。
+
+    以前这个判断是「浏览器进程退出了」⇒ Edge 的 relaunch 会被误判 ⇒
+    服务被杀 ⇒ 页面 "Failed to fetch" / 首次打开「无法访问此网站」。
+    ⇒ 改成看**客户端自己的心跳**（前端定时器发的，与操作无关）。
+
+    ⚠️ **启动后的宽限期**：刚起服务时页面可能还没加载完（Edge 首启要初始化
+    profile，可能几秒）⇒ 前 `GRACE` 秒不看心跳。
+    """
+    while True:
+        time.sleep(2)
+        try:
+            if _client_present():
+                continue
+            if _CLIENT_GONE_AT[0]:
+                _log("[life] 客户端已离开（关窗 beacon）⇒ 服务退出")
+            else:
+                _log("[life] 客户端心跳超时 ⇒ 服务退出")
+            httpd.shutdown()
+            return
+        except Exception:
+            pass
+
+
 def run(serve_only: bool = False, no_window: bool = False,
         no_browser: bool = False) -> int:
     """起服务 + 拉起 Edge 独立窗口；窗口关掉 ⇒ 服务一起退。"""
     token = secrets.token_urlsafe(16)
     _Handler.token = token
+    # v1.4.2：重置判活状态（同一个进程里可能起过多次服务）
+    _STARTED_AT[0] = time.time()
+    _LAST_BEAT[0] = 0.0
+    _CLIENT_GONE_AT[0] = 0.0
 
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     port = httpd.server_address[1]
     threading.Thread(target=_serve_forever, args=(httpd,), daemon=True).start()
+    # v1.4.2：按**客户端心跳**判活（以前靠「浏览器进程退出」⇒ Edge 的
+    # relaunch 会被误判 ⇒ 服务被杀 ⇒ 页面 Failed to fetch）。
+    threading.Thread(target=_watch_client, args=(httpd,), daemon=True).start()
     url = "http://127.0.0.1:%d/?t=%s" % (port, token)
     print("[OK ] GUI 服务已启动：%s" % url)
     try:
@@ -2154,11 +2282,18 @@ def run(serve_only: bool = False, no_window: bool = False,
                 webbrowser.open(url)
             except Exception:
                 pass
+        # v1.4.2：不再无限等 —— 按**客户端心跳**判活
+        # （客户端走了 ⇒ 服务退；浏览器崩了 ⇒ 心跳断了 ⇒ 超时也退）。
         try:
-            while True:
+            while _client_present():
                 time.sleep(1)
         except KeyboardInterrupt:
-            httpd.shutdown()
+            pass
+        if _CLIENT_GONE_AT[0]:
+            _log("[life] 客户端已离开（关窗 beacon）⇒ 服务退出")
+        else:
+            _log("[life] 客户端心跳超时 ⇒ 服务退出")
+        httpd.shutdown()
         return 0
 
     edge = find_edge()
@@ -2189,8 +2324,14 @@ def run(serve_only: bool = False, no_window: bool = False,
          "--disable-features=Translate,msEdgeSidebarV2,msEdgeShoppingAssistant"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print("[OK ] Edge 独立窗口已启动（pid=%d）—— 关掉窗口即退出。" % proc.pid)
+    # ⚠️ **v1.4.2：不要再 `proc.wait()` 当作「用户关了窗口」** ——
+    # Edge 启动 `--app` 时**首个进程会自己退出**（relaunch，窗口照常开着）
+    # ⇒ 等它返回就等于「服务立刻自杀」⇒ 页面报 "Failed to fetch"、
+    # 首次打开直接「无法访问此网站」（v1.4.1 的实测故障）。
+    # ⇒ 改成**等客户端真的走了**（心跳超时 / 关窗 beacon，由 `_watch_client` 判定）。
     try:
-        proc.wait()
+        while _client_present():
+            time.sleep(1)
     except KeyboardInterrupt:
         pass
     finally:
@@ -2198,6 +2339,7 @@ def run(serve_only: bool = False, no_window: bool = False,
             proc.terminate()
         except Exception:
             pass
+        _log("[life] 客户端离开 ⇒ 服务退出")
         httpd.shutdown()
     return 0
 
