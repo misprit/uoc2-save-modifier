@@ -306,6 +306,7 @@
   "手牌上限": "Hand limit",
   "手牌加 {0}（槽位 {1}）": "Add card {0} (slot {1})",
   "手牌已满 —— 先删一张再添加": "hand is full — remove a card first",
+  "显示 {0} / 共 {1} 个": "showing {0} / {1} total",
   "手牌是": "the hand is",
   "手牌槽位 {0} 改成{1}": "Hand slot {0} → {1}",
   "手牌槽位 {0} 标为{1}": "Hand slot {0} marked as {1}",

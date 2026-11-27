@@ -2351,8 +2351,9 @@ function unitDetailHTML(u){
         u.name_cn||u.name_brief||u.name_full||(L("单位 ")+u.id))), u.id, esc(u.type||"—"), esc(natCn(ut.nationality)), max||"—", bloodDirty?' dirty':'', u.id, pips, u.id, xp, specs.length, u.max_spec||ut.max_spec||3, esc(scopeTip), SEL.fullPool?'checked':'', slots, poolHTML, unitCombatFieldsHTML(u));
 }
 
-function pageUnits(w){
-  const units = VIEW.units||[];
+/* 单位列表的**过滤结果**（页面首绘与搜索刷新共用一份口径）。 */
+function filteredUnits(){
+  const units = (VIEW&&VIEW.units)||[];
   let cur = units.find(u=>u.id===SEL.units);
   if(!cur){ cur = units[0]; SEL.units = cur ? cur.id : null; }
   const q = (UQUERY||"").trim().toLowerCase();
@@ -2360,8 +2361,8 @@ function pageUnits(w){
   /* 过滤器 #2「当前场景（战斗）已激活的单位」——
      名单 = `games/<场景>/units.yml`（扁平的 id 列表，规范 §7.2）。
      ⚠️ **只在战斗进行中才存在** ⇒ 不在战斗里置灰 + 悬停说明原因。 */
-  const battleIds = new Set((VIEW.battle_unit_ids||[]).map(Number));
-  const inBattle = !!VIEW.in_battle && battleIds.size > 0;
+  const battleIds = new Set(((VIEW&&VIEW.battle_unit_ids)||[]).map(Number));
+  const inBattle = !!(VIEW&&VIEW.in_battle) && battleIds.size > 0;
   const list = units.filter(u=>{
     if(hqf!=="" && String(u.hq_id??"")!==hqf) return false;
     if(UONLY && inBattle && !battleIds.has(u.id)) return false;
@@ -2375,6 +2376,14 @@ function pageUnits(w){
                  (u.id)).toLowerCase();
     return hay.includes(q);
   });
+  return {units:units, cur:cur, list:list, battleIds:battleIds, inBattle:inBattle};
+}
+
+function pageUnits(w){
+  const f = filteredUnits();
+  const units = f.units, cur = f.cur, list = f.list;
+  const battleIds = f.battleIds, inBattle = f.inBattle;
+  const hqf = UHQFILTER;
   const hqs = VIEW.hqs||[];
   /* ⚠️ `data-tip` 的值里**不能直接带双引号**（`class="tn"`）——
      否则属性提前闭合，提示文字会被当成正文渲染出来（U53 实测踩到）。
@@ -2391,12 +2400,12 @@ function pageUnits(w){
       <label class="chk{2}" data-tip="{3}">
         <input type="checkbox" id="ubattle" {4} {5}>仅当前场景激活</label>
       <span class="sp"></span>
-      <span class="tbcount">显示 {6} / 共 {7} 个</span>
+      <span class="tbcount" id="ucount">显示 {6} / 共 {7} 个</span>
     </div>
     <div class="cols cols-units cols-fill">
     <div class="panel"><h3>单位 · 共 {8} 个</h3>
       <div class="pbody">
-        <div class="rows">{9}</div>
+        <div class="rows" id="urows">{9}</div>
       </div></div>
     <div class="panel"><h3>单位 · 详情</h3>
       <div class="detail" id="udetail">{10}</div>
@@ -2409,10 +2418,11 @@ function pageUnits(w){
   const uq = document.getElementById("uq");
   if(uq) uq.addEventListener("input", function(){
     UQUERY = this.value;
-    const pos = this.selectionStart;
-    show("units");
-    const n = document.getElementById("uq");
-    if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} }
+    /* ⚠️ **只刷列表，不整页重绘**（T13）——
+       整页重绘会把**输入框本身**重建 ⇒ 浏览器正在进行的 **IME 组合被打断**
+       ⇒ 汉字打不进去（英文能打，因为不需要组合）。
+       ⇒ 这里只更新列表 + 计数 + 详情，输入框节点原封不动。 */
+    refreshUnitsList();
   });
   const uh = document.getElementById("uhq");
   if(uh) uh.addEventListener("change", function(){ UHQFILTER = this.value; show("units"); });
@@ -5160,6 +5170,22 @@ function togglePoolGroup(nat){
   refreshUnitLocal(SEL.units);
 }
 function toggleFullPool(){ SEL.fullPool = !SEL.fullPool; refreshUnitLocal(SEL.units); }
+
+/* 只刷新**单位列表 + 计数 + 详情**（工具栏不动）——
+   ⚠️ 搜索时必须走这里，不能整页重绘（T13：中文输入法会被打断）。 */
+function refreshUnitsList(){
+  const f = filteredUnits();
+  const rows = document.getElementById("urows");
+  if(rows) rows.innerHTML = f.list.map(unitRowHTML).join("") ||
+    L(`<div class="placeholder"><div class="big">没有匹配的单位</div>
+      换个关键词，或把「总部」筛选清空。</div>`);
+  const cnt = document.getElementById("ucount");
+  if(cnt) cnt.textContent = L2("显示 {0} / 共 {1} 个", f.list.length, f.units.length);
+  const det = document.getElementById("udetail");
+  if(det) det.innerHTML = unitDetailHTML(f.cur);
+  if(f.cur) bindUnitControls(f.cur);
+  paintPending();
+}
 
 /* ---------- 应用 / 撤销 ---------- */
 /* 待应用的编辑列表 → 请求体。
