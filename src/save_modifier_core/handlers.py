@@ -1945,13 +1945,16 @@ def _card_store_set(w, e: Edit) -> Outcome:
             reason = wl.reason(card_type) or "不在本战役商店的可上架清单里"
             oc.errors.append(f"卡牌 {card_type} 不能上架：{reason}")
             return oc
-        # ★ 换成**货架上已有**的类型也不行（否则等于凭空多出一张同款卡）。
-        if _shelf_has_card_type(w, shelf, card_type, ignore_position=position):
-            oc.errors.append(
-                f"货架上已经有同类型的卡（{card_type}）了 —— "
-                "同一张卡不能重复上架")
-            return oc
+        # ★ 换成**货架上已有**的**召唤卡**类型也不行
+        #   （否则同一个单位被认领两次 ⇒ 地图上两个同款兵模）。
+        #   ⚠️ 普通卡**可以**有多张（玩家能买多张）⇒ 只拦召唤卡（用户 2026-11-27 拍板）。
         info = w.catalog.card_type(card_type) or {}
+        if info.get("has_unit") and \
+                _shelf_has_card_type(w, shelf, card_type, ignore_position=position):
+            oc.errors.append(
+                f"货架上已经有同类型的召唤卡（{card_type}）了 —— "
+                "同一张召唤卡不能重复上架（会召唤同一个单位两次）")
+            return oc
         if info.get("has_unit"):
             uid = _reserved_unit_id(w, card_type)
             if uid is None:
@@ -2049,15 +2052,19 @@ def _card_store_add(w, e: Edit) -> Outcome:
         oc.errors.append(f"卡牌 {card_type} 不能上架：{reason}")
         return oc
 
-    # ★ 同一张卡**不许在货架上出现两次**（召唤卡重复上架 ⇒ 同一个单位
-    #   被召唤两次 ⇒ 地图上两个同款兵模、先那个不能点选）。
-    if _shelf_has_card_type(w, shelf, card_type):
+    # ★ **只有召唤卡**才不许在货架上出现两次 ——
+    #   召唤卡多张 ⇒ 同一个 `unit_id` 被认领两次 ⇒ 地图上两个同款兵模、
+    #   先那个不能点选（B-5 实测）。
+    #   ⚠️ **普通卡（空袭 / 炮击 / 补给…）天然就能有多张**，玩家也**可以买多张**
+    #   ⇒ 一律禁重复是把规则**收得过宽**（用户 2026-11-27 拍板：只收紧召唤卡）。
+    info = w.catalog.card_type(card_type) or {}
+    if info.get("has_unit") and _shelf_has_card_type(w, shelf, card_type):
         oc.errors.append(
-            f"货架上已经有同类型的卡（{card_type}）了 —— 同一张卡不能重复上架")
+            f"货架上已经有同类型的召唤卡（{card_type}）了 —— "
+            "同一张召唤卡不能重复上架（会召唤同一个单位两次）")
         return oc
 
     unit_id = None
-    info = w.catalog.card_type(card_type) or {}
     if info.get("has_unit"):
         unit_id = _reserved_unit_id(w, card_type)
         if unit_id is None:

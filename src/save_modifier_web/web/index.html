@@ -4570,8 +4570,9 @@ function renderCardPickerModal(){
   const types = Object.keys(CATALOG&&CATALOG.card_types ? CATALOG.card_types : {}).sort();
   const isHand = M.mode==="hand";
   /* 货架上**同类型**的张数（角标「已有 N」）——
-     货架侧同一张卡不许重复上架 ⇒ 选之前就该看见。
-     ⚠️ 换牌时**不算自己那格**（把 A 换成 A = 什么都没改 ⇒ 允许）。 */
+     ⚠️ 换牌时**不算自己那格**（把 A 换成 A = 什么都没改 ⇒ 允许）。
+     ⚠️ **只有召唤卡**不能重复上架（同一个单位被认领两次 ⇒ 地图上两个同款兵模）；
+     **普通卡**（空袭 / 炮击…）天然能有多张、也能买多张 ⇒ 只显示角标，不拦。 */
   const shelfCards = isHand ? [] : projectedCards(VIEW.shelf, "shelf");
   const dupOf = (t)=>{
     let n = shelfCards.filter(c=>c.card_type===t).length;
@@ -4589,6 +4590,9 @@ function renderCardPickerModal(){
        ⇒ 手牌这一侧一律灰掉；卡牌商店那一侧不受影响（货架走白名单）。 */
     if(!blocked && isHand && info.has_unit) blocked = L("空降/登陆卡不能直接加到手牌");
     const dup = dupOf(t);
+    /* 货架上已有**召唤卡** ⇒ 不能再上一张（同一个单位会被认领两次）⇒ 灰掉。 */
+    if(!blocked && !isHand && info.has_unit && dup>0)
+      blocked = L("货架上已有同类型的召唤卡，不能重复上架");
     return {id:t, name:cardCn(t), tex:cardImg(t), blocked:!!blocked,
       dup:dup?(L("已有 ")+dup):"",
       title:(info.subtitle||"")+(blocked?("："+blocked):"")+(dup?("："+L("货架上已有")):""),

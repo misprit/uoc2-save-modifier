@@ -340,6 +340,7 @@
   "改成无限": "Make unlimited",
   "改战役进度": "Change campaign progress",
   "改收费": "Paid",
+  "货架上已有同类型的召唤卡，不能重复上架": "the shelf already has a summon card of this type — it cannot be listed twice",
   "改成免费": "Make this card free",
   "改成收费": "Make this card paid",
   "攻": "ATK",
@@ -820,7 +821,7 @@
  },
  "errors": {
   "修复废墟城市 {arg0}：战役清单删 {arg1} 处；场景快照 {arg2} 处；同格要塞 {arg3} 处": "Restored ruined city {arg0}: {arg1} removed from the campaign list, {arg2} scenario snapshots, {arg3} same-tile forts",
-  "货架上已经有同类型的卡（{card_type}）了 —— 同一张卡不能重复上架": "the shelf already has a card of the same type ({card_type}) — the same card cannot be listed twice",
+  "货架上已经有同类型的召唤卡（{card_type}）了 —— 同一张召唤卡不能重复上架（会召唤同一个单位两次）": "the shelf already has a summon card of the same type ({card_type}) — the same summon card cannot be listed twice (it would summon the same unit twice)",
   "坐标 {arg0} 不在废墟清单里": "Coordinate {arg0} is not in the ruined-city list",
   "坐标必须是两个非负整数（地图坐标 [x, y]）": "The coordinate must be two non-negative integers (map coordinate [x, y])",
   "根 main.yml 里没有 destroyed_cities —— 这个存档没有废墟清单": "The root main.yml has no destroyed_cities — this save has no ruined-city list",
