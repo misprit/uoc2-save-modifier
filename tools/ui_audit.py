@@ -138,6 +138,33 @@ WALK = r"""
       if(after) after.click();          /* 点回去，别把状态留给后面的步骤 */
       await sleep(400);
     });
+    /* ⚠️ **候选池搜索框**：真敲字 ⇒ 真过滤 ⇒ 分组自动展开。
+       （只看「有搜索框」不够 —— 必须验证**过滤真的发生了**。） */
+    await step('单位页-候选池搜索', async()=>{
+      const box = document.getElementById('poolq');
+      if(!box) throw new Error('候选池里没有搜索框（poolq）');
+      const body = document.getElementById('poolbody');
+      if(!body) throw new Error('候选池体（poolbody）不见了');
+      const before = body.querySelectorAll('.pcell').length;
+      if(!before) throw new Error('候选池里一个格子都没有（显示所有特种兵 没开？）');
+      const first = Object.keys((CATALOG&&CATALOG.spec_types)||{})[0];
+      if(!first) throw new Error('目录里没有特种兵类型');
+      box.value = first;
+      box.dispatchEvent(new Event('input',{bubbles:true}));
+      await sleep(400);
+      const after = document.querySelectorAll('#poolbody .pcell').length;
+      if(after === 0) throw new Error('搜一个真实存在的 type id 反而一个都没了');
+      if(after >= before) throw new Error('搜索后格子数没减少（过滤没生效）');
+      /* 搜到的分组必须**展开**（否则搜到了却藏在折叠组里看不见） */
+      const hidden = Array.from(document.querySelectorAll('#poolbody .grpbody'))
+        .filter(b=>b.style.display==='none').length;
+      if(hidden) throw new Error('有搜索词时分组仍是折叠的（搜到了看不见）');
+      box.value = '';
+      box.dispatchEvent(new Event('input',{bubbles:true}));
+      await sleep(400);
+      const restored = document.querySelectorAll('#poolbody .pcell').length;
+      if(restored < before) throw new Error('清空搜索后格子没回来');
+    });
     await step('单位页-隐藏所有特种兵', async()=>{ toggleFullPool(); await sleep(400); });
     await step('单位页-加特种兵', async()=>{
       const pool = unitPoolFor(u); if(!pool || !pool.candidates.length) return;

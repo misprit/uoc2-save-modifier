@@ -507,6 +507,12 @@ table.spec-tbl .thumb img.spico,.fptab .thumb img.spico{
   border:1px solid var(--border);color:var(--muted);font-family:var(--mono);white-space:nowrap}
 .specpool{display:block;height:100%;overflow:auto;flex:1;min-width:0}
 .poolflat{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px}
+/* 候选池的**搜索框**（375 种只能逐组翻 ⇒ 给个搜索入口）；
+   搜索框与池体各自独占一行，池体沿用 .poolflat 的横排（padding 由外层给）。 */
+.poolsearch{flex:1 0 100%;padding:0 0 9px}
+.poolsearch .inp{width:100%;box-sizing:border-box}
+/* 池体沿用 `.poolflat` 的横排布局（内层再包一层 flex-wrap ⇒ 观感与原来一致） */
+#poolbody{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:6px;min-width:0}
 .grphead{display:flex;align-items:center;gap:7px;padding:4px 12px;background:var(--surface-alt);
   border-top:1px solid var(--border);font-size:13.5px;font-weight:600;color:var(--accent-dark);
   cursor:pointer;user-select:none}
@@ -5123,9 +5129,31 @@ function specAttachCheck(specName, unitType){
 function specCanAttach(specName, unitType){
   return specAttachCheck(specName, unitType).ok;
 }
+/* 全量候选池里的**一个条目**（字段与 `spickMatch` 用的那套对齐）——
+   搜索要按「中文名 / type id / 国籍 / 特性 / 全名」匹配。 */
+function specPoolItem(t){
+  const st = ((CATALOG&&CATALOG.spec_types)||{})[t]||{};
+  return {id:t, name:st.cn||t, nat:st.nationality||"",
+          natName:natCn(st.nationality||""), sub:st.full||"",
+          flags:st.flags||[]};
+}
 function fullPoolHTML(u, selected){
+  /* ⚠️ 输入框里显示**原样**的词（不要 lower）—— 用户敲什么就看到什么；
+     匹配用小写（`fullPoolBodyHTML` 内部再 lower 一次）。 */
+  const q = (SEL.poolQuery||"").trim();
+  /* 搜索框在**池体外面** ⇒ 搜索时只重画池体，输入框节点不变 ⇒ IME 不被打断 */
+  return L2('<div class="poolsearch"><input class="inp" id="poolq" type="text"'
+          + ' autocomplete="off" placeholder="{0}" value="{1}"'
+          + ' oninput="poolQueryChanged(this.value)"></div>',
+          L("搜索特种兵 / 国籍 / 特性…"), esc(q))
+       + '<div id="poolbody">' + fullPoolBodyHTML(u, selected, q) + '</div>';
+}
+function fullPoolBodyHTML(u, selected, q){
   const cat = CATALOG||{};
-  const all = Object.keys(cat.spec_types||{});
+  const rawq = (q===undefined ? (SEL.poolQuery||"") : q).trim();
+  const qy = rawq.toLowerCase();
+  const all = Object.keys(cat.spec_types||{})
+                 .filter(t=>spickMatch(specPoolItem(t), qy));
   /* 槽位上限（`min(3, max_spec)`）—— 满了才不让再挂 */
   const cap = u.max_spec || ((cat.unit_types||{})[u.type]||{}).max_spec || 3;
   const used = selected.length;
@@ -5164,7 +5192,8 @@ function fullPoolHTML(u, selected){
          读：这里传**国籍 id**（`n.nat`）⇒ `SEL.poolOpen['german']`。
          以前读的时候传了整个分组对象 ⇒ 查的是 `SEL.poolOpen['[object Object]']`
          ⇒ 永远 undefined ⇒ **31 个国籍分组一个都点不开**（U145 遗留）。 */
-      const open = poolGroupOpen(n.nat);
+      /* ⚠️ **有搜索词时强制展开** —— 否则搜到了却藏在折叠组里看不见。 */
+      const open = qy ? true : poolGroupOpen(n.nat);
       out += L2(`<div class="grphead{0}"
         onclick="togglePoolGroup('{1}')">
         <span class="caret">▼</span>{2}
@@ -5173,7 +5202,28 @@ function fullPoolHTML(u, selected){
         <div class="grpbody" {5}>{6}</div>`, open?'':' closed', esc(n.nat), esc(natCn(n.nat)), n.items.length, canN, open?'':'style="display:none"', items);
     });
   });
+  if(!out){
+    out = qy
+      ? L2(`<div style="padding:14px;color:var(--muted);font-size:12px">
+          {0}</div>`, L2("没有匹配「{0}」的特种兵", esc(rawq)))
+      : L2(`<div style="padding:14px;color:var(--muted);font-size:12px">
+          {0}</div>`, L("没有可选的特种兵"));
+  }
   return out;
+}
+/* 搜索框的输入事件（去抖：375 个图标每次按键都重画会卡） */
+function poolQueryChanged(q){
+  SEL.poolQuery = q;
+  clearTimeout(window._poolQueryTimer);
+  window._poolQueryTimer = setTimeout(function(){ setPoolQuery(q); }, 150);
+}
+/* 真正重画**池体**（输入框不动 ⇒ 中文输入法不被打断） */
+function setPoolQuery(q){
+  SEL.poolQuery = q;
+  const u = (VIEW&&VIEW.units||[]).find(x=>x.id===SEL.units);
+  const body = document.getElementById("poolbody");
+  if(!u || !body) return;
+  body.innerHTML = fullPoolBodyHTML(u, projectedSpecs(u), (q||"").trim());
 }
 /* 分组默认**折叠** —— 只有用户点开的才展开（`SEL.poolOpen` 里记着） */
 function poolGroupOpen(nat){ return !!(SEL.poolOpen && SEL.poolOpen[nat]); }

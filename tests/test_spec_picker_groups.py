@@ -175,7 +175,10 @@ class SpecPickerGroupsTest(unittest.TestCase):
         """
         units = self._body(self.html, "function fullPoolHTML(",
                            "function poolGroupOpen(")
-        self.assertIn("const open = poolGroupOpen(n.nat);", units)
+        # ⚠️ 断言的是**键的形态**（`n.nat`），不是整行写法 ——
+        # 整行写法会随「有搜索词就展开」这类分支变化 ⇒ 把 bug 锁进断言。
+        self.assertIn("poolGroupOpen(n.nat)", units)
+        self.assertNotIn("poolGroupOpen(n)", units)
         # 写的那一侧传的也必须是**国籍 id**
         self.assertIn("onclick=\"togglePoolGroup('{1}')\"", units)
         self.assertIn("esc(n.nat)", units)
