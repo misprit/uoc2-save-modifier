@@ -1556,6 +1556,9 @@ const NEEDS_CATALOG = {units:1, hqs:1, cards:1, store:1, campaign:1};
 async function loadPickers(unitType){
   const k = unitType || "";
   if(PICKCACHE[k]) return PICKCACHE[k];
+  /* ⚠️ 切回启动页时 `VIEW` 会被置空 ⇒ 这里再读 `VIEW._save_id` 就炸
+     （「Cannot read properties of null」）⇒ 没有存档就别去请求。 */
+  if(!VIEW || !VIEW._save_id) return null;
   const q = "?save_id=" + encOnce(VIEW._save_id) + (unitType ? "&unit_type=" + encOnce(unitType) : "");
   PICKCACHE[k] = await api("/api/pickers" + q);
   PICK = PICKCACHE[k];
@@ -1925,6 +1928,8 @@ async function prefetchUnitPools(types){
     if(t && PICKCACHE[t]===undefined && want.indexOf(t)<0) want.push(t);
   });
   if(!want.length) return;
+  /* ⚠️ 同上：`VIEW` 为空（切回启动页了）就别去请求。 */
+  if(!VIEW || !VIEW._save_id) return;
   try{
     const q = "?save_id=" + encOnce(VIEW._save_id) +
               "&unit_types=" + encOnce(want.join(","));
@@ -4775,6 +4780,7 @@ function alertModal(msg){
 /* ===================================================================
    战役页三块（U41）+ 概览页备份与撤销栈 + 卡牌 is_free
    =================================================================== */
+let SAVE_TOKEN = 0;       /* openSave 的在途守卫（换存档时作废旧的请求） */
 let CDETAIL = null;      /* /api/campaign-detail */
 let USTACK = null;       /* /api/undo-stack */
 let SETTINGS = null;     /* /api/settings —— 游戏本体目录等（U69） */
@@ -5392,6 +5398,8 @@ function doSwitchSave(){
 function doSwitchSaveForce(){
   PENDING = []; paintPending();
   closeModal();
+  /* 作废在途的 openSave（它回来后不能覆盖当前界面） */
+  SAVE_TOKEN++;
   VIEW = null; USTACK = null; PICKCACHE = {};
   invalidateCampaignDetail();   /* B-7：换存档 ⇒ 战役详情作废 */
   document.getElementById("app").style.display = "none";
@@ -5702,9 +5710,16 @@ async function openSave(sid){
   /* ⚠️ B-7：换存档 ⇒ 战役详情（路线图 / 名册 / 废墟）**必须作废** ——
      否则它们还是**上一个存档**的（名册整张表串了、废墟判错场景）。 */
   invalidateCampaignDetail();
+  /* ⚠️ **在途守卫**（与 `CDETAIL_TOKEN` 同一类问题）：
+     切换存档时旧的 `openSave` 可能还在路上 ⇒ 它回来后会把**新**存档
+     的界面覆盖成旧的 ⇒ 每次打开存档作废上一个。 */
+  const token = ++SAVE_TOKEN;
   try {
-    VIEW = await api("/api/view/" + encOnce(sid));
+    const data = await api("/api/view/" + encOnce(sid));
+    if(token !== SAVE_TOKEN) return;          /* 已经换存档了 ⇒ 丢弃这份 */
+    VIEW = data;
   } catch(e) {
+    if(token !== SAVE_TOKEN) return;
     const r = document.getElementById("rows");
     if(r) r.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">`
       + L2("读取存档失败：{0}</td></tr>", esc(e.message));
@@ -5793,6 +5808,16 @@ function show(p){
 }
 function renderPage(p){
   const w = document.getElementById("work");
+  /* ⚠️ **没有打开存档时不能渲染功能页** —— 页面函数会读 `VIEW.xxx`，
+     而切回启动页时 `VIEW` 已被置空 ⇒ 「Cannot read properties of null」。
+     ⇒ 这里直接回启动页（启动页不走 renderPage）。 */
+  if(!VIEW){
+    const splash = document.getElementById("splash");
+    const app = document.getElementById("app");
+    if(splash) splash.style.display = "block";
+    if(app) app.style.display = "none";
+    return;
+  }
   /* 导航高亮跟随当前页（`?page=` 深链进来时原来还亮在「概览」） */
   document.querySelectorAll(".rail .nav").forEach(x=>
     x.classList.toggle("on", x.dataset.p===p));
