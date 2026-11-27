@@ -1133,6 +1133,8 @@
   "卡牌类型 {card_type} 不是 persistent 卡型，禁止改 used": "card type {card_type} is not persistent; changing used is forbidden",
   "卡牌类型 {card_type} 没有游戏定义，禁止改 used": "card type {card_type} has no game definition; changing used is forbidden",
   "备份标识无效": "invalid backup id",
+  "used 必须是 True / False，收到 {raw_used}": "used must be True / False, got {raw_used}",
+  "卡牌 {card_type} 不是持续卡（persistent）—— 它用完就会从战役里移除，标成「已使用」没有意义": "card {card_type} is not a persistent card - it is removed from the campaign once used, so marking it used has no meaning",
   "没有游戏包目录，无法校验卡牌类型是否允许改 used": "the game package directory is missing; cannot validate whether this card type may change used",
   "请求体必须严格包含 save_id 和 ids": "request body must contain exactly save_id and ids",
   "备份失败，已拒绝写回存档：{arg0}": "Backup failed; the save was not written: {arg0}"

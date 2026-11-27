@@ -1607,11 +1607,23 @@ def _card_add(w, e: Edit) -> Outcome:
     if flag is None:
         oc.errors.append(f"is_free 必须是 True / False，收到 {is_free!r}")
         return oc
+    # N-5：新卡可以直接标成「已使用」—— 但**只有持续卡**有意义
+    #（非持续卡用完就从战役里移除，`used` 不参与它的玩法）。
+    raw_used = e.params.get("used")
+    used_flag = _as_bool(raw_used)
+    if used_flag is None:
+        oc.errors.append(f"used 必须是 True / False，收到 {raw_used!r}")
+        return oc
+    if used_flag and (w.catalog.card_type(card_type) or {}).get("persistent") is not True:
+        oc.errors.append(
+            f"卡牌 {card_type!r} 不是持续卡（persistent）—— "
+            "它用完就会从战役里移除，标成「已使用」没有意义")
+        return oc
     cards.append({"card_type": card_type,
                   "is_free": flag,
                   "position": position,
                   "unit_id": unit_id,
-                  "used": False})
+                  "used": used_flag})
     w.touch("cards.yml")
     oc.summary = f"加卡 {card_type}（槽位 {position}）"
     limit = CARD_DECK_LIMIT.get(_level_of(w))

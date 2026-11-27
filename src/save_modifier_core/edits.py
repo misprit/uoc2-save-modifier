@@ -254,11 +254,17 @@ class Edit:
 
     @staticmethod
     def card_add(card_type: str, *, is_free: bool = False,
-                 position: int | None = None, unit_id: int | None = None) -> "Edit":
-        """加一张卡到手牌。"""
+                 position: int | None = None, unit_id: int | None = None,
+                 used: bool = False) -> "Edit":
+        """加一张卡到手牌。
+
+        `used` = **这张新卡是不是「已使用」**（N-5）。
+        ⚠️ **只有持续卡（`persistent`）能是 True** —— 非持续卡用完就从战役里
+        移除，`used` 对它没有意义 ⇒ 核心库会拒绝。
+        """
         return Edit("card_add", {
             "card_type": card_type, "is_free": is_free,
-            "position": position, "unit_id": unit_id,
+            "position": position, "unit_id": unit_id, "used": used,
         })
 
     @staticmethod

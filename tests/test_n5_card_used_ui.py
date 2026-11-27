@@ -20,6 +20,7 @@ HTML = Path(__file__).resolve().parents[1] / "src/save_modifier_web/web/index.ht
 
 FUNCS = ("cardInfo", "cardCn", "cardImg", "cardTileHTML", "projectedCards",
          "pendingAddOf", "dropPendingKind", "setPending", "queueEdit",
+         "patchPendingParams",
          "cardSetFree", "cardSetUsed", "cardStoreSetFree")
 
 PROBE = r"""
@@ -164,17 +165,23 @@ class TestCardUsedUI(unittest.TestCase):
                                  "pending": []}, view=view)
         self.assertEqual("card_set_used:1", out["pending"][0]["key"])
 
-    def test_card_set_used_ignores_pending_add(self):
-        """待加的卡还没写盘 ⇒ 存档里没有这张卡 ⇒ 不挂 used 改动。"""
+    def test_card_set_used_on_a_pending_add_edits_that_add(self):
+        """⚠️ T5 续：新加的卡（还没落盘）点「已用」⇒ **改那条加卡待应用**，
+        不新增 `card_set`（那会因「手牌里没有这个槽位」被核心库整批拦下）。
+
+        ⇒ 一次落盘就能把新卡标成已使用（与「免费」同一套机制）。
+        """
         view = {"hand": [], "shelf": []}
         pending = [{"kind": "card_add", "key": "card_add:1",
                     "params": {"card_type": "tactical_para_german", "position": 1,
-                               "is_free": False},
+                               "is_free": False, "used": False},
                     "label": "x"}]
         out = self.run_scenario({"kind": "toggle", "position": 1, "used": True,
                                  "pending": pending}, view=view)
-        self.assertEqual([], [e for e in out["pending"] if e["kind"] == "card_set"])
-        self.assertEqual(1, len(out["pending"]))
+        self.assertEqual([], [e for e in out["pending"] if e["kind"] == "card_set"],
+                         "待加的卡不该另发 card_set")
+        self.assertEqual(1, len(out["pending"]), "还是那一条加卡待应用")
+        self.assertIs(True, out["pending"][0]["params"]["used"])
 
     # -------------------------------------------------- 界面 ↔ 待应用 同步
 

@@ -3094,7 +3094,8 @@ function projectedCards(list, kind){
   PENDING.forEach(p=>{
     if(p.kind==="card_add" && kind==="hand")
       out.push({card_type:p.params.card_type, position:p.params.position,
-                is_free:!!p.params.is_free, unit_id:null, used:false, _new:true});
+                is_free:!!p.params.is_free, unit_id:null,
+                used:!!p.params.used, _new:true});
     if(p.kind==="card_remove" && kind==="hand"){
       const i = out.findIndex(c=>c.position===p.params.position);
       if(i>=0) out.splice(i,1);
@@ -3192,7 +3193,8 @@ function cardAdd(type){
   for(let p=1;p<=limit;p++){ if(!used.has(p)){ pos=p; break; } }
   if(pos===null){ SEL.cardErr = L("手牌已满 —— 先删一张再添加"); show("cards"); return; }
   setPending("card_add", `card_add:${pos}`,
-    {card_type:type, position:pos, is_free:false}, L2("手牌加 {0}（槽位 {1}）", cardCn(type), pos));
+    {card_type:type, position:pos, is_free:false, used:false},
+    L2("手牌加 {0}（槽位 {1}）", cardCn(type), pos));
   SEL.cardPicker = null;
   show("cards");
 }
@@ -5027,9 +5029,15 @@ function cardSetUsed(position, used){
      原来取的是**投影值**（含挂起）⇒ 再点一次时「目标值 == 投影值 ≠ 原值」
      ⇒ 撤不掉那条待应用 ⇒ 界面与待应用对不上（T5 实测）。 */
   const c = (VIEW.hand||[]).find(x=>x.position===position);
-  /* 待加的卡**还没写盘** ⇒ 存档里没有这一张 ⇒ 不给挂 used 改动
-     （核心库会报「手牌里没有槽位号为 N 的卡」⇒ 整批被拦）。 */
-  if(pendingAddOf("card_add", position)){ show("cards"); return; }
+  /* 待加的卡**还没写盘** ⇒ 存档里没有这一张 ⇒ 改那条「加卡」待应用本身
+     （与 `cardSetFree` 同一套机制）⇒ 一次落盘就能把新卡标成已使用。 */
+  const pend = pendingAddOf("card_add", position);
+  if(pend){
+    patchPendingParams("card_add", pend.key,
+      Object.assign({}, pend.params, {used:!!used}), pend.label);
+    show("cards");
+    return;
+  }
   /* ⚠️ key 要与 is_free 的分开（`card_set:{position}`）——
      两处改的是同一个槽位的**不同字段**，同时挂起时要各留一条。 */
   queueEdit("card_set", `card_set_used:${position}`,
