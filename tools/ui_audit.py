@@ -158,6 +158,28 @@ WALK = r"""
     await step('总部页-兵库删条目', async()=>{
       const cur = projectedPool(h); if(cur.length) hqPoolRemove(h.id, cur[0]._o); await sleep(400); });
     await step('卡牌页-渲染', async()=>{ PAGE='cards'; show('cards'); await sleep(1200); });
+    /* ⚠️ T5：卡牌状态改成了**按钮**（免费/收费、已用/未用，点一下切状态）——
+       这里真点一次：① 按钮文字要跟着状态变 ② 待应用里要出现对应编辑。 */
+    await step('卡牌页-状态按钮切换', async()=>{
+      const sel = '#work .hcard .acts button[onclick*="cardSetFree"]';
+      const btn = document.querySelector(sel);
+      if(!btn) throw new Error('卡面上找不到「免费/收费」按钮');
+      const before = btn.textContent.trim();
+      btn.click(); await sleep(500);
+      const after = document.querySelector(sel);
+      if(!after) throw new Error('点完按钮后卡面上按钮没了');
+      if(after.textContent.trim()===before)
+        throw new Error('按钮文字没跟着状态变（仍是 ' + before + '）');
+      const pend = (PENDING||[]).filter(p=>p.kind==='card_set' && p.params.field==='is_free');
+      if(!pend.length) throw new Error('待应用里没有「免费/收费」的改动');
+    });
+    await step('卡牌页-持续卡已用按钮', async()=>{
+      const btn = document.querySelector('#work .hcard .acts button[onclick*="cardSetUsed"]');
+      if(!btn) return;          /* 这个存档的手牌里没有持续卡 ⇒ 跳过（不算失败） */
+      btn.click(); await sleep(500);
+      const pend = (PENDING||[]).filter(p=>p.kind==='card_set' && p.params.field==='used');
+      if(!pend.length) throw new Error('待应用里没有「已使用」的改动');
+    });
     await step('卡牌页-换牌', async()=>{
       const c=(VIEW.hand||[])[0]; if(c) openCardPickerModal('hand', c.position); await sleep(500);
       closeModal(); await sleep(200); });

@@ -6,7 +6,7 @@
 `tools/build_dist.py`（zip 文件名）与界面显示的版本号都读这里 —— **唯一来源**。
 """
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 #: 作者署名（启动器 exe 的版本信息 / 界面「关于」/ 日志头 都用它）
 AUTHOR = "烟柳边城 misprit"
