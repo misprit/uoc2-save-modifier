@@ -141,6 +141,8 @@ button,input,select{font:inherit}
 #splash .by::before{content:"by ";font-size:11px;opacity:.7}
 /* 特别鸣谢（作者名下面一行） */
 #splash .thanks{color:var(--muted);font-size:11.5px;margin:-4px 0 10px;opacity:.85}
+/* ⚠️ **人名不翻译**（群友的名字）⇒ 单独一段，不进词表 */
+#splash .thanks .nm{margin:0 .35em;white-space:nowrap}
 #splash .sub{color:var(--muted);margin-bottom:22px}
 .picker{width:min(1180px,100%);background:var(--surface);border:1px solid var(--border);
   border-radius:10px;overflow:hidden}
@@ -975,7 +977,7 @@ table.fptab .numin{width:72px;font-size:22px;padding:5px 9px}
 <div id="splash">
   <h1>统一指挥 2 存档修改器</h1>
   <div class="by">烟柳边城 misprit</div>
-  <div class="thanks">特别鸣谢 IQ180 的学生会会计的详细测试</div>
+  <div class="thanks"><span>特别鸣谢</span><span class="nm">IQ180 的学生会会计</span><span>的详细测试</span></div>
   <div class="sub">选一个存档开始</div>
   <div class="picker">
     <div class="bar">

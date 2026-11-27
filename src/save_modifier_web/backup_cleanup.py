@@ -52,7 +52,22 @@ def _enumerate(save):
     exact = re.compile(re.escape(save.stem) + r"_BACKUP(?:_(?:[2-9]|[1-9][0-9]+))?" + re.escape(save.suffix))
     # 只有程序自身 bak 可回收；旧 appdata fallback bak 仅作为只读遗留目录。
     root = core_paths.backup_dir().absolute()
-    if root.is_relative_to(core_paths.fallback_backup_dir().absolute()) or any(root.is_relative_to(folder) for folder in sources):
+    # ⚠️ **v1.4.3 修**：区分「程序**专属**的 bak」与「环境变量指定的目录」。
+    #
+    # * **程序专属**（`<修改器目录>/bak/`，默认布局）
+    #   ⇒ 里面的 `_BACKUP.usg` **一定是程序自己写的** ⇒ 该列、该删。
+    #   ⚠️ 玩家把程序解压到**存档目录里面**是完全合理的用法
+    #   （实测：`%LOCALAPPDATA%\.uoc2\save\uoc2-save-modifier`）
+    #   ⇒ 旧写法「bak 落在存档目录里就整个跳过」⇒ **概览页能显示、
+    #   管理备份却一条都没有**（两处口径不一致）。
+    # * **环境变量指定的**（`UOC2_BAK_DIR`）⇒ 那个目录**可能就是**存档目录
+    #   ⇒ 里面的 `_BACKUP.usg` 可能是玩家/游戏造的 ⇒ **保持原来的闸门**。
+    own_backup_dir = (core_paths.modifier_home()
+                      / core_paths.BACKUP_DIR_NAME).absolute()
+    is_own_backup_dir = (root == own_backup_dir)
+    if not is_own_backup_dir and (
+            root.is_relative_to(core_paths.fallback_backup_dir().absolute())
+            or any(root.is_relative_to(folder) for folder in sources)):
         return
     try:
         if not _clean(root) or not root.is_dir():

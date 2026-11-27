@@ -47,8 +47,10 @@ SERVER = os.path.join(REPO, "src", "save_modifier_web", "server.py")
 CJK = re.compile(r"[一-鿿]")
 PH = re.compile(r"\{([^{}]*)\}")
 ATTRS = ("title", "placeholder", "data-tip", "alt")
-#: 作者署名**故意不翻**（U98）
-NO_TRANS = ("烟柳边城",)
+#: **故意不翻**的名字（U98 + v1.4.3）：
+#: * 「烟柳边城」—— 作者署名；
+#: * 「IQ180 的学生会会计」—— 群友的名字（用户 2026-11-27 明确要求不翻译）。
+NO_TRANS = ("烟柳边城", "IQ180 的学生会会计")
 #: **故意**空译文的条目：量词（英文里没有"个/条"）与语言名（"中文"）。
 KNOWN_EMPTY = {"个", "条", "个", " 条", "中文", "中文"}
 

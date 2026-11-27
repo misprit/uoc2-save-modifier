@@ -233,7 +233,11 @@ class TestSplashThanks(unittest.TestCase):
         cls.html = read(HTML)
 
     def test_thanks_line_exists(self):
-        self.assertIn("特别鸣谢 IQ180 的学生会会计的详细测试", self.html)
+        # ⚠️ v1.4.3：整句已拆成三段（可译 / **人名** / 可译）——
+        #    人名是群友的名字 ⇒ **不翻译**（见 test_v143_thanks_name.py）。
+        self.assertIn("特别鸣谢", self.html)
+        self.assertIn("IQ180 的学生会会计", self.html)
+        self.assertIn("的详细测试", self.html)
 
     def test_thanks_is_below_the_author(self):
         """位置：作者署名**下面**。"""
@@ -243,6 +247,7 @@ class TestSplashThanks(unittest.TestCase):
 
     def test_thanks_has_a_style(self):
         self.assertIn("#splash .thanks{", self.html)
+        self.assertIn("#splash .thanks .nm{", self.html)
 
 
 if __name__ == "__main__":

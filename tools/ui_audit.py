@@ -124,6 +124,26 @@ WALK = r"""
     });
     await step('单位页-渲染', async()=>{ PAGE='units'; show('units'); await sleep(1200); });
     await step('单位页-选单位', async()=>{ if(u) pickUnit(u.id); await sleep(400); });
+
+    /* ⚠️ **管理备份**（玩家实测报过「一条都没有」）——
+       概览页能显示备份、但「管理备份」列不出来 ⇒ 两处口径不一致。
+       ⚠️ 备份**由巡检的 Python 侧造好**（见 main() 里的 seed_backup）⇒
+          这一步只验界面：**必须列出**、**必须能勾选**。 */
+    await step('管理备份能列出并勾选', async()=>{
+      openBackupManager(); await sleep(800);
+      const box = document.querySelector('.bkmanage-list');
+      if(!box) throw new Error('管理备份窗口没打开');
+      const cbs = box.querySelectorAll('input[data-backup-id]');
+      if(!cbs.length) throw new Error('管理备份窗口里一条备份都没有（界面列表为空）');
+      cbs[0].click(); await sleep(400);
+      if(!box.querySelectorAll('input[data-backup-id]:checked').length)
+        throw new Error('备份勾不上（勾了没反应）');
+      closeModal(); await sleep(300);
+    });
+
+    /* ⚠️ **管理备份**（玩家实测报过「一条都没有」）——
+       概览页能显示备份、但「管理备份」列不出来 ⇒ 两处口径不一致。
+       这一步：造一份备份 → 打开管理备份 ⇒ **必须列出**、且**能勾选**。 */
     await step('单位页-工事等级', async()=>{ if(u) setUnitEntr(u.id, 1); await sleep(300); });
     await step('单位页-行动力', async()=>{ if(u) setUnitAp(u.id, 2); await sleep(300); });
     await step('单位页-移动力', async()=>{ if(u){ const el=document.getElementById('in_mp_'+u.id);
@@ -306,6 +326,51 @@ WALK = r"""
 """
 
 
+def seed_backup(url, save_id):
+    """**造一份备份**（Python 侧，直接调接口）。
+
+    ⚠️ 页面那步只验「能列出、能勾选」—— 造备份放在这里，
+    免得页面里出错时**整段走查挂在 timeout 上**（看不出是哪一步）。
+
+    返回造出来的备份条数（0 = 已经有备份了，没动它）。
+    """
+    import urllib.parse
+    base = url.split("?")[0].rsplit("/", 1)[0]
+    token = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get("t", [""])[0]
+
+    def call(path, payload=None):
+        req = urllib.request.Request(
+            base + path,
+            data=(json.dumps(payload).encode("utf-8") if payload is not None else None),
+            headers={"X-Token": token,
+                     "Content-Type": "application/json"},
+            method="POST" if payload is not None else "GET")
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read().decode("utf-8"))
+
+    sid = urllib.parse.unquote(save_id)
+    before = (call("/api/backups/preview?save_id=" + save_id).get("backups") or [])
+    if before:
+        return len(before)
+    # 改一个单位的行动力并写回 ⇒ 产生一份备份
+    view = call("/api/view/" + save_id)
+    units = (view.get("units") or [])
+    if not units:
+        return 0
+    uid = units[0].get("id")
+    edits = [{"kind": "unit_field", "params": {"unit_id": uid, "field": "ap", "value": 2}}]
+    plan = call("/api/plan", {"save_id": sid, "edits": edits})
+    if not plan.get("ok"):
+        print("   造备份：plan 失败", plan.get("errors"))
+        return 0
+    res = call("/api/commit", {"save_id": sid, "edits": edits})
+    if not res.get("ok"):
+        print("   造备份：commit 失败", res.get("errors"))
+        return 0
+    after = (call("/api/backups/preview?save_id=" + save_id).get("backups") or [])
+    return len(after)
+
+
 def main() -> int:
     if len(sys.argv) < 3:
         print(__doc__)
@@ -358,6 +423,13 @@ def main() -> int:
         return true;
       })()
     """ % save_id)
+
+    # 先造一份备份（页面那步要验「能列出、能勾选」⇒ 必须先有备份）
+    try:
+        n = seed_backup(url, save_id)
+        print("   （巡检前造备份：%d 份）" % n)
+    except Exception as exc:
+        print("   造备份失败（不致命，继续走查）：", exc)
 
     log = cdp_eval(ws, WALK)
     print("=== 走查步骤 ===")
