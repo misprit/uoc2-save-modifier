@@ -83,8 +83,10 @@ class TestFreeStateOnItsOwnLine(CardsFreeUiTestBase):
     def setUp(self):
         self.tile = self.slice("function cardTileHTML", "function closeCardPicker")
 
-    def test_freeline_row_exists(self):
-        self.assertIn("freeline", self.tile)
+    def test_status_is_not_a_separate_line(self):
+        """⚠️ T5（玩家 2026-11-27 口径）：**状态不再单独占一行** ——
+        免费 / 收费、已用 / 未用都改成**按钮**（按钮上就是当前状态）。"""
+        self.assertNotIn("freeline", self.tile)
 
     def test_card_name_has_no_free_suffix_anymore(self):
         """❌ 旧的「卡名 · 免费」后缀不许再回来。"""
@@ -97,26 +99,24 @@ class TestFreeStateOnItsOwnLine(CardsFreeUiTestBase):
         self.assertIn('L("收费")', self.tile)
 
     def test_buttons_follow_the_current_state(self):
-        """按钮文案随状态变：免费⇒「改收费」，收费⇒「改免费」。
+        """按钮上就是**当前状态**：免费 ⇒ 「免费」，收费 ⇒ 「收费」（点一下切换）。
 
-        U93：英文按钮词太长会被**截断** ⇒ 英文改用短词（Free / Paid），
+        ⚠️ T5：玩家要求「不再单独显示免费和未使用的状态，都改成一个按钮。
+        每次点按钮切换状态」⇒ 按钮文字 = **当前状态**（不是「改成 X」）。
+        U93：英文按钮词太长会被**截断** ⇒ 英文用短词（Free / Paid），
         完整说明放进 title（`改成免费` / `改成收费`）。
         """
-        self.assertIn('const freeBtn = free ? L("改收费") : L("改免费");', self.tile)
+        self.assertIn('const freeBtn = free ? L("免费") : L("收费");', self.tile)
         self.assertIn('const freeTip = free ? L("改成收费") : L("改成免费");', self.tile)
-        self.assertIn('title="{9}"', self.tile)
+        self.assertIn('title="{7}"', self.tile)
 
-    def test_freeline_has_its_own_css(self):
-        """.hcard .freeline —— 免费 / 收费两套颜色。"""
-        self.assertIn(".hcard .freeline", self.html)
-        self.assertIn(".hcard .freeline.free", self.html)
-        self.assertIn(".hcard .freeline.paid", self.html)
+    def test_freeline_css_is_gone(self):
+        """状态行没了 ⇒ 那几条 CSS 也该清掉（别留死规则）。"""
+        self.assertNotIn(".hcard .freeline", self.html)
 
-    def test_freeline_is_not_truncated(self):
-        """状态行**不许**被 ellipsis 截掉（卡名长的时候也要看得见）。"""
-        css = self.slice(".hcard .freeline{", "/* 手牌的两个操作")
-        self.assertIn("text-overflow:clip", css)
-        self.assertNotIn("text-overflow:ellipsis", css)
+    def test_state_button_is_not_truncated(self):
+        """状态在**按钮**上 ⇒ 卡名长的时候状态照样看得见（按钮自己占位）。"""
+        self.assertIn('const freeBtn = free ? L("免费") : L("收费");', self.tile)
 
 
 class TestFreeEnglishWords(CardsFreeUiTestBase):

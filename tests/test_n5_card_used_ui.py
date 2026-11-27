@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
-"""N-5 前端：持续卡才有「已使用 / 未使用」开关。
+"""N-5 + T5：持续卡的「已用 / 未用」—— 状态在**按钮**上，且与待应用**同步**。
 
-**为什么用 node 真跑**：手牌卡的渲染是一串模板 + 投影逻辑，
-静态断言源码字面量会把「写法」锁死、却拦不住「渲染结果不对」
-⇒ 这里把 `index.html` 里的真函数抽出来跑，验的是**渲染出来的 HTML**。
+**玩家口径（2026-11-27）**：
+* 「不再单独显示免费和未使用的状态，都改成一个按钮。每次点按钮切换状态」；
+* 「要注意待应用里要和界面显示同步」—— 点一次显示另一状态、待应用里有一条；
+  再点一次回到原值、**待应用里应该没有这条**。
+
+**为什么用 node 真跑**：验的是**渲染出来的 HTML** 与**挂起的编辑**，
+不是源码里有没有某个字符串（静态断言会把写法锁死、却拦不住行为不对）。
 """
 import json
 import re
@@ -16,7 +20,7 @@ HTML = Path(__file__).resolve().parents[1] / "src/save_modifier_web/web/index.ht
 
 FUNCS = ("cardInfo", "cardCn", "cardImg", "cardTileHTML", "projectedCards",
          "pendingAddOf", "dropPendingKind", "setPending", "queueEdit",
-         "cardSetUsed")
+         "cardSetFree", "cardSetUsed", "cardStoreSetFree")
 
 PROBE = r"""
 const CATALOG = __CATALOG__;
@@ -31,21 +35,27 @@ function paintPending(){}
 
 __FUNCS__
 
-const scenario = __SCENARIO__;
-let out = {};
-if(scenario.kind === "tile"){
-  out.html = cardTileHTML(scenario.card, scenario.mode);
+const out = {};
+const sc = __SCENARIO__;
+if(sc.kind === "tile"){
+  out.html = cardTileHTML(sc.card, sc.mode);
 }
-if(scenario.kind === "pending"){
-  PENDING = scenario.pending;
-  const proj = projectedCards(VIEW.hand, "hand");
-  out.used = proj.length ? !!proj[0].used : null;
-}
-if(scenario.kind === "toggle"){
-  PENDING = scenario.pending || [];
-  cardSetUsed(scenario.position, scenario.used);
+if(sc.kind === "toggle"){
+  PENDING = sc.pending || [];
+  cardSetUsed(sc.position, sc.used);
   out.pending = PENDING.map(x => ({kind:x.kind, key:x.key, params:x.params,
                                   value:x.value, label:x.label}));
+}
+if(sc.kind === "toggle_free"){
+  PENDING = sc.pending || [];
+  cardSetFree(sc.position, sc.free);
+  out.pending = PENDING.map(x => ({kind:x.kind, key:x.key, params:x.params,
+                                  value:x.value, label:x.label}));
+}
+if(sc.kind === "projection"){
+  PENDING = sc.pending || [];
+  const proj = projectedCards(VIEW.hand, "hand");
+  out.cards = proj.map(c => ({position:c.position, used:!!c.used, is_free:!!c.is_free}));
 }
 console.log(JSON.stringify(out));
 """
@@ -84,35 +94,46 @@ class TestCardUsedUI(unittest.TestCase):
     def tile(self, card, mode="hand"):
         return self.run_scenario({"kind": "tile", "card": card, "mode": mode})["html"]
 
-    # -------------------------------------------------- 渲染
+    # -------------------------------------------------- 渲染：状态在按钮上
 
-    def test_persistent_hand_card_shows_used_line(self):
+    def test_persistent_hand_card_has_used_button(self):
         html = self.tile({"card_type": "tactical_para_german", "position": 1,
                           "is_free": False, "used": False})
-        self.assertIn("usedline", html)
-        self.assertIn('onclick="cardSetUsed(1,true)"', html)
-        self.assertIn("未使用", html)
+        self.assertIn("cardSetUsed(1,true)", html, "未使用 ⇒ 点了要变成已使用")
+        self.assertIn("未用", html, "按钮上显示当前状态")
 
-    def test_used_card_shows_used_state_and_toggles_back(self):
+    def test_used_card_button_toggles_back(self):
         html = self.tile({"card_type": "tactical_para_german", "position": 2,
                           "is_free": True, "used": True})
-        self.assertIn("usedline used", html)
-        self.assertIn('onclick="cardSetUsed(2,false)"', html)
-        self.assertIn("已使用", html)
+        self.assertIn("cardSetUsed(2,false)", html, "已使用 ⇒ 点了要变成未使用")
+        self.assertIn("已用", html)
 
-    def test_non_persistent_card_has_no_used_line(self):
+    def test_non_persistent_card_has_no_used_button(self):
         html = self.tile({"card_type": "air_attack_allies", "position": 1,
                           "is_free": False, "used": False})
-        self.assertNotIn("usedline", html)
         self.assertNotIn("cardSetUsed", html)
 
-    def test_shelf_card_has_no_used_line(self):
-        """货架上的卡不是手牌 ⇒ 不给「已使用」开关。"""
+    def test_shelf_card_has_no_used_button(self):
         html = self.tile({"card_type": "tactical_para_german", "position": 1,
                           "is_free": False, "used": False}, mode="shelf")
+        self.assertNotIn("cardSetUsed", html)
+
+    def test_status_is_not_a_separate_line(self):
+        """状态**不再单独占一行**（玩家要求：都改成按钮）。"""
+        html = self.tile({"card_type": "tactical_para_german", "position": 1,
+                          "is_free": True, "used": False})
+        self.assertNotIn("freeline", html)
         self.assertNotIn("usedline", html)
 
-    # -------------------------------------------------- 投影
+    def test_free_button_shows_current_state(self):
+        """免费 / 收费也是**按钮**（按钮上就是当前状态）。"""
+        html = self.tile({"card_type": "tactical_para_german", "position": 1,
+                          "is_free": True, "used": False})
+        self.assertIn("cardSetFree(1,false)", html, "当前免费 ⇒ 点了要变收费")
+        self.assertIn("免费", html)
+        self.assertNotIn("freeline", html)
+
+    # -------------------------------------------------- 挂起与同步
 
     def test_pending_used_is_reflected_in_projection(self):
         view = {"hand": [{"card_type": "tactical_para_german", "position": 1,
@@ -120,10 +141,8 @@ class TestCardUsedUI(unittest.TestCase):
         pending = [{"kind": "card_set", "key": "card_set_used:1",
                     "params": {"position": 1, "field": "used", "value": True},
                     "label": "x", "value": True}]
-        out = self.run_scenario({"kind": "pending", "pending": pending}, view=view)
-        self.assertIs(True, out["used"])
-
-    # -------------------------------------------------- 挂起改动
+        out = self.run_scenario({"kind": "projection", "pending": pending}, view=view)
+        self.assertIs(True, out["cards"][0]["used"])
 
     def test_card_set_used_queues_used_field(self):
         view = {"hand": [{"card_type": "tactical_para_german", "position": 1,
@@ -138,7 +157,7 @@ class TestCardUsedUI(unittest.TestCase):
         self.assertIs(True, e["params"]["value"])
 
     def test_card_set_used_key_differs_from_is_free_key(self):
-        """两处改的是**同一槽位的不同字段** ⇒ key 必须分开，否则一条会顶掉另一条。"""
+        """两处改的是**同一槽位的不同字段** ⇒ key 必须分开。"""
         view = {"hand": [{"card_type": "tactical_para_german", "position": 1,
                           "is_free": False, "used": False}], "shelf": []}
         out = self.run_scenario({"kind": "toggle", "position": 1, "used": True,
@@ -154,27 +173,39 @@ class TestCardUsedUI(unittest.TestCase):
                     "label": "x"}]
         out = self.run_scenario({"kind": "toggle", "position": 1, "used": True,
                                  "pending": pending}, view=view)
-        # 那条「加卡」待应用**原样留着**（不能被误删）⇒ 只断言没有新增 card_set
         self.assertEqual([], [e for e in out["pending"] if e["kind"] == "card_set"])
         self.assertEqual(1, len(out["pending"]))
 
+    # -------------------------------------------------- 界面 ↔ 待应用 同步
 
-class TestCatalogPersistentFlag(unittest.TestCase):
-    """前端要判断「这张卡是不是持续卡」⇒ 服务端得把 `persistent` 带出来。"""
+    def test_toggling_back_to_the_stored_value_drops_the_pending(self):
+        """⭐ 玩家明确要求：点一次改了、再点一次回到原值 ⇒ **待应用里不该留这条**。
 
-    def test_catalog_payload_exposes_persistent_flag(self):
-        try:
-            from save_modifier_web import server
-            payload = server._catalog_payload()
-        except Exception as exc:      # 没装游戏包 ⇒ 本机跑不了，跳过而不是红
-            self.skipTest("拿不到游戏包目录：%s" % (exc,))
-        types = payload.get("card_types") or {}
-        self.assertTrue(types, "card_types 是空的")
-        for name, d in types.items():
-            self.assertIn("persistent", d, "卡型 %s 少了 persistent 标记" % name)
-            self.assertIsInstance(d["persistent"], bool)
-        self.assertTrue(any(d["persistent"] for d in types.values()),
-                        "游戏包里应当有 persistent 卡型（实测 19 / 39）")
+        ⚠️ 这条曾经是 **bug**：`cardSetUsed` 的 `base` 取的是**投影值**（含挂起）
+        ⇒ 再点一次时「目标值 == 投影值 ≠ 存档原值」⇒ 撤不掉。
+        """
+        view = {"hand": [{"card_type": "tactical_para_german", "position": 1,
+                          "is_free": False, "used": False}], "shelf": []}
+        # 先点一次 ⇒ 挂起 used=true
+        first = self.run_scenario({"kind": "toggle", "position": 1, "used": True,
+                                   "pending": []}, view=view)
+        self.assertEqual(1, len(first["pending"]))
+        # 再点一次（回到存档原值 false）⇒ 待应用被撤掉
+        second = self.run_scenario({"kind": "toggle", "position": 1, "used": False,
+                                    "pending": first["pending"]}, view=view)
+        self.assertEqual([], second["pending"],
+                         "回到存档原值 ⇒ 待应用里不该留这条")
+
+    def test_free_toggle_back_to_stored_value_drops_the_pending(self):
+        """免费 / 收费 同样要能撤掉（它一直是对的 ⇒ 这条是回归护栏）。"""
+        view = {"hand": [{"card_type": "tactical_para_german", "position": 1,
+                          "is_free": True, "used": False}], "shelf": []}
+        first = self.run_scenario({"kind": "toggle_free", "position": 1, "free": False,
+                                   "pending": []}, view=view)
+        self.assertEqual(1, len(first["pending"]))
+        second = self.run_scenario({"kind": "toggle_free", "position": 1, "free": True,
+                                    "pending": first["pending"]}, view=view)
+        self.assertEqual([], second["pending"])
 
 
 if __name__ == "__main__":

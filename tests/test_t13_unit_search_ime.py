@@ -52,7 +52,7 @@ function paintPending(){}
 const touched = [];
 const nodes = {
   urows:   {innerHTML:"", textContent:""},
-  ucount:  {innerHTML:"", textContent:""},
+  unitcount: {innerHTML:"", textContent:""},
   udetail: {innerHTML:"", textContent:""},
   uq:      {innerHTML:"<input id=uq>", textContent:"", value:""},
 };
@@ -61,7 +61,7 @@ __FUNCS__
 refreshUnitsList();
 console.log(JSON.stringify({
   rows: nodes.urows.innerHTML,
-  count: nodes.ucount.textContent,
+  count: nodes.unitcount.textContent,
   detail: nodes.udetail.innerHTML,
   toolbar: nodes.uq.innerHTML,
 }));
@@ -86,7 +86,7 @@ console.log(JSON.stringify({
 
     def test_list_and_count_have_ids(self):
         self.assertIn('id="urows"', self.source)
-        self.assertIn('id="ucount"', self.source)
+        self.assertIn('id="unitcount"', self.source)
 
 
 if __name__ == "__main__":

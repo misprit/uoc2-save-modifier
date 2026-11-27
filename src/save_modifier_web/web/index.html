@@ -753,19 +753,11 @@ tr.oldrow{opacity:.6}
 .hcard .cp{font-size:12px;color:var(--muted);text-align:center;margin-top:4px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hcard .cp b{font-family:var(--mono);color:var(--accent-dark)}
-/* **免费 / 收费** 单独一行（不再当卡名后缀 —— 卡名一长就看不见了） */
-.hcard .freeline{font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:visible;
-  text-overflow:clip;font-weight:600}
-.hcard .freeline.free{color:var(--ok)}
-.hcard .freeline.paid{color:var(--muted);font-weight:400}
-/* N-5：**持续卡**才有「已使用 / 未使用」这一行（点一下切换） */
-.hcard .usedline{font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:visible;
-  text-overflow:clip;font-weight:600;cursor:pointer}
-.hcard .usedline.used{color:var(--muted);font-weight:400}
-.hcard .usedline.unused{color:var(--ok)}
-.hcard .usedline:hover{text-decoration:underline}
-/* 手牌的两个操作**并成一行**（原来一卡两行，卡片区被撑得很高） */
-.hcard .acts{text-align:center;white-space:nowrap}
+/* ⚠️ T5：**状态不再单独占一行** —— 免费/收费、已用/未用都改成**按钮**
+   （按钮上就是当前状态，点一下切到另一个）⇒ 卡面少两行，更紧凑。 */
+/* 手牌的操作**并成一行**（原来一卡两行，卡片区被撑得很高）；
+   ⚠️ T5：现在可能有**三个**按钮（移除 / 免费↔收费 / 已用↔未用）⇒ 允许换行。 */
+.hcard .acts{text-align:center;white-space:normal}
 .hcard .rm{display:inline-block;width:auto;margin:5px 2px 0;font-size:11px;padding:2px 6px}
 .slotempty{width:104px;height:124px;flex:none;border:1px dashed var(--border);border-radius:7px;
   display:grid;place-items:center;color:var(--muted);font-size:12.5px;cursor:pointer;
@@ -2405,7 +2397,7 @@ function pageUnits(w){
       <label class="chk{2}" data-tip="{3}">
         <input type="checkbox" id="ubattle" {4} {5}>仅当前场景激活</label>
       <span class="sp"></span>
-      <span class="tbcount" id="ucount">显示 {6} / 共 {7} 个</span>
+      <span class="tbcount" id="unitcount">显示 {6} / 共 {7} 个</span>
     </div>
     <div class="cols cols-units cols-fill">
     <div class="panel"><h3>单位 · 共 {8} 个</h3>
@@ -3140,48 +3132,49 @@ function projectedCards(list, kind){
 }
 
 function cardTileHTML(c, kind){
-  /* 卡名与「免费 / 收费」**分开两行** —— 卡名被截断时状态照样看得见。 */
+  /* ⚠️ T5：**状态不再单独占一行** —— 都在按钮上（按钮显示**当前状态**，
+     点一下切到另一个）。免费/收费、已用/未用都是同一套交互。
+     英文用短词（Free / Paid、Used / Unused），完整说明放进 title。 */
   const free = !!c.is_free;
-  /* 英文按钮词太长会被**截断**（"Make paid" → "Make pa…"）
-     ⇒ 英文用短词（Free / Paid），完整说明放进 title。 */
-  const freeBtn = free ? L("改收费") : L("改免费");
+  const freeBtn = free ? L("免费") : L("收费");
   const freeTip = free ? L("改成收费") : L("改成免费");
+  const used = !!c.used;
+  const usedBtn = used ? L("已用") : L("未用");
+  const usedTip = used ? L("标成未使用") : L("标成已使用");
   /* 货架上有牌时也能**换牌** —— 点卡面（跟空槽位「点此上架」对称）。
      ⚠️ 按钮行放不下第三个按钮（卡宽 104px，中文三个按钮就超宽了）⇒ 用卡面。 */
-  /* N-5：**持续卡**才有「已使用 / 未使用」这一行 ——
-     非持续卡用完就从战役里移除，`used` 不参与玩法 ⇒ 不给开关。 */
+  /* N-5：**持续卡**才有「已用 / 未用」那个按钮 ——
+     非持续卡用完就从战役里移除，`used` 不参与玩法 ⇒ 不给按钮。 */
   const persist = (kind==="hand") && !!cardInfo(c.card_type).persistent;
-  const used = !!c.used;
-  const usedLine = persist
-    ? L2(`<div class="cp usedline {0}" onclick="cardSetUsed({1},{2})" title="{3}">{4}</div>`,
-         used?"used":"unused", c.position, used?"false":"true",
-         L("持续卡：用过之后仍留在牌堆"), used?L("已使用"):L("未使用"))
+  const usedBtnHTML = persist
+    ? `<button class="btn rm" onclick="cardSetUsed(${c.position},${used?"false":"true"})"
+         title="${esc(usedTip)}">${esc(usedBtn)}</button>`
     : "";
   const img = imgTag(cardImg(c.card_type), cardCn(c.card_type));
   const ci = (kind==="shelf")
     ? `<div class="ci" style="cursor:pointer" title="${esc(L("点击换成别的牌"))}"
          onclick="openCardPicker('shelf',${c.position},'set')">${img}</div>`
     : `<div class="ci">${img}</div>`;
+  /* ⚠️ 占位符编号要跟着实参**一一对应**（`L2` 按下标替换）——
+     删掉「免费 / 收费」那一行后，后面的编号整体前移了两位。 */
   return L2(`<div class="hcard">
     <div class="ci">{0}</div>
     <div class="cp"><b>{1}</b></div>
     <div class="cp" style="margin-top:1px">{2}</div>
-    <div class="cp freeline {3}">{4}</div>
-    {10}
     <div class="acts">
-      <button class="btn rm" onclick="{5}">
+      <button class="btn rm" onclick="{3}">
+        {4}</button>
+      <button class="btn rm" onclick="{5}" title="{7}">
         {6}</button>
-      <button class="btn rm" onclick="{7}" title="{9}">
-        {8}</button>
+      {8}
     </div>
   </div>`, ci, esc(cardCn(c.card_type)),
      esc(cardInfo(c.card_type).subtitle||""),
-     free?"free":"paid", free?L("免费"):L("收费"),
      kind==="hand"
         ? ("cardRemove("+c.position+")") : ("cardStoreRemove("+c.position+")"), kind==="hand"?L("移除"):L("下架"), kind==="hand"
         ? ("cardSetFree("+c.position+","+(free?"false":"true")+")")
         : ("cardStoreSetFree("+c.position+","+(free?"false":"true")+")"), freeBtn, freeTip,
-     usedLine);
+     usedBtnHTML);
 }
 
 /* 卡牌选择器现在走**模态框**（U40b）
@@ -5030,7 +5023,10 @@ function cardSetFree(position, free){
 }
 /* ---------- N-5：持续卡的「已使用 / 未使用」 ---------- */
 function cardSetUsed(position, used){
-  const c = projectedCards(VIEW.hand,"hand").find(x=>x.position===position);
+  /* ⚠️ `base` 必须是**存档原值**（`VIEW.hand`）—— 与 `cardSetFree` 一致。
+     原来取的是**投影值**（含挂起）⇒ 再点一次时「目标值 == 投影值 ≠ 原值」
+     ⇒ 撤不掉那条待应用 ⇒ 界面与待应用对不上（T5 实测）。 */
+  const c = (VIEW.hand||[]).find(x=>x.position===position);
   /* 待加的卡**还没写盘** ⇒ 存档里没有这一张 ⇒ 不给挂 used 改动
      （核心库会报「手牌里没有槽位号为 N 的卡」⇒ 整批被拦）。 */
   if(pendingAddOf("card_add", position)){ show("cards"); return; }
@@ -5184,8 +5180,8 @@ function refreshUnitsList(){
   const rows = document.getElementById("urows");
   if(rows) rows.innerHTML = f.list.map(unitRowHTML).join("") ||
     L(`<div class="placeholder"><div class="big">没有匹配的单位</div>
-      换个关键词，或把「总部」筛选清空。</div>`);
-  const cnt = document.getElementById("ucount");
+            换个关键词，或把「总部」筛选清空。</div>`);
+  const cnt = document.getElementById("unitcount");
   if(cnt) cnt.textContent = L2("显示 {0} / 共 {1} 个", f.list.length, f.units.length);
   const det = document.getElementById("udetail");
   if(det) det.innerHTML = unitDetailHTML(f.cur);

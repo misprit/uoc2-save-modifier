@@ -90,6 +90,9 @@ const CODE = `
 var VIEW = null;
 var CDETAIL = null;
 var CDETAIL_TOKEN = 0;
+/* openSave 的在途守卫（切换存档时作废旧请求）
+   —— 注意：**这整段是 JS 模板字符串**，注释里不能出现反引号！ */
+var SAVE_TOKEN = 0;
 var CDETAIL_LOADING = false;
 var USTACK = null;
 var PAGE = "campaign";
