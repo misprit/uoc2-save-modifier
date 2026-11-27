@@ -70,12 +70,31 @@ def _enumerate(save):
         return
 
 
-def _check_recycle_result(hr, recycled):
-    # COPYENGINE_S_PENDING / USER_IGNORED 都是正值，但不代表已回收。
-    if hr != 0:
-        raise BackupCleanupError("Windows 未完成回收 (0x%08X)" % (hr & 0xffffffff))
+def _check_recycle_result(hr, recycled, path):
+    """判「回收到底成没成」—— **看行为，不看 HRESULT**。
+
+    ⚠️ 实测（2026-11-27）：Windows 的 `RecycleItem` **成功时也返回正值状态码**
+    —— `0x00270008` = COPYENGINE_S_USER_IGNORED（名字骗人：实际是
+    「没有弹确认框，操作照常执行」）⇒ 旧判据 `hr != 0 ⇒ 失败`
+    把**成功**报成了失败（玩家看到「回收失败」，备份其实已在回收站里）。
+
+    ⇒ 判据：
+      ① HRESULT 为负（明确的失败）⇒ 失败；
+      ② 没有返回回收后的项目 ⇒ 失败；
+      ③ 文件**仍在原处** ⇒ 失败（根本没被移走）；
+      ④ 其余 ⇒ 成功 —— `ITransferSource::RecycleItem` 的语义就是「放进回收站」，
+         它**没有永久删除那条路**（永久删除是 `RemoveItem`，我们没调）。
+    """
+    if hr < 0:
+        raise BackupCleanupError("Windows 回收失败 (0x%08X)" % (hr & 0xffffffff))
     if not recycled:
         raise BackupCleanupError("Windows 未返回回收后的项目")
+    try:
+        still_there = path.exists()
+    except OSError:
+        still_there = True
+    if still_there:
+        raise BackupCleanupError("Windows 没有回收该文件（它还在原处）")
 
 
 def _recycle_windows(path):
@@ -109,7 +128,7 @@ def _recycle_windows(path):
         # IShellItem::BindToHandler(3); ITransferSource::RecycleItem(8), NOT RemoveItem(9).
         check(method(parent, 3, (ptr, ptr, ptr, output), None, bhid, iid_source, ctypes.byref(source)))
         hr = method(source, 8, (ptr, ptr, ctypes.c_uint, output), item, bin_item, 0, ctypes.byref(recycled))
-        _check_recycle_result(hr, recycled)
+        _check_recycle_result(hr, recycled, path)
     finally:
         for obj in (recycled, source, bin_item, item, parent):
             if obj:
